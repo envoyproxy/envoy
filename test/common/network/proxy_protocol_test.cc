@@ -149,6 +149,7 @@ TEST_P(ProxyProtocolTest, Basic) {
   expectData("more data");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }
@@ -160,6 +161,7 @@ TEST_P(ProxyProtocolTest, BasicV6) {
   expectData("more data");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1:2:3::4");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }
@@ -179,6 +181,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
   expectData("...");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }
@@ -198,6 +201,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   expectData("...");
 
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "254.254.254.254");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }
@@ -419,6 +423,7 @@ TEST_P(WildcardProxyProtocolTest, Basic) {
 
   EXPECT_EQ(server_connection_->remoteAddress()->asString(), "1.2.3.4:65535");
   EXPECT_EQ(server_connection_->localAddress()->asString(), "254.254.254.254:1234");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }
@@ -431,6 +436,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 
   EXPECT_EQ(server_connection_->remoteAddress()->asString(), "[1:2:3::4]:65535");
   EXPECT_EQ(server_connection_->localAddress()->asString(), "[5:6::7:8]:1234");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
 }

@@ -904,10 +904,10 @@ void HttpIntegrationTest::testInvalidCharacterInFirstline() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void HttpIntegrationTest::testLowVersion() {
+void HttpIntegrationTest::testInvalidVersion() {
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/0.8\r\nHost: host\r\n\r\n",
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }

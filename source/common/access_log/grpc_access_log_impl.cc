@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
+#include "common/request_info/utility.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -144,10 +145,6 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   // TODO(mattklein123): Populate tls_properties field.
-  // TODO(mattklein123): Populate time_to_first_upstream_tx_byte field.
-  // TODO(mattklein123): Populate time_to_last_upstream_tx_byte field.
-  // TODO(mattklein123): Populate time_to_last_upstream_rx_byte field.
-  // TODO(mattklein123): Populate time_to_first_downstream_tx_byte field.
   // TODO(mattklein123): Populate metadata field and wire up to filters.
   auto* common_properties = log_entry->mutable_common_properties();
 
@@ -162,22 +159,53 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *common_properties->mutable_downstream_local_address());
   }
   common_properties->mutable_start_time()->MergeFrom(
-      Protobuf::util::TimeUtil::MicrosecondsToTimestamp(
-          std::chrono::duration_cast<std::chrono::microseconds>(
+      Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(
               request_info.startTime().time_since_epoch())
               .count()));
-  if (request_info.requestReceivedDuration().valid()) {
+
+  Optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
+  if (dur.valid()) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::MicrosecondsToDuration(
-            request_info.requestReceivedDuration().value().count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
-  if (request_info.responseReceivedDuration().valid()) {
+
+  dur = request_info.firstUpstreamTxByteSent();
+  if (dur.valid()) {
+    common_properties->mutable_time_to_first_upstream_tx_byte()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
+  dur = request_info.lastUpstreamTxByteSent();
+  if (dur.valid()) {
+    common_properties->mutable_time_to_last_upstream_tx_byte()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
+  dur = request_info.firstUpstreamRxByteReceived();
+  if (dur.valid()) {
     common_properties->mutable_time_to_first_upstream_rx_byte()->MergeFrom(
-        Protobuf::util::TimeUtil::MicrosecondsToDuration(
-            request_info.responseReceivedDuration().value().count()));
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
-  common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
-      Protobuf::util::TimeUtil::MicrosecondsToDuration(request_info.duration().count()));
+
+  dur = request_info.lastUpstreamRxByteReceived();
+  if (dur.valid()) {
+    common_properties->mutable_time_to_last_upstream_rx_byte()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
+  dur = request_info.firstDownstreamTxByteSent();
+  if (dur.valid()) {
+    common_properties->mutable_time_to_first_downstream_tx_byte()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
+  dur = request_info.lastDownstreamTxByteSent();
+  if (dur.valid()) {
+    common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
   if (request_info.upstreamHost() != nullptr) {
     Network::Utility::addressToProtobufAddress(
         *request_info.upstreamHost()->address(),

@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "426db8db7d1cbd17573e295b52d7aab7a97ba1ff",  # chromium-64.0.3282.119
+        commit = "b4061d947ac3aee79235a7ece0f500d8005c80ff",  # chromium-65.0.3325.146
         remote = "https://boringssl.googlesource.com/boringssl",
     ),
     com_google_absl = dict(
@@ -26,9 +26,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "2081e5df5e87402398847431e16b87c71dd5c4d632314bb976ace8161f4d32de",
-        strip_prefix = "spdlog-0.16.2",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.16.2.tar.gz"],
+        sha256 = "b88d7be261d9089c817fc8cee6c000d69f349b357828e4c7f66985bc5d5360b8",
+        strip_prefix = "spdlog-0.16.3",
+        urls = ["https://github.com/gabime/spdlog/archive/v0.16.3.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
@@ -39,8 +39,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
-        remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
+        commit = "f3c1f42601d13504c68e2bc81c60604f0de055dd",
+        remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
         commit = "6a198acd328f976984699f7272bbec7c8b220f65",
@@ -51,7 +51,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "feae95a3a69f111bc1897b9048d9acbc290992f9",  # v2.7.1
+        commit = "dd74753cf5cf8944438d6f49ddf46f9659993dfb",  # v2.8.0
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -76,7 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "42f85a50c509b4e7451123f525c75bf92ace3a52",
+        commit = "e9c53c404b0105cd42cb4cf015251e5aa9187cd3",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

@@ -83,6 +83,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "perf_annotation_test",
+    srcs = ["perf_annotation_test.cc"],
+    deps = [
+        "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "perf_annotation_disabled_test",
+    srcs = ["perf_annotation_disabled_test.cc"],
+    deps = [
+        "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "to_lower_table_test",
     srcs = ["to_lower_table_test.cc"],
     deps = ["//source/common/common:to_lower_table_lib"],

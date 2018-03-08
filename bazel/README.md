@@ -259,6 +259,7 @@ The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
   This is useful in cases where you have a lua script that loads shared object libraries, such as those installed via luarocks.
+* Perf annotation with `define perf_annotation=enabled` (see source/common/common/perf_annotation.h for details).
 
 ## Stats Tunables
 

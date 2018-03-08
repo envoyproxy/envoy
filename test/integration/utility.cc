@@ -52,14 +52,15 @@ void BufferingStreamDecoder::onComplete() {
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
 BufferingStreamDecoderPtr
-IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
+IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
+                                   const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
-                                   Network::Address::IpVersion version, const std::string& host) {
+                                   const std::string& host) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version)))};
+  Upstream::HostDescriptionConstSharedPtr host_description{
+      Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
   Http::CodecClientProd client(
       type,
       dispatcher->createClientConnection(
@@ -68,6 +69,9 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr),
       host_description, *dispatcher);
+      dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                         Network::Test::createRawBufferSocket(), nullptr),
+      host_description);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
     dispatcher->exit();
@@ -88,6 +92,14 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return response;
+}
+
+BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(
+    uint32_t port, const std::string& method, const std::string& url, const std::string& body,
+    Http::CodecClient::Type type, Network::Address::IpVersion ip_version, const std::string& host) {
+  auto addr = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
+  return makeSingleRequest(addr, method, url, body, type, host);
 }
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,

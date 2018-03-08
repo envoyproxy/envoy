@@ -3819,6 +3819,132 @@ virtual_hosts:
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
 
+// Test to check Prefix Rewrite for redirects
+TEST(RouteConfigurationV2, RedirectPrefixRewrite) {
+  std::string RedirectPrefixRewrite = R"EOF(
+name: AllRedirects
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/prefix"}
+        redirect: { prefix_rewrite: "/new/prefix" }
+      - match: { path: "/path/" }
+        redirect: { prefix_rewrite: "/new/path/" }
+      - match: { prefix: "/host/prefix" }
+        redirect: { host_redirect: new.lyft.com, prefix_rewrite: "/new/prefix"}
+      - match: { regex: "/[r][e][g][e][x].*"}
+        redirect: { prefix_rewrite: "/new/regex-prefix/" }
+      - match: { prefix: "/http/prefix"}
+        redirect: { prefix_rewrite: "/https/prefix" , https_redirect: true }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RedirectPrefixRewrite), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/prefix/some/path/?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/prefix/some/path/?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/new/path/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host/prefix/1", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://new.lyft.com/new/prefix/1", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/regex/hello/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/regex-prefix/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/http/prefix/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+  }
+}
+
+// Test to check Strip Query for redirect messages
+TEST(RouteConfigurationV2, RedirectStripQuery) {
+  std::string RouteDynPathRedirect = R"EOF(
+name: AllRedirects
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/query/true"}
+        redirect: { prefix_rewrite: "/new/prefix", strip_query: "true" }
+      - match: { prefix: "/query/false" }
+        redirect: { prefix_rewrite: "/new/prefix", strip_query: "false" }
+      - match: { path: "/host/query-default" }
+        redirect: { host_redirect: new.lyft.com }
+      - match: { path: "/path/redirect/"}
+        redirect: { path_redirect: "/new/path-redirect/" }
+      - match: { prefix: "/all/combinations"}
+        redirect: { host_redirect: "new.lyft.com", prefix_rewrite: "/new/prefix" , https_redirect: "true", strip_query: "true" }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RouteDynPathRedirect), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/query/true?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/prefix", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/query/false/some/path?lang=eng&con=US", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/new/prefix/some/path?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host/query-default?lang=eng&con=US", true, false);
+    EXPECT_EQ("https://new.lyft.com/host/query-default?lang=eng&con=US",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/all/combinations/here/we/go?key=value", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://new.lyft.com/new/prefix/here/we/go", redirect->newPath(headers));
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

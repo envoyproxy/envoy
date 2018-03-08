@@ -10,8 +10,10 @@
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -156,6 +158,32 @@ TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
   server_.local_info_.node_.set_cluster("");
   MainImpl config;
   EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
+}
+
+TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenOtDynamicTracing) {
+  std::string yaml = fmt::sprintf(R"EOF(
+  admin:
+    access_log_path: /dev/null
+    address:
+      socket_address: { address: 1.2.3.4, port_value: 5678 }
+
+  tracing:
+    http:
+      name: envoy.dynamic.ot
+      config:
+        library: %s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so
+        config: {
+          "output_file" : "fake_file"
+        }
+  )EOF",
+                                  TestEnvironment::runfilesDirectory());
+
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromYaml(yaml, bootstrap);
+
+  server_.local_info_.node_.set_cluster("");
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
 }
 
 TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {

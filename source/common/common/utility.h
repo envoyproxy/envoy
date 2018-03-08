@@ -432,4 +432,39 @@ struct StringViewHash {
   std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
 };
 
+/**
+ * Computes running standard-deviation using Welford's algorithm:
+ * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+ */
+class WelfordStandardDeviation {
+public:
+  /**
+   * Accumulates a new value into the standard deviation.
+   * @param newValue the new value
+   */
+  void update(double newValue);
+
+  /**
+   * @return double the computed mean value.
+   */
+  double mean() const { return mean_; }
+
+  /**
+   * @return uint64_t the number of times update() was called
+   */
+  uint64_t count() const { return count_; }
+
+  /**
+   * @return double the standard deviation.
+   */
+  double computeStandardDeviation() const;
+
+private:
+  double computeVariance() const;
+
+  uint64_t count_{0};
+  double mean_{0};
+  double m2_{0};
+};
+
 } // namespace Envoy

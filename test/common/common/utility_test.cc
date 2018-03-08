@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -666,6 +667,44 @@ TEST(IntervalSet, testIntervalTargeted) {
   // initial setup:         [15    20)      [25   30)      [35   35)
   // insertion points:                                              [ )
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
+}
+
+TEST(WelfordStandardDeviation, AllEntriesTheSame) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(10);
+  EXPECT_EQ(10, wsd.mean());
+  EXPECT_EQ(0, wsd.computeStandardDeviation());
+}
+
+TEST(WelfordStandardDeviation, SmallVariance) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(9);
+  wsd.update(11);
+  EXPECT_LT(0.5, wsd.computeStandardDeviation());
+  EXPECT_GT(1.0, wsd.computeStandardDeviation());
+  EXPECT_EQ(10, wsd.mean());
+}
+
+TEST(WelfordStandardDeviation, HugeVariance) {
+  WelfordStandardDeviation wsd;
+  wsd.update(20);
+  wsd.update(2000);
+  wsd.update(200000);
+  wsd.update(20000000);
+  EXPECT_EQ(5050505, wsd.mean());
+  EXPECT_LT(1000, wsd.computeStandardDeviation());
+}
+
+TEST(WelfordStandardDeviation, InsufficientData) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  EXPECT_EQ(10, wsd.mean());
+  EXPECT_TRUE(std::isnan(wsd.computeStandardDeviation()));
 }
 
 } // namespace Envoy

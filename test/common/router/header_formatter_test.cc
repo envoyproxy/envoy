@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -75,7 +76,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWitho
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
+  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   testFormatting(request_info, "PROTOCOL", "HTTP/1.1");
 }
@@ -388,7 +389,7 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
+  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
@@ -538,7 +539,7 @@ route:
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
-  ON_CALL(request_info, protocol()).WillByDefault(ReturnRef(protocol));
+  ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());

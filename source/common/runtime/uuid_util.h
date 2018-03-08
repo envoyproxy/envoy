@@ -3,9 +3,10 @@
 #include <string>
 
 namespace Envoy {
+
 enum class UuidTraceStatus { NoTrace, Sampled, Client, Forced };
 
-/*
+/**
  * Utils for uuid4.
  */
 class UuidUtils {
@@ -16,7 +17,7 @@ public:
    * @param out will contain the result of the operation.
    * @param mod modulo used in the operation.
    */
-  static bool uuidModBy(const std::string& uuid, uint16_t& out, uint16_t mod);
+  static bool uuidModBy(const std::string& uuid, uint64_t& out, uint64_t mod);
 
   /**
    * Modify uuid in a way it can be detected if uuid is traceable or not.
@@ -50,4 +51,5 @@ private:
   // Initial value for freshly generated uuid4.
   static const char NO_TRACE = '4';
 };
+
 } // namespace Envoy

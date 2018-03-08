@@ -198,6 +198,34 @@ TEST(NetworkUtility, AnyAddress) {
   }
 }
 
+TEST(NetworkUtility, ParseProtobufAddress) {
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_address("127.0.0.1");
+    proto_address.mutable_socket_address()->set_port_value(1234);
+    EXPECT_EQ("127.0.0.1:1234", Utility::protobufAddressToAddress(proto_address)->asString());
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_address("::1");
+    proto_address.mutable_socket_address()->set_port_value(1234);
+    EXPECT_EQ("[::1]:1234", Utility::protobufAddressToAddress(proto_address)->asString());
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_pipe()->set_path("/tmp/unix-socket");
+    EXPECT_EQ("/tmp/unix-socket", Utility::protobufAddressToAddress(proto_address)->asString());
+  }
+#if defined(__linux__)
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_pipe()->set_path("@/tmp/abstract-unix-socket");
+    EXPECT_EQ("@/tmp/abstract-unix-socket",
+              Utility::protobufAddressToAddress(proto_address)->asString());
+  }
+#endif
+}
+
 TEST(NetworkUtility, AddressToProtobufAddress) {
   {
     envoy::api::v2::core::Address proto_address;
