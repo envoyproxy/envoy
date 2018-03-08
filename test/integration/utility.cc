@@ -63,8 +63,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
   Http::CodecClientProd client(
       type,
-  dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
-                                     Network::Test::createRawBufferSocket(), nullptr),
+      dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
+                                         Network::Test::createRawBufferSocket(), nullptr),
       host_description, *dispatcher);
   BufferingStreamDecoderPtr response(new BufferingStreamDecoder([&]() -> void {
     client.close();
