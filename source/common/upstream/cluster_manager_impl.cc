@@ -205,8 +205,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
-  // Now setup ADS if needed, this might rely on a primary cluster and the
-  // thread local cluster manager.
+  // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_.reset(new Config::GrpcMuxImpl(
         bootstrap.node(),
