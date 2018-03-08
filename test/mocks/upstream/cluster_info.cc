@@ -3,11 +3,11 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/upstream/upstream_impl.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
