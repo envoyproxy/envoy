@@ -219,8 +219,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }
 
-  ads_mux_->start();
-
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
@@ -290,6 +288,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Potentially move to secondary initialization on the static bootstrap clusters if all primary
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
+
+  ads_mux_->start();
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
