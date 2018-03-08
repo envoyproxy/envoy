@@ -57,6 +57,30 @@ route_config:
                   key: "x-route-response"
                   value: "route"
             response_headers_to_remove: ["x-route-response-remove"]
+        - match: { prefix: "/vhost-route-and-weighted-clusters" }
+          route:
+            request_headers_to_add:
+              - header:
+                  key: "x-route-request"
+                  value: "route"
+            response_headers_to_add:
+              - header:
+                  key: "x-route-response"
+                  value: "route"
+            response_headers_to_remove: ["x-route-response-remove"]
+            weighted_clusters:
+              clusters:
+                - name: cluster_0
+                  weight: 100
+                  request_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-request"
+                        value: "weighted-cluster-1"
+                  response_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-response"
+                        value: "weighted-cluster-1"
+                  response_headers_to_remove: ["x-weighted-cluster-response-remove"]
     - name: route-headers
       domains: ["route-headers.com"]
       routes:
@@ -154,7 +178,7 @@ public:
     use_eds_ = true;
   }
 
-  void initializeFilter(HeaderMode mode, bool include_route_config_headers) {
+  void initializeFilter(HeaderMode mode, bool inject_route_config_headers) {
     config_helper_.addConfigModifier(
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                 hcm) {
@@ -164,7 +188,7 @@ public:
           const bool append = mode == HeaderMode::Append;
 
           auto* route_config = hcm.mutable_route_config();
-          if (include_route_config_headers) {
+          if (inject_route_config_headers) {
             // Configure route config level headers.
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-response",
                       "routeconfig", append);
@@ -177,16 +201,25 @@ public:
             addHeader(route_config->mutable_response_headers_to_add(), "x-routeconfig-dynamic",
                       "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
 
-            // Iterate over VirtualHosts and nested Routes, adding a dynamic response header.
+            // Iterate over VirtualHosts, nested Routes and WeightedClusters, adding a dynamic
+            // response header.
             for (auto& vhost : *route_config->mutable_virtual_hosts()) {
               addHeader(vhost.mutable_response_headers_to_add(), "x-vhost-dynamic",
-                        "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+                        "vhost:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
 
               for (auto& rte : *vhost.mutable_routes()) {
                 if (rte.has_route()) {
-                  addHeader(rte.mutable_route()->mutable_response_headers_to_add(),
-                            "x-route-dynamic", "%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
-                            append);
+                  auto* mutable_rte = rte.mutable_route();
+                  addHeader(mutable_rte->mutable_response_headers_to_add(), "x-route-dynamic",
+                            "route:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%", append);
+
+                  if (mutable_rte->has_weighted_clusters()) {
+                    for (auto& c : *mutable_rte->mutable_weighted_clusters()->mutable_clusters()) {
+                      addHeader(c.mutable_response_headers_to_add(), "x-weighted-cluster-dynamic",
+                                "weighted:%UPSTREAM_METADATA([\"test.namespace\", \"key\"])%",
+                                append);
+                    }
+                  }
                 }
               }
             }
@@ -204,10 +237,17 @@ public:
 
             for (auto& rte : *vhost.mutable_routes()) {
               if (rte.has_route()) {
-                disableHeaderValueOptionAppend(
-                    *rte.mutable_route()->mutable_request_headers_to_add());
-                disableHeaderValueOptionAppend(
-                    *rte.mutable_route()->mutable_response_headers_to_add());
+                auto* mutable_rte = rte.mutable_route();
+
+                disableHeaderValueOptionAppend(*mutable_rte->mutable_request_headers_to_add());
+                disableHeaderValueOptionAppend(*mutable_rte->mutable_response_headers_to_add());
+
+                if (mutable_rte->has_weighted_clusters()) {
+                  for (auto& c : *mutable_rte->mutable_weighted_clusters()->mutable_clusters()) {
+                    disableHeaderValueOptionAppend(*c.mutable_request_headers_to_add());
+                    disableHeaderValueOptionAppend(*c.mutable_response_headers_to_add());
+                  }
+                }
               }
             }
           }
@@ -643,28 +683,85 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
       });
 }
 
-// Validates that upstream host metadata can be emitted in headers.
-TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
-  prepareEDS();
-  initializeFilter(HeaderMode::Replace, true);
+// Validates the relationship between route configuration, virtual host, route, and weighted
+// cluster header manipulations when appending.
+TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHeaderManipulation) {
+  initializeFilter(HeaderMode::Append, true);
   performRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/vhost-and-route"},
+          {":path", "/vhost-route-and-weighted-clusters"},
           {":scheme", "http"},
           {":authority", "vhost-headers.com"},
           {"x-routeconfig-request", "downstream"},
           {"x-vhost-request", "downstream"},
           {"x-route-request", "downstream"},
+          {"x-weighted-cluster-request", "downstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "vhost-headers.com"},
+          {"x-routeconfig-request", "downstream"},
+          {"x-vhost-request", "downstream"},
+          {"x-route-request", "downstream"},
+          {"x-weighted-cluster-request", "downstream"},
+          {"x-weighted-cluster-request", "weighted-cluster-1"},
+          {"x-route-request", "route"},
+          {"x-vhost-request", "vhost"},
+          {"x-routeconfig-request", "routeconfig"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":method", "GET"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-routeconfig-response", "upstream"},
+          {"x-routeconfig-response-remove", "upstream"},
+          {"x-vhost-response", "upstream"},
+          {"x-vhost-response-remove", "upstream"},
+          {"x-route-response", "upstream"},
+          {"x-route-response-remove", "upstream"},
+          {"x-weighted-cluster-response", "upstream"},
+          {"x-weighted-cluster-response-remove", "upstream"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-routeconfig-response", "upstream"},
+          {"x-vhost-response", "upstream"},
+          {"x-route-response", "upstream"},
+          {"x-weighted-cluster-response", "upstream"},
+          {"x-weighted-cluster-response", "weighted-cluster-1"},
+          {"x-route-response", "route"},
+          {"x-vhost-response", "vhost"},
+          {"x-routeconfig-response", "routeconfig"},
+          {":status", "200"},
+      });
+}
+
+// Validates the relationship between route configuration, virtual host, route and weighted cluster
+// header manipulations when replacing.
+TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHeaderManipulation) {
+  initializeFilter(HeaderMode::Replace, true);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":scheme", "http"},
+          {":authority", "vhost-headers.com"},
+          {"x-routeconfig-request", "downstream"},
+          {"x-vhost-request", "downstream"},
+          {"x-route-request", "downstream"},
+          {"x-weighted-cluster-request", "downstream"},
           {"x-unmodified", "request"},
       },
       Http::TestHeaderMapImpl{
           {":authority", "vhost-headers.com"},
           {"x-unmodified", "request"},
+          {"x-weighted-cluster-request", "weighted-cluster-1"},
           {"x-route-request", "route"},
           {"x-vhost-request", "vhost"},
           {"x-routeconfig-request", "routeconfig"},
-          {":path", "/vhost-and-route"},
+          {":path", "/vhost-route-and-weighted-clusters"},
           {":method", "GET"},
       },
       Http::TestHeaderMapImpl{
@@ -674,15 +771,65 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {"x-routeconfig-response", "upstream"},
           {"x-vhost-response", "upstream"},
           {"x-route-response", "upstream"},
+          {"x-weighted-cluster-response", "upstream"},
           {"x-unmodified", "response"},
       },
       Http::TestHeaderMapImpl{
           {"server", "envoy"},
           {"x-unmodified", "response"},
+          {"x-weighted-cluster-response", "weighted-cluster-1"},
           {"x-route-response", "route"},
-          {"x-route-dynamic", "metadata-value"},
           {"x-vhost-response", "vhost"},
-          {"x-vhost-dynamic", "metadata-value"},
+          {"x-routeconfig-response", "routeconfig"},
+          {":status", "200"},
+      });
+}
+
+// Validates that upstream host metadata can be emitted in headers.
+TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
+  prepareEDS();
+  initializeFilter(HeaderMode::Replace, true);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":scheme", "http"},
+          {":authority", "vhost-headers.com"},
+          {"x-routeconfig-request", "downstream"},
+          {"x-vhost-request", "downstream"},
+          {"x-route-request", "downstream"},
+          {"x-weighted-cluster-request", "downstream"},
+          {"x-unmodified", "request"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "vhost-headers.com"},
+          {"x-unmodified", "request"},
+          {"x-weighted-cluster-request", "weighted-cluster-1"},
+          {"x-route-request", "route"},
+          {"x-vhost-request", "vhost"},
+          {"x-routeconfig-request", "routeconfig"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":method", "GET"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-routeconfig-response", "upstream"},
+          {"x-vhost-response", "upstream"},
+          {"x-route-response", "upstream"},
+          {"x-weighted-cluster-response", "upstream"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {"x-weighted-cluster-response", "weighted-cluster-1"},
+          {"x-weighted-cluster-dynamic", "weighted:metadata-value"},
+          {"x-route-response", "route"},
+          {"x-route-dynamic", "route:metadata-value"},
+          {"x-vhost-response", "vhost"},
+          {"x-vhost-dynamic", "vhost:metadata-value"},
           {"x-routeconfig-response", "routeconfig"},
           {"x-routeconfig-dynamic", "metadata-value"},
           {":status", "200"},
