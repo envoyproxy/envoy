@@ -41,8 +41,8 @@ TEST(Logger, All) {
 TEST(Logger, evaluateParams) {
   uint32_t i = 1;
 
-  // set logger's level to low level.
-  // log message with higher severity and make sure that params were evaluated.
+  // Set logger's level to low level.
+  // Log message with higher severity and make sure that params were evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "test message '{}'", i++);
   EXPECT_THAT(i, testing::Eq(2));
@@ -51,7 +51,7 @@ TEST(Logger, evaluateParams) {
 TEST(Logger, doNotEvaluateParams) {
   uint32_t i = 1;
 
-  // set logger's logging level high and log a message with lower severity
+  // Set logger's logging level high and log a message with lower severity
   // params should not be evaluated.
   GET_MISC_LOGGER().set_level(spdlog::level::critical);
   ENVOY_LOG_MISC(error, "test message '{}'", i++);
@@ -62,7 +62,7 @@ TEST(Logger, logAsStatement) {
   // Just log as part of if ... statement
   uint32_t i = 1, j = 1;
 
-  // set logger's logging level to high
+  // Set logger's logging level to high
   GET_MISC_LOGGER().set_level(spdlog::level::critical);
 
   // Make sure that if statement inside of LOGGER macro does not catch trailing
@@ -75,7 +75,7 @@ TEST(Logger, logAsStatement) {
   EXPECT_THAT(i, testing::Eq(1));
   EXPECT_THAT(j, testing::Eq(1));
 
-  // do the same with curly brackets
+  // Do the same with curly brackets
   if (true) {
     ENVOY_LOG_MISC(warn, "test message 3 '{}'", i++);
   } else {
