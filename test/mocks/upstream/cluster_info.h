@@ -78,6 +78,7 @@ public:
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  Optional<std::chrono::milliseconds> idle_timeout_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
 };
 
