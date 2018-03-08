@@ -75,3 +75,4 @@ final version.
 * Added support for prefix_rewrite for redirects.
 * Added support for stripping query string for redirects.
 * Added support for specifying a metadata matcher for upstream clusters in the tcp filter
+* Added support for listening on UNIX domain sockets.

@@ -26,6 +26,7 @@
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::Test;
 using testing::_;
@@ -249,9 +250,9 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   Optional<Http::Protocol> protocol = Http::Protocol::Http2;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnPointee(&protocol));
   Optional<uint32_t> response_code;
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag(Tracing::Tags::get().HTTP_URL, path_prefix + expected_path));
@@ -269,7 +270,7 @@ TEST(HttpConnManFinalizerImpl, NullRequestHeaders) {
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   Optional<uint32_t> response_code;
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
   EXPECT_CALL(*span, setTag(Tracing::Tags::get().HTTP_STATUS_CODE, "0"));
@@ -291,7 +292,7 @@ TEST(HttpConnManFinalizerImpl, UpstreamClusterTagSet) {
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(11));
   Optional<uint32_t> response_code;
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(request_info, upstreamHost()).Times(2);
 
   EXPECT_CALL(*span, setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, "my_upstream_cluster"));
@@ -316,7 +317,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
 
   Optional<Http::Protocol> protocol = Http::Protocol::Http10;
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnPointee(&protocol));
   const std::string service_node = "i-453";
 
   // Check that span is populated correctly.
@@ -329,7 +330,7 @@ TEST(HttpConnManFinalizerImpl, SpanOptionalHeaders) {
   EXPECT_CALL(*span, setTag(Tracing::Tags::get().REQUEST_SIZE, "10"));
 
   Optional<uint32_t> response_code;
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 
@@ -357,7 +358,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   request_headers.insertClientTraceId().value(std::string("client_trace_id"));
 
   Optional<Http::Protocol> protocol = Http::Protocol::Http10;
-  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+  EXPECT_CALL(request_info, protocol()).WillOnce(ReturnPointee(&protocol));
   EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(10));
   const std::string service_node = "i-453";
 
@@ -384,7 +385,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   EXPECT_CALL(config, requestHeadersForTags());
 
   Optional<uint32_t> response_code(503);
-  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+  EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
   ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
