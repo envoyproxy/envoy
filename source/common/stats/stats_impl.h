@@ -50,7 +50,7 @@ public:
   /**
    * @param stat_name The stat name
    * @return bool indicates whether tag extraction should be skipped for this stat_name due
-   * to a subdstring mismatch.
+   * to a substring mismatch.
    */
   bool substrMismatch(const std::string& stat_name) const;
 
