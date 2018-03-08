@@ -493,13 +493,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& primary_clu
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
 
-  tls_->runOnAllThreads([this, name = primary_cluster.info()->name(), priority, hosts_copy,
-                         healthy_hosts_copy, hosts_per_locality_copy,
-                         healthy_hosts_per_locality_copy, hosts_added, hosts_removed]() -> void {
-    ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-        healthy_hosts_per_locality_copy, hosts_added, hosts_removed, *tls_);
-  });
+  tls_->runOnAllThreads([
+    this, name = primary_cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
+    hosts_per_locality_copy, healthy_hosts_per_locality_copy, hosts_added, hosts_removed
+  ]()
+                            ->void {
+                              ThreadLocalClusterManagerImpl::updateClusterMembership(
+                                  name, priority, hosts_copy, healthy_hosts_copy,
+                                  hosts_per_locality_copy, healthy_hosts_per_locality_copy,
+                                  hosts_added, hosts_removed, *tls_);
+                            });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
