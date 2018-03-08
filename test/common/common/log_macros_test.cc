@@ -60,25 +60,42 @@ TEST(Logger, doNotEvaluateParams) {
 
 TEST(Logger, logAsStatement) {
   // Just log as part of if ... statement
+  uint32_t i = 1, j = 1;
 
+  // set logger's logging level to high
+  GET_MISC_LOGGER().set_level(spdlog::level::critical);
+
+  // Make sure that if statement inside of LOGGER macro does not catch trailing
+  // else ....
   if (true)
-    ENVOY_LOG_MISC(critical, "test message 1");
+    ENVOY_LOG_MISC(warn, "test message 1 '{}'", i++);
   else
-    ENVOY_LOG_MISC(critical, "test message 2");
+    ENVOY_LOG_MISC(critical, "test message 2 '{}'", j++);
+
+  ASSERT_THAT(i, testing::Eq(1));
+  ASSERT_THAT(j, testing::Eq(1));
 
   // do the same with curly brackets
   if (true) {
-    ENVOY_LOG_MISC(critical, "test message 3");
+    ENVOY_LOG_MISC(warn, "test message 3 '{}'", i++);
   } else {
-    ENVOY_LOG_MISC(critical, "test message 4");
+    ENVOY_LOG_MISC(critical, "test message 4 '{}'", j++);
   }
+
+  ASSERT_THAT(i, testing::Eq(1));
+  ASSERT_THAT(j, testing::Eq(1));
 }
 
 #ifdef NVLOG
 TEST(Logger, doNotExpandTraceAndDebug) {
-  // The following two macros should not be expanded to no-op if NVLOG compile flag is defined.
-  ENVOY_LOG_TO_LOGGER(nonExistingLogger, trace, "test message 5");
-  ENVOY_LOG_TO_LOGGER(nonExistingLogger, debug, "test message 6");
+  uint32_t i = 1;
+
+  // The following two macros should be expanded to no-op if NVLOG compile flag is defined.
+  ENVOY_LOG_TO_LOGGER(nonExistingLogger, trace, "test message 5 '{}'", i++);
+  ASSERT_THAT(i, testing::Eq(1));
+
+  ENVOY_LOG_TO_LOGGER(nonExistingLogger, debug, "test message 6 '{}'", i++);
+  ASSERT_THAT(i, testing::Eq(1));
 }
 #endif /* NVLOG */
 } // namespace Envoy
