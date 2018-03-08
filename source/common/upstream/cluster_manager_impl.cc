@@ -355,21 +355,24 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster
   auto& primary_cluster_entry = primary_clusters_.at(cluster_name);
   ENVOY_LOG(info, "add/update cluster {}", cluster_name);
   tls_->runOnAllThreads(
-      [this, new_cluster = primary_cluster_entry.cluster_->info(),
-       thread_aware_lb_factory = primary_cluster_entry.loadBalancerFactory()]() -> void {
-        ThreadLocalClusterManagerImpl& cluster_manager =
-            tls_->getTyped<ThreadLocalClusterManagerImpl>();
+      [
+        this, new_cluster = primary_cluster_entry.cluster_->info(),
+        thread_aware_lb_factory = primary_cluster_entry.loadBalancerFactory()
+      ]()
+          ->void {
+            ThreadLocalClusterManagerImpl& cluster_manager =
+                tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-        if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-          ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
-        } else {
-          ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
-        }
+            if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+              ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+            } else {
+              ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+            }
 
-        cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
-            new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
-                                                            thread_aware_lb_factory));
-      });
+            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
+                new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
+                                                                thread_aware_lb_factory));
+          });
 
   init_helper_.addCluster(*primary_cluster_entry.cluster_);
   return true;
