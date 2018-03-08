@@ -190,8 +190,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 
   if (config.common_http_protocol_options().has_idle_timeout()) {
-    idle_timeout_.value(std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(config.common_http_protocol_options().idle_timeout())));
+    idle_timeout_.value(std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
+        config.common_http_protocol_options().idle_timeout())));
   }
 }
 
