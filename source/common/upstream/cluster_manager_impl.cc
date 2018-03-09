@@ -231,7 +231,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // existence of the v1 sds backing cluster, and the ads backing cluster.
   // TODO(htuch): Add support for multiple clusters, #1170.
   const ClusterInfoMap loaded_clusters = clusters();
-
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     const auto& sds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
     switch (sds_config.config_source_specifier_case()) {
@@ -263,7 +262,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
           fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
     }
   }
-  
+
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
   tls_->set([this, local_cluster_name](
