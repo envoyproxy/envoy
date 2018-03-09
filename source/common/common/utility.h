@@ -123,6 +123,12 @@ public:
   static bool atoul(const char* str, uint64_t& out, int base = 10);
 
   /**
+   * Convert a string to a long, checking for error.
+   * @param return TRUE if successful, FALSE otherwise.
+   */
+  static bool atol(const char* str, int64_t& out, int base = 10);
+
+  /**
    * Perform a case insensitive compare of 2 strings.
    * @param lhs supplies string 1.
    * @param rhs supplies string 2.

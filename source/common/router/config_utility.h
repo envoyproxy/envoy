@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <regex>
 #include <string>
 #include <vector>
@@ -25,14 +27,49 @@ namespace Router {
  */
 class ConfigUtility {
 public:
+  enum class HeaderMatchType { Value, Regex, Range };
+
   struct HeaderData {
+    // HeaderMatcher will consist of one of the below two options :
+    // 1) value (string) and regex (bool)
     // An empty header value allows for matching to be only based on header presence.
     // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
     // exact string matching.
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
-        : name_(config.name()), value_(config.value()),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
-          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
+    // This is now deprecated.
+    // 2) header_match_specifier which can be any one of exact_match, regex_match or range_match.
+    // Absence of these options implies empty header value  => match based on header presence.
+    // exact_match value will be used for exact string matching.
+    // regex_match : Match will succeed if header value matches the value specified in regex_match.
+    // range_match : Match will succeed if header value lies within the range specified in this
+    // field, using half open interval semantics [start,end)
+    HeaderData(const envoy::api::v2::route::HeaderMatcher& config) : name_(config.name()) {
+      switch (config.header_match_specifier_case()) {
+      case envoy::api::v2::route::HeaderMatcher::kExactMatch:
+        header_match_type_ = HeaderMatchType::Value;
+        value_ = config.exact_match();
+        break;
+      case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
+        header_match_type_ = HeaderMatchType::Regex;
+        regex_pattern_ = RegexUtil::parseRegex(config.regex_match());
+        break;
+      case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
+        header_match_type_ = HeaderMatchType::Range;
+        range_.set_start(config.range_match().start());
+        range_.set_end(config.range_match().end());
+        break;
+      case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
+      default:
+        if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
+          header_match_type_ = HeaderMatchType::Regex;
+          regex_pattern_ = RegexUtil::parseRegex(config.value());
+        } else {
+          header_match_type_ = HeaderMatchType::Value;
+          value_ = config.value();
+        }
+        break;
+      }
+    }
+
     HeaderData(const Json::Object& config)
         : HeaderData([&config] {
             envoy::api::v2::route::HeaderMatcher header_matcher;
@@ -41,9 +78,10 @@ public:
           }()) {}
 
     const Http::LowerCaseString name_;
-    const std::string value_;
-    const bool is_regex_;
-    const std::regex regex_pattern_;
+    HeaderMatchType header_match_type_;
+    std::string value_;
+    std::regex regex_pattern_;
+    envoy::type::Int64Range range_;
   };
 
   // A QueryParameterMatcher specifies one "name" or "name=value" element

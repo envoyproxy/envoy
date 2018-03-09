@@ -79,6 +79,20 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 }
 
+bool StringUtil::atol(const char* str, int64_t& out, int base) {
+  if (strlen(str) == 0) {
+    return false;
+  }
+
+  char* end_ptr;
+  out = strtol(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 absl::string_view StringUtil::ltrim(absl::string_view source) {
   const absl::string_view::size_type pos = source.find_first_not_of(WhitespaceChars);
   if (pos != absl::string_view::npos) {
