@@ -87,6 +87,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "edf_scheduler_lib",
+    hdrs = ["edf_scheduler.h"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
@@ -138,6 +144,7 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
+        ":edf_scheduler_lib",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:load_balancer_interface",
