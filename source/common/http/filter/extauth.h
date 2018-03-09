@@ -64,7 +64,7 @@ typedef std::shared_ptr<const ExtAuthConfig> ExtAuthConfigConstSharedPtr;
 /**
  * ExtAuth filter itself.
  */
-class ExtAuth : Logger::Loggable<Logger::Id::filter>,
+class ExtAuth : public Logger::Loggable<Logger::Id::filter>,
                 public StreamDecoderFilter,
                 public Http::AsyncClient::Callbacks {
 public:
@@ -87,13 +87,13 @@ public:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  void dumpHeaders(const char* what, HeaderMap* headers);
+  void dumpHeaders(const char* what, HeaderMap* headers); // dump headers for debugging
 
   ExtAuthConfigConstSharedPtr config_;
   StreamDecoderFilterCallbacks* callbacks_{};
   bool auth_complete_;
   Http::AsyncClient::Request* auth_request_{};
-  Http::HeaderMap* request_headers_;
+  Http::HeaderMap* request_headers_{};
 };
 
 } // Http
