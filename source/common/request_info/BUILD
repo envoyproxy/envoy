@@ -11,12 +11,19 @@ envoy_package()
 envoy_cc_library(
     name = "request_info_lib",
     hdrs = ["request_info_impl.h"],
-    deps = ["//include/envoy/request_info:request_info_interface"],
+    deps = [
+        "//include/envoy/request_info:request_info_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    deps = ["//include/envoy/request_info:request_info_interface"],
+    deps = [
+        "//include/envoy/common:optional",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/request_info:request_info_interface",
+    ],
 )

@@ -23,6 +23,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::WithArg;
 using testing::_;
@@ -154,7 +155,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   CheckRequestUtils::createHttpCheck(&callbacks_, headers, request);
 }
 
@@ -170,7 +171,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnRef(protocol_));
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
 
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common/common/compiler_requirements.h"
+#include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
@@ -37,23 +38,24 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options, bool hot_restart) : options_(options) {
+MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
+  Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
+  case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
-    if (hot_restart) {
+    if (!options.hotRestartDisabled()) {
       restarter_.reset(new Server::HotRestartImpl(options_));
     }
 #endif
-    if (!hot_restart) {
+    if (restarter_.get() == nullptr) {
       restarter_.reset(new Server::HotRestartNopImpl());
     }
 
-    Stats::RawStatData::configure(options_);
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
@@ -84,30 +86,28 @@ bool MainCommonBase::run() {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     return Server::validateConfig(options_, local_address, component_factory_);
   }
+  case Server::Mode::InitOnly:
+    PERF_DUMP();
+    return true;
   }
   NOT_REACHED;
 }
 
-MainCommon::MainCommon(int argc, char** argv, bool hot_restart)
-    : options_(computeOptions(argc, argv, hot_restart)), base_(*options_, hot_restart) {}
+MainCommon::MainCommon(int argc, char** argv)
+    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info), base_(options_) {}
 
-std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, bool hot_restart) {
-  OptionsImpl::HotRestartVersionCb hot_restart_version_cb = [](uint64_t, uint64_t) {
-    return "disabled";
-  };
-
+std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
+                                          bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
-  if (hot_restart) {
-    // Enabled by default, except on OS X. Control with "bazel --define=hot_restart=disabled"
-    hot_restart_version_cb = [](uint64_t max_num_stats, uint64_t max_stat_name_len) {
-      return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
-    };
+  if (hot_restart_enabled) {
+    return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
   }
 #else
-  // Hot-restart should not be specified if the support is not compiled in.
-  RELEASE_ASSERT(!hot_restart);
+  UNREFERENCED_PARAMETER(hot_restart_enabled);
+  UNREFERENCED_PARAMETER(max_num_stats);
+  UNREFERENCED_PARAMETER(max_stat_name_len);
 #endif
-  return std::make_unique<OptionsImpl>(argc, argv, hot_restart_version_cb, spdlog::level::info);
+  return "disabled";
 }
 
 // Legacy implementation of main_common.
@@ -116,11 +116,7 @@ std::unique_ptr<OptionsImpl> MainCommon::computeOptions(int argc, char** argv, b
 // and MainCommon can be merged. The current theory is that only Google calls this.
 int main_common(OptionsImpl& options) {
   try {
-#if ENVOY_HOT_RESTART
-    MainCommonBase main_common(options, true);
-#else
-    MainCommonBase main_common(options, false);
-#endif
+    MainCommonBase main_common(options);
     return main_common.run() ? EXIT_SUCCESS : EXIT_FAILURE;
   } catch (EnvoyException& e) {
     return EXIT_FAILURE;

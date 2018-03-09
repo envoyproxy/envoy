@@ -140,9 +140,11 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.host_ = nullptr;
     request_info.start_time_ = SystemTime(1h);
-    request_info.duration_ = 2ms;
+    request_info.start_time_monotonic_ = MonotonicTime(1h);
+    request_info.last_downstream_tx_byte_sent_.value(2ms);
     request_info.downstream_local_address_ =
         std::make_shared<Network::Address::PipeInstance>("/foo");
+
     expectLog(R"EOF(
 http_logs:
   log_entry:
@@ -160,7 +162,6 @@ http_logs:
         nanos: 2000000
     request: {}
     response: {}
-
 )EOF");
     access_log_->log(nullptr, nullptr, request_info);
   }
@@ -169,22 +170,26 @@ http_logs:
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.host_ = nullptr;
     request_info.start_time_ = SystemTime(1h);
-    request_info.duration_ = 2ms;
-    request_info.downstream_local_address_ = nullptr;
-    request_info.downstream_remote_address_ = nullptr;
-    request_info.protocol_ = Http::Protocol::Http2;
+    request_info.last_downstream_tx_byte_sent_.value(std::chrono::nanoseconds(2000000));
+
     expectLog(R"EOF(
 http_logs:
   log_entry:
     common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
       start_time:
         seconds: 3600
       time_to_last_downstream_tx_byte:
         nanos: 2000000
-    protocol_version: HTTP2
     request: {}
     response: {}
-
 )EOF");
     access_log_->log(nullptr, nullptr, request_info);
   }
@@ -192,9 +197,15 @@ http_logs:
   {
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.start_time_ = SystemTime(1h);
-    request_info.request_received_duration_ = 2ms;
-    request_info.response_received_duration_ = 4ms;
-    request_info.duration_ = 6ms;
+
+    request_info.last_downstream_rx_byte_received_.value(2ms);
+    request_info.first_upstream_tx_byte_sent_.value(4ms);
+    request_info.last_upstream_tx_byte_sent_.value(6ms);
+    request_info.first_upstream_rx_byte_received_.value(8ms);
+    request_info.last_upstream_rx_byte_received_.value(10ms);
+    request_info.first_downstream_tx_byte_sent_.value(12ms);
+    request_info.last_downstream_tx_byte_sent_.value(14ms);
+
     request_info.upstream_local_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2");
     request_info.protocol_ = Http::Protocol::Http10;
@@ -232,10 +243,18 @@ http_logs:
         seconds: 3600
       time_to_last_rx_byte:
         nanos: 2000000
-      time_to_first_upstream_rx_byte:
+      time_to_first_upstream_tx_byte:
         nanos: 4000000
+      time_to_last_upstream_tx_byte:
+        nanos:  6000000
+      time_to_first_upstream_rx_byte:
+        nanos: 8000000
+      time_to_last_upstream_rx_byte:
+        nanos: 10000000
+      time_to_first_downstream_tx_byte:
+        nanos: 12000000
       time_to_last_downstream_tx_byte:
-        nanos: 6000000
+        nanos: 14000000
       upstream_remote_address:
         socket_address:
           address: "10.0.0.1"

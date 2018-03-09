@@ -36,6 +36,7 @@ public:
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(rewritePathHeader, void(Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
 };

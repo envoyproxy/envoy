@@ -110,7 +110,10 @@ void Instance::onReadWorker() {
       throw EnvoyException("failed to read proxy protocol");
     }
 
-    socket.setLocalAddress(local_address, false);
+    // Only set the local address if it really changed, and mark it as address being restored.
+    if (*local_address != *socket.localAddress()) {
+      socket.setLocalAddress(local_address, true);
+    }
     socket.setRemoteAddress(remote_address);
   }
 

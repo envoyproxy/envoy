@@ -10,13 +10,6 @@ load(
 
 envoy_package()
 
-envoy_cc_fuzz_test(
-    name = "base64_fuzz_test",
-    srcs = ["base64_fuzz_test.cc"],
-    corpus = "base64_corpus",
-    deps = ["//source/common/common:base64_lib"],
-)
-
 envoy_cc_test(
     name = "base64_test",
     srcs = ["base64_test.cc"],
@@ -73,6 +66,22 @@ envoy_cc_test(
     deps = [
         "//source/common/common:utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "perf_annotation_test",
+    srcs = ["perf_annotation_test.cc"],
+    deps = [
+        "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "perf_annotation_disabled_test",
+    srcs = ["perf_annotation_disabled_test.cc"],
+    deps = [
+        "//source/common/common:perf_annotation_lib",
     ],
 )
 

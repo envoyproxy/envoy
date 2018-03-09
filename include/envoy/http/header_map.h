@@ -256,6 +256,7 @@ private:
   HEADER_FUNC(EnvoyForceTrace)                                                                     \
   HEADER_FUNC(EnvoyImmediateHealthCheckFail)                                                       \
   HEADER_FUNC(EnvoyInternalRequest)                                                                \
+  HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \

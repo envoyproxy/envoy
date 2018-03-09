@@ -55,6 +55,7 @@ public:
   // Router::DirectResponseEntry
   void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
   std::string newPath(const Http::HeaderMap& headers) const override;
+  void rewritePathHeader(Http::HeaderMap&) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
 };
@@ -303,6 +304,13 @@ public:
 
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
+  bool isRedirect() const {
+    if (!isDirectResponse()) {
+      return false;
+    }
+    return !host_redirect_.empty() || !path_redirect_.empty() || !prefix_rewrite_redirect_.empty();
+  }
+
   bool matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const;
   void validateClusters(Upstream::ClusterManager& cm) const;
 
@@ -341,6 +349,7 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
+  void rewritePathHeader(Http::HeaderMap&) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
 
@@ -486,6 +495,8 @@ private:
   const std::string host_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  const bool strip_query_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
@@ -527,6 +538,9 @@ public:
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::HeaderMap& headers) const override;
+
 private:
   const std::string prefix_;
 };
@@ -550,6 +564,9 @@ public:
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::HeaderMap& headers) const override;
+
 private:
   const std::string path_;
 };
@@ -572,6 +589,9 @@ public:
 
   // Router::Matchable
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
+
+  // Router::DirectResponseEntry
+  void rewritePathHeader(Http::HeaderMap& headers) const override;
 
 private:
   const std::regex regex_;

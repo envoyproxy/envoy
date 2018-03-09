@@ -26,6 +26,15 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
+std::string AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
+  if (time) {
+    return std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count());
+  } else {
+    return UnspecifiedValueString;
+  }
+}
+
 const std::string&
 AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
   if (protocol) {
@@ -150,23 +159,11 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      absl::optional<std::chrono::microseconds> duration = request_info.requestReceivedDuration();
-      if (duration) {
-        return std::to_string(
-            std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
-      } else {
-        return UnspecifiedValueString;
-      }
+      return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());
     };
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      absl::optional<std::chrono::microseconds> duration = request_info.responseReceivedDuration();
-      if (duration) {
-        return std::to_string(
-            std::chrono::duration_cast<std::chrono::milliseconds>(duration.value()).count());
-      } else {
-        return UnspecifiedValueString;
-      }
+      return AccessLogFormatUtils::durationToString(request_info.firstUpstreamRxByteReceived());
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
@@ -187,8 +184,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return std::to_string(
-          std::chrono::duration_cast<std::chrono::milliseconds>(request_info.duration()).count());
+      return AccessLogFormatUtils::durationToString(request_info.requestComplete());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {

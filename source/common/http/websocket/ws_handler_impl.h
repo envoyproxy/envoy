@@ -30,6 +30,11 @@ public:
                 Upstream::ClusterManager& cluster_manager,
                 Network::ReadFilterCallbacks* read_callbacks);
 
+  // Upstream::LoadBalancerContext
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return route_entry_.metadataMatchCriteria();
+  }
+
 protected:
   // Filter::TcpProxy
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }

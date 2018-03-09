@@ -53,26 +53,6 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
   EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
 }
 
-TEST(TcpProxyConfigTest, NoCluster) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "cluster": "fake_cluster"
-          }
-        ]
-      }
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
-}
-
 TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
   std::string json_string = R"EOF(
   {

@@ -8,6 +8,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/perf_annotation.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
@@ -26,6 +27,10 @@ size_t roundUpMultipleNaturalAlignment(size_t val) {
   static_assert(multiple == 1 || multiple == 2 || multiple == 4 || multiple == 8 || multiple == 16,
                 "multiple must be a power of 2 for this algorithm to work");
   return (val + multiple - 1) & ~(multiple - 1);
+}
+
+bool regexStartsWithDot(absl::string_view regex) {
+  return absl::StartsWith(regex, "\\.") || absl::StartsWith(regex, "(?=\\.)");
 }
 
 } // namespace
@@ -75,7 +80,7 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
       if (!absl::ascii_isalnum(regex[i]) && (regex[i] != '_')) {
         if (i > 1) {
           const bool last_char = i == regex.size() - 1;
-          if ((!last_char && (regex[i] == '\\') && (regex[i + 1] == '.')) ||
+          if ((!last_char && regexStartsWithDot(regex.substr(i))) ||
               (last_char && (regex[i] == '$'))) {
             prefix.append(regex.data() + 1, i - 1);
           }
@@ -104,6 +109,7 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
 bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
 
+  PERF_OPERATION(perf);
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
@@ -125,8 +131,10 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
     std::string::size_type end = remove_subexpr.second - stat_name.begin();
     remove_characters.insert(start, end);
+    PERF_RECORD(perf, "re-match", name_);
     return true;
   }
+  PERF_RECORD(perf, "re-miss", name_);
   return false;
 }
 

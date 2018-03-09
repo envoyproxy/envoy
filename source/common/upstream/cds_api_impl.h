@@ -36,6 +36,9 @@ public:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+  }
 
 private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,

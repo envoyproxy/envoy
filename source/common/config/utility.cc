@@ -148,23 +148,6 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
                            *lds_config.mutable_api_config_source());
 }
 
-std::string Utility::resourceName(const ProtobufWkt::Any& resource) {
-  if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
-  }
-  if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
-  }
-  throw EnvoyException(
-      fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
-}
-
 Stats::TagProducerPtr
 Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());

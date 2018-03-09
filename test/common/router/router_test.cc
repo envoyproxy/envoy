@@ -32,6 +32,7 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
@@ -218,7 +219,7 @@ TEST_F(RouterTest, UseDownstreamProtocol1) {
   absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http11};
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -238,7 +239,7 @@ TEST_F(RouterTest, UseDownstreamProtocol2) {
   absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -1555,6 +1556,7 @@ TEST_F(RouterTest, AltStatName) {
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, rewritePathHeader(_));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));
@@ -1571,6 +1573,7 @@ TEST_F(RouterTest, Redirect) {
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
   EXPECT_CALL(direct_response, newPath(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, rewritePathHeader(_));
   EXPECT_CALL(direct_response, responseCode()).WillOnce(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, responseBody()).WillOnce(ReturnRef(EMPTY_STRING));
   EXPECT_CALL(direct_response, finalizeResponseHeaders(_, _));

@@ -262,7 +262,9 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
-                   Network::SocketPtr{new Network::UdsListenSocket(uds_path)}, type, false) {
+                   Network::SocketPtr{new Network::UdsListenSocket(
+                       std::make_shared<Network::Address::PipeInstance>(uds_path))},
+                   type, false) {
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
