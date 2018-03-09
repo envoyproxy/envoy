@@ -231,6 +231,7 @@ public:
             TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
       }
     });
+
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
     ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
@@ -245,6 +246,29 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate server comes up with EDS Cluster that uses ADS as ConfigSource.
+TEST_P(AdsIntegrationTest, EdsClusterWithAdsConfigSource) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* grpc_service =
+        bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
+    setGrpcService(*grpc_service, "ads_cluster", fake_upstreams_.back()->localAddress());
+    auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ads_cluster->set_name("ads_cluster");
+
+    // Add EDS Cluster that uses ADS as config Source.
+    auto* ads_eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ads_eds_cluster->set_name("ads_eds_cluster");
+    ads_eds_cluster->set_type(envoy::api::v2::Cluster::EDS);
+    auto* eds_cluster_config = ads_eds_cluster->mutable_eds_cluster_config();
+    auto* eds_config = eds_cluster_config->mutable_eds_config();
+    eds_config->mutable_ads()->InitAsDefaultInstance();
+  });
+  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  HttpIntegrationTest::initialize();
+  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+}
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
