@@ -111,12 +111,12 @@ private:
 
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
-  void processSubsets(const HostVector& hosts_added, const HostVector& hosts_removed,
-                      std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb);
+  void processSubsets(
+      const HostVector& hosts_added, const HostVector& hosts_removed,
+      std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
-  bool hostMatchesDefaultSubset(const Host& host);
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
   LbSubsetEntryPtr
@@ -126,6 +126,7 @@ private:
                                       uint32_t idx);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
+  std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
   const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
@@ -135,7 +136,7 @@ private:
   Runtime::RandomGenerator& random_;
 
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
+  const SubsetMetadata default_subset_metadata_;
   const std::vector<std::set<std::string>> subset_keys_;
 
   const PrioritySet& original_priority_set_;
