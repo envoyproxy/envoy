@@ -195,6 +195,8 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
+TEST_P(Http2IntegrationTest, IdleTimout) { testIdleTimeout(); }
+
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
 void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
