@@ -267,6 +267,7 @@ TEST_P(AdsIntegrationTest, EdsClusterWithAdsConfigSource) {
   });
   setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   HttpIntegrationTest::initialize();
+  fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
   ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
 }
 
