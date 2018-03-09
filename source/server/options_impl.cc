@@ -18,17 +18,6 @@
 #define ENVOY_DEFAULT_MAX_STATS 16384
 #endif
 
-// Can be overridden at compile time
-// See comment in common/stat/stat_impl.h for rationale behind
-// this constant.
-#ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
-#define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
-#endif
-
-#if ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH < 60
-#error "ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be >= 60"
-#endif
-
 namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level) {
