@@ -22,8 +22,8 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//include/envoy/request_info:request_info_interface",
     ],
+    external_deps=["abseil_optional"],
 )

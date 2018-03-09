@@ -261,12 +261,12 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 
   Http::MockAsyncClientRequest request(&cm_.async_client_);
   Http::AsyncClient::Callbacks* callback;
-  const Optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
   EXPECT_CALL(cm_.async_client_, send_(_, _, timeout))
       .WillOnce(
           Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+                     const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
