@@ -169,7 +169,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
           std::chrono::duration_cast<std::chrono::nanoseconds>(
               request_info.startTime().time_since_epoch())
               .count()));
-  
+
   absl::optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
   if (dur) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
@@ -181,7 +181,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     common_properties->mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
-  
+
   dur = request_info.lastUpstreamTxByteSent();
   if (dur) {
     common_properties->mutable_time_to_last_upstream_tx_byte()->MergeFrom(

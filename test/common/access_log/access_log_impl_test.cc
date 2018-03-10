@@ -94,7 +94,8 @@ public:
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  absl::optional<std::chrono::nanoseconds> duration(const absl::optional<MonotonicTime>& time) const {
+  absl::optional<std::chrono::nanoseconds>
+  duration(const absl::optional<MonotonicTime>& time) const {
     if (!time) {
       return {};
     }
@@ -333,8 +334,8 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   log->log(&request_headers_, &response_headers_, request_info_);
 
   request_info_.response_code_ = 200;
-  request_info_.end_time_ = request_info_.startTimeMonotonic() +
-                                std::chrono::microseconds(1001000000000000);
+  request_info_.end_time_ =
+      request_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -699,21 +700,19 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
-  request_info.end_time_ = request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(100000);
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 
-  request_info.end_time_ = request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(100000001000);
+  request_info.end_time_ =
+      request_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
-  request_info.end_time_ = request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(10000);
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 }

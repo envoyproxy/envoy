@@ -26,7 +26,8 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
 }
 
-std::string AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
+std::string
+AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
   if (time) {
     return std::to_string(
         std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count());
