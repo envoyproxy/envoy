@@ -308,7 +308,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_ = (200);
+  request_info_.response_code_ = 200;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -578,7 +578,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_ = (500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -608,7 +608,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_ = (500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -641,7 +641,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_ = (500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -735,7 +735,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
-  info.response_code_ = (400);
+  info.response_code_ = 400;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers));
 

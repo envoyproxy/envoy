@@ -152,7 +152,7 @@ absl::optional<uint64_t> FaultFilter::delayDuration() {
 
   // Delay only if the duration is >0ms
   if (duration > 0) {
-    ret = (duration);
+    ret = duration;
   }
 
   return ret;

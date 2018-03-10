@@ -144,7 +144,7 @@ void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   callbacks_.onReceiveTrailingMetadata(std::move(trailers));
   if (!grpc_status) {
-    grpc_status = (Status::GrpcStatus::Unknown);
+    grpc_status = Status::GrpcStatus::Unknown;
   }
   callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
   cleanup();

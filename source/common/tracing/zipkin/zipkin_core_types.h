@@ -172,12 +172,7 @@ public:
   /**
    * @return true if the endpoint attribute is set, or false otherwise.
    */
-  bool isSetEndpoint() const {
-    if (endpoint_) {
-      return true;
-    }
-    return false;
-  }
+  bool isSetEndpoint() const { return endpoint_.has_value(); }
 
   /**
    * Serializes the annotation as a Zipkin-compliant JSON representation as a string.
@@ -338,12 +333,7 @@ public:
   /**
    * @return Whether or not the parent_id attribute is set.
    */
-  bool isSetParentId() const {
-    if (parent_id_) {
-      return true;
-    }
-    return false;
-  }
+  bool isSetParentId() const { return parent_id_.has_value(); }
 
   /**
    * @return a vector with all annotations added to the span.

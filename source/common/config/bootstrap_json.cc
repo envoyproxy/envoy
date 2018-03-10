@@ -27,7 +27,7 @@ void BootstrapJson::translateClusterManagerBootstrap(
     Config::Utility::translateEdsConfig(
         *json_sds,
         *bootstrap.mutable_dynamic_resources()->mutable_deprecated_v1()->mutable_sds_config());
-    eds_config = (bootstrap.dynamic_resources().deprecated_v1().sds_config());
+    eds_config = bootstrap.dynamic_resources().deprecated_v1().sds_config();
   }
 
   if (json_cluster_manager.hasObject("cds")) {
@@ -43,6 +43,7 @@ void BootstrapJson::translateClusterManagerBootstrap(
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters()->Add();
     Config::CdsJson::translateCluster(*json_cluster, eds_config, *cluster);
   }
+
   auto* cluster_manager = bootstrap.mutable_cluster_manager();
   JSON_UTIL_SET_STRING(json_cluster_manager, *cluster_manager, local_cluster_name);
   if (json_cluster_manager.hasObject("outlier_detection")) {

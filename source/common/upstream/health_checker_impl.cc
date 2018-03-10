@@ -284,7 +284,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
-    service_name_ = (config.http_health_check().service_name());
+    service_name_ = config.http_health_check().service_name();
   }
 }
 
@@ -646,7 +646,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
-    service_name_ = (config.grpc_health_check().service_name());
+    service_name_ = config.grpc_health_check().service_name();
   }
 }
 

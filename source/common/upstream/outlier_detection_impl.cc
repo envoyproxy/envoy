@@ -34,7 +34,7 @@ void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
-  last_ejection_time_ = (ejection_time);
+  last_ejection_time_ = ejection_time;
 }
 
 void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {

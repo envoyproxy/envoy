@@ -162,7 +162,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
     std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
                                          filter_chain.filter_chain_match().sni_domains().end());
     if (!filters_hash) {
-      filters_hash = (RepeatedPtrUtil::hash(filter_chain.filters()));
+      filters_hash = RepeatedPtrUtil::hash(filter_chain.filters());
       filter_factories_ =
           parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this);
     } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
