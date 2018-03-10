@@ -113,6 +113,15 @@ public:
         factory_.local_info_, log_manager_, factory_.dispatcher_));
   }
 
+  void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
+                  uint64_t warming) {
+    EXPECT_EQ(added, factory_.stats_.counter("cluster_manager.cluster_added").value());
+    EXPECT_EQ(modified, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+    EXPECT_EQ(removed, factory_.stats_.counter("cluster_manager.cluster_removed").value());
+    EXPECT_EQ(active, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+    EXPECT_EQ(warming, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+  }
+
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
@@ -266,9 +275,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
                     defaultStaticClusterJson("new_cluster")}));
 
   create(parseBootstrapFromJson(json));
-
-  EXPECT_EQ(3UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
-  EXPECT_EQ(3UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+  checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
 }
@@ -383,8 +390,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   subset_config->add_subset_selectors()->add_keys("x");
 
   create(bootstrap);
-
-  EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   factory_.tls_.shutdownThread();
 }
@@ -776,6 +782,34 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
+  const std::string json = R"EOF(
+  {
+    "clusters": []
+  }
+  )EOF";
+
+  create(parseBootstrapFromJson(json));
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+
+  EXPECT_TRUE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+  checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   const std::string json = R"EOF(
   {
@@ -795,10 +829,12 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
-  EXPECT_EQ(1UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   // Now try to update again but with the same hash.
   EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
@@ -838,10 +874,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   drained_cb();
 
-  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_added").value());
-  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_modified").value());
-  EXPECT_EQ(1UL, factory_.stats_.counter("cluster_manager.cluster_removed").value());
-  EXPECT_EQ(0UL, factory_.stats_.gauge("cluster_manager.total_clusters").value());
+  checkStats(1 /*added*/, 1 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));

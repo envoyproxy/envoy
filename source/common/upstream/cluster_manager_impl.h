@@ -128,7 +128,8 @@ private:
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
-  GAUGE  (total_clusters)
+  GAUGE  (active_clusters)                                                                         \
+  GAUGE  (warming_clusters)
 // clang-format on
 
 /**
@@ -157,9 +158,10 @@ public:
     init_helper_.setInitializedCb(callback);
   }
   ClusterInfoMap clusters() override {
+    // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;
     for (auto& cluster : primary_clusters_) {
-      clusters_map.emplace(cluster.first, *cluster.second.cluster_);
+      clusters_map.emplace(cluster.first, *cluster.second->cluster_);
     }
 
     return clusters_map;
@@ -265,6 +267,8 @@ private:
     PrimaryClusterData(uint64_t config_hash, bool added_via_api, ClusterSharedPtr&& cluster)
         : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
 
+    bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
+
     LoadBalancerFactorySharedPtr loadBalancerFactory() {
       if (thread_aware_lb_ != nullptr) {
         return thread_aware_lb_->factory();
@@ -280,19 +284,26 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
   };
 
+  typedef std::unique_ptr<PrimaryClusterData> PrimaryClusterDataPtr;
+  typedef std::unordered_map<std::string, PrimaryClusterDataPtr> PrimaryClusterMap;
+
+  void createOrUpdateTlsPrimaryCluster(PrimaryClusterData& cluster);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api);
+  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api,
+                   PrimaryClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const HostVector& hosts_added, const HostVector& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
+  void updateGauges();
 
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
-  std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
+  PrimaryClusterMap primary_clusters_;
+  PrimaryClusterMap warming_clusters_;
   Optional<envoy::api::v2::core::ConfigSource> eds_config_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
