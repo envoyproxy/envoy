@@ -307,6 +307,9 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_delay_injected(true);
   common_access_log_expected.mutable_response_flags()->set_fault_injected(true);
   common_access_log_expected.mutable_response_flags()->set_rate_limited(true);
+  common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
+      envoy::config::filter::accesslog::v2::ResponseFlags_Unauthorized_Reason::
+          ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }

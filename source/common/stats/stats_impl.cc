@@ -69,8 +69,9 @@ std::string Utility::sanitizeStatsName(const std::string& name) {
   return stats_name;
 }
 
-TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex)
-    : name_(name), prefix_(std::string(extractRegexPrefix(regex))),
+TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex,
+                                   const std::string& substr)
+    : name_(name), prefix_(std::string(extractRegexPrefix(regex))), substr_(substr),
       regex_(RegexUtil::parseRegex(regex)) {}
 
 std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
@@ -93,7 +94,8 @@ std::string TagExtractorImpl::extractRegexPrefix(absl::string_view regex) {
 }
 
 TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
-                                                     const std::string& regex) {
+                                                     const std::string& regex,
+                                                     const std::string& substr) {
 
   if (name.empty()) {
     throw EnvoyException("tag_name cannot be empty");
@@ -103,13 +105,22 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
     throw EnvoyException(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
-  return TagExtractorPtr{new TagExtractorImpl(name, regex)};
+  return TagExtractorPtr{new TagExtractorImpl(name, regex, substr)};
+}
+
+bool TagExtractorImpl::substrMismatch(const std::string& stat_name) const {
+  return !substr_.empty() && stat_name.find(substr_) == std::string::npos;
 }
 
 bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
-
   PERF_OPERATION(perf);
+
+  if (substrMismatch(stat_name)) {
+    PERF_RECORD(perf, "re-skip-substr", name_);
+    return false;
+  }
+
   std::smatch match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
   if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
@@ -181,15 +192,11 @@ int TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   int num_found = 0;
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
-      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
+      addExtractor(
+          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_));
       ++num_found;
     }
   }
-  // TODO(jmarantz): Changing the default tag regexes so that more than one regex can
-  // yield the same tag, on the theory that this will reduce regex backtracking. At the
-  // moment, this doesn't happen, so this flow isn't well tested. When we start exploiting
-  // this, and it's tested, we can simply remove this assert.
-  ASSERT(num_found <= 1);
   return num_found;
 }
 
@@ -241,7 +248,8 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       names.emplace(desc.name_);
-      addExtractor(Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_));
+      addExtractor(
+          Stats::TagExtractorImpl::createTagExtractor(desc.name_, desc.regex_, desc.substr_));
     }
   }
   return names;

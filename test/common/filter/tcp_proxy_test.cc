@@ -676,6 +676,39 @@ TEST_F(TcpProxyTest, NoHost) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
+TEST_F(TcpProxyTest, WithMetadataMatch) {
+  auto v1 = ProtobufWkt::Value();
+  v1.set_string_value("v1");
+  auto v2 = ProtobufWkt::Value();
+  v2.set_number_value(2.0);
+  auto v3 = ProtobufWkt::Value();
+  v3.set_bool_value(true);
+
+  std::vector<Router::MetadataMatchCriterionImpl> criteria = {{"a", v1}, {"b", v2}, {"c", v3}};
+
+  auto metadata_struct = ProtobufWkt::Struct();
+  auto mutable_fields = metadata_struct.mutable_fields();
+
+  for (const auto& criterion : criteria) {
+    mutable_fields->insert({criterion.name(), criterion.value().value()});
+  }
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_metadata_match()->mutable_filter_metadata()->insert(
+      {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
+
+  configure(config);
+  filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+
+  const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+
+  EXPECT_EQ(metadata_criteria.size(), criteria.size());
+  for (size_t i = 0; i < criteria.size(); ++i) {
+    EXPECT_EQ(metadata_criteria[i]->name(), criteria[i].name());
+    EXPECT_EQ(metadata_criteria[i]->value(), criteria[i].value());
+  }
+}
+
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
   filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));

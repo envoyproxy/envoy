@@ -151,7 +151,7 @@ TEST_P(HttpExtAuthzFilterParamTest, OkResponse) {
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized))
+              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService))
       .Times(0);
   request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::OK);
 
@@ -198,7 +198,7 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized));
+              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
   request_callbacks_->onComplete(Envoy::ExtAuthz::CheckStatus::Denied);
 
   EXPECT_EQ(
