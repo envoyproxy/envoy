@@ -4014,8 +4014,8 @@ virtual_hosts:
           headers:
             - name: test_header_range
               range_match:
-                 start: 1
-                 end: 10
+                 start: -9223372036854775808
+                 end: -10
         route:
           cluster: local_service_with_header_range_test1
       - match:
@@ -4034,10 +4034,26 @@ virtual_hosts:
           headers:
             - name: test_header_range
               range_match:
-                 start: -9223372036854775808
-                 end: -10
+                 start: 1
+                 end: 10
         route:
           cluster: local_service_with_header_range_test3
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: 9223372036854775801
+                 end: 9223372036854775807
+        route:
+          cluster: local_service_with_header_range_test4
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              exact_match: "9223372036854775807"
+        route:
+          cluster: local_service_with_header_range_test5
       - match:
           prefix: "/"
         route:
@@ -4090,7 +4106,7 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    headers.addCopy("test_header_range", "9");
+    headers.addCopy("test_header_range", "-9223372036854775808");
     EXPECT_EQ("local_service_with_header_range_test1",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
@@ -4103,6 +4119,18 @@ virtual_hosts:
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9");
+    EXPECT_EQ("local_service_with_header_range_test3",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9223372036854775807");
+    EXPECT_EQ("local_service_with_header_range_test5",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_multiple_range", "-9");
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
@@ -4111,12 +4139,6 @@ virtual_hosts:
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_range", "19");
     EXPECT_EQ("local_service_without_headers",
-              config.route(headers, 0)->routeEntry()->clusterName());
-  }
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    headers.addCopy("test_header_range", "-9223372036854775808");
-    EXPECT_EQ("local_service_with_header_range_test3",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
 }

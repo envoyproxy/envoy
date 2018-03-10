@@ -44,24 +44,31 @@ bool ConfigUtility::matchHeaders(const Http::HeaderMap& request_headers,
     for (const HeaderData& cfg_header_data : config_headers) {
       const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
 
+      if (header == nullptr) {
+        matches = false;
+        break;
+      }
+
       switch (cfg_header_data.header_match_type_) {
       case HeaderMatchType::Value:
-        matches &= (header != nullptr) && (cfg_header_data.value_.empty() ||
-                                           (header->value() == cfg_header_data.value_.c_str()));
+        matches &=
+            (cfg_header_data.value_.empty() || header->value() == cfg_header_data.value_.c_str());
         break;
 
       case HeaderMatchType::Regex:
-        matches &= (header != nullptr) &&
-                   std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
+        matches &= std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
         break;
 
-      case HeaderMatchType::Range:
+      case HeaderMatchType::Range: {
         int64_t header_value = 0;
-        matches &= (header != nullptr) &&
-                   StringUtil::atol(header->value().c_str(), header_value, 10) &&
+        matches &= StringUtil::atol(header->value().c_str(), header_value, 10) &&
                    header_value >= cfg_header_data.range_.start() &&
                    header_value < cfg_header_data.range_.end();
         break;
+      }
+
+      default:
+        NOT_REACHED;
       }
 
       if (!matches) {

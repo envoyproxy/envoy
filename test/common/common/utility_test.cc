@@ -35,6 +35,33 @@ TEST(StringUtil, atoul) {
   EXPECT_EQ(789U, out);
 }
 
+TEST(StringUtil, atol) {
+  int64_t out;
+  EXPECT_FALSE(StringUtil::atol("-123b", out));
+  EXPECT_FALSE(StringUtil::atol("", out));
+  EXPECT_FALSE(StringUtil::atol("b123", out));
+
+  EXPECT_TRUE(StringUtil::atol("123", out));
+  EXPECT_EQ(123, out);
+  EXPECT_TRUE(StringUtil::atol("-123", out));
+  EXPECT_EQ(-123, out);
+  EXPECT_TRUE(StringUtil::atol("+123", out));
+  EXPECT_EQ(123, out);
+
+  EXPECT_TRUE(StringUtil::atol("  456", out));
+  EXPECT_EQ(456, out);
+
+  EXPECT_TRUE(StringUtil::atol("00789", out));
+  EXPECT_EQ(789, out);
+
+  // INT64_MAX + 1
+  EXPECT_FALSE(StringUtil::atol("9223372036854775808", out));
+
+  // INT64_MIN
+  EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
+  EXPECT_EQ(-9223372036854775808, out);
+}
+
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
