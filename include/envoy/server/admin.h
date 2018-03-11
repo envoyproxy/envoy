@@ -47,7 +47,7 @@ typedef std::unique_ptr<HandlerInfo> HandlerInfoPtr;
 class HystrixHandlerInfo : public HandlerInfo {
 public:
   HystrixHandlerInfo(Http::StreamDecoderFilterCallbacks* callbacks)
-      : stats_(new Stats::Hystrix()), data_timer_(nullptr), ping_timer_(nullptr),
+      : stats_(std::make_unique<Stats::Hystrix>()), data_timer_(nullptr), ping_timer_(nullptr),
         callbacks_(callbacks) {}
   virtual ~HystrixHandlerInfo(){};
   void Destroy();

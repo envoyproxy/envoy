@@ -138,8 +138,8 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false));
@@ -171,21 +171,21 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_FALSE(
       admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
 
   HandlerInfo handler_info;
 

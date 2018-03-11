@@ -5,6 +5,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "common/common/logger.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -13,7 +15,7 @@ const uint64_t Hystrix::ROLLING_WINDOW_IN_MS;
 const uint64_t Hystrix::PING_INTERVAL_IN_MS;
 
 // add new value to rolling window, in place of oldest one
-void Hystrix::pushNewValue(std::string key, int value) {
+void Hystrix::pushNewValue(std::string key, uint64_t value) {
   // create vector if do not exist
   if (rolling_stats_map_.find(key) == rolling_stats_map_.end()) {
     rolling_stats_map_[key].resize(num_of_buckets_, value);
@@ -39,6 +41,43 @@ uint64_t Hystrix::getRollingValue(std::string cluster_name, std::string stats) {
   } else {
     return 0;
   }
+}
+
+void Hystrix::updateRollingWindowMap(Stats::Store& stats, std::string cluster_name) {
+  std::string prefix = "cluster." + cluster_name + ".";
+
+  // combining timeouts+retries - retries are counted  as separate requests
+  // (alternative: each request including the retries counted as 1)
+  uint64_t timeouts = stats.counter(prefix + "upstream_rq_timeout").value() +
+                      stats.counter(prefix + "upstream_rq_per_try_timeout").value();
+
+  pushNewValue(prefix + "timeouts", timeouts);
+
+  // combining errors+retry errors - retries are counted as separate requests
+  // (alternative: each request including the retries counted as 1)
+  // since timeouts are 504 (or 408), deduce them from here.
+  // timeout retries were not counted here anyway.
+  uint64_t errors = stats.counter(prefix + "upstream_rq_5xx").value() +
+                    stats.counter(prefix + "retry.upstream_rq_5xx").value() +
+                    stats.counter(prefix + "upstream_rq_4xx").value() +
+                    stats.counter(prefix + "retry.upstream_rq_4xx").value() -
+                    stats.counter(prefix + "upstream_rq_timeout").value();
+
+  pushNewValue(prefix + "errors", errors);
+
+  uint64_t success = stats.counter(prefix + "upstream_rq_2xx").value();
+  pushNewValue(prefix + "success", success);
+
+  uint64_t rejected = stats.counter(prefix + "upstream_rq_pending_overflow").value();
+  pushNewValue(prefix + "rejected", rejected);
+
+  // should not take from upstream_rq_total since it is updated before its components,
+  // leading to wrong results such as error percentage higher than 100%
+  uint64_t total = errors + timeouts + success + rejected;
+  pushNewValue(prefix + "total", total);
+
+  // TODO (@trabetti) : why does it fail compilation?
+  // ENVOY_LOG(trace, "{}", printRollingWindow());
 }
 
 void Hystrix::resetRollingWindow() { rolling_stats_map_.clear(); }
@@ -68,28 +107,15 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, std::string cluster_name,
   addIntToStream("currentTime", static_cast<uint64_t>(currentTime), cluster_info);
   addInfoToStream("isCircuitBreakerOpen", "false", cluster_info);
 
-  // combining timeouts+retries - retries are counted  as separate requests
-  // (alternative: each request including the retries counted as 1)
-  double timeouts = getRollingValue(cluster_name, "upstream_rq_timeout") +
-                    getRollingValue(cluster_name, "upstream_rq_per_try_timeout");
+  uint64_t errors = getRollingValue(cluster_name, "errors");
+  uint64_t timeouts = getRollingValue(cluster_name, "timeouts");
+  uint64_t rejected = getRollingValue(cluster_name, "rejected");
+  uint64_t total = getRollingValue(cluster_name, "total");
 
-  // combining errors+retry errors - retries are counted as separate requests
-  // (alternative: each request including the retries counted as 1)
-  // since timeouts are 504 (or 408), deduce them from here.
-  // timeout retries were not counted here anyway.
-  double errors = getRollingValue(cluster_name, "upstream_rq_5xx") +
-                  getRollingValue(cluster_name, "retry.upstream_rq_5xx") +
-                  getRollingValue(cluster_name, "upstream_rq_4xx") +
-                  getRollingValue(cluster_name, "retry.upstream_rq_4xx") -
-                  getRollingValue(cluster_name, "upstream_rq_timeout");
-
-  double success = getRollingValue(cluster_name, "upstream_rq_2xx");
-  double rejected = getRollingValue(cluster_name, "upstream_rq_pending_overflow");
-
-  // should not take from upstream_rq_total since it is updated before its components,
-  // leading to wrong results such as error percentage bigger than 100%
-  double total = errors + timeouts + success + rejected;
-  double error_rate = total == 0 ? 0 : ((errors + timeouts + rejected) / total) * 100;
+  uint64_t error_rate =
+      total == 0
+          ? 0
+          : (static_cast<double>(errors + timeouts + rejected) / static_cast<double>(total)) * 100;
 
   addIntToStream("errorPercentage", error_rate, cluster_info);
   addIntToStream("errorCount", errors, cluster_info);
@@ -110,7 +136,7 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, std::string cluster_name,
   // there is no parallel counter in Envoy since as a result of errors (outlier detection)
   // requests are not rejected, but rather the node is removed from load balancer healthy pool
   addIntToStream("rollingCountShortCircuited", 0, cluster_info);
-  addIntToStream("rollingCountSuccess", success, cluster_info);
+  addIntToStream("rollingCountSuccess", getRollingValue(cluster_name, "success"), cluster_info);
   addIntToStream("rollingCountThreadPoolRejected", 0, cluster_info);
   addIntToStream("rollingCountTimeout", timeouts, cluster_info);
   addIntToStream("rollingCountBadRequests", 0, cluster_info);
@@ -172,6 +198,21 @@ void Hystrix::getClusterStats(std::stringstream& ss, std::string cluster_name,
                               uint64_t max_concurrent_requests, uint64_t reporting_hosts) {
   addHystrixCommand(ss, cluster_name, max_concurrent_requests, reporting_hosts);
   addHystrixThreadPool(ss, cluster_name, max_concurrent_requests, reporting_hosts);
+}
+
+std::string Hystrix::printRollingWindow() {
+  std::stringstream out_str;
+
+  for (std::map<std::string, RollingStats>::const_iterator it = rolling_stats_map_.begin();
+       it != rolling_stats_map_.end(); ++it) {
+    out_str << it->first << " | ";
+    RollingStats rolling_stats = it->second;
+    for (uint64_t i = 0; i < rolling_stats.size(); i++) {
+      out_str << rolling_stats[i] << " | ";
+    }
+    out_str << std::endl;
+  }
+  return out_str.str();
 }
 
 } // namespace Stats

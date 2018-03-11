@@ -70,6 +70,9 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     saw_content_length = true;
   }
 
+  // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
+  // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
+  // header to avoid adding chunks
   if (headers.NoChunks()) {
     no_chunks = true;
   }

@@ -1,90 +1,131 @@
 #include <sstream>
 
+#include "common/common/empty_string.h"
+#include "common/http/codes.h"
 #include "common/stats/hystrix.h"
+#include "common/stats/stats_impl.h"
+
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
 
-void checkStreamField(std::string dataMessage, std::string key, uint64_t expected) {
+// copied from CodeUtilityTest in codes_test.cc
+class HystrixUtilityTest : public testing::Test {
+public:
+  void addResponse(uint64_t code, bool canary, bool internal_request,
+                   const std::string& request_vhost_name = EMPTY_STRING,
+                   const std::string& request_vcluster_name = EMPTY_STRING,
+                   const std::string& from_az = EMPTY_STRING,
+                   const std::string& to_az = EMPTY_STRING) {
+    Http::CodeUtility::ResponseStatInfo info{global_store_,
+                                             cluster_scope_,
+                                             "cluster.clusterName.",
+                                             code,
+                                             internal_request,
+                                             request_vhost_name,
+                                             request_vcluster_name,
+                                             from_az,
+                                             to_az,
+                                             canary};
+
+    Http::CodeUtility::chargeResponseStat(info);
+  }
+
+  IsolatedStoreImpl global_store_;
+  IsolatedStoreImpl cluster_scope_;
+};
+
+std::string getStreamField(std::string dataMessage, std::string key) {
   std::string actual = dataMessage.substr(dataMessage.find(key));
   actual = actual.substr(actual.find(" ") + 1);
   std::size_t length = actual.find(",");
   actual = actual.substr(0, length);
-  EXPECT_EQ(actual, std::to_string(expected));
+  // EXPECT_EQ(actual, std::to_string(expected));
+  return actual;
+}
+
+// this part is useful for testing updateRollingWindowMap()
+// by using addResponse() to
+TEST_F(HystrixUtilityTest, CreateDataMessage) {
+  Stats::Hystrix hystrix;
+  std::stringstream ss;
+  std::string cluster_name = "clusterName";
+  uint64_t expected_queue_size = 12;
+  uint64_t expectedReportingHosts = 16;
+
+  // insert data to rolling window
+  for (uint64_t i = 0; i < 14; i++) {
+    hystrix.incCounter();
+    addResponse(201, false, false);
+    addResponse(401, false, false);
+    addResponse(501, false, true);
+
+    hystrix.updateRollingWindowMap(cluster_scope_, cluster_name);
+  }
+
+  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
+  std::string dataMessage = ss.str();
+
+  // check stream format and data
+  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "66");
+  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "20");
+  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "30");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "10");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "propertyValue_queueSizeRejectionThreshold"),
+            std::to_string(expected_queue_size));
+  EXPECT_EQ(getStreamField(dataMessage, "reportingHosts"), std::to_string(expectedReportingHosts));
 }
 
 TEST(Hystrix, CreateDataMessage) {
   Stats::Hystrix hystrix;
   std::stringstream ss;
-  std::string clusterName = "clusterName";
-  uint64_t expectedQueueSize = 12;
+  std::string cluster_name = "clusterName";
+  uint64_t expected_queue_size = 12;
   uint64_t expectedReportingHosts = 16;
 
   EXPECT_EQ(hystrix.GetRollingWindowIntervalInMs(), 1000);
   EXPECT_EQ(hystrix.GetPingIntervalInMs(), 3000);
 
   // insert data to rolling window
-  for (uint64_t i = 0; i < 10; i++) {
+  for (uint64_t i = 0; i < 15; i++) {
     hystrix.incCounter();
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_timeout", i + 1);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_per_try_timeout", (i + 1) * 2);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_5xx", (i + 1) * 3);
-    hystrix.pushNewValue("cluster.clusterName.retry.upstream_rq_5xx", (i + 1) * 4);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_4xx", (i + 1) * 5);
-    hystrix.pushNewValue("cluster.clusterName.retry.upstream_rq_4xx", (i + 1) * 6);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_2xx", (i + 1) * 7);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_pending_overflow", (i + 1) * 8);
+    hystrix.pushNewValue("cluster.clusterName.timeouts", (i + 1) * 3);
+    hystrix.pushNewValue("cluster.clusterName.errors", (i + 1) * 17);
+    hystrix.pushNewValue("cluster.clusterName.success", (i + 1) * 7);
+    hystrix.pushNewValue("cluster.clusterName.rejected", (i + 1) * 8);
+    hystrix.pushNewValue("cluster.clusterName.total", (i + 1) * 35);
   }
-  hystrix.getClusterStats(ss, clusterName, expectedQueueSize, expectedReportingHosts);
+  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
   std::string dataMessage = ss.str();
 
   // check stream format and data
-  checkStreamField(dataMessage, "errorPercentage", 80);
-  checkStreamField(dataMessage, "errorCount", 153);
-  checkStreamField(dataMessage, "requestCount", 315);
-  checkStreamField(dataMessage, "rollingCountSemaphoreRejected", 72);
-  checkStreamField(dataMessage, "rollingCountSuccess", 63);
-  checkStreamField(dataMessage, "rollingCountTimeout", 27);
-  checkStreamField(dataMessage, "propertyValue_queueSizeRejectionThreshold", expectedQueueSize);
-  checkStreamField(dataMessage, "reportingHosts", expectedReportingHosts);
-
-  // make sure the rolling window really rolls
-  ss.str("");
-  for (uint64_t i = 10; i < 13; i++) {
-    hystrix.incCounter();
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_timeout", i + 1);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_per_try_timeout", (i + 1) * 2);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_5xx", (i + 1) * 3);
-    hystrix.pushNewValue("cluster.clusterName.retry.upstream_rq_5xx", (i + 1) * 4);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_4xx", (i + 1) * 5);
-    hystrix.pushNewValue("cluster.clusterName.retry.upstream_rq_4xx", (i + 1) * 6);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_2xx", (i + 1) * 7);
-    hystrix.pushNewValue("cluster.clusterName.upstream_rq_pending_overflow", (i + 1) * 8);
-  }
-  hystrix.getClusterStats(ss, clusterName, expectedQueueSize, expectedReportingHosts);
-  dataMessage = ss.str();
-
-  checkStreamField(dataMessage, "errorPercentage", 80);
-  checkStreamField(dataMessage, "errorCount", 153);
-  checkStreamField(dataMessage, "requestCount", 315);
-  checkStreamField(dataMessage, "rollingCountSemaphoreRejected", 72);
-  checkStreamField(dataMessage, "rollingCountSuccess", 63);
-  checkStreamField(dataMessage, "rollingCountTimeout", 27);
+  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "80");
+  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "170");
+  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "350");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "80");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "70");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "30");
+  EXPECT_EQ(getStreamField(dataMessage, "propertyValue_queueSizeRejectionThreshold"),
+            std::to_string(expected_queue_size));
+  EXPECT_EQ(getStreamField(dataMessage, "reportingHosts"), std::to_string(expectedReportingHosts));
 
   // check reset of window
   ss.str("");
   hystrix.resetRollingWindow();
-  hystrix.getClusterStats(ss, clusterName, expectedQueueSize, expectedReportingHosts);
+  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
   dataMessage = ss.str();
 
-  checkStreamField(dataMessage, "errorPercentage", 0);
-  checkStreamField(dataMessage, "errorCount", 0);
-  checkStreamField(dataMessage, "requestCount", 0);
-  checkStreamField(dataMessage, "rollingCountSemaphoreRejected", 0);
-  checkStreamField(dataMessage, "rollingCountSuccess", 0);
-  checkStreamField(dataMessage, "rollingCountTimeout", 0);
+  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "0");
+  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "0");
 }
 
 } // namespace Stats

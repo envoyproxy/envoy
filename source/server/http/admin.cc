@@ -624,12 +624,10 @@ void AdminFilter::onComplete() {
   bool end_stream = true;
 
   if (path.find("/hystrix_event_stream") == std::string::npos) {
-    HandlerInfoPtr temp_handler(new HandlerInfo);
-    handler_info_ = std::move(temp_handler);
+    handler_info_ = std::make_unique<HandlerInfo>();
     code = parent_.runCallback(path, *header_map, response, *handler_info_);
   } else {
-    HandlerInfoPtr temp_handler(new HystrixHandlerInfo(callbacks_));
-    handler_info_ = std::move(temp_handler);
+    handler_info_ = std::make_unique<HystrixHandlerInfo>(callbacks_);
     code = parent_.runCallback(path, *header_map, response, *handler_info_);
     end_stream = false;
   }
@@ -680,7 +678,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerHealthcheckOk), false, true},
           {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
            false},
-          {"/hot_restart_version", "print the hot restart compatability version",
+          {"/hot_restart_version", "print the hot restart compatibility version",
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
            true},
@@ -862,12 +860,9 @@ void HystrixHandlerInfo::Destroy() {
 void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfo* hystrix_handler_info,
                                                 Server::Instance& server) {
   hystrix_handler_info->stats_->incCounter();
-
-  for (const Stats::CounterSharedPtr& counter : server.stats().counters()) {
-    // we save all upstream_rq stats.
-    if (counter->name().find("upstream_rq_") != std::string::npos) {
-      hystrix_handler_info->stats_->pushNewValue(counter->name(), counter->value());
-    }
+  for (auto& cluster : server.clusterManager().clusters()) {
+    hystrix_handler_info->stats_->updateRollingWindowMap(server.stats(),
+                                                         cluster.second.get().info()->name());
   }
 }
 
@@ -889,11 +884,7 @@ void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_han
   }
   Buffer::OwnedImpl data;
   data.add(ss.str());
-
-  // using write() since we are sending network level
-  // TODO(trabetti): is there an alternative to the const_cast?
-  (const_cast<Network::Connection*>((hystrix_handler_info->callbacks_)->connection()))
-      ->write(data, false);
+  hystrix_handler_info->callbacks_->encodeData(data, false);
 
   // restart timer
   hystrix_handler_info->data_timer_->enableTimer(
@@ -903,11 +894,7 @@ void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfo* hystrix_han
 void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfo* hystrix_handler_info) {
   Buffer::OwnedImpl data;
   data.add(":\n\n");
-
-  // using write() since we are sending network level
-  // TODO(trabetti): is there an alternative to the const_cast?
-  (const_cast<Network::Connection*>((hystrix_handler_info->callbacks_)->connection()))
-      ->write(data, false);
+  hystrix_handler_info->callbacks_->encodeData(data, false);
 
   // restart timer
   hystrix_handler_info->ping_timer_->enableTimer(

@@ -2,6 +2,8 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/stats/stats.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -12,15 +14,15 @@ typedef std::map<std::string, RollingStats> RollingStatsMap;
 class Hystrix {
 
 public:
-  Hystrix() : current_index_(DEFAULT_NUM_OF_BUCKETS - 1), num_of_buckets_(DEFAULT_NUM_OF_BUCKETS){};
+  Hystrix() : current_index_(DEFAULT_NUM_OF_BUCKETS), num_of_buckets_(DEFAULT_NUM_OF_BUCKETS + 1){};
 
-  Hystrix(int num_of_buckets)
-      : current_index_(num_of_buckets - 1), num_of_buckets_(num_of_buckets){};
+  Hystrix(uint64_t num_of_buckets)
+      : current_index_(num_of_buckets), num_of_buckets_(num_of_buckets + 1){};
 
   /**
    * Add new value to top of rolling window, pushing out the oldest value
    */
-  void pushNewValue(std::string key, int value);
+  void pushNewValue(std::string key, uint64_t value);
 
   /**
    * increment pointer of next value to add to rolling window
@@ -45,10 +47,14 @@ public:
    */
   static uint64_t GetPingIntervalInMs() { return PING_INTERVAL_IN_MS; }
 
+  void updateRollingWindowMap(Stats::Store& stats, std::string cluster_name);
+
   /**
    * clear map
    */
   void resetRollingWindow();
+
+  std::string printRollingWindow();
 
 private:
   /**
@@ -85,8 +91,8 @@ private:
                             uint64_t reporting_hosts);
 
   RollingStatsMap rolling_stats_map_;
-  int current_index_;
-  int num_of_buckets_;
+  uint64_t current_index_;
+  uint64_t num_of_buckets_;
   // TODO(trabetti): May want to make this configurable via config file
   static const uint64_t DEFAULT_NUM_OF_BUCKETS = 10;
   static const uint64_t ROLLING_WINDOW_IN_MS = 10000;

@@ -75,4 +75,8 @@ envoy_cc_library(
     name = "hystrix_lib",
     srcs = ["hystrix.cc"],
     hdrs = ["hystrix.h"],
+    deps = [
+        ":stats_lib",
+        "//source/common/common:logger_lib",
+    ],
 )
