@@ -110,8 +110,8 @@ public:
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
    * @param route supplies the Route configuration.
    * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
-   * specified, or the HTTP status code from the route's redirect if specified, or an empty Option
-   * otherwise.
+   * specified, or the HTTP status code from the route's redirect if specified, or an empty
+   * absl::optional otherwise.
    */
   static absl::optional<Http::Code>
   parseDirectResponseCode(const envoy::api::v2::route::Route& route);

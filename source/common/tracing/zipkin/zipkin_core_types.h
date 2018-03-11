@@ -249,15 +249,9 @@ public:
   void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
-   * @return true of the endpoint attribute has been set, or false otherwise.
+   * @return true if the endpoint attribute is set, or false otherwise.
    */
-  bool isSetEndpoint() const {
-    if (endpoint_) {
-      return true;
-    }
-    return false;
-  }
-
+  bool isSetEndpoint() const { return endpoint_.has_value(); }
   /**
    * @return the key attribute.
    */

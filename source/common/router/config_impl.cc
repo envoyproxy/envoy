@@ -162,7 +162,7 @@ absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstr
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy
       const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
-      hash = (old_value ^ new_hash.value());
+      hash = old_value ^ new_hash.value();
     }
   }
   return hash;

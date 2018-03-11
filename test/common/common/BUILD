@@ -19,6 +19,13 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "base64_fuzz_test",
+    srcs = ["base64_fuzz_test.cc"],
+    corpus = "base64_corpus",
+    deps = ["//source/common/common:base64_lib"],
+)
+
 envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
