@@ -27,9 +27,9 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
-using testing::_;
 
 namespace Envoy {
 
@@ -69,6 +69,7 @@ IntegrationCodecClient::IntegrationCodecClient(
       codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
+  setCodecClientCallbacks(*this);
   dispatcher.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(connected_);
 }
@@ -88,6 +89,7 @@ void IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& header
 
 void IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size,
                                                  IntegrationStreamDecoder& response) {
+  disableIdleTimer();
   Http::StreamEncoder& encoder = newStream(response);
   encoder.getStream().addCallbacks(response);
   encoder.encodeHeaders(headers, false);
@@ -131,6 +133,7 @@ Http::StreamEncoder& IntegrationCodecClient::startRequest(const Http::HeaderMap&
 void IntegrationCodecClient::waitForDisconnect() {
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(disconnected_);
+  enableIdleTimer();
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -842,40 +845,39 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
 void HttpIntegrationTest::testIdleTimeout() {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->add_clusters();
-    cluster->set_name("cluster_1");
-      auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
-      auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
-      std::chrono::milliseconds timeout(1000);
-      auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
-      idle_time_out->set_seconds(seconds.count());
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(1000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
   });
-   config_helper_.addRoute("direct.example.com", "/test/long", "cluster_1", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
-  config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
-
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // valide that timeout is set and is as per expectation.
+  bool has_idle_timeout =
+      config_helper_.bootstrap().static_resources().clusters(0).has_common_http_protocol_options();
 
-  // Request 1.
+  EXPECT_TRUE(has_idle_timeout);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                              {":path", "/test/long/url"},
                                                              {":scheme", "http"},
-                                                             {":authority", "direct.example.com"}},
+                                                             {":authority", "host"}},
                                      1024, *response_);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
   response_->waitForEndStream();
-  test_server_->waitForCounterGe("cluster.cluster_1.upstream_cx_idle_timeout", 1);
 
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
-  // EXPECT_TRUE(upstream_request_->complete());
-  // EXPECT_EQ(512U, upstream_request_->bodyLength());
-  // EXPECT_TRUE(response_->complete());
-  // EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  // do not send any requests and validate if idle time out kicks in.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
 void HttpIntegrationTest::testTwoRequests() {

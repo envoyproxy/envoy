@@ -16,7 +16,7 @@ namespace Envoy {
 /**
  * HTTP codec client used during integration testing.
  */
-class IntegrationCodecClient : public Http::CodecClientProd {
+class IntegrationCodecClient : public Http::CodecClientProd, Http::CodecClientCallbacks {
 public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
@@ -30,6 +30,8 @@ public:
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
+  void onStreamDestroy() override { enableIdleTimer(); }
+  void onStreamReset(Http::StreamResetReason) override { enableIdleTimer(); }
   Http::StreamEncoder& startRequest(const Http::HeaderMap& headers,
                                     IntegrationStreamDecoder& response);
   void waitForDisconnect();
