@@ -493,7 +493,26 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(TcpProxyTest, UpstreamDisconnect) {
+// Test that downstream is closed after an upstream LocalClose.
+TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
+  setup(1);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test that downstream is closed after an upstream RemoteClose.
+TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
@@ -510,8 +529,23 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that reconnect is attempted after a connect failure
-TEST_F(TcpProxyTest, ConnectAttemptsUpstreamFail) {
+// Test that reconnect is attempted after a local connect failure
+TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempts()->set_value(2);
+  setup(2, config);
+
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+  raiseEventUpstreamConnected(1);
+
+  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+}
+
+// Test that reconnect is attempted after a remote connect failure
+TEST_F(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
@@ -779,7 +813,6 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
-  EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   idle_timer->callback_();

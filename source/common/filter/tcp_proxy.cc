@@ -162,8 +162,14 @@ void TcpProxy::finalizeUpstreamConnectionStats() {
 
 void TcpProxy::closeUpstreamConnection() {
   finalizeUpstreamConnectionStats();
-  upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-  read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_connection_));
+
+  // Move the upstream_connection_ into a temporary so that when
+  // onUpstreamEvent() is called with LocalClose, we know that it is
+  // already closed, and don't go into an infinite event loop.
+  Network::ClientConnectionPtr conn(std::move(upstream_connection_));
+
+  conn->close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().dispatcher().deferredDelete(std::move(conn));
 }
 
 void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -441,13 +447,18 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     connect_timeout_timer_.reset();
   }
 
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
+  // upstream_connection_ can be nullptr when we received a RemoteClose, called into
+  // closeUpstreamConnection() in this block, and are now receiving a LocalClose event.
+  if ((upstream_connection_ != nullptr) && (event == Network::ConnectionEvent::RemoteClose ||
+                                            event == Network::ConnectionEvent::LocalClose)) {
     disableIdleTimer();
-  }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_.inc();
+    auto& destroy_ctx_stat =
+        (event == Network::ConnectionEvent::RemoteClose)
+            ? read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_
+            : read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_;
+    destroy_ctx_stat.inc();
+
     if (connecting) {
       request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
       read_callbacks_->upstreamHost()->outlierDetector().putResult(
@@ -459,8 +470,6 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
     } else {
       read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     }
-  } else if (event == Network::ConnectionEvent::LocalClose) {
-    read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_.inc();
   } else if (event == Network::ConnectionEvent::Connected) {
     connect_timespan_->complete();
 
