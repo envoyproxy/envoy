@@ -30,22 +30,23 @@ public:
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
-  void onStreamDestroy() override { 
+  void onStreamDestroy() override {
     num_active_requests_--;
     if (num_active_requests_ == 0) {
-      enableIdleTimer(); 
+      enableIdleTimer();
     }
   }
-  void onStreamReset(Http::StreamResetReason) override {  
+  void onStreamReset(Http::StreamResetReason) override {
     num_active_requests_--;
     if (num_active_requests_ == 0) {
-      enableIdleTimer(); 
-    } 
+      enableIdleTimer();
+    }
   }
   Http::StreamEncoder& startRequest(const Http::HeaderMap& headers,
                                     IntegrationStreamDecoder& response);
   void waitForDisconnect();
   int num_active_requests_;
+
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
     ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
