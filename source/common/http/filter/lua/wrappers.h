@@ -113,7 +113,6 @@ private:
   /**
    * Get a metadata value from the map.
    * @param 1 (string): filter.
-   * @param 2 (string): key.
    * @return string value if found or nil.
    */
   DECLARE_LUA_FUNCTION(MetadataMapWrapper, luaGet);
