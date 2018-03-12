@@ -33,6 +33,12 @@ TEST(StringUtil, atoul) {
 
   EXPECT_TRUE(StringUtil::atoul("00789", out));
   EXPECT_EQ(789U, out);
+
+  // Verify subsequent call to atoul succeeds after the first one
+  // failed due to errno ERANGE
+  EXPECT_FALSE(StringUtil::atoul("18446744073709551616", out));
+  EXPECT_TRUE(StringUtil::atoul("18446744073709551615", out));
+  EXPECT_EQ(18446744073709551615U, out);
 }
 
 TEST(StringUtil, atol) {

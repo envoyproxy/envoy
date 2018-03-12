@@ -29,54 +29,12 @@ class ConfigUtility {
 public:
   enum class HeaderMatchType { Value, Regex, Range };
 
+  // A HeaderData specifies one of exact value or regex or range element
+  // to match in a request's header, specified in the header_match_type_ member.
+  // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData {
-    // HeaderMatcher will consist of one of the below two options:
-    // 1.value (string) and regex (bool)
-    //   An empty header value allows for matching to be only based on header presence.
-    //   Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
-    //   exact string matching.
-    //   This is now deprecated.
-    // 2.header_match_specifier which can be any one of exact_match, regex_match or range_match.
-    //   Absence of these options implies empty header value match based on header presence.
-    //   a.exact_match: value will be used for exact string matching.
-    //   b.regex_match: Match will succeed if header value matches the value specified here.
-    //   c.range_match: Match will succeed if header value lies within the range specified
-    //     here, using half open interval semantics [start,end).
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config) : name_(config.name()) {
-      switch (config.header_match_specifier_case()) {
-      case envoy::api::v2::route::HeaderMatcher::kExactMatch:
-        header_match_type_ = HeaderMatchType::Value;
-        value_ = config.exact_match();
-        break;
-      case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
-        header_match_type_ = HeaderMatchType::Regex;
-        regex_pattern_ = RegexUtil::parseRegex(config.regex_match());
-        break;
-      case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
-        header_match_type_ = HeaderMatchType::Range;
-        range_.set_start(config.range_match().start());
-        range_.set_end(config.range_match().end());
-        break;
-      case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
-        FALLTHRU;
-      default:
-        if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
-          header_match_type_ = HeaderMatchType::Regex;
-          regex_pattern_ = RegexUtil::parseRegex(config.value());
-        } else {
-          header_match_type_ = HeaderMatchType::Value;
-          value_ = config.value();
-        }
-        break;
-      }
-    }
-
-    HeaderData(const Json::Object& config)
-        : HeaderData([&config] {
-            envoy::api::v2::route::HeaderMatcher header_matcher;
-            Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
-            return header_matcher;
-          }()) {}
+    HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
+    HeaderData(const Json::Object& config);
 
     const Http::LowerCaseString name_;
     HeaderMatchType header_match_type_;
