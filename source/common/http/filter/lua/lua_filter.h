@@ -48,6 +48,9 @@ public:
    */
   virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
 
+  /**
+   * @return const envoy::api::v2::core::Metadata the metadata of current route
+   */
   virtual const envoy::api::v2::core::Metadata routeEntryMetadata() const PURE;
 };
 
