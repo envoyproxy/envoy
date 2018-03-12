@@ -23,6 +23,15 @@
 
 #include "absl/strings/string_view.h"
 
+// Can be overridden at compile time
+#ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
+#define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
+#endif
+
+#if ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH < 60
+#error "ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be >= 60"
+#endif
+
 namespace Envoy {
 namespace Stats {
 
@@ -265,7 +274,7 @@ private:
   // If you want to increase the max user supplied name length, use the compiler
   // option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
   // max-obj-name-len
-  static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = 60;
+  static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH;
   static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
 
   static size_t& initializeAndGetMutableMaxObjNameLength(size_t configured_size);
