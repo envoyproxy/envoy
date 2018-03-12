@@ -697,16 +697,16 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster3"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
-  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster4"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"));
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster5"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"));
 
   cds->initialized_callback_();
 
@@ -714,7 +714,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cluster4->initialize_callback_();
 
   // Test cluster 5 getting removed before everything is initialized.
-  cluster_manager_->removePrimaryCluster("cluster5");
+  cluster_manager_->removeCluster("cluster5");
 
   EXPECT_CALL(initialized, ready());
   cluster3->initialize_callback_();
@@ -757,7 +757,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
-  cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("cluster1"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"));
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -767,7 +767,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
       });
 
   // Remove the new cluster.
-  cluster_manager_->removePrimaryCluster("cluster1");
+  cluster_manager_->removeCluster("cluster1");
 
   // Fire a member callback on the local cluster, which should not call any update callbacks on
   // the deleted cluster.
@@ -800,11 +800,11 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
 
-  EXPECT_TRUE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+  EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
@@ -828,7 +828,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
@@ -837,7 +837,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   // Now try to update again but with the same hash.
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
 
   // Now do it again with a different hash.
   auto update_cluster = defaultStaticCluster("fake_cluster");
@@ -853,7 +853,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         // Test inline init.
         initialize_callback();
       }));
-  EXPECT_TRUE(cluster_manager_->addOrUpdatePrimaryCluster(update_cluster));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -865,12 +865,12 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // Now remove it. This should drain the connection pool.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  EXPECT_TRUE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+  EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
 
   // Remove an unknown cluster.
-  EXPECT_FALSE(cluster_manager_->removePrimaryCluster("foo"));
+  EXPECT_FALSE(cluster_manager_->removeCluster("foo"));
 
   drained_cb();
 
@@ -880,7 +880,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
 }
 
-TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
+TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("some_cluster")}));
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
@@ -897,10 +897,10 @@ TEST_F(ClusterManagerImplTest, AddOrUpdatePrimaryClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  EXPECT_FALSE(cluster_manager_->addOrUpdatePrimaryCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
 
   // Attempt to remove a static cluster.
-  EXPECT_FALSE(cluster_manager_->removePrimaryCluster("fake_cluster"));
+  EXPECT_FALSE(cluster_manager_->removeCluster("fake_cluster"));
 
   factory_.tls_.shutdownThread();
 

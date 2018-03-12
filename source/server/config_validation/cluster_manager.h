@@ -19,7 +19,7 @@ public:
                                   ThreadLocal::Instance& tls, Runtime::RandomGenerator& random,
                                   Network::DnsResolverSharedPtr dns_resolver,
                                   Ssl::ContextManager& ssl_context_manager,
-                                  Event::Dispatcher& primary_dispatcher,
+                                  Event::Dispatcher& main_thread_dispatcher,
                                   const LocalInfo::LocalInfo& local_info);
 
   ClusterManagerPtr
