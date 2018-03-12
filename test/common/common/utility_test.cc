@@ -59,7 +59,7 @@ TEST(StringUtil, atol) {
 
   // INT64_MIN
   EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
-  EXPECT_EQ(-9223372036854775808, out);
+  EXPECT_EQ(INT64_MIN, out);
 }
 
 TEST(DateUtil, All) {
