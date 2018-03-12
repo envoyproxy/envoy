@@ -7,9 +7,7 @@ namespace Envoy {
 class LuaIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LuaIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
-        metadata_{new envoy::api::v2::core::Metadata{}} {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -75,7 +73,6 @@ baz: bat
 
   FakeHttpConnectionPtr fake_lua_connection_;
   FakeStreamPtr lua_request_;
-  envoy::api::v2::core::Metadata* metadata_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LuaIntegrationTest,
