@@ -141,7 +141,7 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   } else {
     ASSERT(string_type == "sds");
     if (!eds_config) {
-      throw EnvoyException("fetching invalid Optional value");
+      throw EnvoyException("cannot create sds cluster with no sds config");
     }
     cluster.set_type(envoy::api::v2::Cluster::EDS);
     cluster.mutable_eds_cluster_config()->mutable_eds_config()->CopyFrom(eds_config.value());

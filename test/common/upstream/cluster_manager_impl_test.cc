@@ -208,7 +208,8 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
   const std::string json = fmt::sprintf("{%s}", clustersJson({defaultSdsClusterJson("cluster_1")}));
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromJson(json)), EnvoyException,
+                            "cannot create sds cluster with no sds config");
 }
 
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
