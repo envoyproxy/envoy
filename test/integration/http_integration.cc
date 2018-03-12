@@ -27,9 +27,9 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
-using testing::_;
 
 namespace Envoy {
 
