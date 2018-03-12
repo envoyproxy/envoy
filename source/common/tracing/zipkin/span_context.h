@@ -41,35 +41,6 @@ public:
   SpanContext(const Span& span);
 
   /**
-   * Serializes the SpanContext object as a string. This encoding of a SpanContext is used
-   * as the contents of the x-ot-span-context HTTP header, and allows Envoy to track the
-   * relationships among related Zipkin spans.
-   *
-   * @return a string-encoded SpanContext in the following format:
-   *
-   * "<16-hex-string trace id>;<16-hex-string span id>;<16-hex-string parent id>;<annotation list>
-   *
-   * The annotation list, if present, can contain the strings "cs", "cr", "ss", "sr", depending on
-   * which annotations are present. The semi-colon character is used as the separator for the
-   * annotation list.
-   *
-   * Example of a returned string corresponding to a span with the SR annotation:
-   * "25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c;sr"
-   *
-   * Example of a returned string corresponding to a span with no annotations:
-   * "25c6f38dd0600e78;56707c7b3e1092af;c49193ea42335d1c"
-   */
-  const std::string serializeToString();
-
-  /**
-   * Initializes a SpanContext object based on the given string.
-   *
-   * @param span_context_str The string-encoding of a SpanContext in the same format produced by the
-   * method serializeToString().
-   */
-  void populateFromString(const std::string& span_context_str);
-
-  /**
    * @return the span id as an integer
    */
   uint64_t id() const { return id_; }

@@ -171,12 +171,9 @@ TEST(ZipkinTracerTest, spanCreation) {
   // ==============
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
-  const std::string generated_parent_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string modified_root_span_context_str = root_span_context.traceIdAsHexString() + ";" +
-                                                     root_span_context.idAsHexString() + ";" +
-                                                     generated_parent_id;
-  SpanContext modified_root_span_context;
-  modified_root_span_context.populateFromString(modified_root_span_context_str);
+  const uint generated_parent_id = Util::generateRandom64();
+  SpanContext modified_root_span_context(root_span_context.trace_id(), root_span_context.id(),
+                                         generated_parent_id, root_span_context.sampled());
   SpanPtr new_shared_context_span =
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
   EXPECT_NE(0LL, new_shared_context_span->startTime());

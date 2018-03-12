@@ -50,10 +50,6 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   request_headers.insertXB3Sampled().value().setReference(
       span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
                       : ZipkinCoreConstants::get().NOT_SAMPLED);
-
-  // Set the ot-span-context header with the new context.
-  SpanContext context(span_);
-  request_headers.insertOtSpanContext().value(context.serializeToString());
 }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
@@ -98,29 +94,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
 
-  if (request_headers.OtSpanContext()) {
-    // Get the open-tracing span context.
-    // This header contains a span's parent-child relationships set by the downstream Envoy.
-    // The context built from this header allows the Zipkin tracer to
-    // properly set the span id and the parent span id.
-    SpanContext context;
-
-    context.populateFromString(request_headers.OtSpanContext()->value().c_str());
-
-    // Create either a child or a shared-context Zipkin span.
-    //
-    // An all-new child span will be started if the current context carries the SR annotation. In
-    // this case, we are dealing with an egress operation that causally succeeds a previous
-    // ingress operation. This envoy instance will be the the client-side of the new span, to which
-    // it will add the CS annotation.
-    //
-    // Differently, a shared-context span will be created if the current context carries the CS
-    // annotation. In this case, we are dealing with an ingress operation. This envoy instance,
-    // being at the receiving end, will add the SR annotation to the shared span context.
-
-    new_zipkin_span =
-        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
-  } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
+  if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
     uint64_t trace_id(0);
     uint64_t span_id(0);
     uint64_t parent_id(0);
