@@ -235,7 +235,7 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-   // Start request 1
+  // Start request 1
   encoder1 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                   {":path", "/test/long/url"},
                                                                   {":scheme", "http"},
@@ -274,8 +274,8 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   EXPECT_EQ(request2_bytes, response2->body().size());
 
   // Validate that idle time is not kicked in.
-  EXPECT_EQ(0,test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
-  EXPECT_NE(0,test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
+  EXPECT_NE(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
