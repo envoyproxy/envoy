@@ -279,10 +279,6 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   EXPECT_TRUE(response1->complete());
   EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
 
-  // Validate that idle time is not kicked in and connection count is not zero.
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
-  EXPECT_NE(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
-
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 0);
