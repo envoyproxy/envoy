@@ -276,7 +276,7 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
                   request_headers_.XB3Sampled()->value().getString()) == 0);
 }
 
-TEST_F(ZipkinDriverTest, SerializeAndDeserializeContextB3SampledFalse) {
+TEST_F(ZipkinDriverTest, SerializeAndDeserializeContextB3NotSampled) {
   setupValidDriver();
 
   EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
@@ -285,6 +285,29 @@ TEST_F(ZipkinDriverTest, SerializeAndDeserializeContextB3SampledFalse) {
 
   // Only context header set is B3 sampled to indicate trace should not be sampled
   request_headers_.insertXB3Sampled().value(ZipkinCoreConstants::get().NOT_SAMPLED);
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to not sample
+  EXPECT_TRUE(ZipkinCoreConstants::get().NOT_SAMPLED.compare(
+                  request_headers_.XB3Sampled()->value().getString()) == 0);
+}
+
+TEST_F(ZipkinDriverTest, SerializeAndDeserializeContextB3NotSampledWithFalse) {
+  setupValidDriver();
+
+  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  EXPECT_EQ(nullptr, request_headers_.XB3SpanId());
+  EXPECT_EQ(nullptr, request_headers_.XB3TraceId());
+
+  // Only context header set is B3 sampled to indicate trace should not be sampled (using legacy
+  // 'false' value)
+  const std::string notSampled = "false";
+  request_headers_.insertXB3Sampled().value(notSampled);
   Tracing::SpanPtr span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
 

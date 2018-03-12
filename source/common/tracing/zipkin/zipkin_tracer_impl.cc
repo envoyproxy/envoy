@@ -12,6 +12,20 @@
 namespace Envoy {
 namespace Zipkin {
 
+namespace {
+// The functions below are needed due to the "C++ static initialization order fiasco."
+
+/**
+ * @return a regex to match a "not sampled" decision.
+ *
+ * Note that a function is needed because the string used to build the regex
+ * cannot be initialized statically.
+ */
+static const std::regex& notSampledRegex() {
+  CONSTRUCT_ON_FIRST_USE(std::regex, "(" + ZipkinCoreConstants::get().NOT_SAMPLED + "|false)");
+}
+} // namespace
+
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
@@ -119,8 +133,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     }
 
     if (request_headers.XB3Sampled()) {
-      sampled = ZipkinCoreConstants::get().SAMPLED.compare(
-                    request_headers.XB3Sampled()->value().getString()) == 0;
+      sampled = !std::regex_match(request_headers.XB3Sampled()->value().c_str(), notSampledRegex());
     }
     SpanContext context(trace_id, span_id, parent_id, sampled);
 
