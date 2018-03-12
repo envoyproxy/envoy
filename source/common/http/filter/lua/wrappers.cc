@@ -100,6 +100,66 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   }
 }
 
+void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& value) {
+  ProtobufWkt::Value::KindCase kind = value.kind_case();
+
+  switch (kind) {
+  case ProtobufWkt::Value::kNullValue:
+    return lua_pushnil(state);
+
+  case ProtobufWkt::Value::kNumberValue:
+    return lua_pushnumber(state, value.number_value());
+
+  case ProtobufWkt::Value::kBoolValue:
+    return lua_pushboolean(state, value.bool_value());
+
+  case ProtobufWkt::Value::kStringValue: {
+    const auto string_value = value.string_value();
+    return lua_pushlstring(state, string_value.c_str(), string_value.size());
+  }
+
+  case ProtobufWkt::Value::kStructValue: {
+    return createTable(state, std::move(value.struct_value().fields()));
+  }
+
+  case ProtobufWkt::Value::kListValue: {
+    const auto list = value.list_value();
+    const int values_size = list.values_size();
+
+    lua_createtable(state, values_size, 0);
+    for (int i = 0; i < values_size; i++) {
+      setValue(state, std::move(list.values(i)));
+      lua_rawseti(state, -2, i + 1);
+    }
+    return;
+  }
+
+  default:
+    NOT_REACHED;
+  }
+}
+
+void MetadataMapWrapper::createTable(
+    lua_State* state, const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields) {
+  lua_createtable(state, 0, fields.size());
+  for (const auto field : fields) {
+    int top = lua_gettop(state);
+    lua_pushlstring(state, field.first.c_str(), field.first.size());
+    setValue(state, std::move(field.second));
+    lua_settable(state, top);
+  }
+}
+
+int MetadataMapWrapper::luaGet(lua_State* state) {
+  const char* filter = luaL_checkstring(state, 2);
+  const auto filter_it = metadata_.filter_metadata().find(filter);
+  if (filter_it == metadata_.filter_metadata().end()) {
+    return 0;
+  }
+  createTable(state, std::move(filter_it->second.fields()));
+  return 1;
+}
+
 } // namespace Lua
 } // namespace Filter
 } // namespace Http

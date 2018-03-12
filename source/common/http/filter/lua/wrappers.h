@@ -10,6 +10,7 @@ namespace Filter {
 namespace Lua {
 
 class HeaderMapWrapper;
+class MetadataMapWrapper;
 
 /**
  * Iterator over a header map.
@@ -96,6 +97,32 @@ private:
   Envoy::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
 
   friend class HeaderMapIterator;
+};
+
+/**
+ * Lua wrapper for a metadata map.
+ * TODO(dio): define MetadataMapIterator.
+ */
+class MetadataMapWrapper : public Envoy::Lua::BaseLuaObject<MetadataMapWrapper> {
+public:
+  MetadataMapWrapper(const envoy::api::v2::core::Metadata& metadata) : metadata_{metadata} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+
+private:
+  /**
+   * Get a metadata value from the map.
+   * @param 1 (string): filter.
+   * @param 2 (string): key.
+   * @return string value if found or nil.
+   */
+  DECLARE_LUA_FUNCTION(MetadataMapWrapper, luaGet);
+
+  void setValue(lua_State* state, const ProtobufWkt::Value&& value);
+  void createTable(lua_State* state,
+                   const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
+
+  const envoy::api::v2::core::Metadata metadata_;
 };
 
 } // namespace Lua

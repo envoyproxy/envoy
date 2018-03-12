@@ -18,6 +18,84 @@ public:
   }
 };
 
+class LuaMetadataMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<MetadataMapWrapper> {
+public:
+  virtual void setup(const std::string& script) {
+    Envoy::Lua::LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
+  }
+
+  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::api::v2::core::Metadata metadata;
+    MessageUtil::loadFromYaml(yaml_string, metadata);
+    return metadata;
+  }
+};
+
+// Basic methods test for the metadata wrapper.
+TEST_F(LuaMetadataMapWrapperTest, Methods) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      recipe = object:get("make.delicious.bread")
+
+      testPrint(recipe["name"])
+      testPrint(recipe["origin"])
+
+      testPrint(tostring(recipe["lactose"]))
+      testPrint(tostring(recipe["nut"]))
+
+      testPrint(tostring(recipe["portion"]))
+      testPrint(tostring(recipe["minutes"]))
+
+      testPrint(recipe["butter"]["type"])
+      testPrint(tostring(recipe["butter"]["expensive"]))
+
+      for i, ingredient in ipairs(recipe["ingredients"]) do
+        testPrint(ingredient)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  const std::string yaml = R"EOF(
+filter_metadata:
+  make.delicious.bread:
+    name: pulla
+    origin: finland
+    lactose: true
+    nut: false
+    portion: 5
+    minutes: 30.5
+    butter:
+      type: grass_fed
+      expensive: false
+    ingredients:
+      - fluor
+      - milk
+)EOF";
+
+  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  MetadataMapWrapper::create(coroutine_->luaState(), metadata);
+
+  EXPECT_CALL(*this, testPrint("pulla"));
+  EXPECT_CALL(*this, testPrint("finland"));
+
+  EXPECT_CALL(*this, testPrint("true"));
+  EXPECT_CALL(*this, testPrint("false"));
+
+  EXPECT_CALL(*this, testPrint("5"));
+  EXPECT_CALL(*this, testPrint("30.5"));
+
+  EXPECT_CALL(*this, testPrint("grass_fed"));
+  EXPECT_CALL(*this, testPrint("false"));
+
+  EXPECT_CALL(*this, testPrint("fluor"));
+  EXPECT_CALL(*this, testPrint("milk"));
+
+  start("callMe");
+}
+
 // Basic methods test for the header wrapper.
 TEST_F(LuaHeaderMapWrapperTest, Methods) {
   const std::string SCRIPT{R"EOF(

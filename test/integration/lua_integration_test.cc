@@ -7,7 +7,9 @@ namespace Envoy {
 class LuaIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+        metadata_{new envoy::api::v2::core::Metadata{}} {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -40,6 +42,20 @@ public:
           auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
+
+          const std::string key = "io.envoyproxy.lua";
+          const std::string yaml = R"EOF(
+foo: bar
+baz: bat
+)EOF";
+          ProtobufWkt::Struct value;
+          MessageUtil::loadFromYaml(yaml, value);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_metadata()
+              ->mutable_filter_metadata()
+              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
         });
 
     initialize();
@@ -59,6 +75,7 @@ public:
 
   FakeHttpConnectionPtr fake_lua_connection_;
   FakeStreamPtr lua_request_;
+  envoy::api::v2::core::Metadata* metadata_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LuaIntegrationTest,
@@ -79,12 +96,18 @@ config:
       request_handle:logErr("log test")
       request_handle:logCritical("log test")
 
+      local metadata = request_handle:metadata():get("io.envoyproxy.lua")
       local body_length = request_handle:body():length()
       request_handle:headers():add("request_body_size", body_length)
+      request_handle:headers():add("request_metadata_foo", metadata["foo"])
+      request_handle:headers():add("request_metadata_baz", metadata["baz"])
     end
 
     function envoy_on_response(response_handle)
+      local metadata = response_handle:metadata():get("io.envoyproxy.lua")
       local body_length = response_handle:body():length()
+      response_handle:headers():add("response_metadata_foo", metadata["foo"])
+      response_handle:headers():add("response_metadata_baz", metadata["baz"])
       response_handle:headers():add("response_body_size", body_length)
       response_handle:headers():remove("foo")
     end
@@ -110,6 +133,16 @@ config:
                          ->value()
                          .c_str());
 
+  EXPECT_STREQ("bar", upstream_request_->headers()
+                          .get(Http::LowerCaseString("request_metadata_foo"))
+                          ->value()
+                          .c_str());
+
+  EXPECT_STREQ("bat", upstream_request_->headers()
+                          .get(Http::LowerCaseString("request_metadata_baz"))
+                          ->value()
+                          .c_str());
+
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -121,6 +154,12 @@ config:
 
   EXPECT_STREQ(
       "7", response_->headers().get(Http::LowerCaseString("response_body_size"))->value().c_str());
+  EXPECT_STREQ(
+      "bar",
+      response_->headers().get(Http::LowerCaseString("response_metadata_foo"))->value().c_str());
+  EXPECT_STREQ(
+      "bat",
+      response_->headers().get(Http::LowerCaseString("response_metadata_baz"))->value().c_str());
   EXPECT_EQ(nullptr, response_->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();

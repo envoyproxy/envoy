@@ -43,6 +43,7 @@ public:
         }));
 
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))

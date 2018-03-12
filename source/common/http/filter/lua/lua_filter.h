@@ -47,6 +47,8 @@ public:
    * @param state supplies the active Lua state.
    */
   virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
+
+  virtual const envoy::api::v2::core::Metadata routeEntryMetadata() const PURE;
 };
 
 class Filter;
@@ -95,12 +97,13 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},       {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks}, {"trailers", static_luaTrailers},
-            {"logTrace", static_luaLogTrace},     {"logDebug", static_luaLogDebug},
-            {"logInfo", static_luaLogInfo},       {"logWarn", static_luaLogWarn},
-            {"logErr", static_luaLogErr},         {"logCritical", static_luaLogCritical},
-            {"httpCall", static_luaHttpCall},     {"respond", static_luaRespond}};
+    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
+            {"respond", static_luaRespond}};
   }
 
 private:
@@ -150,6 +153,11 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
 
   /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -174,6 +182,7 @@ private:
     headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
+    metadata_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -192,6 +201,7 @@ private:
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
   Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> body_wrapper_;
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
+  Envoy::Lua::LuaDeathRef<MetadataMapWrapper> metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   AsyncClient::Request* http_request_{};
@@ -279,6 +289,12 @@ private:
     void continueIteration() override { return callbacks_->continueDecoding(); }
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    const envoy::api::v2::core::Metadata routeEntryMetadata() const override {
+      if (callbacks_ && callbacks_->route() && callbacks_->route()->routeEntry()) {
+        return callbacks_->route()->routeEntry()->metadata();
+      }
+      return envoy::api::v2::core::Metadata{};
+    }
 
     Filter& parent_;
     StreamDecoderFilterCallbacks* callbacks_{};
@@ -295,6 +311,12 @@ private:
     void continueIteration() override { return callbacks_->continueEncoding(); }
     void onHeadersModified() override {}
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    const envoy::api::v2::core::Metadata routeEntryMetadata() const override {
+      if (callbacks_ && callbacks_->route() && callbacks_->route()->routeEntry()) {
+        return callbacks_->route()->routeEntry()->metadata();
+      }
+      return envoy::api::v2::core::Metadata{};
+    }
 
     Filter& parent_;
     StreamEncoderFilterCallbacks* callbacks_{};
