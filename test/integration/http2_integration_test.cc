@@ -235,7 +235,7 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Start request 1
+   // Start request 1
   encoder1 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
                                                                   {":path", "/test/long/url"},
                                                                   {":scheme", "http"},
@@ -268,16 +268,24 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   upstream_request2->encodeData(request2_bytes, true);
   response2->waitForEndStream();
   EXPECT_TRUE(upstream_request2->complete());
+  EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
   EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ(request2_bytes, response2->body().size());
+
+  // Validate that idle time is not kicked in.
+  EXPECT_EQ(0,test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
+  EXPECT_NE(0,test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request1->encodeData(request1_bytes, true);
+  upstream_request1->encodeData(request2_bytes, true);
   response1->waitForEndStream();
   EXPECT_TRUE(upstream_request1->complete());
+  EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
   EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ(request2_bytes, response1->body().size());
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
