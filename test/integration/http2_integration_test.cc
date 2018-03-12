@@ -199,7 +199,9 @@ TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 
 TEST_P(Http2IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
-TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) { simultaneousRequestsWithIdleTimeout(); }
+TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
+  simultaneousRequestsWithIdleTimeout();
+}
 
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
 void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {

@@ -129,7 +129,6 @@ protected:
   void testOverlyLongHeaders();
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
-  
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
