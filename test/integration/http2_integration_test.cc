@@ -228,7 +228,7 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
 
   initialize();
 
-  // valide that timeout is set and is as per expectation.
+  // Validate that timeout is set and is as per expectation.
   bool has_idle_timeout =
       config_helper_.bootstrap().static_resources().clusters(0).has_common_http_protocol_options();
   EXPECT_TRUE(has_idle_timeout);
@@ -259,12 +259,6 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   codec_client_->sendData(*encoder1, request1_bytes, true);
   upstream_request1->waitForEndStream(*dispatcher_);
 
-  // Validate that idle time is not kicked in and connection count is not zero even after sleeping
-  // for idle timeout. As our idle timeout is 1000ms, sleep for 1100ms just in case.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
-  EXPECT_NE(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
-
   // Finish request 2
   codec_client_->sendData(*encoder2, request2_bytes, true);
   upstream_request2->waitForEndStream(*dispatcher_);
@@ -285,7 +279,11 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   EXPECT_TRUE(response1->complete());
   EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
 
-  // do not send any requests and validate idle timeout kicks in after both the requests are done.
+  // Validate that idle time is not kicked in and connection count is not zero.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
+  EXPECT_NE(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 0);
 }
