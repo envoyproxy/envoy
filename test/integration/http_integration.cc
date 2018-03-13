@@ -928,6 +928,7 @@ void HttpIntegrationTest::testHttp10Disabled() {
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
+// Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 void HttpIntegrationTest::testHttp10Enabled() {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
@@ -944,6 +945,8 @@ void HttpIntegrationTest::testHttp10Enabled() {
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 }
 
+// Verify for HTTP/1.0 a keep-alive header results in no connection: close.
+// Also verify existing host headers are passed through for the HTTP/1.0 case.
 void HttpIntegrationTest::testHttp10WithHostAndKeepAlive() {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);

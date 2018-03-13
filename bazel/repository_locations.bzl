@@ -76,6 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
+        #FIXME update once https://github.com/envoyproxy/envoy/issues/170 lands.
         commit = "e1d75c1497877e31eae6232e4ce35fbe70ae6bc8",
         remote = "https://github.com/alyssawilk/envoy-api",
     ),
