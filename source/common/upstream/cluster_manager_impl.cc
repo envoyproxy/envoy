@@ -340,7 +340,9 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
-  // We don't allow updates to statically configured clusters in the main configuration.
+  // We don't allow updates to statically configured clusters in the main configuration. We check
+  // both the warming clusters and the active clusters to see if we need an update or the update
+  // should be blocked.
   const std::string cluster_name = cluster.name();
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
@@ -354,6 +356,8 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
+    // The following init manager remove call is a NOP in the case we are already initialized. It's
+    // just kept here to avoid additional logic.
     init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
     cm_stats_.cluster_modified_.inc();
   } else {
