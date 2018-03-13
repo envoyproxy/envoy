@@ -194,9 +194,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//source/common/network:utility_lib",
         "//source/common/upstream:outlier_detection_lib",

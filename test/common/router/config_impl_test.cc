@@ -1289,15 +1289,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -1318,24 +1316,21 @@ TEST_F(RouterMatcherCookieHashPolicyTest, NoTtl) {
     // With no cookie, no hash is generated.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // With no matching cookie, no hash is generated.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // Matching cookie produces a valid hash.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; hash=brown");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // The hash policy is per-route.
@@ -1376,20 +1371,20 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; hash=brown");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     uint64_t hash_1, hash_2;
@@ -1419,16 +1414,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()
-                    ->hashPolicy()
-                    ->generateHash("1.2.3.4", headers, add_cookie_nop_)
-                    .valid());
+    EXPECT_TRUE(
+        route->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -1469,8 +1461,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");

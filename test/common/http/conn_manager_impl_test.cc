@@ -229,7 +229,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -241,7 +241,7 @@ public:
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
-  const Optional<std::string>& userAgent() override { return user_agent_; }
+  const absl::optional<std::string>& userAgent() override { return user_agent_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
@@ -264,8 +264,8 @@ public:
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  Optional<std::string> user_agent_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::string> user_agent_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
@@ -885,7 +885,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   EXPECT_CALL(*handler, log(_, _, _))
       .WillOnce(Invoke(
           [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode().valid());
+            EXPECT_TRUE(request_info.responseCode());
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
             EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
             EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
@@ -1459,7 +1459,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
   // Not used in the test.
   delete codec_;
 
-  idle_timeout_.value(std::chrono::milliseconds(10));
+  idle_timeout_ = (std::chrono::milliseconds(10));
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(_));
   setup(false, "");
@@ -1472,7 +1472,7 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
-  idle_timeout_.value(std::chrono::milliseconds(10));
+  idle_timeout_ = (std::chrono::milliseconds(10));
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(_));
   setup(false, "");

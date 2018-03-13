@@ -62,7 +62,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
-  Optional<std::string> user_agent_;
+  absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -136,7 +136,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -257,7 +257,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
 
@@ -272,7 +272,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers;
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),

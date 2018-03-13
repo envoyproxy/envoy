@@ -27,10 +27,10 @@ void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host)
   Http::MockAsyncClientRequest request(&cm.async_client_);
   Http::AsyncClient::Callbacks* callback;
   EXPECT_CALL(cm.async_client_,
-              send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(5))))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5))))
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message, inner_message);
             EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
             callback = &callbacks;
@@ -46,10 +46,10 @@ void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host)
   message->headers().insertHost().value(std::string(host));
   EXPECT_CALL(cm, httpAsyncClientForCluster("bar")).WillOnce(ReturnRef(cm.async_client_));
   EXPECT_CALL(cm.async_client_,
-              send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(10))))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(10))))
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message, inner_message);
             EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
             callback = &callbacks;

@@ -55,7 +55,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   expose_headers_ = config.expose_headers();
   max_age_ = config.max_age();
   if (config.has_allow_credentials()) {
-    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
@@ -73,13 +73,13 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback) const override {
+    absl::optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
     if (header) {
-      hash.value(HashUtil::xxHash64(header->value().c_str()));
+      hash = HashUtil::xxHash64(header->value().c_str());
     }
     return hash;
   }
@@ -92,17 +92,17 @@ class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
   CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback add_cookie) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback add_cookie) const override {
+    absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
     if (value.empty() && ttl_ != std::chrono::seconds(0)) {
       value = add_cookie(key_, ttl_);
-      hash.value(HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
-      hash.value(HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
     }
     return hash;
   }
@@ -114,11 +114,11 @@ private:
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  Optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
-                              const HashPolicy::AddCookieCallback) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+                                    const HashPolicy::AddCookieCallback) const override {
+    absl::optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
-      hash.value(HashUtil::xxHash64(downstream_addr));
+      hash = HashUtil::xxHash64(downstream_addr);
     }
     return hash;
   }
@@ -151,17 +151,18 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers,
-                                                const AddCookieCallback add_cookie) const {
-  Optional<uint64_t> hash;
+absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
+                                                      const Http::HeaderMap& headers,
+                                                      const AddCookieCallback add_cookie) const {
+  absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
-    if (new_hash.valid()) {
+    const absl::optional<uint64_t> new_hash =
+        hash_impl->evaluate(downstream_addr, headers, add_cookie);
+    if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy
-      const uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
-      hash.value(old_value ^ new_hash.value());
+      const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      hash = old_value ^ new_hash.value();
     }
   }
   return hash;
@@ -324,7 +325,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
   bool matches = true;
 
-  if (runtime_.valid()) {
+  if (runtime_) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
                                                  random_value);
   }
@@ -361,14 +362,14 @@ void RouteEntryImplBase::finalizeResponseHeaders(
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
 }
 
-Optional<RouteEntryImplBase::RuntimeData>
+absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
-  Optional<RuntimeData> runtime;
+  absl::optional<RuntimeData> runtime;
   if (route_match.has_runtime()) {
     RuntimeData data;
     data.key_ = route_match.runtime().runtime_key();
     data.default_ = route_match.runtime().default_value();
-    runtime.value(data);
+    runtime = data;
   }
 
   return runtime;
@@ -820,7 +821,7 @@ const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     bool method_matches =
-        !entry.method_.valid() || headers.Method()->value().c_str() == entry.method_.value();
+        !entry.method_ || headers.Method()->value().c_str() == entry.method_.value();
 
     if (method_matches && std::regex_match(headers.Path()->value().c_str(), entry.pattern_)) {
       return &entry;

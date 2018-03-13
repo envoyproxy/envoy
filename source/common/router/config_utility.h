@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
@@ -18,6 +17,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -105,16 +106,17 @@ public:
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
    * @param route supplies the Route configuration.
-   * @return Optional<Http::Code> the HTTP status from the route's direct_response if specified,
-   *         or the HTTP status code from the route's redirect if specified,
-   *         or an empty Option otherwise.
+   * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
+   * specified, or the HTTP status code from the route's redirect if specified, or an empty
+   * absl::optional otherwise.
    */
-  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::route::Route& route);
+  static absl::optional<Http::Code>
+  parseDirectResponseCode(const envoy::api::v2::route::Route& route);
 
   /**
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
-   * @return Optional<std::string> the response body provided inline in the route's
+   * @return absl::optional<std::string> the response body provided inline in the route's
    *         direct_response if specified, or the contents of the file named in the
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.

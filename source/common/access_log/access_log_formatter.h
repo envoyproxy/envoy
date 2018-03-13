@@ -5,9 +5,10 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/common/optional.h"
 #include "envoy/common/time.h"
 #include "envoy/request_info/request_info.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -21,7 +22,7 @@ public:
 
 private:
   static void parseCommand(const std::string& token, const size_t start, std::string& main_header,
-                           std::string& alternative_header, Optional<size_t>& max_length);
+                           std::string& alternative_header, absl::optional<size_t>& max_length);
 };
 
 /**
@@ -30,8 +31,8 @@ private:
 class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
-  static const std::string& protocolToString(const Optional<Http::Protocol>& protocol);
-  static std::string durationToString(const Optional<std::chrono::nanoseconds>& time);
+  static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
+  static std::string durationToString(const absl::optional<std::chrono::nanoseconds>& time);
 
 private:
   AccessLogFormatUtils();
@@ -74,14 +75,14 @@ private:
 class HeaderFormatter {
 public:
   HeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                  const Optional<size_t>& max_length);
+                  const absl::optional<size_t>& max_length);
 
   std::string format(const Http::HeaderMap& headers) const;
 
 private:
   Http::LowerCaseString main_header_;
   Http::LowerCaseString alternative_header_;
-  Optional<size_t> max_length_;
+  absl::optional<size_t> max_length_;
 };
 
 /**
@@ -90,7 +91,7 @@ private:
 class RequestHeaderFormatter : public Formatter, HeaderFormatter {
 public:
   RequestHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                         const Optional<size_t>& max_length);
+                         const absl::optional<size_t>& max_length);
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
@@ -103,7 +104,7 @@ public:
 class ResponseHeaderFormatter : public Formatter, HeaderFormatter {
 public:
   ResponseHeaderFormatter(const std::string& main_header, const std::string& alternative_header,
-                          const Optional<size_t>& max_length);
+                          const absl::optional<size_t>& max_length);
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,

@@ -81,7 +81,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (config_.idleTimeout().valid()) {
+  if (config_.idleTimeout()) {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     idle_timer_->enableTimer(config_.idleTimeout().value());
@@ -405,7 +405,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_.value(response_code);
+  request_info_.response_code_ = response_code;
 
   if (request_info_.hc_request_) {
     return;
@@ -530,7 +530,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.runtime_, connection_manager_.local_info_);
   ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
-  ASSERT(!cached_route_.valid());
+  ASSERT(!cached_route_);
   refreshCachedRoute();
 
   // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
@@ -792,7 +792,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
   request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_.value(std::move(route));
+  cached_route_ = std::move(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1251,7 +1251,7 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.valid()) {
+  if (!parent_.cached_route_) {
     parent_.refreshCachedRoute();
   }
 
@@ -1259,7 +1259,7 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
-  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
+  parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
