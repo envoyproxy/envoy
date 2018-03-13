@@ -24,55 +24,60 @@ TagNameValues::TagNameValues() {
   // - Typical * notation will be used to denote an arbitrary set of characters.
 
   // *_rq(_<response_code>)
-  addRegex(RESPONSE_CODE, "_rq(_(\\d{3}))$");
+  addRegex(RESPONSE_CODE, "_rq(_(\\d{3}))$", "_rq_");
 
   // *_rq_(<response_code_class>)xx
-  addRegex(RESPONSE_CODE_CLASS, "_rq_(\\d)xx$");
+  addRegex(RESPONSE_CODE_CLASS, "_rq_(\\d)xx$", "_rq_");
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
-  addRegex(DYNAMO_PARTITION_ID, "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."
-                                "capacity(?=\\.).*?(\\.__partition_id=(\\w{7}))"
-                                "$");
+  addRegex(DYNAMO_PARTITION_ID,
+           "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."
+           "capacity(?=\\.).*?(\\.__partition_id=(\\w{7}))$",
+           ".dynamodb.table.");
 
   // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)<base_stat> or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
-  addRegex(DYNAMO_OPERATION, "^http(?=\\.).*?\\.dynamodb.(?:operation|table(?="
-                             "\\.).*?\\.capacity)(\\.(.*?))(?:\\.|$)");
+  addRegex(DYNAMO_OPERATION,
+           "^http(?=\\.).*?\\.dynamodb.(?:operation|table(?="
+           "\\.).*?\\.capacity)(\\.(.*?))(?:\\.|$)",
+           ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
   addRegex(MONGO_CALLSITE,
-           "^mongo(?=\\.).*?\\.collection(?=\\.).*?\\.callsite\\.((.*?)\\.).*?query.\\w+?$");
+           "^mongo(?=\\.).*?\\.collection(?=\\.).*?\\.callsite\\.((.*?)\\.).*?query.\\w+?$",
+           ".collection.");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRegex(DYNAMO_TABLE, "^http(?=\\.).*?\\.dynamodb.(?:table|error)\\.((.*?)\\.)");
+  addRegex(DYNAMO_TABLE, "^http(?=\\.).*?\\.dynamodb.(?:table|error)\\.((.*?)\\.)", ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
-  addRegex(MONGO_COLLECTION, "^mongo(?=\\.).*?\\.collection\\.((.*?)\\.).*?query.\\w+?$");
+  addRegex(MONGO_COLLECTION, "^mongo(?=\\.).*?\\.collection\\.((.*?)\\.).*?query.\\w+?$",
+           ".collection.");
 
   // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
-  addRegex(MONGO_CMD, "^mongo(?=\\.).*?\\.cmd\\.((.*?)\\.)\\w+?$");
+  addRegex(MONGO_CMD, "^mongo(?=\\.).*?\\.cmd\\.((.*?)\\.)\\w+?$", ".cmd.");
 
   // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)<base_stat>
-  addRegex(GRPC_BRIDGE_METHOD, "^cluster(?=\\.).*?\\.grpc(?=\\.).*\\.((.*?)\\.)\\w+?$");
+  addRegex(GRPC_BRIDGE_METHOD, "^cluster(?=\\.).*?\\.grpc(?=\\.).*\\.((.*?)\\.)\\w+?$", ".grpc.");
 
   // http.[<stat_prefix>.]user_agent.(<user_agent>.)<base_stat>
-  addRegex(HTTP_USER_AGENT, "^http(?=\\.).*?\\.user_agent\\.((.*?)\\.)\\w+?$");
+  addRegex(HTTP_USER_AGENT, "^http(?=\\.).*?\\.user_agent\\.((.*?)\\.)\\w+?$", ".user_agent.");
 
   // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)<base_stat>
-  addRegex(VIRTUAL_CLUSTER, "^vhost(?=\\.).*?\\.vcluster\\.((.*?)\\.)\\w+?$");
+  addRegex(VIRTUAL_CLUSTER, "^vhost(?=\\.).*?\\.vcluster\\.((.*?)\\.)\\w+?$", ".vcluster.");
 
   // http.[<stat_prefix>.]fault.(<downstream_cluster>.)<base_stat>
-  addRegex(FAULT_DOWNSTREAM_CLUSTER, "^http(?=\\.).*?\\.fault\\.((.*?)\\.)\\w+?$");
+  addRegex(FAULT_DOWNSTREAM_CLUSTER, "^http(?=\\.).*?\\.fault\\.((.*?)\\.)\\w+?$", ".fault.");
 
   // listener.[<address>.]ssl.cipher.(<cipher>)
   addRegex(SSL_CIPHER, "^listener(?=\\.).*?\\.ssl\\.cipher(\\.(.*?))$");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$");
+  addRegex(SSL_CIPHER_SUITE, "^cluster(?=\\.).*?\\.ssl\\.ciphers(\\.(.*?))$", ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRegex(GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)");
+  addRegex(GRPC_BRIDGE_SERVICE, "^cluster(?=\\.).*?\\.grpc\\.((.*?)\\.)", ".grpc.");
 
   // tcp.(<stat_prefix>.)<base_stat>
   addRegex(TCP_PREFIX, "^tcp\\.((.*?)\\.)\\w+?$");
@@ -86,8 +91,11 @@ TagNameValues::TagNameValues() {
   // cluster.(<cluster_name>.)*
   addRegex(CLUSTER_NAME, "^cluster\\.((.*?)\\.)");
 
-  // http.(<stat_prefix>.)* or listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^(?:|listener(?=\\.).*?\\.)http\\.((.*?)\\.)");
+  // listener.[<address>.]http.(<stat_prefix>.)*
+  addRegex(HTTP_CONN_MANAGER_PREFIX, "^listener(?=\\.).*?\\.http\\.((.*?)\\.)", ".http.");
+
+  // http.(<stat_prefix>.)*
+  addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
 
   // listener.(<address>.)*
   addRegex(LISTENER_ADDRESS,
@@ -100,8 +108,9 @@ TagNameValues::TagNameValues() {
   addRegex(MONGO_PREFIX, "^mongo\\.((.*?)\\.)");
 }
 
-void TagNameValues::addRegex(const std::string& name, const std::string& regex) {
-  descriptor_vec_.emplace_back(Descriptor(name, regex));
+void TagNameValues::addRegex(const std::string& name, const std::string& regex,
+                             const std::string& substr) {
+  descriptor_vec_.emplace_back(Descriptor(name, regex, substr));
 }
 
 } // namespace Config
