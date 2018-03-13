@@ -45,13 +45,14 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
 TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(fd, address) {}
 
-UdsListenSocket::UdsListenSocket(const std::string& uds_path)
-    : ListenSocketImpl(-1, std::make_shared<Address::PipeInstance>(uds_path)) {
-  remove(uds_path.c_str());
-  fd_ = local_address_->socket(Address::SocketType::Stream);
+UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
+    : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
   RELEASE_ASSERT(fd_ != -1);
   doBind();
 }
+
+UdsListenSocket::UdsListenSocket(int fd, const Address::InstanceConstSharedPtr& address)
+    : ListenSocketImpl(fd, address) {}
 
 } // namespace Network
 } // namespace Envoy

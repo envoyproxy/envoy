@@ -29,7 +29,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::DelayInjected, "DI"),
       std::make_pair(ResponseFlag::FaultInjected, "FI"),
       std::make_pair(ResponseFlag::RateLimited, "RL"),
-      std::make_pair(ResponseFlag::Unauthorized, "UA"),
+      std::make_pair(ResponseFlag::UnauthorizedExternalService, "UAEX"),
   };
 
   for (const auto& test_case : expected) {

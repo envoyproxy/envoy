@@ -23,6 +23,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::WithArg;
 using testing::_;
@@ -39,7 +40,7 @@ class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::AsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -74,7 +75,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
       .WillOnce(
           Invoke([this](const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
                         Grpc::AsyncRequestCallbacks&, Tracing::Span&,
-                        const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+                        const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
             EXPECT_EQ("envoy.service.auth.v2.Authorization", service_method.service()->full_name());
             EXPECT_EQ("Check", service_method.name());
             return &async_request_;
@@ -122,7 +123,7 @@ public:
   };
 
   Network::Address::InstanceConstSharedPtr addr_;
-  Optional<Http::Protocol> protocol_;
+  absl::optional<Http::Protocol> protocol_;
   CheckRequestUtils check_request_generator_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
@@ -154,7 +155,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnRef(protocol_));
+  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
   CheckRequestUtils::createHttpCheck(&callbacks_, headers, request);
 }
 
@@ -170,7 +171,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnRef(protocol_));
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
 
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));

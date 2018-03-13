@@ -1,11 +1,12 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <regex>
 #include <string>
 #include <vector>
 
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/common/optional.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
@@ -17,6 +18,8 @@
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -25,25 +28,20 @@ namespace Router {
  */
 class ConfigUtility {
 public:
+  enum class HeaderMatchType { Value, Regex, Range };
+
+  // A HeaderData specifies one of exact value or regex or range element
+  // to match in a request's header, specified in the header_match_type_ member.
+  // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData {
-    // An empty header value allows for matching to be only based on header presence.
-    // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
-    // exact string matching.
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
-        : name_(config.name()), value_(config.value()),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
-          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
-    HeaderData(const Json::Object& config)
-        : HeaderData([&config] {
-            envoy::api::v2::route::HeaderMatcher header_matcher;
-            Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
-            return header_matcher;
-          }()) {}
+    HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
+    HeaderData(const Json::Object& config);
 
     const Http::LowerCaseString name_;
-    const std::string value_;
-    const bool is_regex_;
-    const std::regex regex_pattern_;
+    HeaderMatchType header_match_type_;
+    std::string value_;
+    std::regex regex_pattern_;
+    envoy::type::Int64Range range_;
   };
 
   // A QueryParameterMatcher specifies one "name" or "name=value" element
@@ -108,16 +106,17 @@ public:
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
    * @param route supplies the Route configuration.
-   * @return Optional<Http::Code> the HTTP status from the route's direct_response if specified,
-   *         or the HTTP status code from the route's redirect if specified,
-   *         or an empty Option otherwise.
+   * @return absl::optional<Http::Code> the HTTP status from the route's direct_response if
+   * specified, or the HTTP status code from the route's redirect if specified, or an empty
+   * absl::optional otherwise.
    */
-  static Optional<Http::Code> parseDirectResponseCode(const envoy::api::v2::route::Route& route);
+  static absl::optional<Http::Code>
+  parseDirectResponseCode(const envoy::api::v2::route::Route& route);
 
   /**
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
-   * @return Optional<std::string> the response body provided inline in the route's
+   * @return absl::optional<std::string> the response body provided inline in the route's
    *         direct_response if specified, or the contents of the file named in the
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.

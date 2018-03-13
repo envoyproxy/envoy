@@ -59,7 +59,8 @@ typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
 
 class UdsListenSocket : public ListenSocketImpl {
 public:
-  UdsListenSocket(const std::string& uds_path);
+  UdsListenSocket(const Address::InstanceConstSharedPtr& address);
+  UdsListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {

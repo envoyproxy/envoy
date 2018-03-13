@@ -34,9 +34,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/common:optional",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",

@@ -81,7 +81,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (config_.idleTimeout().valid()) {
+  if (config_.idleTimeout()) {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     idle_timer_->enableTimer(config_.idleTimeout().value());
@@ -364,6 +364,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
+  request_info_.onRequestComplete();
+
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
@@ -403,7 +405,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_.value(response_code);
+  request_info_.response_code_ = response_code;
 
   if (request_info_.hc_request_) {
     return;
@@ -440,9 +442,7 @@ Ssl::Connection* ConnectionManagerImpl::ActiveStream::ssl() {
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
-
+  maybeEndDecode(end_stream);
   request_headers_ = std::move(headers);
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
 #ifndef NVLOG
@@ -530,7 +530,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.runtime_, connection_manager_.local_info_);
   ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
-  ASSERT(!cached_route_.valid());
+  ASSERT(!cached_route_);
   refreshCachedRoute();
 
   // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
@@ -667,13 +667,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
+  maybeEndDecode(end_stream);
   request_info_.bytes_received_ += data.length();
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = end_stream;
-  if (state_.remote_complete_) {
-    ENVOY_STREAM_LOG(debug, "request end stream", *this);
-  }
-
   decodeData(nullptr, data, end_stream);
 }
 
@@ -727,9 +722,8 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers) {
+  maybeEndDecode(true);
   request_trailers_ = std::move(trailers);
-  ASSERT(!state_.remote_complete_);
-  state_.remote_complete_ = true;
   decodeTrailers(nullptr, *request_trailers_);
 }
 
@@ -757,6 +751,15 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
       return;
     }
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
+  ASSERT(!state_.remote_complete_);
+  state_.remote_complete_ = end_stream;
+  if (end_stream) {
+    request_info_.onLastDownstreamRxByteReceived();
+    ENVOY_STREAM_LOG(debug, "request end stream", *this);
   }
 }
 
@@ -789,7 +792,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
   request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_.value(std::move(route));
+  cached_route_ = std::move(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -917,7 +920,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // For Egress (outbound) response, if a decorator operation name has been provided, it
       // should be used to override the active span's operation.
       if (resp_operation_override) {
-        if (!resp_operation_override->value().empty()) {
+        if (!resp_operation_override->value().empty() && active_span_) {
           active_span_->setOperation(resp_operation_override->value().c_str());
         }
         // Remove header so not propagated to service.
@@ -941,6 +944,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 #endif
 
   // Now actually encode via the codec.
+  request_info_.onFirstDownstreamTxByteSent();
   response_encoder_->encodeHeaders(headers,
                                    end_stream && continue_data_entry == encoder_filters_.end());
 
@@ -1031,6 +1035,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
+    request_info_.onLastDownstreamTxByteSent();
     request_timer_->complete();
     connection_manager_.doEndStream(*this);
   }
@@ -1246,7 +1251,7 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.valid()) {
+  if (!parent_.cached_route_) {
     parent_.refreshCachedRoute();
   }
 
@@ -1254,7 +1259,7 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
-  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
+  parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
