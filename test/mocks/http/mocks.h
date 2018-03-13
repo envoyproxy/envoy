@@ -62,6 +62,7 @@ public:
   MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
+  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {

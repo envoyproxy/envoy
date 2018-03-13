@@ -84,6 +84,8 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       encodeHeader(Headers::get().ContentLength.get().c_str(),
                    Headers::get().ContentLength.get().size(), "0", 1);
       chunk_encoding_ = false;
+    } else if (connection_.protocol() == Protocol::Http10) {
+      chunk_encoding_ = false;
     } else {
       encodeHeader(Headers::get().TransferEncoding.get().c_str(),
                    Headers::get().TransferEncoding.get().size(),

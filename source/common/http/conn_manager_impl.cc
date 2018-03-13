@@ -471,14 +471,32 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
-    // The protocol may have shifted in the HTTP/1.0 case so reset it.
-    request_info_.protocol(protocol);
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
+    // Send "Upgrade Required" if HTTP/1.0 support is not expliictly configured on.
+    if (!connection_manager_.config_.http1Settings().accept_http_10_) {
+      // The protocol may have shifted in the HTTP/1.0 case so reset it.
+      request_info_.protocol(protocol);
+      HeaderMapImpl headers{
+          {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
+      encodeHeaders(nullptr, headers, true);
+      return;
+    } else {
+      // HTTP/1.0 defaults to single-use connections.  Make sure the connection
+      // will be closed unless Keep-Alive is present.
+      state_.saw_connection_close_ = true;
+      if (request_headers_->Connection() &&
+          0 == StringUtil::caseInsensitiveCompare(
+                   request_headers_->Connection()->value().c_str(),
+                   Http::Headers::get().ConnectionValues.KeepAlive.c_str())) {
+        state_.saw_connection_close_ = false;
+      }
+    }
   }
 
+  // Add a default host if configured to do so.
+  if (!request_headers_->Host() && (protocol == Protocol::Http10 || protocol == Protocol::Http11) &&
+      !connection_manager_.config_.http1Settings().default_host_.empty()) {
+    request_headers_->insertHost().value(connection_manager_.config_.http1Settings().default_host_);
+  }
   // Require host header. For HTTP/1.1 Host has already been translated to :authority.
   if (!request_headers_->Host()) {
     HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
