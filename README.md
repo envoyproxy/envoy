@@ -65,7 +65,13 @@ The Envoy team meets every other Tuesday at 9am PT. The public Google calendar i
 
 Meeting minutes are here: https://goo.gl/5Cergb
 
-## Reporting security vulnerabilities
+## Security
+
+### Security Audit
+
+A third party security audit was performed by Cure53, you can see the full report [here](docs/SECURITY_AUDIT.pdf).
+
+### Reporting security vulnerabilities
 
 If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
 [envoy-security](mailto:envoy-security@googlegroups.com). We'll send a confirmation
