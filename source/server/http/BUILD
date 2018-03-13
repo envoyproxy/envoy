@@ -50,7 +50,7 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "@envoy_api//envoy/admin:admin_cc",
+        "@envoy_api//envoy/admin/v2:config_dump_cc",
     ],
 )
 

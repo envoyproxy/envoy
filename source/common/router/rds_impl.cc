@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/admin.pb.h"
+#include "envoy/admin/v2/config_dump.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
 
@@ -241,7 +241,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 }
 
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::RouteConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v2::RouteConfigDump>();
   auto* const dynamic_configs = config_dump->mutable_dynamic_route_configs();
   for (const auto& provider : getRdsRouteConfigProviders()) {
     *(dynamic_configs->Add()) = provider->configAsProto();

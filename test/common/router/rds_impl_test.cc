@@ -1,8 +1,8 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/admin/admin.pb.h"
-#include "envoy/admin/admin.pb.validate.h"
+#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2/config_dump.pb.validate.h"
 
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
@@ -547,7 +547,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   auto message_ptr = config_tracker_callback_();
   EXPECT_NE(nullptr, message_ptr);
   const auto& route_config_dump =
-      MessageUtil::downcastAndValidate<const envoy::admin::RouteConfigDump&>(*message_ptr);
+      MessageUtil::downcastAndValidate<const envoy::admin::v2::RouteConfigDump&>(*message_ptr);
   EXPECT_EQ(0, route_config_dump.static_route_configs_size());
   EXPECT_EQ(1, route_config_dump.dynamic_route_configs_size());
   EXPECT_TRUE(ProtobufUtil::MessageDifferencer::Equivalent(

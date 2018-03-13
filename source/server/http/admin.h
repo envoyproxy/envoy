@@ -152,7 +152,7 @@ private:
                           Buffer::Instance& response);
   Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response);
-  Http::Code handlerConfigDump(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response) const;
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response);
