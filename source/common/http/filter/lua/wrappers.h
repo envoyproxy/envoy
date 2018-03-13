@@ -117,7 +117,6 @@ private:
 
 /**
  * Lua wrapper for a metadata map.
- * TODO(dio): define and implement MetadataMapIterator.
  */
 class MetadataMapWrapper : public Envoy::Lua::BaseLuaObject<MetadataMapWrapper> {
 public:

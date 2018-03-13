@@ -41,13 +41,17 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = "io.envoyproxy.lua";
-          const std::string yaml = R"EOF(
-foo: bar
-baz: bat
-)EOF";
+          const std::string key = "foo.bar";
+          const std::string yaml =
+          R"EOF(
+            foo: bar
+            baz: bat
+          )EOF";
+
           ProtobufWkt::Struct value;
           MessageUtil::loadFromYaml(yaml, value);
+
+          // Sets the route metadata.
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
@@ -93,7 +97,7 @@ config:
       request_handle:logErr("log test")
       request_handle:logCritical("log test")
 
-      local metadata = request_handle:metadata():get("io.envoyproxy.lua")
+      local metadata = request_handle:metadata():get("foo.bar")
       local body_length = request_handle:body():length()
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
@@ -101,7 +105,7 @@ config:
     end
 
     function envoy_on_response(response_handle)
-      local metadata = response_handle:metadata():get("io.envoyproxy.lua")
+      local metadata = response_handle:metadata():get("foo.bar")
       local body_length = response_handle:body():length()
       response_handle:headers():add("response_metadata_foo", metadata["foo"])
       response_handle:headers():add("response_metadata_baz", metadata["baz"])
