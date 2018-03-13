@@ -295,11 +295,10 @@ private:
  */
 class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+  CounterImpl(RawStatData& data, RawStatDataAllocator& /*alloc*/, std::string&& tag_extracted_name,
               std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
-  ~CounterImpl() { alloc_.free(data_); }
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data) {}
+  ~CounterImpl() {}
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -316,7 +315,6 @@ public:
 
 private:
   RawStatData& data_;
-  RawStatDataAllocator& alloc_;
 };
 
 /**
@@ -328,7 +326,7 @@ public:
             std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
-  ~GaugeImpl() { alloc_.free(data_); }
+  ~GaugeImpl() {}
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
@@ -378,6 +376,10 @@ public:
   // RawStatDataAllocator
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+  ~HeapRawStatDataAllocator();
+
+private:
+  RawStatData* data_ = nullptr;
 };
 
 /**

@@ -30,7 +30,7 @@ namespace Stats {
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
+  ~TestAllocator() { EXPECT_FALSE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
@@ -114,9 +114,6 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, store_->gauges().front().get());
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
-
   store_->shutdownThreading();
 }
 
@@ -151,9 +148,6 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get());
   EXPECT_EQ(2L, store_->gauges().front().use_count());
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -185,9 +179,6 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
@@ -206,15 +197,10 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
 
-  EXPECT_CALL(*this, free(_));
-  EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
@@ -243,9 +229,6 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -285,8 +268,6 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, g2.value());
   EXPECT_EQ(1UL, store_->gauges().size());
 
-  // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
-  EXPECT_CALL(*this, free(_)).Times(2);
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
@@ -297,9 +278,6 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
@@ -315,9 +293,6 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
-
-  // Includes overflow but not the failsafe stat which we allocated from the heap.
-  EXPECT_CALL(*this, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -338,9 +313,6 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
   tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
 }
 
 } // namespace Stats
