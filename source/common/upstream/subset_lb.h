@@ -55,8 +55,7 @@ private:
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
 
-    void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed,
-                HostPredicate predicate);
+    void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
     bool empty() { return empty_; }
 
@@ -80,6 +79,7 @@ private:
 
   private:
     const PrioritySet& original_priority_set_;
+    const HostPredicate predicate_;
     bool empty_ = true;
   };
 
@@ -113,7 +113,8 @@ private:
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
   void processSubsets(const HostVector& hosts_added, const HostVector& hosts_removed,
-                      std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> cb);
+                      std::function<void(LbSubsetEntryPtr)> update_cb,
+                      std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> new_cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
@@ -125,6 +126,7 @@ private:
 
   LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
                                       uint32_t idx);
+  void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
 
