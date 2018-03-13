@@ -205,6 +205,21 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
+  // Now setup ADS if needed, this might rely on a primary cluster.
+  if (bootstrap.dynamic_resources().has_ads_config()) {
+    ads_mux_.reset(new Config::GrpcMuxImpl(
+        bootstrap.node(),
+        Config::Utility::factoryForApiConfigSource(
+            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+            ->create(),
+        primary_dispatcher,
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+  } else {
+    ads_mux_.reset(new Config::NullGrpcMuxImpl());
+  }
+
+  // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::api::v2::Cluster::EDS) {
@@ -254,21 +269,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
-
-  // Now setup ADS if needed, this might rely on a primary cluster and the
-  // thread local cluster manager.
-  if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(),
-        Config::Utility::factoryForApiConfigSource(
-            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
-            ->create(),
-        primary_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
-  } else {
-    ads_mux_.reset(new Config::NullGrpcMuxImpl());
-  }
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {

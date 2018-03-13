@@ -18,7 +18,7 @@ const std::string ResponseFlagUtils::NO_ROUTE_FOUND = "NR";
 const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
-const std::string ResponseFlagUtils::UNAUTHORIZED = "UA";
+const std::string ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE = "UAEX";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -81,8 +81,8 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
     appendString(result, RATE_LIMITED);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::Unauthorized)) {
-    appendString(result, UNAUTHORIZED);
+  if (request_info.getResponseFlag(ResponseFlag::UnauthorizedExternalService)) {
+    appendString(result, UNAUTHORIZED_EXTERNAL_SERVICE);
   }
 
   return result.empty() ? NONE : result;
