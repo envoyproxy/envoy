@@ -13,6 +13,7 @@
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/upstream/cds_subscription.h"
 
 namespace Envoy {
 namespace Config {
@@ -39,6 +40,17 @@ public:
       const envoy::api::v2::core::ConfigSource& config, const envoy::api::v2::core::Node& node,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
+      const std::string& rest_method, const std::string& grpc_method) {
+    return subscriptionFromConfigSource(config, node, dispatcher, cm, random,
+        scope, rest_legacy_constructor, cm.adsMux(), rest_method, grpc_method);
+  }
+
+  template <class ResourceType>
+  static std::unique_ptr<Subscription<ResourceType>> subscriptionFromConfigSource(
+      const envoy::api::v2::core::ConfigSource& config, const envoy::api::v2::core::Node& node,
+      Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+      Stats::Scope& scope, std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
+      Config::GrpcMux& ads_mux,
       const std::string& rest_method, const std::string& grpc_method) {
     std::unique_ptr<Subscription<ResourceType>> result;
     SubscriptionStats stats = Utility::generateStats(scope);
@@ -79,13 +91,32 @@ public:
       break;
     }
     case envoy::api::v2::core::ConfigSource::kAds: {
-      result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(cm.adsMux(), stats));
+      result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(ads_mux, stats));
       break;
     }
     default:
       throw EnvoyException("Missing config source specifier in envoy::api::v2::core::ConfigSource");
     }
     return result;
+  }
+
+  static std::unique_ptr<Subscription<envoy::api::v2::Cluster>> cdsSubscriptionFromConfigSource(
+      const envoy::api::v2::core::ConfigSource& cds_config, const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+      const LocalInfo::LocalInfo& local_info,
+      Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
+      Stats::Scope& scope, Config::GrpcMux& ads_mux) {
+
+    return subscriptionFromConfigSource<envoy::api::v2::Cluster>(
+          cds_config, local_info.node(), dispatcher, cm, random, scope,
+          [&cds_config, &eds_config, &cm, &dispatcher, &random, &scope,
+           &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
+            return new Upstream::CdsSubscription(Config::Utility::generateStats(scope), cds_config,
+                                       eds_config, cm, dispatcher, random, local_info);
+          },
+          ads_mux,
+          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
+          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+
   }
 };
 

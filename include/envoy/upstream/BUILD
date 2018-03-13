@@ -14,6 +14,26 @@ envoy_cc_library(
     deps = [
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
+        ":lazy_loader_interface",
+        ":upstream_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/grpc:async_client_manager_interface",
+        "//include/envoy/http:async_client_interface",
+        "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "lazy_loader_interface",
+    hdrs = ["lazy_loader.h"],
+    deps = [
+        ":load_balancer_interface",
+        ":thread_local_cluster_interface",
         ":upstream_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/config:grpc_mux_interface",

@@ -24,7 +24,7 @@ class OriginalDstCluster : public ClusterImplBase {
 public:
   OriginalDstCluster(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
                      Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                     ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
+                     ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api, bool added_lazily);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

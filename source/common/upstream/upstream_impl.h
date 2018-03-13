@@ -296,13 +296,15 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                  bool added_lazily_);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
+  bool addedLazily() const override { return added_lazily_; }
   const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const override {
     return common_lb_config_;
   }
@@ -372,6 +374,7 @@ private:
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
+  const bool added_lazily_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
@@ -390,7 +393,7 @@ public:
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                 bool added_via_api);
+                                 bool added_via_api, bool added_lazily);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -419,7 +422,7 @@ protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const Network::Address::InstanceConstSharedPtr source_address,
                   Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  Ssl::ContextManager& ssl_context_manager, bool added_via_api, bool added_lazily);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
@@ -463,7 +466,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    ClusterManager& cm, bool added_via_api, bool added_lazily);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -495,7 +498,7 @@ public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, bool added_via_api);
+                       Event::Dispatcher& dispatcher, bool added_via_api, bool added_lazily);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

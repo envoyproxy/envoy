@@ -10,7 +10,6 @@
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/cds_subscription.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -33,15 +32,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
   Config::Utility::checkLocalInfo("cds", local_info);
 
   subscription_ =
-      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
-          cds_config, local_info.node(), dispatcher, cm, random, *scope_,
-          [this, &cds_config, &eds_config, &cm, &dispatcher, &random,
-           &local_info]() -> Config::Subscription<envoy::api::v2::Cluster>* {
-            return new CdsSubscription(Config::Utility::generateStats(*scope_), cds_config,
-                                       eds_config, cm, dispatcher, random, local_info);
-          },
-          "envoy.api.v2.ClusterDiscoveryService.FetchClusters",
-          "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
+      Config::SubscriptionFactory::cdsSubscriptionFromConfigSource(
+          cds_config, eds_config, local_info, dispatcher, cm, random, scope, cm.adsMux());
 }
 
 void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
@@ -62,6 +54,10 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
 
   for (auto cluster : clusters_to_remove) {
     const std::string cluster_name = cluster.first;
+    if (cluster.second.get().info()->addedLazily()) {
+      ENVOY_LOG(debug, "cds: not removing '{}' as it was added lazily", cluster_name);
+      continue;
+    }
     if (cm_.removePrimaryCluster(cluster_name)) {
       ENVOY_LOG(debug, "cds: remove cluster '{}'", cluster_name);
     }

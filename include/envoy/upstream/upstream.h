@@ -378,6 +378,8 @@ public:
    */
   virtual bool addedViaApi() const PURE;
 
+  virtual bool addedLazily() const PURE;
+
   /**
    * @return the connect timeout for upstream hosts that belong to this cluster.
    */

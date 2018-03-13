@@ -27,6 +27,7 @@
 #include "common/protobuf/utility.h"
 #include "common/router/shadow_writer_impl.h"
 #include "common/upstream/cds_api_impl.h"
+#include "common/upstream/lazy_loader_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
@@ -201,7 +202,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false);
+      loadCluster(cluster, false, false);
     }
   }
 
@@ -223,7 +224,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false);
+      loadCluster(cluster, false, false);
     }
   }
 
@@ -299,6 +300,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
             ->create(),
         primary_dispatcher));
   }
+
+  // Lazy loading requires CDS
+  if (bootstrap.dynamic_resources().has_cds_config()) {
+    lazy_loader_.reset(new LazyLoaderImpl(bootstrap, local_info, primary_dispatcher, random, *this, stats));
+  }
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
@@ -337,6 +343,10 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 }
 
 bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) {
+  return addOrUpdatePrimaryCluster(cluster, false);
+}
+
+bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster, bool added_lazily) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration.
   const std::string cluster_name = cluster.name();
@@ -351,7 +361,7 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster
     init_helper_.removeCluster(*existing_cluster->second.cluster_);
   }
 
-  loadCluster(cluster, true);
+  loadCluster(cluster, true, added_lazily);
   auto& primary_cluster_entry = primary_clusters_.at(cluster_name);
   ENVOY_LOG(info, "add/update cluster {}", cluster_name);
   tls_->runOnAllThreads(
@@ -369,9 +379,13 @@ bool ClusterManagerImpl::addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster
               ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
             }
 
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
+            auto thread_local_cluster =
                 new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
-                                                                thread_aware_lb_factory));
+                                                                thread_aware_lb_factory);
+            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+            for (auto *cb : cluster_manager.update_callbacks_) {
+              cb->onClusterAddOrUpdate(*thread_local_cluster);
+            }
           });
 
   init_helper_.addCluster(*primary_cluster_entry.cluster_);
@@ -396,14 +410,17 @@ bool ClusterManagerImpl::removePrimaryCluster(const std::string& cluster_name) {
     ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
     ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
     cluster_manager.thread_local_clusters_.erase(cluster_name);
+    for (auto *cb : cluster_manager.update_callbacks_) {
+      cb->onClusterRemoval(cluster_name);
+    }
   });
 
   return true;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api) {
+void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api, bool added_lazily) {
   ClusterSharedPtr new_cluster =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api, added_lazily);
 
   if (!added_via_api) {
     if (primary_clusters_.find(new_cluster->info()->name()) != primary_clusters_.end()) {
@@ -434,7 +451,7 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   size_t num_erased = primary_clusters_.erase(primary_cluster_reference.info()->name());
   auto cluster_entry_it = primary_clusters_
                               .emplace(primary_cluster_reference.info()->name(),
-                                       PrimaryClusterData{MessageUtil::hash(cluster), added_via_api,
+                                       PrimaryClusterData{MessageUtil::hash(cluster), added_via_api, added_lazily,
                                                           std::move(new_cluster)})
                               .first;
 
@@ -546,6 +563,16 @@ const std::string ClusterManagerImpl::versionInfo() const {
     return cds_api_->versionInfo();
   }
   return "static";
+}
+
+void ClusterManagerImpl::addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  cluster_manager.update_callbacks_.insert(&cb);
+}
+
+void ClusterManagerImpl::removeClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  cluster_manager.update_callbacks_.erase(&cb);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
@@ -805,10 +832,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, bool added_lazily) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, primary_dispatcher_, local_info_,
-                                 outlier_event_logger, added_via_api);
+                                 outlier_event_logger, added_via_api, added_lazily);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(

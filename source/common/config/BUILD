@@ -284,6 +284,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/upstream:cds_subscription_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
