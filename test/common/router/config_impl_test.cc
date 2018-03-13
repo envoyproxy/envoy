@@ -975,6 +975,13 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
         },
         {
           "prefix": "/",
+          "cluster": "local_service_with_header_range",
+          "headers" : [
+            {"name": "test_header_range", "range_match": {"start" : 1, "end" : 10}}
+          ]
+        },
+        {
+          "prefix": "/",
           "cluster": "local_service_without_headers"
         }
       ]
@@ -1030,6 +1037,20 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9");
+    EXPECT_EQ("local_service_with_header_range",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "19");
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
@@ -3945,6 +3966,182 @@ virtual_hosts:
   }
 }
 
+TEST(RouteMatcherTest, HeaderMatchedRoutingV2) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header
+              exact_match: test
+        route:
+          cluster: local_service_with_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_multiple1
+              exact_match: test1
+            - name: test_header_multiple2
+              exact_match: test2
+        route:
+          cluster: local_service_with_multiple_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_presence
+        route:
+          cluster: local_service_with_empty_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_pattern
+              regex_match: "^user=test-\\d+$"
+        route:
+          cluster: local_service_with_header_pattern_set_regex
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_pattern
+              exact_match: "^customer=test-\\d+$"
+        route:
+          cluster: local_service_with_header_pattern_unset_regex
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: -9223372036854775808
+                 end: -10
+        route:
+          cluster: local_service_with_header_range_test1
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_multiple_range
+              range_match:
+                 start: -10
+                 end: 1
+            - name: test_header_multiple_exact
+              exact_match: test
+        route:
+          cluster: local_service_with_header_range_test2
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: 1
+                 end: 10
+        route:
+          cluster: local_service_with_header_range_test3
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: 9223372036854775801
+                 end: 9223372036854775807
+        route:
+          cluster: local_service_with_header_range_test4
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              exact_match: "9223372036854775807"
+        route:
+          cluster: local_service_with_header_range_test5
+      - match:
+          prefix: "/"
+        route:
+          cluster: local_service_without_headers
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  {
+    EXPECT_EQ("local_service_without_headers",
+              config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header", "test");
+    EXPECT_EQ("local_service_with_headers", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple1", "test1");
+    headers.addCopy("test_header_multiple2", "test2");
+    EXPECT_EQ("local_service_with_multiple_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("non_existent_header", "foo");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_presence", "test");
+    EXPECT_EQ("local_service_with_empty_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_pattern", "user=test-1223");
+    EXPECT_EQ("local_service_with_header_pattern_set_regex",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "-9223372036854775808");
+    EXPECT_EQ("local_service_with_header_range_test1",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple_range", "-9");
+    headers.addCopy("test_header_multiple_exact", "test");
+    EXPECT_EQ("local_service_with_header_range_test2",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9");
+    EXPECT_EQ("local_service_with_header_range_test3",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9223372036854775807");
+    EXPECT_EQ("local_service_with_header_range_test5",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple_range", "-9");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "19");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy
