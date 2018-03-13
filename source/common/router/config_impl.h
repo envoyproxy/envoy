@@ -443,12 +443,9 @@ private:
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string runtime_key,
-                         Runtime::Loader& loader, const std::string& name, uint64_t weight,
-                         MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria)
-        : DynamicRouteEntry(parent, name), runtime_key_(runtime_key), loader_(loader),
-          cluster_weight_(weight),
-          cluster_metadata_match_criteria_(std::move(cluster_metadata_match_criteria)) {}
+    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string rutime_key,
+                         Runtime::Loader& loader,
+                         const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -461,11 +458,24 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
+    void finalizeRequestHeaders(Http::HeaderMap& headers,
+                                const RequestInfo::RequestInfo& request_info) const override {
+      request_headers_parser_->evaluateHeaders(headers, request_info);
+      DynamicRouteEntry::finalizeRequestHeaders(headers, request_info);
+    }
+    void finalizeResponseHeaders(Http::HeaderMap& headers,
+                                 const RequestInfo::RequestInfo& request_info) const override {
+      response_headers_parser_->evaluateHeaders(headers, request_info);
+      DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
+    }
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
     MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
+    HeaderParserPtr request_headers_parser_;
+    HeaderParserPtr response_headers_parser_;
   };
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;

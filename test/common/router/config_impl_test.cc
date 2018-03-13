@@ -2865,6 +2865,74 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
                EnvoyException);
 }
 
+TEST(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster1
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster1
+                response_headers_to_remove: [ "x-remove-cluster1" ]
+              - name: cluster2
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster2
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster2
+                response_headers_to_remove: [ "x-remove-cluster2" ]
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::TestHeaderMapImpl resp_headers({{"x-remove-cluster1", "value"}});
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, request_info);
+    EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
+
+    route->finalizeResponseHeaders(resp_headers, request_info);
+    EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::TestHeaderMapImpl resp_headers({{"x-remove-cluster2", "value"}});
+    const RouteEntry* route = config.route(headers, 55)->routeEntry();
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, request_info);
+    EXPECT_EQ("cluster2", headers.get_("x-req-cluster"));
+
+    route->finalizeResponseHeaders(resp_headers, request_info);
+    EXPECT_EQ("cluster2", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster2"));
+  }
+}
+
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);

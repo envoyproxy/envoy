@@ -269,26 +269,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      const std::string& cluster_name = cluster.name();
-
-      MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria;
-      if (cluster.has_metadata_match()) {
-        const auto filter_it = cluster.metadata_match().filter_metadata().find(
-            Envoy::Config::MetadataFilters::get().ENVOY_LB);
-        if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-          if (metadata_match_criteria_) {
-            cluster_metadata_match_criteria =
-                metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
-          } else {
-            cluster_metadata_match_criteria.reset(new MetadataMatchCriteriaImpl(filter_it->second));
-          }
-        }
-      }
-
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(
-          new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
-                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight),
-                                   std::move(cluster_metadata_match_criteria)));
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(
+          this, runtime_key_prefix + "." + cluster.name(), loader_, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -532,6 +514,28 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
       if (!cm.get(cluster->clusterName())) {
         throw EnvoyException(
             fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
+      }
+    }
+  }
+}
+
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const RouteEntryImplBase* parent, const std::string runtime_key, Runtime::Loader& loader,
+    const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster)
+    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key), loader_(loader),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
+      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
+      response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
+                                                       cluster.response_headers_to_remove())) {
+  if (cluster.has_metadata_match()) {
+    const auto filter_it = cluster.metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+      if (parent->metadata_match_criteria_) {
+        cluster_metadata_match_criteria_ =
+            parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+      } else {
+        cluster_metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
       }
     }
   }
