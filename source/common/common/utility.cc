@@ -71,8 +71,24 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 
   char* end_ptr;
+  errno = 0;
   out = strtoul(str, &end_ptr, base);
   if (*end_ptr != '\0' || (out == ULONG_MAX && errno == ERANGE)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+bool StringUtil::atol(const char* str, int64_t& out, int base) {
+  if (strlen(str) == 0) {
+    return false;
+  }
+
+  char* end_ptr;
+  errno = 0;
+  out = strtol(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;

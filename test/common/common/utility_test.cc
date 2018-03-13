@@ -33,6 +33,39 @@ TEST(StringUtil, atoul) {
 
   EXPECT_TRUE(StringUtil::atoul("00789", out));
   EXPECT_EQ(789U, out);
+
+  // Verify subsequent call to atoul succeeds after the first one
+  // failed due to errno ERANGE
+  EXPECT_FALSE(StringUtil::atoul("18446744073709551616", out));
+  EXPECT_TRUE(StringUtil::atoul("18446744073709551615", out));
+  EXPECT_EQ(18446744073709551615U, out);
+}
+
+TEST(StringUtil, atol) {
+  int64_t out;
+  EXPECT_FALSE(StringUtil::atol("-123b", out));
+  EXPECT_FALSE(StringUtil::atol("", out));
+  EXPECT_FALSE(StringUtil::atol("b123", out));
+
+  EXPECT_TRUE(StringUtil::atol("123", out));
+  EXPECT_EQ(123, out);
+  EXPECT_TRUE(StringUtil::atol("-123", out));
+  EXPECT_EQ(-123, out);
+  EXPECT_TRUE(StringUtil::atol("+123", out));
+  EXPECT_EQ(123, out);
+
+  EXPECT_TRUE(StringUtil::atol("  456", out));
+  EXPECT_EQ(456, out);
+
+  EXPECT_TRUE(StringUtil::atol("00789", out));
+  EXPECT_EQ(789, out);
+
+  // INT64_MAX + 1
+  EXPECT_FALSE(StringUtil::atol("9223372036854775808", out));
+
+  // INT64_MIN
+  EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
+  EXPECT_EQ(INT64_MIN, out);
 }
 
 TEST(DateUtil, All) {

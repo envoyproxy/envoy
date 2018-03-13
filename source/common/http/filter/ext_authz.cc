@@ -111,7 +111,8 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
       (status == CheckStatus::Error && !config_->failureModeAllow())) {
     Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getDeniedHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
-    callbacks_->requestInfo().setResponseFlag(Envoy::RequestInfo::ResponseFlag::Unauthorized);
+    callbacks_->requestInfo().setResponseFlag(
+        Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     // We can get completion inline, so only call continue if that isn't happening.
     if (!initiating_call_) {

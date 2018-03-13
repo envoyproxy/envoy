@@ -21,7 +21,7 @@ namespace Envoy {
 namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const Optional<std::chrono::milliseconds>& timeout)
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.auth.v2.Authorization.Check")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
@@ -135,7 +135,7 @@ void CheckRequestUtils::setHttpRequest(
   httpreq.set_size(sdfc->requestInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->requestInfo().protocol().valid()) {
+  if (sdfc->requestInfo().protocol()) {
     httpreq.set_protocol(
         Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
   }

@@ -32,7 +32,7 @@ private:
   const static std::string DELAY_INJECTED;
   const static std::string FAULT_INJECTED;
   const static std::string RATE_LIMITED;
-  const static std::string UNAUTHORIZED;
+  const static std::string UNAUTHORIZED_EXTERNAL_SERVICE;
 };
 
 /**

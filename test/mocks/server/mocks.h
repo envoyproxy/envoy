@@ -237,7 +237,7 @@ public:
   ~MockInstance();
 
   // Server::Instance
-  RateLimit::ClientPtr rateLimitClient(const Optional<std::chrono::milliseconds>&) override {
+  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
@@ -321,7 +321,7 @@ public:
   MockFactoryContext();
   ~MockFactoryContext();
 
-  RateLimit::ClientPtr rateLimitClient(const Optional<std::chrono::milliseconds>&) override {
+  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override {
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 

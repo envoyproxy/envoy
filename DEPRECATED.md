@@ -16,6 +16,8 @@ The following features have been DEPRECATED and will be removed in the specified
   `grpc_services` instead.
 * 'use_original_dst' field in the v2 LDS API is deprecated. Use listener filters and filter chain
   matching instead.
+* `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
+  or `regex_match` oneof instead.
 
 ## Version 1.5.0
 

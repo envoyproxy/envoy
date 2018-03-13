@@ -31,7 +31,7 @@ public:
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                      const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
 };
 

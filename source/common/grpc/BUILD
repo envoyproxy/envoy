@@ -50,8 +50,8 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
+    external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/grpc:status",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
