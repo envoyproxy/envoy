@@ -167,9 +167,6 @@ RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
   return ret;
 };
 
-// TODO(jsedgwick) sortof-copypasta, see note in rds_impl.h, willfix in subsequent PR
-// This lazy clearing of dead weak ptrs is jank, but will do until said willfix.
-// Doesn't matter much anyways since the number of static routes is bounded.
 std::vector<RouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
   std::vector<RouteConfigProviderSharedPtr> providers_strong;

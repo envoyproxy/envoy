@@ -15,8 +15,8 @@ namespace Server {
 class ConfigTracker {
 public:
   // Must not return nullptr
-  using Cb = std::function<ProtobufTypes::MessagePtr()>;
-  using CbsMap = std::map<std::string, Cb>;
+  typedef std::function<ProtobufTypes::MessagePtr()> Cb;
+  typedef std::map<std::string, Cb> CbsMap;
 
   // TODO doxme
   class EntryOwner {
