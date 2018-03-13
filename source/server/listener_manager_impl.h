@@ -50,6 +50,7 @@ public:
   }
 
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
@@ -208,6 +209,8 @@ public:
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::SocketSharedPtr& socket);
+  void setSocketAndOptions(const Network::SocketSharedPtr& socket);
+  const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
 
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return *this; }

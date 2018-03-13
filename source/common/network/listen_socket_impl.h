@@ -51,8 +51,10 @@ protected:
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
-  TcpListenSocket(const Address::InstanceConstSharedPtr& address, bool bind_to_port);
-  TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
+  TcpListenSocket(const Address::InstanceConstSharedPtr& address,
+                  const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
+                  const Network::Socket::OptionsSharedPtr& options);
 };
 
 typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;

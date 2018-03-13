@@ -39,9 +39,12 @@ public:
 
     /**
      * @param socket the socket on which to apply options.
+     * @param pre_bind 'true' if socket has has not been bound yet, and is going to be bound
+     *        after the options are set. This an be used to determine whether to set options
+     *        that only make sense for bound sockets if set before the bind() call.
      * @return true if succeeded, false otherwise.
      */
-    virtual bool setOptions(Socket& socket) const PURE;
+    virtual bool setOptions(Socket& socket, bool pre_bind) const PURE;
 
     /**
      * @return bits that can be used to separate connections based on the options. Should return

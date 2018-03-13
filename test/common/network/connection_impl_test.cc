@@ -161,7 +161,8 @@ public:
 protected:
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), true};
+  std::shared_ptr<MockSocketOptions> options_{std::make_shared<NiceMock<MockSocketOptions>>()};
+  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), options_, true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -254,7 +255,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   auto options = std::make_shared<MockSocketOptions>();
 
-  EXPECT_CALL(*options, setOptions(_)).WillOnce(Return(true));
+  EXPECT_CALL(*options, setOptions(_, false)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOptions(options);
@@ -302,7 +303,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   auto options = std::make_shared<MockSocketOptions>();
 
-  EXPECT_CALL(*options, setOptions(_)).WillOnce(Return(false));
+  EXPECT_CALL(*options, setOptions(_, false)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOptions(options);

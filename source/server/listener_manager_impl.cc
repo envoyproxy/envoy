@@ -74,6 +74,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                                 const Network::Socket::OptionsSharedPtr& options,
                                                  bool bind_to_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
@@ -94,9 +95,9 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(fd, address);
+    return std::make_shared<Network::TcpListenSocket>(fd, address, options);
   }
-  return std::make_shared<Network::TcpListenSocket>(address, bind_to_port);
+  return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
 }
 
 DrainManagerPtr
@@ -273,9 +274,14 @@ Init::Manager& ListenerImpl::initManager() {
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   ASSERT(!socket_);
   socket_ = socket;
+}
+
+void ListenerImpl::setSocketAndOptions(const Network::SocketSharedPtr& socket) {
+  setSocket(socket);
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
-    bool ok = listen_socket_options_->setOptions(*socket_);
+    // 'pre_bind = false' as bind() is never done after this.
+    bool ok = listen_socket_options_->setOptions(*socket_, false);
     const std::string message =
         fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -350,12 +356,12 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocket((*existing_warming_listener)->getSocket());
+    new_listener->setSocketAndOptions((*existing_warming_listener)->getSocket());
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocket((*existing_active_listener)->getSocket());
+    new_listener->setSocketAndOptions((*existing_active_listener)->getSocket());
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -394,10 +400,14 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
     }
 
-    new_listener->setSocket(
-        draining_listener_socket
-            ? draining_listener_socket
-            : factory_.createListenSocket(new_listener->address(), new_listener->bindToPort()));
+    if (draining_listener_socket) {
+      new_listener->setSocketAndOptions(draining_listener_socket);
+    } else {
+      // Options set by createListenSocket().
+      new_listener->setSocket(factory_.createListenSocket(new_listener->address(),
+                                                          new_listener->listenSocketOptions(),
+                                                          new_listener->bindToPort()));
+    }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));

@@ -273,7 +273,7 @@ public:
   MockSocketOptions();
   ~MockSocketOptions();
 
-  MOCK_CONST_METHOD1(setOptions, bool(Socket&));
+  MOCK_CONST_METHOD2(setOptions, bool(Socket&, bool pre_bind));
   MOCK_CONST_METHOD0(hashKey, uint32_t());
 };
 

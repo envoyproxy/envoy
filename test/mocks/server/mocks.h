@@ -165,8 +165,9 @@ public:
                std::vector<Configuration::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD2(createListenSocket,
+  MOCK_METHOD3(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        const Network::Socket::OptionsSharedPtr& options,
                                         bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());

@@ -29,7 +29,9 @@ void ListenSocketImpl::doBind() {
   }
 }
 
-TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address, bool bind_to_port)
+TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options,
+                                 bool bind_to_port)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
   RELEASE_ASSERT(fd_ != -1);
 
@@ -37,13 +39,22 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1);
 
+  if (options && !options->setOptions(*this, bind_to_port)) {
+    throw EnvoyException("TcpListenSocket: Setting socket options failed");
+  }
+
   if (bind_to_port) {
     doBind();
   }
 }
 
-TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(fd, address) {}
+TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options)
+    : ListenSocketImpl(fd, address) {
+  if (options && !options->setOptions(*this, false)) {
+    throw EnvoyException("TcpListenSocket: Setting socket options failed");
+  }
+}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
