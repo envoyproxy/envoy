@@ -310,8 +310,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
     Stats::Tag tag = {"a.tag-name", "a.tag-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c(
-        new Stats::CounterImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
     counters.push_back(c);
   }
 
@@ -321,8 +321,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
     Stats::Tag tag = {"another_tag_name", "another_tag-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c(
-        new Stats::CounterImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
     counters.push_back(c);
   }
 
@@ -332,8 +332,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
     Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g(
-        new Stats::GaugeImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
     gauges.push_back(g);
   }
 
@@ -343,8 +343,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
     Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g(
-        new Stats::GaugeImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
     gauges.push_back(g);
   }
 
@@ -368,8 +368,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
     Stats::Tag tag = {"a.tag-name", "a.tag-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c(
-        new Stats::CounterImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
     counters.push_back(c);
   }
 
@@ -379,8 +379,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
     Stats::Tag tag = {"another_tag_name", "another_tag-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c(
-        new Stats::CounterImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
     counters.push_back(c);
   }
 
@@ -390,8 +390,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
     Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g(
-        new Stats::GaugeImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
     gauges.push_back(g);
   }
 
@@ -401,8 +401,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
     Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
     cluster_tags.push_back(tag);
     Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g(
-        new Stats::GaugeImpl(*data, alloc, std::string(name), std::move(cluster_tags)));
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
     gauges.push_back(g);
   }
 

@@ -249,7 +249,7 @@ public:
   /**
    * Extracts counters and gauges and relevant tags, appending them to
    * the response buffer after sanitizing the metric / label names.
-   * @return int64_t total number of metric types inserted in response.
+   * @return uint64_t total number of metric types inserted in response.
    */
   static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                     const std::list<Stats::GaugeSharedPtr>& gauges,
