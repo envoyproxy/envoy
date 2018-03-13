@@ -201,6 +201,7 @@ public:
         .WillOnce(Invoke([&](Network::ConnectionPtr& conn) -> void {
           upstream_connection_ = std::move(conn);
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
+          upstream_connection_->addReadFilter(std::make_shared<NiceMock<Network::MockReadFilter>>());
 
           expected_callbacks--;
           if (expected_callbacks == 0) {

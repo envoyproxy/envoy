@@ -128,6 +128,12 @@ public:
     EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::LocalClose));
     client_connection_->close(ConnectionCloseType::NoFlush);
     if (wait_for_remote_close) {
+      EXPECT_CALL(*read_filter_, onData(_, _))
+          .Times(1)
+          .WillOnce(Invoke([&](Buffer::Instance&, bool end_stream) -> FilterStatus {
+            EXPECT_TRUE(end_stream);
+            return FilterStatus::StopIteration;
+          }));
       EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
           .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
@@ -391,9 +397,17 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
+      .Times(1)
       .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
         data.drain(data.length());
         server_connection_->close(ConnectionCloseType::FlushWrite);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterStatus {
+        EXPECT_EQ(0, data.length());
+        EXPECT_TRUE(end_stream);
         return FilterStatus::StopIteration;
       }));
 
@@ -461,6 +475,7 @@ TEST_P(ConnectionImplTest, CloseOnReadDisableWithoutCloseDetection) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   client_connection_->readDisable(false);
+  client_connection_->addReadFilter(std::make_shared<NiceMock<MockReadFilter>>());
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -795,8 +810,9 @@ TEST_P(ConnectionImplTest, ReadOnCloseTest) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterStatus {
         EXPECT_EQ(buffer_size, data.length());
+        EXPECT_TRUE(end_stream);
         return FilterStatus::StopIteration;
       }));
 
@@ -818,8 +834,9 @@ TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterStatus {
         EXPECT_EQ(buffer_size, data.length());
+        EXPECT_FALSE(end_stream);
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
@@ -1165,6 +1182,7 @@ public:
         socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
         Network::Test::createRawBufferSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
+    client_connection_->addReadFilter(std::make_shared<NiceMock<MockReadFilter>>());
     client_connection_->connect();
 
     read_filter_.reset(new NiceMock<MockReadFilter>());

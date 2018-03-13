@@ -21,6 +21,7 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/http/exception.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/stats/stats_impl.h"
@@ -240,8 +241,13 @@ private:
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.codec_->dispatch(data);
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      try {
+        parent_.codec_->dispatch(data);
+      } catch (Http::CodecProtocolException& e) {
+        ASSERT(end_stream);
+        parent_.connection_.close(Network::ConnectionCloseType::NoFlush);
+      }
       return Network::FilterStatus::StopIteration;
     }
 
