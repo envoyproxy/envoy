@@ -48,6 +48,20 @@ public:
 typedef std::unique_ptr<GrpcMuxWatch> GrpcMuxWatchPtr;
 
 /**
+ * Handle critical gRPC log messages.
+ */
+class GrpcMuxLogger {
+public:
+  virtual ~GrpcMuxLogger() {}
+
+  /**
+   * Logs a warning message.
+   * @param message supplies the string to be logged.
+   */
+  virtual void warn(const std::string& message) const PURE;
+};
+
+/**
  * Manage one or more gRPC subscriptions on a single stream to management server. This can be used
  * for a single xDS API, e.g. EDS, or to combined multiple xDS APIs for ADS.
  */

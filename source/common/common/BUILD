@@ -196,3 +196,9 @@ envoy_cc_library(
         ":utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "token_bucket_lib",
+    hdrs = ["token_bucket.h"],
+    srcs = ["token_bucket.cc"],
+)

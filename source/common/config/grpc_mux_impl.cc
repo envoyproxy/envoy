@@ -10,8 +10,10 @@ namespace Config {
 
 GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method)
-    : node_(node), async_client_(std::move(async_client)), service_method_(service_method) {
+                         const Protobuf::MethodDescriptor& service_method,
+                         const GrpcMuxLogger& logger)
+    : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
+      grpc_mux_logger_(logger) {
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
 }
 
@@ -50,6 +52,10 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ApiState& api_state = api_state_[type_url];
+  if (!api_state.limit_request.consume() && api_state.limit_log.consume()) {
+    grpc_mux_logger_.warn(fmt::format("Too many sendDiscoveryRequest calls for {}.", type_url));
+  }
+
   if (api_state.paused_) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;

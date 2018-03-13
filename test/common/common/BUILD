@@ -105,6 +105,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "token_bucket_test",
+    srcs = ["token_bucket_test.cc"],
+    deps = [
+        "//source/common/common:token_bucket_lib",
+        "//test/test_common:utility_lib",   
+    ],
+)
+
+envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],

@@ -1,3 +1,6 @@
+#include <chrono>
+#include <thread>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
@@ -29,7 +32,8 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTest : public testing::Test {
 public:
-  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
+  GrpcMuxImplTest()
+      : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()), mock_logger_{} {
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
@@ -39,7 +43,8 @@ public:
         envoy::api::v2::core::Node(), std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
         dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+        mock_logger_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -72,6 +77,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
+  NiceMock<MockGrpcMuxLogger> mock_logger_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -283,6 +289,39 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
   expectSendMessage(type_url, {"x", "y"}, "2");
   expectSendMessage(type_url, {}, "2");
+}
+
+// Verifies that warning messages get logged when Envoy detects too many requests.
+TEST_F(GrpcMuxImplTest, TooManyRequests) {
+  auto onReceiveMessage = [&](uint64_t burst, std::chrono::milliseconds delay) {
+    while (burst--) {
+      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+          new envoy::api::v2::DiscoveryResponse());
+      response->set_version_info("baz");
+      response->set_nonce("bar");
+      response->set_type_url("foo");
+      grpc_mux_->onReceiveMessage(std::move(response));
+
+      std::this_thread::sleep_for(delay);
+    }
+  };
+
+  const uint64_t initial_burst = 90;
+  const uint64_t delayed_burst = 55;
+
+  EXPECT_CALL(mock_logger_, warn("Too many sendDiscoveryRequest calls for foo.")).Times(2);
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(initial_burst + delayed_burst + 1);
+  EXPECT_CALL(*async_client_, start(_, _)).WillRepeatedly(Return(&async_stream_));
+
+  auto foo_sub = grpc_mux_->subscribe("foo", {"x"}, callbacks_);
+  expectSendMessage("foo", {"x"}, "");
+  grpc_mux_->start();
+
+  // First rate-limit warning message should be issued here.
+  onReceiveMessage(initial_burst, std::chrono::milliseconds{0});
+
+  // Next warning message should take at least 5 seconds.
+  onReceiveMessage(delayed_burst, std::chrono::milliseconds{100});
 }
 
 } // namespace
