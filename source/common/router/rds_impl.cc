@@ -153,13 +153,6 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
     ENVOY_LOG_MISC(
         warn, "Unable to add routes to config tracker, route config dumps will not be available");
   }
-
-  admin_.addHandler("/routes", "print out currently loaded dynamic HTTP route tables",
-                    MAKE_ADMIN_HANDLER(RouteConfigProviderManagerImpl::handlerRoutes), true, false);
-}
-
-RouteConfigProviderManagerImpl::~RouteConfigProviderManagerImpl() {
-  admin_.removeHandler("/routes");
 }
 
 std::vector<RdsRouteConfigProviderSharedPtr>
@@ -253,55 +246,5 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   return config_dump;
 }
 
-Http::Code RouteConfigProviderManagerImpl::handlerRoutes(absl::string_view url, Http::HeaderMap&,
-                                                         Buffer::Instance& response) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  // If there are no query params, print out all the configured route tables.
-  if (query_params.size() == 0) {
-    return handlerRoutesLoop(response, getRdsRouteConfigProviders());
-  }
-
-  // If there are query params, make sure it is only the route_config_name param.
-  const auto it = query_params.find("route_config_name");
-  if (query_params.size() == 1 && it != query_params.end()) {
-    // Create a vector with all the providers that have the queried route_config_name.
-    std::vector<RdsRouteConfigProviderSharedPtr> selected_providers;
-    for (const auto& provider : getRdsRouteConfigProviders()) {
-      if (provider->routeConfigName() == it->second) {
-        selected_providers.push_back(provider);
-      }
-    }
-    return handlerRoutesLoop(response, selected_providers);
-  }
-  response.add("{\n");
-  response.add("    \"general_usage\": \"/routes (dump all dynamic HTTP route tables).\",\n");
-  response.add("    \"specify_name_usage\": \"/routes?route_config_name=<name> (dump all dynamic "
-               "HTTP route tables with the "
-               "<name> if any).\"\n");
-  response.add("}");
-  return Http::Code::NotFound;
-}
-
-Http::Code RouteConfigProviderManagerImpl::handlerRoutesLoop(
-    Buffer::Instance& response, const std::vector<RdsRouteConfigProviderSharedPtr> providers) {
-  bool first_item = true;
-  response.add("[\n");
-  for (const auto& provider : providers) {
-    if (!first_item) {
-      response.add(",");
-    } else {
-      first_item = false;
-    }
-    response.add("{\n");
-    response.add(fmt::format("\"version_info\": \"{}\",\n", provider->versionInfo()));
-    response.add(fmt::format("\"route_config_name\": \"{}\",\n", provider->routeConfigName()));
-    response.add(fmt::format("\"config_source\": {},\n", provider->configSource()));
-    response.add("\"route_table_dump\": ");
-    response.add(fmt::format("{}\n", provider->configAsJson()));
-    response.add("}\n");
-  }
-  response.add("]\n");
-  return Http::Code::OK;
-}
 } // namespace Router
 } // namespace Envoy

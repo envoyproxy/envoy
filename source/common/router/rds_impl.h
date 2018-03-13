@@ -158,7 +158,6 @@ public:
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
                                  ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
-  ~RouteConfigProviderManagerImpl();
 
   // RouteConfigProviderManager
   std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
@@ -174,29 +173,6 @@ public:
                                Runtime::Loader& runtime, Upstream::ClusterManager& cm) override;
 
 private:
-  /**
-   * The handler used in the Admin /routes endpoint. This handler is used to
-   * populate the response Buffer::Instance with information about the currently
-   * loaded dynamic HTTP Route Tables.
-   * @param path_and_query supplies the url path and query-params sent to the Admin endpoint.
-   * @param response_headers enables setting of http headers (eg content-type, cache-control) in
-   * the handler.
-   * @param response supplies the buffer to fill with information.
-   * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
-   */
-  Http::Code handlerRoutes(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                           Buffer::Instance& response);
-
-  /**
-   * Helper function used by handlerRoutes. The function loops through the providers
-   * and adds them to the response.
-   * @param response supplies the buffer to fill with information.
-   * @param providers supplies the vector of providers to add to the response.
-   * @return Http::Code OK.
-   */
-  Http::Code handlerRoutesLoop(Buffer::Instance& response,
-                               const std::vector<RdsRouteConfigProviderSharedPtr> providers);
-
   ProtobufTypes::MessagePtr dumpRouteConfigs();
 
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
