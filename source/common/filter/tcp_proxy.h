@@ -71,7 +71,7 @@ public:
     SharedConfig(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
-    const Optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
+    const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -81,7 +81,7 @@ public:
     const Stats::ScopePtr stats_scope_;
 
     const TcpProxyStats stats_;
-    Optional<std::chrono::milliseconds> idle_timeout_;
+    absl::optional<std::chrono::milliseconds> idle_timeout_;
   };
 
   typedef std::shared_ptr<SharedConfig> SharedConfigSharedPtr;
@@ -102,7 +102,9 @@ public:
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() { return shared_config_->idleTimeout(); }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() {
+    return shared_config_->idleTimeout();
+  }
   TcpProxyUpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
@@ -149,7 +151,7 @@ public:
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return {}; }
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
     if (config_) {
       return config_->metadataMatchCriteria();

@@ -92,8 +92,17 @@ void RdsJson::translateHeaderMatcher(const Json::Object& json_header_matcher,
                                      envoy::api::v2::route::HeaderMatcher& header_matcher) {
   json_header_matcher.validateSchema(Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA);
   JSON_UTIL_SET_STRING(json_header_matcher, header_matcher, name);
-  JSON_UTIL_SET_STRING(json_header_matcher, header_matcher, value);
-  JSON_UTIL_SET_BOOL(json_header_matcher, header_matcher, regex);
+
+  if (json_header_matcher.getBoolean("regex", false)) {
+    header_matcher.set_regex_match(json_header_matcher.getString("value", ""));
+  } else if (json_header_matcher.hasObject("value")) {
+    header_matcher.set_exact_match(json_header_matcher.getString("value", ""));
+  } else if (json_header_matcher.hasObject("range_match")) {
+    auto* range = header_matcher.mutable_range_match();
+    const auto json_range_match = json_header_matcher.getObject("range_match");
+    range->set_start(json_range_match->getInteger("start"));
+    range->set_end(json_range_match->getInteger("end"));
+  }
 }
 
 void RdsJson::translateQueryParameterMatcher(

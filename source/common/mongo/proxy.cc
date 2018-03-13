@@ -293,8 +293,8 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-Optional<uint64_t> ProxyFilter::delayDuration() {
-  Optional<uint64_t> result;
+absl::optional<uint64_t> ProxyFilter::delayDuration() {
+  absl::optional<uint64_t> result;
 
   if (!fault_config_) {
     return result;
@@ -310,7 +310,7 @@ Optional<uint64_t> ProxyFilter::delayDuration() {
 
   // Delay only if the duration is > 0ms.
   if (duration > 0) {
-    result.value(duration);
+    result = duration;
   }
 
   return result;
@@ -330,9 +330,9 @@ void ProxyFilter::tryInjectDelay() {
     return;
   }
 
-  const Optional<uint64_t> delay_ms = delayDuration();
+  const absl::optional<uint64_t> delay_ms = delayDuration();
 
-  if (delay_ms.valid()) {
+  if (delay_ms) {
     delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { delayInjectionTimerCallback(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(delay_ms.value()));

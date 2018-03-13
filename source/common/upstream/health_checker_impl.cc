@@ -284,7 +284,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
-    service_name_.value(config.http_health_check().service_name());
+    service_name_ = config.http_health_check().service_name();
   }
 }
 
@@ -361,7 +361,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
     return false;
   }
 
-  if (parent_.service_name_.valid() &&
+  if (parent_.service_name_ &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
     parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
@@ -646,7 +646,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
-    service_name_.value(config.grpc_health_check().service_name());
+    service_name_ = config.grpc_health_check().service_name();
   }
 }
 
@@ -670,7 +670,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     // grpc-status be used if available.
     if (end_stream) {
       const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
-      if (grpc_status.valid()) {
+      if (grpc_status) {
         onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
         return;
       }
@@ -687,7 +687,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     // This is how, for instance, grpc-go signals about missing service - HTTP/2 200 OK with
     // 'unimplemented' gRPC status.
     const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
-    if (grpc_status.valid()) {
+    if (grpc_status) {
       onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
       return;
     }
@@ -733,9 +733,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
     Http::HeaderMapPtr&& trailers) {
   auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
   auto grpc_status =
-      maybe_grpc_status.valid() ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
+      maybe_grpc_status ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
   const std::string grpc_message =
-      maybe_grpc_status.valid() ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
+      maybe_grpc_status ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
   onRpcComplete(grpc_status, grpc_message, true);
 }
 
@@ -771,7 +771,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
   grpc::health::v1::HealthCheckRequest request;
-  if (parent_.service_name_.valid()) {
+  if (parent_.service_name_) {
     request.set_service(parent_.service_name_.value());
   }
 

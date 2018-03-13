@@ -4,7 +4,6 @@
 #include <list>
 #include <memory>
 
-#include "envoy/common/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
@@ -15,6 +14,8 @@
 #include "common/common/linked_object.h"
 #include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {

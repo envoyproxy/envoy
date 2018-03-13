@@ -73,7 +73,7 @@ Annotation& Annotation::operator=(const Annotation& ann) {
 }
 
 void Annotation::changeEndpointServiceName(const std::string& service_name) {
-  if (endpoint_.valid()) {
+  if (endpoint_) {
     endpoint_.value().setServiceName(service_name);
   }
 }
@@ -90,7 +90,7 @@ const std::string Annotation::toJson() {
 
   std::string json_string = s.GetString();
 
-  if (endpoint_.valid()) {
+  if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::get().ANNOTATION_ENDPOINT.c_str());
   }
@@ -130,7 +130,7 @@ const std::string BinaryAnnotation::toJson() {
 
   std::string json_string = s.GetString();
 
-  if (endpoint_.valid()) {
+  if (endpoint_) {
     Util::mergeJsons(json_string, static_cast<Endpoint>(endpoint_.value()).toJson(),
                      ZipkinJsonFieldNames::get().BINARY_ANNOTATION_ENDPOINT.c_str());
   }
@@ -180,17 +180,17 @@ const std::string Span::toJson() {
   writer.Key(ZipkinJsonFieldNames::get().SPAN_ID.c_str());
   writer.String(Hex::uint64ToHex(id_).c_str());
 
-  if (parent_id_.valid() && parent_id_.value()) {
+  if (parent_id_ && parent_id_.value()) {
     writer.Key(ZipkinJsonFieldNames::get().SPAN_PARENT_ID.c_str());
     writer.String(Hex::uint64ToHex(parent_id_.value()).c_str());
   }
 
-  if (timestamp_.valid()) {
+  if (timestamp_) {
     writer.Key(ZipkinJsonFieldNames::get().SPAN_TIMESTAMP.c_str());
     writer.Int64(timestamp_.value());
   }
 
-  if (duration_.valid()) {
+  if (duration_) {
     writer.Key(ZipkinJsonFieldNames::get().SPAN_DURATION.c_str());
     writer.Int64(duration_.value());
   }

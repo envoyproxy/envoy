@@ -324,6 +324,10 @@ def _com_google_absl():
         name = "abseil_int128",
         actual = "@com_google_absl//absl/numeric:int128",
     )
+    native.bind(
+        name = "abseil_optional",
+        actual = "@com_google_absl//absl/types:optional",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")

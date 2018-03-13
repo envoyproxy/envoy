@@ -68,7 +68,7 @@ Meeting minutes are here: https://goo.gl/5Cergb
 ## Reporting security vulnerabilities
 
 If you've found a vulnerability or a potential vulnerability in Envoy please let us know at
-[envoy-security](https://groups.google.com/forum/#!forum/envoy-security). We'll send a confirmation
+[envoy-security](mailto:envoy-security@googlegroups.com). We'll send a confirmation
 email to acknowledge your report, and we'll send an additional email when we've identified the issue
 positively or negatively.
 
