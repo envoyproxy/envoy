@@ -4,7 +4,9 @@
 #include <map>
 #include <memory>
 
+#include "common/common/non_copyable.h"
 #include "common/protobuf/protobuf.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Server {
@@ -12,6 +14,7 @@ namespace Server {
 // TODO doxme
 class ConfigTracker {
 public:
+  // Must not return nullptr
   using Cb = std::function<ProtobufTypes::MessagePtr()>;
   using CbsMap = std::map<std::string, Cb>;
 
@@ -20,8 +23,6 @@ public:
   public:
     using Ptr = std::unique_ptr<EntryOwner>;
     virtual ~EntryOwner() {}
-    EntryOwner(const EntryOwner&) = delete;                  // Noncopyable
-    EntryOwner& operator=(const EntryOwner& other) = delete; // Non-copy-constructible
   protected:
     EntryOwner() = default; // A sly way to make this class "abstract"
   };
@@ -29,9 +30,9 @@ public:
   virtual ~ConfigTracker() = default;
 
   // TODO doxme
-  virtual const CbsMap& getCallbacksMap() const = 0;
+  virtual const CbsMap& getCallbacksMap() const PURE;
   // TODO doxme
-  virtual EntryOwner::Ptr add(std::string key, Cb cb) = 0;
+  virtual EntryOwner::Ptr add(std::string key, Cb cb) PURE;
 };
 
 } // namespace Server

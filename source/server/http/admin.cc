@@ -284,20 +284,8 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message;
-    try {
-      message = key_callback_pair.second();
-    } catch (const std::exception& e) {
-      ENVOY_LOG(warn, "Config dump callback with key \"{}\" threw an exception: {}",
-                key_callback_pair.first, e.what());
-      continue;
-    }
-
-    if (!message) {
-      ENVOY_LOG(warn, "Config dump callback with key \"{}\" returned a null message",
-                key_callback_pair.first);
-      continue;
-    }
-
+    message = key_callback_pair.second();
+    RELEASE_ASSERT(nullptr);
     Protobuf::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;

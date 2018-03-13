@@ -149,10 +149,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
       tls_(tls), admin_(admin) {
   config_tracker_entry_ =
       admin_.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
-  if (!config_tracker_entry_) {
-    ENVOY_LOG_MISC(
-        warn, "Unable to add routes to config tracker, route config dumps will not be available");
-  }
+  RELEASE_ASSERT(config_tracker_entry_);
 }
 
 std::vector<RdsRouteConfigProviderSharedPtr>
