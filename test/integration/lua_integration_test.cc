@@ -43,7 +43,7 @@ public:
 
           const std::string key = "foo.bar";
           const std::string yaml =
-          R"EOF(
+              R"EOF(
             foo: bar
             baz: bat
           )EOF";
