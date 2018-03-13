@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -32,6 +33,39 @@ TEST(StringUtil, atoul) {
 
   EXPECT_TRUE(StringUtil::atoul("00789", out));
   EXPECT_EQ(789U, out);
+
+  // Verify subsequent call to atoul succeeds after the first one
+  // failed due to errno ERANGE
+  EXPECT_FALSE(StringUtil::atoul("18446744073709551616", out));
+  EXPECT_TRUE(StringUtil::atoul("18446744073709551615", out));
+  EXPECT_EQ(18446744073709551615U, out);
+}
+
+TEST(StringUtil, atol) {
+  int64_t out;
+  EXPECT_FALSE(StringUtil::atol("-123b", out));
+  EXPECT_FALSE(StringUtil::atol("", out));
+  EXPECT_FALSE(StringUtil::atol("b123", out));
+
+  EXPECT_TRUE(StringUtil::atol("123", out));
+  EXPECT_EQ(123, out);
+  EXPECT_TRUE(StringUtil::atol("-123", out));
+  EXPECT_EQ(-123, out);
+  EXPECT_TRUE(StringUtil::atol("+123", out));
+  EXPECT_EQ(123, out);
+
+  EXPECT_TRUE(StringUtil::atol("  456", out));
+  EXPECT_EQ(456, out);
+
+  EXPECT_TRUE(StringUtil::atol("00789", out));
+  EXPECT_EQ(789, out);
+
+  // INT64_MAX + 1
+  EXPECT_FALSE(StringUtil::atol("9223372036854775808", out));
+
+  // INT64_MIN
+  EXPECT_TRUE(StringUtil::atol("-9223372036854775808", out));
+  EXPECT_EQ(INT64_MIN, out);
 }
 
 TEST(DateUtil, All) {
@@ -666,6 +700,44 @@ TEST(IntervalSet, testIntervalTargeted) {
   // initial setup:         [15    20)      [25   30)      [35   35)
   // insertion points:                                              [ )
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
+}
+
+TEST(WelfordStandardDeviation, AllEntriesTheSame) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(10);
+  EXPECT_EQ(10, wsd.mean());
+  EXPECT_EQ(0, wsd.computeStandardDeviation());
+}
+
+TEST(WelfordStandardDeviation, SmallVariance) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(10);
+  wsd.update(9);
+  wsd.update(11);
+  EXPECT_LT(0.5, wsd.computeStandardDeviation());
+  EXPECT_GT(1.0, wsd.computeStandardDeviation());
+  EXPECT_EQ(10, wsd.mean());
+}
+
+TEST(WelfordStandardDeviation, HugeVariance) {
+  WelfordStandardDeviation wsd;
+  wsd.update(20);
+  wsd.update(2000);
+  wsd.update(200000);
+  wsd.update(20000000);
+  EXPECT_EQ(5050505, wsd.mean());
+  EXPECT_LT(1000, wsd.computeStandardDeviation());
+}
+
+TEST(WelfordStandardDeviation, InsufficientData) {
+  WelfordStandardDeviation wsd;
+  wsd.update(10);
+  EXPECT_EQ(10, wsd.mean());
+  EXPECT_TRUE(std::isnan(wsd.computeStandardDeviation()));
 }
 
 } // namespace Envoy

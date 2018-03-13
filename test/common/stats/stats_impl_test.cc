@@ -111,6 +111,18 @@ TEST(TagExtractorTest, SingleSubexpression) {
   EXPECT_EQ("listner_port", tags.at(0).name_);
 }
 
+TEST(TagExtractorTest, substrMismatch) {
+  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
+  EXPECT_TRUE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
+}
+
+TEST(TagExtractorTest, noSubstrMismatch) {
+  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
+}
+
 TEST(TagExtractorTest, EmptyName) {
   EXPECT_THROW_WITH_MESSAGE(TagExtractorImpl::createTagExtractor("", "^listener\\.(\\d+?\\.)"),
                             EnvoyException, "tag_name cannot be empty");
@@ -396,6 +408,7 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 
   EXPECT_EQ("", extractRegexPrefix("^prefix(foo)."));
   EXPECT_EQ("prefix", extractRegexPrefix("^prefix\\.foo"));
+  EXPECT_EQ("prefix_optional", extractRegexPrefix("^prefix_optional(?=\\.)"));
   EXPECT_EQ("", extractRegexPrefix("^notACompleteToken"));   //
   EXPECT_EQ("onlyToken", extractRegexPrefix("^onlyToken$")); //
   EXPECT_EQ("", extractRegexPrefix("(prefix)"));

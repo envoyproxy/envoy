@@ -75,19 +75,28 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                                  bool bind_to_port) {
-  // For each listener config we share a single TcpListenSocket among all threaded listeners.
-  // UdsListenerSockets are not managed and do not participate in hot restart as they are only
-  // used for testing. First we try to get the socket from our parent if applicable.
-  // TODO(mattklein123): UDS support.
-  ASSERT(address->type() == Network::Address::Type::Ip);
+  ASSERT(address->type() == Network::Address::Type::Ip ||
+         address->type() == Network::Address::Type::Pipe);
+
+  // For each listener config we share a single socket among all threaded listeners.
+  // First we try to get the socket from our parent if applicable.
+  if (address->type() == Network::Address::Type::Pipe) {
+    const std::string addr = fmt::format("unix://{}", address->asString());
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
+    if (fd != -1) {
+      ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
+      return std::make_shared<Network::UdsListenSocket>(fd, address);
+    }
+    return std::make_shared<Network::UdsListenSocket>(address);
+  }
+
   const std::string addr = fmt::format("tcp://{}", address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
     return std::make_shared<Network::TcpListenSocket>(fd, address);
-  } else {
-    return std::make_shared<Network::TcpListenSocket>(address, bind_to_port);
   }
+  return std::make_shared<Network::TcpListenSocket>(address, bind_to_port);
 }
 
 DrainManagerPtr
@@ -98,12 +107,7 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
-    : parent_(parent),
-      // TODO(htuch): Validate not pipe when doing v2.
-      address_(
-          Network::Utility::parseInternetAddress(config.address().socket_address().address(),
-                                                 config.address().socket_address().port_value(),
-                                                 !config.address().socket_address().ipv4_compat())),
+    : parent_(parent), address_(Network::Utility::protobufAddressToAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),

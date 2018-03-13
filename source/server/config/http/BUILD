@@ -143,9 +143,11 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/http/filter:ip_tagging_filter_lib",
-        "//source/common/json:config_schemas_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
     ],
 )
 
@@ -157,6 +159,18 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:lightstep_tracer_lib",
+        "//source/server:configuration_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "dynamic_opentracing_lib",
+    srcs = ["dynamic_opentracing_http_tracer.cc"],
+    hdrs = ["dynamic_opentracing_http_tracer.h"],
+    deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/tracing:dynamic_opentracing_driver_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/server:configuration_lib",
     ],
 )
@@ -214,5 +228,19 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/server:configuration_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "ext_authz_lib",
+    srcs = ["ext_authz.cc"],
+    hdrs = ["ext_authz.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/common/http/filter:ext_authz_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )

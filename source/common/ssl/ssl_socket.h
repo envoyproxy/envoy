@@ -55,6 +55,7 @@ private:
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
   bool shutdown_sent_{};
+  uint64_t bytes_to_retry_{};
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
 };

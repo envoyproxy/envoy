@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <regex>
 #include <string>
 #include <vector>
@@ -25,25 +27,20 @@ namespace Router {
  */
 class ConfigUtility {
 public:
+  enum class HeaderMatchType { Value, Regex, Range };
+
+  // A HeaderData specifies one of exact value or regex or range element
+  // to match in a request's header, specified in the header_match_type_ member.
+  // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData {
-    // An empty header value allows for matching to be only based on header presence.
-    // Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
-    // exact string matching.
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
-        : name_(config.name()), value_(config.value()),
-          is_regex_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)),
-          regex_pattern_(is_regex_ ? RegexUtil::parseRegex(value_) : std::regex()) {}
-    HeaderData(const Json::Object& config)
-        : HeaderData([&config] {
-            envoy::api::v2::route::HeaderMatcher header_matcher;
-            Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
-            return header_matcher;
-          }()) {}
+    HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
+    HeaderData(const Json::Object& config);
 
     const Http::LowerCaseString name_;
-    const std::string value_;
-    const bool is_regex_;
-    const std::regex regex_pattern_;
+    HeaderMatchType header_match_type_;
+    std::string value_;
+    std::regex regex_pattern_;
+    envoy::type::Int64Range range_;
   };
 
   // A QueryParameterMatcher specifies one "name" or "name=value" element

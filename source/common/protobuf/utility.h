@@ -50,6 +50,13 @@ namespace ProtobufPercentHelper {
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value);
 uint64_t convertPercent(double percent, uint64_t max_value);
 
+/**
+ * Convert a fractional percent denominator enum into an integer.
+ * @param percent supplies percent to convert.
+ * @return the converted denominator.
+ */
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
+
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
 

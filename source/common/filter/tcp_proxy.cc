@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/config/well_known_names.h"
 
 namespace Envoy {
 namespace Filter {
@@ -60,10 +61,6 @@ TcpProxyConfig::TcpProxyConfig(
   if (config.has_deprecated_v1()) {
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
              route_desc : config.deprecated_v1().routes()) {
-      if (!context.clusterManager().get(route_desc.cluster())) {
-        throw EnvoyException(
-            fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
-      }
       routes_.emplace_back(Route(route_desc));
     }
   }
@@ -72,6 +69,17 @@ TcpProxyConfig::TcpProxyConfig(
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
     default_route.set_cluster(config.cluster());
     routes_.emplace_back(default_route);
+  }
+
+  if (config.has_metadata_match()) {
+    const auto& filter_metadata = config.metadata_match().filter_metadata();
+
+    const auto filter_it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it != filter_metadata.end()) {
+      cluster_metadata_match_criteria_ =
+          std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
   }
 
   for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
@@ -120,6 +128,8 @@ TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& clu
       upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
 TcpProxy::~TcpProxy() {
+  request_info_.onRequestComplete();
+
   if (config_ != nullptr) {
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, request_info_);

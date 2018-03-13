@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/optional.h"
+#include "envoy/common/time.h"
 #include "envoy/request_info/request_info.h"
 
 namespace Envoy {
@@ -29,6 +31,7 @@ class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const Optional<Http::Protocol>& protocol);
+  static std::string durationToString(const Optional<std::chrono::nanoseconds>& time);
 
 private:
   AccessLogFormatUtils();

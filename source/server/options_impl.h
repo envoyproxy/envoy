@@ -15,7 +15,10 @@ namespace Envoy {
  */
 class OptionsImpl : public Server::Options {
 public:
-  typedef std::function<std::string(uint64_t, uint64_t)> HotRestartVersionCb;
+  /**
+   * Parameters are max_num_stats, max_stat_name_len, hot_restart_enabled
+   */
+  typedef std::function<std::string(uint64_t, uint64_t, bool)> HotRestartVersionCb;
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.

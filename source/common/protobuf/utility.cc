@@ -21,6 +21,20 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent) {
+  switch (percent.denominator()) {
+  case envoy::type::FractionalPercent::HUNDRED:
+    return 100;
+  case envoy::type::FractionalPercent::TEN_THOUSAND:
+    return 10000;
+  case envoy::type::FractionalPercent::MILLION:
+    return 1000000;
+  default:
+    // Checked by schema.
+    NOT_REACHED;
+  }
+}
+
 } // namespace ProtobufPercentHelper
 
 MissingFieldException::MissingFieldException(const std::string& field_name,

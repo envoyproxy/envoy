@@ -795,7 +795,14 @@ const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "name" : {"type" : "string"},
       "value" : {"type" : "string"},
-      "regex" : {"type" : "boolean"}
+      "regex" : {"type" : "boolean"},
+      "range_match" : {
+        "type" : "object",
+        "properties" : {
+          "start" : {"type" : "integer"},
+          "end" : {"type" : "integer"}
+        }
+      }
     },
     "required" : ["name"],
     "additionalProperties" : false
@@ -1071,39 +1078,6 @@ const std::string Json::Schema::GRPC_JSON_TRANSCODER_FILTER_SCHEMA(R"EOF(
       }
     },
     "required" : ["proto_descriptor", "services"],
-    "additionalProperties" : false
-  }
-  )EOF");
-
-const std::string Json::Schema::IP_TAGGING_HTTP_FILTER_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type" : "object",
-    "properties" : {
-      "request_type" : {
-        "type" : "string",
-        "enum" : ["internal", "external", "both"]
-      },
-      "ip_tags" : {
-        "type" : "array",
-        "minItems" : 1,
-        "uniqueItems" : true,
-        "items" : {
-          "type" : "object",
-          "properties" : {
-            "ip_tag_name" : { "type" : "string" },
-            "ip_list" : {
-              "type" : "array",
-              "minItems" : 1,
-              "uniqueItems" : true,
-              "items" : { "type" : "string" }
-            }
-          },
-          "required" : ["ip_tag_name", "ip_list"],
-          "additionalProperties" : false
-        }
-      }
-    },
     "additionalProperties" : false
   }
   )EOF");
