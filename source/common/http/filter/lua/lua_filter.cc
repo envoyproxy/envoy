@@ -410,6 +410,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<MetadataMapWrapper>();
+  lua_state_.registerType<MetadataMapIterator>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {

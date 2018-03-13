@@ -100,6 +100,22 @@ private:
 };
 
 /**
+ * Iterator over a metadata map.
+ */
+class MetadataMapIterator : public Envoy::Lua::BaseLuaObject<MetadataMapIterator> {
+public:
+  MetadataMapIterator(MetadataMapWrapper& parent);
+
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  DECLARE_LUA_CLOSURE(MetadataMapIterator, luaPairsIterator);
+
+private:
+  MetadataMapWrapper& parent_;
+  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+};
+
+/**
  * Lua wrapper for a metadata map.
  * TODO(dio): define and implement MetadataMapIterator.
  */
@@ -107,7 +123,9 @@ class MetadataMapWrapper : public Envoy::Lua::BaseLuaObject<MetadataMapWrapper> 
 public:
   MetadataMapWrapper(const envoy::api::v2::core::Metadata& metadata) : metadata_{metadata} {}
 
-  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet}, {"__pairs", static_luaPairs}};
+  }
 
 private:
   /**
@@ -117,11 +135,26 @@ private:
    */
   DECLARE_LUA_FUNCTION(MetadataMapWrapper, luaGet);
 
+  /**
+   * Implementation of the __pairs metamethod so a metadata wrapper can be iterated over using
+   * pairs().
+   */
+  DECLARE_LUA_FUNCTION(MetadataMapWrapper, luaPairs);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    // Iterators do not survive yields.
+    iterator_.reset();
+  }
+
   void setValue(lua_State* state, const ProtobufWkt::Value&& value);
   void createTable(lua_State* state,
                    const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
 
   const envoy::api::v2::core::Metadata metadata_;
+  Envoy::Lua::LuaDeathRef<MetadataMapIterator> iterator_;
+
+  friend class MetadataMapIterator;
 };
 
 } // namespace Lua

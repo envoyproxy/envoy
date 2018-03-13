@@ -22,6 +22,7 @@ class LuaMetadataMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<Metadat
 public:
   virtual void setup(const std::string& script) {
     Envoy::Lua::LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
+    state_->registerType<MetadataMapIterator>();
   }
 
   envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
@@ -35,6 +36,10 @@ public:
 TEST_F(LuaMetadataMapWrapperTest, Methods) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value["name"]))
+      end
+
       recipe = object:get("make.delicious.bread")
 
       testPrint(recipe["name"])
@@ -73,10 +78,15 @@ filter_metadata:
     ingredients:
       - fluor
       - milk
+  make.delicious.cookie:
+    name: chewy
 )EOF";
 
   envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
   MetadataMapWrapper::create(coroutine_->luaState(), metadata);
+
+  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
+  EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
 
   EXPECT_CALL(*this, testPrint("pulla"));
   EXPECT_CALL(*this, testPrint("finland"));

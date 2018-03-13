@@ -115,7 +115,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& v
 
   case ProtobufWkt::Value::kStringValue: {
     const auto string_value = value.string_value();
-    return lua_pushlstring(state, string_value.c_str(), string_value.size());
+    return lua_pushstring(state, string_value.c_str());
   }
 
   case ProtobufWkt::Value::kStructValue: {
@@ -144,10 +144,26 @@ void MetadataMapWrapper::createTable(
   lua_createtable(state, 0, fields.size());
   for (const auto field : fields) {
     int top = lua_gettop(state);
-    lua_pushlstring(state, field.first.c_str(), field.first.size());
+    lua_pushstring(state, field.first.c_str());
     setValue(state, std::move(field.second));
     lua_settable(state, top);
   }
+}
+
+MetadataMapIterator::MetadataMapIterator(MetadataMapWrapper& parent)
+    : parent_{parent}, current_{parent.metadata_.filter_metadata().begin()} {}
+
+int MetadataMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == parent_.metadata_.filter_metadata().end()) {
+    parent_.iterator_.reset();
+    return 0;
+  }
+
+  lua_pushstring(state, current_->first.c_str());
+  parent_.createTable(state, std::move(current_->second.fields()));
+
+  current_++;
+  return 2;
 }
 
 int MetadataMapWrapper::luaGet(lua_State* state) {
@@ -156,7 +172,18 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
   if (filter_it == metadata_.filter_metadata().end()) {
     return 0;
   }
+
   createTable(state, std::move(filter_it->second.fields()));
+  return 1;
+}
+
+int MetadataMapWrapper::luaPairs(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
+
+  iterator_.reset(MetadataMapIterator::create(state, *this), true);
+  lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
   return 1;
 }
 
