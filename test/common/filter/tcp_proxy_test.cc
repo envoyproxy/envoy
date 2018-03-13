@@ -489,7 +489,8 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
   upstream_read_filter_->onData(response, true);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
-  EXPECT_CALL(*upstream_connections_.at(0), close(_));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -507,7 +508,7 @@ TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_read_filter_->onData(response, false);
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -535,7 +536,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
   raiseEventUpstreamConnected(1);
 
@@ -550,7 +552,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
   raiseEventUpstreamConnected(1);
 
@@ -583,8 +586,12 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   {
     testing::InSequence sequence;
     EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-    EXPECT_CALL(*upstream_connections_.at(1), close(Network::ConnectionCloseType::NoFlush));
-    EXPECT_CALL(*upstream_connections_.at(2), close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(0)));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(1)));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(2)));
     EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   }
 
@@ -815,6 +822,7 @@ TEST_F(TcpProxyTest, IdleTimeout) {
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->callback_();
 }
 

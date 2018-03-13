@@ -233,7 +233,6 @@ protected:
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
   void finalizeUpstreamConnectionStats();
-  void closeUpstreamConnection();
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
