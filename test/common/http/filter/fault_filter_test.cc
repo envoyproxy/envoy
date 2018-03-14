@@ -21,6 +21,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "common/config/well_known_names.h"
 
 using testing::DoAll;
 using testing::Invoke;
@@ -109,6 +110,19 @@ public:
         "fixed_duration_ms" : 5000
       },
       "upstream_cluster" : "www1"
+    }
+    )EOF";
+
+  const std::string fault_in_route_metadata_json = R"EOF(
+    {
+      "envoy.fault" : {
+        "delay" : {
+          "type" : "fixed",
+          "fixed_delay_percent" : 100,
+          "fixed_duration_ms" : 5000
+        },
+        "upstream_cluster" : "www1"
+      }
     }
     )EOF";
 
@@ -707,7 +721,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -722,6 +736,60 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, FaultWithMetadataConfigOnly) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
+  filter_.reset(new FaultFilter(config_));
+  filter_->setDecoderFilterCallbacks(filter_callbacks_);
+
+
+  google::protobuf::Struct filter_config;
+  MessageUtil::loadFromJson(fault_with_target_cluster_json, filter_config);
+  envoy::api::v2::core::Metadata metadata;
+  (*metadata.mutable_filter_metadata())[Envoy::Config::HttpFilterNames::get().FAULT] = filter_config;
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, metadata())
+      .WillOnce(ReturnRef(metadata));
+
+  const std::string upstream_cluster("www1");
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(ReturnRef(upstream_cluster));
+
+  // Delay related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("FaultWithMetadataConfigOnly");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
+      .WillOnce(Return(false));
+
+  // Delay only case
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  timer_->callback_();
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
