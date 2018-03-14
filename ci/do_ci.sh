@@ -20,9 +20,11 @@ function bazel_release_binary_build() {
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   echo "Copying release binary for image build..."
   mkdir -p "${ENVOY_SRCDIR}"/build_release
+  mkdir -p /tmp/envoy-dist
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
   mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+  cp "${ENVOY_SRCDIR}"/build_release_stripped/envoy /tmp/envoy-dist/envoy
 }
 
 function bazel_debug_binary_build() {
@@ -167,6 +169,8 @@ elif [[ "$1" == "check_format" ]]; then
 elif [[ "$1" == "docs" ]]; then
   docs/publish.sh
   exit 0
+elif [[ "$1" == "github_release" ]]; then
+  ./ci/publish_github_release.sh
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
   exit 1
