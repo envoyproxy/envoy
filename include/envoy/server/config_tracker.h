@@ -4,9 +4,10 @@
 #include <map>
 #include <memory>
 
+#include "envoy/common/pure.h"
+
 #include "common/common/non_copyable.h"
 #include "common/protobuf/protobuf.h"
-#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,6 +24,7 @@ public:
   public:
     using Ptr = std::unique_ptr<EntryOwner>;
     virtual ~EntryOwner() {}
+
   protected:
     EntryOwner() = default; // A sly way to make this class "abstract"
   };

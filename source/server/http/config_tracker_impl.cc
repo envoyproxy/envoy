@@ -12,8 +12,8 @@ ConfigTracker::EntryOwner::Ptr ConfigTrackerImpl::add(std::string key, Cb cb) {
 
 const ConfigTracker::CbsMap& ConfigTrackerImpl::getCallbacksMap() const { return *map_; }
 
-ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(
-    std::weak_ptr<ConfigTracker::CbsMap> map_weak, std::string key)
+ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(std::weak_ptr<ConfigTracker::CbsMap> map_weak,
+                                                  std::string key)
     : map_weak_(std::move(map_weak)), key_(std::move(key)) {}
 
 ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {

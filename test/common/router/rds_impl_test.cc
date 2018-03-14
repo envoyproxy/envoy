@@ -48,12 +48,12 @@ class RdsImplTest : public testing::Test {
 public:
   RdsImplTest() : request_(&cm_.async_client_) {
     ON_CALL(admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
+    EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
+        .WillOnce(Return(new Server::MockConfigTracker::MockEntryOwner()));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RdsImplTest() {
-    tls_.shutdownThread();
-  }
+  ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -378,13 +378,12 @@ public:
   RouteConfigProviderManagerImplTest() {
     ON_CALL(admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
     EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
-        .WillOnce(DoAll(SaveArg<1>(&config_tracker_callback_), Return(nullptr)));
+        .WillOnce(DoAll(SaveArg<1>(&config_tracker_callback_),
+                        Return(new Server::MockConfigTracker::MockEntryOwner())));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RouteConfigProviderManagerImplTest() {
-    tls_.shutdownThread();
-  }
+  ~RouteConfigProviderManagerImplTest() { tls_.shutdownThread(); }
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;

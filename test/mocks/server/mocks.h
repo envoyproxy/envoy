@@ -93,8 +93,11 @@ public:
   MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
   MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
   EntryOwner::Ptr add(std::string key, Cb callback) override {
-    return EntryOwner::Ptr(addReturnsRaw(key, std::move(callback)));
+    auto raw = addReturnsRaw(key, std::move(callback));
+    ENVOY_LOG_MISC(debug, "yo %d", raw == nullptr);
+    return EntryOwner::Ptr(raw);
   }
+  class MockEntryOwner : public EntryOwner {};
 };
 
 class MockDrainManager : public DrainManager {
