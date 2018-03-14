@@ -110,7 +110,6 @@ private:
 
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
-   * TODO(jsedgwick) perhaps things should be reworked so this isn't necessary...
    */
   struct NullRouteConfigProvider : public Router::RouteConfigProvider {
     NullRouteConfigProvider();
