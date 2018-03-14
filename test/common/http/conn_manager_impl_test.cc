@@ -929,7 +929,7 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   EXPECT_CALL(*handler, log(_, _, _))
       .WillOnce(Invoke(
           [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode().valid());
+            EXPECT_TRUE(request_info.responseCode());
             EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
             EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
             EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
