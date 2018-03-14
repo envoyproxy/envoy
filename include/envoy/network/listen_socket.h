@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <memory>
 #include <vector>
 
@@ -57,7 +56,7 @@ public:
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
   typedef std::shared_ptr<Option> OptionSharedPtr;
-  typedef std::shared_ptr<std::list<OptionSharedPtr>> OptionsSharedPtr;
+  typedef std::shared_ptr<std::vector<OptionSharedPtr>> OptionsSharedPtr;
 
   /**
    * Set the socket options for later retrieval with options().

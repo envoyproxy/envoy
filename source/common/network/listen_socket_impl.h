@@ -28,7 +28,7 @@ public:
   }
   void setOption(const OptionSharedPtr& option) override {
     if (!options_) {
-      options_ = std::make_shared<std::list<OptionSharedPtr>>();
+      options_ = std::make_shared<std::vector<OptionSharedPtr>>();
     }
     options_->emplace_back(option);
   }

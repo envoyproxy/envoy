@@ -164,7 +164,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   auto option = std::make_shared<MockSocketOption>();
-  auto options = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
   options->emplace_back(option);
 
   EXPECT_CALL(*option, setOption(_, true)).WillOnce(Return(true));

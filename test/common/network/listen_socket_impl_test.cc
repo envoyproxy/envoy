@@ -43,7 +43,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   EXPECT_EQ(0, close(addr_fd.second));
 
   auto option = std::make_shared<MockSocketOption>();
-  auto options = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
   options->emplace_back(option);
   EXPECT_CALL(*option, setOption(_, true)).WillOnce(Return(true));
   TcpListenSocket socket1(addr, options, true);
@@ -52,7 +52,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   EXPECT_EQ(addr->ip()->addressAsString(), socket1.localAddress()->ip()->addressAsString());
 
   auto option2 = std::make_shared<MockSocketOption>();
-  auto options2 = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  auto options2 = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
   options2->emplace_back(option2);
   EXPECT_CALL(*option2, setOption(_, true)).WillOnce(Return(true));
   // The address and port are bound already, should throw exception.

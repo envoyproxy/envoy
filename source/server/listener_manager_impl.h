@@ -251,7 +251,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override { return metadata_; };
   void setListenSocketOption(const Network::Socket::OptionSharedPtr& option) override {
     if (!listen_socket_options_) {
-      listen_socket_options_ = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+      listen_socket_options_ = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
     }
     listen_socket_options_->emplace_back(option);
   }
