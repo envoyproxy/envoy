@@ -62,8 +62,12 @@ MockListenerComponentFactory::MockListenerComponentFactory()
       .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
                                 const Network::Socket::OptionsSharedPtr& options,
                                 bool bind_to_port) -> Network::SocketSharedPtr {
-        if (options && !options->setOptions(*socket_, bind_to_port)) {
-          throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+        if (options) {
+          for (const auto& option : *options) {
+            if (!option->setOption(*socket_, bind_to_port)) {
+              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+            }
+          }
         }
         return socket_;
       }));

@@ -42,15 +42,19 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   // bind failure (in the TcpListenSocket ctor) once isn't considered an error.
   EXPECT_EQ(0, close(addr_fd.second));
 
-  auto options = std::make_shared<MockSocketOptions>();
-  EXPECT_CALL(*options, setOptions(_, true)).WillOnce(Return(true));
+  auto option = std::make_shared<MockSocketOption>();
+  auto options = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  options->emplace_back(option);
+  EXPECT_CALL(*option, setOption(_, true)).WillOnce(Return(true));
   TcpListenSocket socket1(addr, options, true);
   EXPECT_EQ(0, listen(socket1.fd(), 0));
   EXPECT_EQ(addr->ip()->port(), socket1.localAddress()->ip()->port());
   EXPECT_EQ(addr->ip()->addressAsString(), socket1.localAddress()->ip()->addressAsString());
 
-  auto options2 = std::make_shared<MockSocketOptions>();
-  EXPECT_CALL(*options2, setOptions(_, true)).WillOnce(Return(true));
+  auto option2 = std::make_shared<MockSocketOption>();
+  auto options2 = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  options2->emplace_back(option2);
+  EXPECT_CALL(*option2, setOption(_, true)).WillOnce(Return(true));
   // The address and port are bound already, should throw exception.
   EXPECT_THROW(Network::TcpListenSocket socket2(addr, options2, true), EnvoyException);
 

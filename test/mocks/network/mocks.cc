@@ -172,11 +172,11 @@ MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(
 
 MockListenSocket::~MockListenSocket() {}
 
-MockSocketOptions::MockSocketOptions() {
-  ON_CALL(*this, setOptions(_, _)).WillByDefault(Return(true));
+MockSocketOption::MockSocketOption() {
+  ON_CALL(*this, setOption(_, _)).WillByDefault(Return(true));
 }
 
-MockSocketOptions::~MockSocketOptions() {}
+MockSocketOption::~MockSocketOption() {}
 
 MockConnectionSocket::MockConnectionSocket() : local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));

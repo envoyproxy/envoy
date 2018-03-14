@@ -161,8 +161,7 @@ public:
 protected:
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
-  std::shared_ptr<MockSocketOptions> options_{std::make_shared<NiceMock<MockSocketOptions>>()};
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), options_, true};
+  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
@@ -253,12 +252,12 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto options = std::make_shared<MockSocketOptions>();
+  auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*options, setOptions(_, false)).WillOnce(Return(true));
+  EXPECT_CALL(*option, setOption(_, false)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOptions(options);
+        socket->setOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -301,12 +300,12 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto options = std::make_shared<MockSocketOptions>();
+  auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*options, setOptions(_, false)).WillOnce(Return(false));
+  EXPECT_CALL(*option, setOption(_, false)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOptions(options);
+        socket->setOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));

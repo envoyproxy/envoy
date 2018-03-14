@@ -540,13 +540,15 @@ ClientConnectionImpl::ClientConnectionImpl(
                      std::move(transport_socket), false) {
   bool will_bind = (source_address != nullptr);
   if (options) {
-    if (!options->setOptions(*socket_, will_bind)) {
-      // Set a special error state to ensure asynchronous close to give the owner of the
-      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-      immediate_error_event_ = ConnectionEvent::LocalClose;
-      // Trigger a write event to close this connection out-of-band.
-      file_event_->activate(Event::FileReadyType::Write);
-      return;
+    for (const auto& option : *options) {
+      if (!option->setOption(*socket_, will_bind)) {
+        // Set a special error state to ensure asynchronous close to give the owner of the
+        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+        immediate_error_event_ = ConnectionEvent::LocalClose;
+        // Trigger a write event to close this connection out-of-band.
+        file_event_->activate(Event::FileReadyType::Write);
+        return;
+      }
     }
   }
   if (will_bind) {

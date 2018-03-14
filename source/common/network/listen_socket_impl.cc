@@ -29,6 +29,17 @@ void ListenSocketImpl::doBind() {
   }
 }
 
+void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options,
+                                              bool pre_bind) {
+  if (options) {
+    for (const auto& option : *options) {
+      if (!option->setOption(*this, pre_bind)) {
+        throw EnvoyException("ListenSocket: Setting socket options failed");
+      }
+    }
+  }
+}
+
 TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
                                  const Network::Socket::OptionsSharedPtr& options,
                                  bool bind_to_port)
@@ -39,9 +50,7 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1);
 
-  if (options && !options->setOptions(*this, bind_to_port)) {
-    throw EnvoyException("TcpListenSocket: Setting socket options failed");
-  }
+  setListenSocketOptions(options, bind_to_port);
 
   if (bind_to_port) {
     doBind();
@@ -51,9 +60,7 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
 TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
                                  const Network::Socket::OptionsSharedPtr& options)
     : ListenSocketImpl(fd, address) {
-  if (options && !options->setOptions(*this, false)) {
-    throw EnvoyException("TcpListenSocket: Setting socket options failed");
-  }
+  setListenSocketOptions(options, false);
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)

@@ -1267,18 +1267,18 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
-    OriginalDstTestConfigFactory() : options_(std::make_shared<Network::MockSocketOptions>()) {}
+    OriginalDstTestConfigFactory() : option_(std::make_shared<Network::MockSocketOption>()) {}
 
     // NamedListenerFilterConfigFactory
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
-      EXPECT_CALL(*options_, setOptions(_, true))
+      EXPECT_CALL(*option_, setOption(_, true))
           .WillOnce(Invoke([](Network::Socket& socket, bool) -> bool {
             fd = socket.fd();
             return true;
           }));
-      context.setListenSocketOptions(options_);
+      context.setListenSocketOption(option_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
       };
@@ -1290,7 +1290,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
     std::string name() override { return "test.listener.original_dst"; }
 
-    std::shared_ptr<Network::MockSocketOptions> options_;
+    std::shared_ptr<Network::MockSocketOption> option_;
   };
 
   /**
@@ -1343,14 +1343,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) {
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
-    OriginalDstTestConfigFactory() : options_(std::make_shared<Network::MockSocketOptions>()) {}
+    OriginalDstTestConfigFactory() : option_(std::make_shared<Network::MockSocketOption>()) {}
 
     // NamedListenerFilterConfigFactory
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
-      EXPECT_CALL(*options_, setOptions(_, true)).WillOnce(Return(false));
-      context.setListenSocketOptions(options_);
+      EXPECT_CALL(*option_, setOption(_, true)).WillOnce(Return(false));
+      context.setListenSocketOption(option_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
       };
@@ -1362,7 +1362,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
 
     std::string name() override { return "testfail.listener.original_dst"; }
 
-    std::shared_ptr<Network::MockSocketOptions> options_;
+    std::shared_ptr<Network::MockSocketOption> option_;
   };
 
   /**

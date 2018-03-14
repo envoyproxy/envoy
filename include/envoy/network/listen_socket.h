@@ -1,6 +1,8 @@
 #pragma once
 
+#include <list>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
@@ -33,9 +35,9 @@ public:
   /**
    * Visitor class for setting socket options.
    */
-  class Options {
+  class Option {
   public:
-    virtual ~Options() {}
+    virtual ~Option() {}
 
     /**
      * @param socket the socket on which to apply options.
@@ -44,22 +46,23 @@ public:
      *        that only make sense for bound sockets if set before the bind() call.
      * @return true if succeeded, false otherwise.
      */
-    virtual bool setOptions(Socket& socket, bool pre_bind) const PURE;
+    virtual bool setOption(Socket& socket, bool pre_bind) const PURE;
 
     /**
-     * @return bits that can be used to separate connections based on the options. Should return
-     *         zero if connections with different options can be pooled together. This is limited
-     *         to 32 bits to allow these bits to be efficiently combined into a larger hash key
-     *         used in connection pool lookups.
+     * @param vector of bits that can be used to separate connections based on the options. Should
+     *        return zero if connections with different options can be pooled together. This is
+     *        limited to 32 bits to allow these bits to be efficiently combined into a larger hash
+     *        key used in connection pool lookups.
      */
-    virtual uint32_t hashKey() const PURE;
+    virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
-  typedef std::shared_ptr<Options> OptionsSharedPtr;
+  typedef std::shared_ptr<Option> OptionSharedPtr;
+  typedef std::shared_ptr<std::list<OptionSharedPtr>> OptionsSharedPtr;
 
   /**
    * Set the socket options for later retrieval with options().
    */
-  virtual void setOptions(const OptionsSharedPtr&) PURE;
+  virtual void setOption(const OptionSharedPtr&) PURE;
 
   /**
    * @return the socket options stored earlier with setOptions(), if any.

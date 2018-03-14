@@ -281,14 +281,16 @@ void ListenerImpl::setSocketAndOptions(const Network::SocketSharedPtr& socket) {
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
-    bool ok = listen_socket_options_->setOptions(*socket_, false);
-    const std::string message =
-        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-    if (!ok) {
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    } else {
-      ENVOY_LOG(debug, "{}", message);
+    for (const auto& option : *listen_socket_options_) {
+      bool ok = option->setOption(*socket_, false);
+      const std::string message =
+          fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+      if (!ok) {
+        ENVOY_LOG(warn, "{}", message);
+        throw EnvoyException(message);
+      } else {
+        ENVOY_LOG(debug, "{}", message);
+      }
     }
   }
 }

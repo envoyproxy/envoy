@@ -758,7 +758,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  absl::optional<uint32_t> hash_key;
+  std::vector<uint8_t> hash_key = {uint8_t(protocol), uint8_t(priority)};
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -767,19 +767,20 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
-      hash_key = options->hashKey();
+      for (const auto& option : *options) {
+        option->hashKey(hash_key);
+      }
     }
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  const auto key = container.key(priority, protocol, hash_key ? hash_key.value() : 0);
-  if (!container.pools_[key]) {
-    container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
+  if (!container.pools_[hash_key]) {
+    container.pools_[hash_key] = parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
-        hash_key ? context->downstreamConnection()->socketOptions() : nullptr);
+        hash_key.size() > 2 ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
-  return container.pools_[key].get();
+  return container.pools_[hash_key].get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(

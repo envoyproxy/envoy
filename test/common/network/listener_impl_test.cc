@@ -163,9 +163,11 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  auto options = std::make_shared<MockSocketOptions>();
+  auto option = std::make_shared<MockSocketOption>();
+  auto options = std::make_shared<std::list<Network::Socket::OptionSharedPtr>>();
+  options->emplace_back(option);
 
-  EXPECT_CALL(*options, setOptions(_, true)).WillOnce(Return(true));
+  EXPECT_CALL(*option, setOption(_, true)).WillOnce(Return(true));
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), options, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;

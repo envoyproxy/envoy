@@ -261,20 +261,20 @@ public:
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
-  MOCK_METHOD1(setOptions, void(const Socket::OptionsSharedPtr& options));
+  MOCK_METHOD1(setOption, void(const Socket::OptionSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
   Address::InstanceConstSharedPtr local_address_;
   OptionsSharedPtr options_;
 };
 
-class MockSocketOptions : public Socket::Options {
+class MockSocketOption : public Socket::Option {
 public:
-  MockSocketOptions();
-  ~MockSocketOptions();
+  MockSocketOption();
+  ~MockSocketOption();
 
-  MOCK_CONST_METHOD2(setOptions, bool(Socket&, bool pre_bind));
-  MOCK_CONST_METHOD0(hashKey, uint32_t());
+  MOCK_CONST_METHOD2(setOption, bool(Socket&, bool pre_bind));
+  MOCK_CONST_METHOD1(hashKey, void(std::vector<uint8_t>&));
 };
 
 class MockConnectionSocket : public ConnectionSocket {
@@ -287,7 +287,7 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD1(setOptions, void(const Network::ConnectionSocket::OptionsSharedPtr&));
+  MOCK_METHOD1(setOption, void(const Network::ConnectionSocket::OptionSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());

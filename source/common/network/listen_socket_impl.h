@@ -26,7 +26,12 @@ public:
       fd_ = -1;
     }
   }
-  void setOptions(const OptionsSharedPtr& options) override { options_ = options; }
+  void setOption(const OptionSharedPtr& option) override {
+    if (!options_) {
+      options_ = std::make_shared<std::list<OptionSharedPtr>>();
+    }
+    options_->emplace_back(option);
+  }
   const OptionsSharedPtr& options() const override { return options_; }
 
 protected:
@@ -44,6 +49,7 @@ protected:
       : SocketImpl(fd, local_address) {}
 
   void doBind();
+  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options, bool pre_bind);
 };
 
 /**
