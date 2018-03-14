@@ -105,6 +105,36 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
+// Socket::Option implementation for API-defined listener socket options.
+// This same object can be extended to handle additional listener socket options.
+class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
+public:
+  ListenerSocketOption(bool transparent) : transparent_(transparent) {}
+
+  // Network::Socket::Option
+  bool setOption(Network::Socket& socket, bool pre_bind) const override {
+    // IP_TRANSPARENT makes a difference only for the following bind(). Set it before the bind
+    // and ignore it after.
+    if (transparent_ && pre_bind) {
+#ifdef SOL_IP
+      int on = 1;
+      if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &on, sizeof(on)) == -1) {
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(errno));
+        throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
+      }
+#else
+      UNREFERENCED_PARAMETER(socket);
+      throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
+#endif
+    }
+    return true;
+  }
+  void hashKey(std::vector<uint8_t>&) const override{}; // Not used for listener sockets.
+
+private:
+  bool transparent_;
+};
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
@@ -125,6 +155,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
+
+  // Add listen socket options, if any.
+  bool transparent = config.transparent();
+  if (transparent) {
+    setListenSocketOption(std::make_shared<ListenerSocketOption>(transparent));
+  }
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
