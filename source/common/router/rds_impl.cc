@@ -152,15 +152,15 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
   RELEASE_ASSERT(config_tracker_entry_);
 }
 
-std::vector<RdsRouteConfigProviderSharedPtr>
+std::vector<RouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
-  std::vector<RdsRouteConfigProviderSharedPtr> ret;
+  std::vector<RouteConfigProviderSharedPtr> ret;
   ret.reserve(route_config_providers_.size());
   for (const auto& element : route_config_providers_) {
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigProviderImpl destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
-    RdsRouteConfigProviderSharedPtr provider = element.second.lock();
+    RouteConfigProviderSharedPtr provider = element.second.lock();
     ASSERT(provider)
     ret.push_back(provider);
   }

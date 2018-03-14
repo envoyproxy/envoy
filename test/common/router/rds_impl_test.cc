@@ -457,7 +457,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(2UL, provider_.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
 
-  std::vector<RdsRouteConfigProviderSharedPtr> configured_providers =
+  std::vector<RouteConfigProviderSharedPtr> configured_providers =
       route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
   EXPECT_EQ(3UL, provider_.use_count());

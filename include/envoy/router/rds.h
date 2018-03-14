@@ -23,7 +23,10 @@ public:
    */
   virtual Router::ConfigConstSharedPtr config() PURE;
 
-  // TODO dox
+  /**
+   * @return envoy::api::v2::RouteConfiguration the underlying RouteConfiguration object associated
+   * with this provider.
+   */
   virtual envoy::api::v2::RouteConfiguration configAsProto() const PURE;
 
   /**
@@ -37,33 +40,7 @@ public:
   virtual const std::string versionInfo() const PURE;
 };
 
-/**
- * A provider for dynamic route configurations.
- * TODO(jsedgwick) This is only needed for legacy /routes admin endpoint. Remove.
- */
-class RdsRouteConfigProvider : public RouteConfigProvider {
-public:
-  virtual ~RdsRouteConfigProvider() {}
-
-  /**
-   * @return std::string the loaded route table in JSON format.
-   */
-  virtual std::string configAsJson() const PURE;
-
-  /**
-   * @return const std::string& the name of the configured route table.
-   */
-  virtual const std::string& routeConfigName() const PURE;
-
-  /**
-   * @return const std::string& the configuration of the service the RdsRouteConfigProvider is
-   * issuing RDS requests to.
-   */
-  virtual const std::string& configSource() const PURE;
-};
-
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
-typedef std::shared_ptr<RdsRouteConfigProvider> RdsRouteConfigProviderSharedPtr;
 
 } // namespace Router
 } // namespace Envoy

@@ -83,7 +83,7 @@ class RouteConfigProviderManagerImpl;
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl
-    : public RdsRouteConfigProvider,
+    : public RouteConfigProvider,
       public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
@@ -99,13 +99,6 @@ public:
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
   envoy::api::v2::RouteConfiguration configAsProto() const override { return route_config_proto_; }
-
-  // Router::RdsRouteConfigProvider
-  std::string configAsJson() const override {
-    return MessageUtil::getJsonStringFromMessage(route_config_proto_, true);
-  }
-  const std::string& routeConfigName() const override { return route_config_name_; }
-  const std::string& configSource() const override { return config_source_; }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
@@ -160,7 +153,7 @@ public:
                                  ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
 
   // RouteConfigProviderManager
-  std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
+  std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
   std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() override;
 
   RouteConfigProviderSharedPtr getRdsRouteConfigProvider(

@@ -47,10 +47,10 @@ public:
                                Runtime::Loader& runtime, Upstream::ClusterManager& cm) PURE;
 
   /**
-   * @return std::vector<Router::RdsRouteConfigProviderSharedPtr> a list of all the
-   * RdsRouteConfigProviders currently loaded.
+   * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
+   * dynamic (RDS) RouteConfigProviders currently loaded.
    */
-  virtual std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() PURE;
+  virtual std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() PURE;
 
   /**
    * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
