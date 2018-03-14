@@ -12,20 +12,6 @@
 namespace Envoy {
 namespace Zipkin {
 
-namespace {
-// The functions below are needed due to the "C++ static initialization order fiasco."
-
-/**
- * @return a regex to match a "not sampled" decision.
- *
- * Note that a function is needed because the string used to build the regex
- * cannot be initialized statically.
- */
-static const std::regex& notSampledRegex() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "(" + ZipkinCoreConstants::get().NOT_SAMPLED + "|false)");
-}
-} // namespace
-
 ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
@@ -93,12 +79,20 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
                                    const std::string&, SystemTime start_time) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
+  bool sampled(true);
+
+  if (request_headers.XB3Sampled()) {
+    // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
+    // zipkin tracers may still use that value, although should be 0 or 1.
+    sampled =
+        request_headers.XB3Sampled()->value().getString() == ZipkinCoreConstants::get().SAMPLED ||
+        request_headers.XB3Sampled()->value().getString() == "true";
+  }
 
   if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
     uint64_t trace_id(0);
     uint64_t span_id(0);
     uint64_t parent_id(0);
-    bool sampled(true);
     if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16) ||
         !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
         (request_headers.XB3ParentSpanId() &&
@@ -106,9 +100,6 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    if (request_headers.XB3Sampled()) {
-      sampled = !std::regex_match(request_headers.XB3Sampled()->value().c_str(), notSampledRegex());
-    }
     SpanContext context(trace_id, span_id, parent_id, sampled);
 
     new_zipkin_span =
@@ -116,11 +107,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   } else {
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
-
-    if (request_headers.XB3Sampled()) {
-      new_zipkin_span->setSampled(ZipkinCoreConstants::get().SAMPLED.compare(
-                                      request_headers.XB3Sampled()->value().getString()) == 0);
-    }
+    new_zipkin_span->setSampled(sampled);
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
