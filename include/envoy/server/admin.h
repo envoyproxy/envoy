@@ -71,7 +71,9 @@ public:
    */
   virtual const Network::Socket& socket() PURE;
 
-  // TODO doxme
+  /*
+   * @return ConfigTracker& tracker for /config_dump endpoint
+   */
   virtual ConfigTracker& getConfigTracker() PURE;
 };
 

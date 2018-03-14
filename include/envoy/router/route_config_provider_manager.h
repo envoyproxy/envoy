@@ -52,7 +52,10 @@ public:
    */
   virtual std::vector<RdsRouteConfigProviderSharedPtr> getRdsRouteConfigProviders() PURE;
 
-  // TODO  doxme
+  /**
+   * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the
+   * static RouteConfigProviders currently loaded.
+   */
   virtual std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() PURE;
 };
 

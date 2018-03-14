@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Server {
 
 /*
- * TODO doxme
+ * Implementation of ConfigTracker
  */
 class ConfigTrackerImpl : public ConfigTracker {
 public:
