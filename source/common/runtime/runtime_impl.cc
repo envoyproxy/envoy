@@ -181,7 +181,7 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
   auto entry = values_.find(key);
-  if (entry == values_.end() || !entry->second.uint_value_.valid()) {
+  if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
   } else {
     return entry->second.uint_value_.value();
@@ -250,7 +250,7 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // succeed that's fine.
       uint64_t converted;
       if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-        entry.uint_value_.value(converted);
+        entry.uint_value_ = converted;
       }
 
       // Separate erase/insert calls required due to the value type being constant; this prevents

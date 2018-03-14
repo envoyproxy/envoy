@@ -6,7 +6,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -15,17 +14,19 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
-  SubsetLoadBalancer(LoadBalancerType lb_type, PrioritySet& priority_set,
-                     const PrioritySet* local_priority_set, ClusterStats& stats,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const LoadBalancerSubsetInfo& subsets,
-                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
-                     const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  SubsetLoadBalancer(
+      LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const LoadBalancerSubsetInfo& subsets,
+      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -128,7 +129,7 @@ private:
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
 
   const LoadBalancerType lb_type_;
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const envoy::api::v2::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;

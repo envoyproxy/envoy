@@ -215,7 +215,7 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual const Optional<std::chrono::milliseconds>& idleTimeout() PURE;
+  virtual const absl::optional<std::chrono::milliseconds>& idleTimeout() PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
@@ -272,7 +272,7 @@ public:
    *         be enabled. User agent will only overwritten if it doesn't already exist. If enabled,
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
-  virtual const Optional<std::string>& userAgent() PURE;
+  virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
    * @return tracing config.
@@ -621,7 +621,7 @@ private:
     Stats::TimespanPtr request_timer_;
     State state_;
     RequestInfo::RequestInfoImpl request_info_;
-    Optional<Router::RouteConstSharedPtr> cached_route_;
+    absl::optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};

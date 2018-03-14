@@ -1,5 +1,3 @@
-#include "envoy/common/optional.h"
-
 #include "common/config/filter_json.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -16,6 +14,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -29,7 +28,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-Optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
+absl::optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string json_string = R"EOF(
   {
@@ -43,7 +42,7 @@ Optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
   envoy::config::filter::accesslog::v2::AccessLog upstream_log;
   Envoy::Config::FilterJson::translateAccessLog(*json_object_ptr, upstream_log);
 
-  return Optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
+  return absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
 }
 
 } // namespace
@@ -73,10 +72,10 @@ class RouterUpstreamLogTest : public testing::Test {
 public:
   RouterUpstreamLogTest() {}
 
-  void init(Optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
+  void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
     envoy::config::filter::http::router::v2::Router router_proto;
 
-    if (upstream_log.valid()) {
+    if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(Invoke([&](const std::string& data) { output_.push_back(data); }));
 

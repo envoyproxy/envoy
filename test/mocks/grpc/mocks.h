@@ -64,7 +64,7 @@ public:
   MOCK_METHOD5_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
                                      const Protobuf::Message& request,
                                      AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                     const Optional<std::chrono::milliseconds>& timeout));
+                                     const absl::optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream*(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks& callbacks));
 };

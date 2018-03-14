@@ -104,11 +104,11 @@ GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
   }
 }
 
-AsyncRequest* GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
-                                          const Protobuf::Message& request,
-                                          AsyncRequestCallbacks& callbacks,
-                                          Tracing::Span& parent_span,
-                                          const Optional<std::chrono::milliseconds>& timeout) {
+AsyncRequest*
+GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
+                            const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
+                            Tracing::Span& parent_span,
+                            const absl::optional<std::chrono::milliseconds>& timeout) {
   auto* const async_request =
       new GoogleAsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
@@ -124,7 +124,7 @@ AsyncRequest* GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& serv
 
 AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
                                           AsyncStreamCallbacks& callbacks) {
-  const Optional<std::chrono::milliseconds> no_timeout;
+  const absl::optional<std::chrono::milliseconds> no_timeout;
   auto grpc_stream =
       std::make_unique<GoogleAsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
 
@@ -137,10 +137,9 @@ AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& serv
   return active_streams_.front().get();
 }
 
-GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
-                                             const Protobuf::MethodDescriptor& service_method,
-                                             AsyncStreamCallbacks& callbacks,
-                                             const Optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
+    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
+    AsyncStreamCallbacks& callbacks, const absl::optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
@@ -153,9 +152,9 @@ GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
 void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   parent_.stats_.streams_total_->inc();
   gpr_timespec abs_deadline =
-      timeout_.valid() ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
-                                      gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
-                       : gpr_inf_future(GPR_CLOCK_REALTIME);
+      timeout_ ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
+                              gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
+               : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
@@ -224,7 +223,7 @@ void GoogleAsyncStreamImpl::writeQueued() {
   write_pending_ = true;
   const PendingMessage& msg = write_pending_queue_.front();
 
-  if (!msg.buf_.valid()) {
+  if (!msg.buf_) {
     ASSERT(msg.end_stream_);
     rw_->WritesDone(&write_last_tag_);
     ++inflight_tags_;
@@ -404,12 +403,10 @@ void GoogleAsyncStreamImpl::cleanup() {
   }
 }
 
-GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent,
-                                               const Protobuf::MethodDescriptor& service_method,
-                                               const Protobuf::Message& request,
-                                               AsyncRequestCallbacks& callbacks,
-                                               Tracing::Span& parent_span,
-                                               const Optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
+    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
+    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+    const absl::optional<std::chrono::milliseconds>& timeout)
     : GoogleAsyncStreamImpl(parent, service_method, *this, timeout), request_(request),
       callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),

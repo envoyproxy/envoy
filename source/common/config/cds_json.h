@@ -2,9 +2,10 @@
 
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/circuit_breaker.pb.h"
-#include "envoy/common/optional.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -62,7 +63,7 @@ public:
    * @param cluster destination v2 envoy::api::v2::Cluster.
    */
   static void translateCluster(const Json::Object& json_cluster,
-                               const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                               const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster);
 };
 

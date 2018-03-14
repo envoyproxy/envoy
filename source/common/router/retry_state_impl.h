@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/optional.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
@@ -12,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -35,7 +35,7 @@ public:
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
   RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
-                          const Optional<Http::StreamResetReason>& reset_reason,
+                          const absl::optional<Http::StreamResetReason>& reset_reason,
                           DoRetryCallback callback) override;
 
 private:
@@ -47,7 +47,7 @@ private:
   void enableBackoffTimer();
   void resetRetry();
   bool wouldRetry(const Http::HeaderMap* response_headers,
-                  const Optional<Http::StreamResetReason>& reset_reason);
+                  const absl::optional<Http::StreamResetReason>& reset_reason);
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;

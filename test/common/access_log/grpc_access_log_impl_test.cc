@@ -141,7 +141,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     request_info.host_ = nullptr;
     request_info.start_time_ = SystemTime(1h);
     request_info.start_time_monotonic_ = MonotonicTime(1h);
-    request_info.last_downstream_tx_byte_sent_.value(2ms);
+    request_info.last_downstream_tx_byte_sent_ = 2ms;
     request_info.downstream_local_address_ =
         std::make_shared<Network::Address::PipeInstance>("/foo");
 
@@ -170,7 +170,7 @@ http_logs:
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.host_ = nullptr;
     request_info.start_time_ = SystemTime(1h);
-    request_info.last_downstream_tx_byte_sent_.value(std::chrono::nanoseconds(2000000));
+    request_info.last_downstream_tx_byte_sent_ = std::chrono::nanoseconds(2000000);
 
     expectLog(R"EOF(
 http_logs:
@@ -198,20 +198,20 @@ http_logs:
     NiceMock<RequestInfo::MockRequestInfo> request_info;
     request_info.start_time_ = SystemTime(1h);
 
-    request_info.last_downstream_rx_byte_received_.value(2ms);
-    request_info.first_upstream_tx_byte_sent_.value(4ms);
-    request_info.last_upstream_tx_byte_sent_.value(6ms);
-    request_info.first_upstream_rx_byte_received_.value(8ms);
-    request_info.last_upstream_rx_byte_received_.value(10ms);
-    request_info.first_downstream_tx_byte_sent_.value(12ms);
-    request_info.last_downstream_tx_byte_sent_.value(14ms);
+    request_info.last_downstream_rx_byte_received_ = 2ms;
+    request_info.first_upstream_tx_byte_sent_ = 4ms;
+    request_info.last_upstream_tx_byte_sent_ = 6ms;
+    request_info.first_upstream_rx_byte_received_ = 8ms;
+    request_info.last_upstream_rx_byte_received_ = 10ms;
+    request_info.first_downstream_tx_byte_sent_ = 12ms;
+    request_info.last_downstream_tx_byte_sent_ = 14ms;
 
     request_info.upstream_local_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2");
     request_info.protocol_ = Http::Protocol::Http10;
     request_info.bytes_received_ = 10;
     request_info.bytes_sent_ = 20;
-    request_info.response_code_.value(200);
+    request_info.response_code_ = 200;
     ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 

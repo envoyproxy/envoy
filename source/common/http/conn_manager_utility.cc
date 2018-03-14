@@ -139,7 +139,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     }
   }
 
-  if (config.userAgent().valid()) {
+  if (config.userAgent()) {
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {

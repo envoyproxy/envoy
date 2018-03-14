@@ -102,7 +102,7 @@ private:
 
   bool isAbortEnabled();
   bool isDelayEnabled();
-  Optional<uint64_t> delayDuration();
+  absl::optional<uint64_t> delayDuration();
   uint64_t abortHttpStatus();
 
   FaultFilterConfigSharedPtr config_;
