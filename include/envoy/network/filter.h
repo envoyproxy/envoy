@@ -81,7 +81,9 @@ public:
   /**
    * Called when data is read on the connection.
    * @param data supplies the read data which may be modified.
-   * @param end_stream supplies whether this is the last byte on the connection.
+   * @param end_stream supplies whether this is the last byte on the connection. It is possible that
+   *                   this is not set on the last byte in the connection, if the FIN arrives after
+   *                   the last byte on a split packet.
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onData(Buffer::Instance& data, bool end_stream) PURE;
