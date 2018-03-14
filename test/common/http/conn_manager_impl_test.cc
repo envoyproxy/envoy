@@ -914,6 +914,43 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
+  setup(false, "");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*handler, log(_, _, _))
+      .WillOnce(Invoke(
+          [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
+            EXPECT_TRUE(request_info.responseCode().valid());
+            EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
+            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+            EXPECT_EQ(nullptr, request_info.routeEntry());
+          }));
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    // These request headers are missing the necessary ":host"
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(0);
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   setup(false, "");
 

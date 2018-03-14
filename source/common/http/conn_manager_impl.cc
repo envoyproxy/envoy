@@ -361,6 +361,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
+  request_info_.downstream_local_address_ =
+      connection_manager_.read_callbacks_->connection().localAddress();
+  // Initially, the downstream remote address is the source address of the
+  // downstream connection. That can change later in the request's lifecycle,
+  // based on XFF processing, but setting the downstream remote address here
+  // prevents surprises for logging code in edge cases.
+  request_info_.downstream_remote_address_ =
+      connection_manager_.read_callbacks_->connection().remoteAddress();
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -519,11 +527,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  // TODO(mattklein123): We should set downstream_local_address_ and downstream_remote_address_
-  // as early as possible in this function since there are various places where we can return and
-  // still log before we get here.
-  request_info_.downstream_local_address_ =
-      connection_manager_.read_callbacks_->connection().localAddress();
+  // Modify the downstream remote address depending on configuration and headers.
   request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
