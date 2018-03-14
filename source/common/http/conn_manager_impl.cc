@@ -471,10 +471,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
-    // Send "Upgrade Required" if HTTP/1.0 support is not expliictly configured on.
+    // The protocol may have shifted in the HTTP/1.0 case so reset it.
+    request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
-      // The protocol may have shifted in the HTTP/1.0 case so reset it.
-      request_info_.protocol(protocol);
+      // Send "Upgrade Required" if HTTP/1.0 support is not expliictly configured on.
       HeaderMapImpl headers{
           {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
       encodeHeaders(nullptr, headers, true);

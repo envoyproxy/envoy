@@ -194,13 +194,18 @@ void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disa
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
+static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 
 void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   started_response_ = true;
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
   connection_.reserveBuffer(4096);
-  connection_.copyToBuffer(RESPONSE_PREFIX, sizeof(RESPONSE_PREFIX) - 1);
+  if (connection_.protocol() == Protocol::Http10 && connection_.supports_http_10()) {
+    connection_.copyToBuffer(HTTP_10_RESPONSE_PREFIX, sizeof(HTTP_10_RESPONSE_PREFIX) - 1);
+  } else {
+    connection_.copyToBuffer(RESPONSE_PREFIX, sizeof(RESPONSE_PREFIX) - 1);
+  }
   connection_.addIntToBuffer(numeric_status);
   connection_.addCharToBuffer(' ');
 

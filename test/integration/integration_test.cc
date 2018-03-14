@@ -176,6 +176,8 @@ TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
 
 TEST_P(IntegrationTest, Http10Disabled) { testHttp10Disabled(); }
 
+TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
+
 TEST_P(IntegrationTest, Http10Enabled) { testHttp10Enabled(); }
 
 TEST_P(IntegrationTest, Http10WithHostandKeepAlive) { testHttp10WithHostAndKeepAlive(); }

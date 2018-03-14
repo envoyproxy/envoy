@@ -131,6 +131,7 @@ protected:
   void testInvalidCharacterInFirstline();
   void testInvalidVersion();
   void testHttp10Disabled();
+  void testHttp09Enabled();
   void testHttp10Enabled();
   void testHttp10WithHostAndKeepAlive();
   void testUpstreamProtocolError();
