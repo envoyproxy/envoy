@@ -210,12 +210,11 @@ TEST_F(RedisSingleServerRequestTest, PingSuccess) {
   RespValue response;
   response.type(RespType::SimpleString);
   response.asString() = "PONG";
-  
+
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   handle_ = splitter_.makeRequest(request, callbacks_);
   EXPECT_EQ(nullptr, handle_);
 };
-
 
 TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   InSequence s;
