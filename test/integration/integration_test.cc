@@ -184,8 +184,6 @@ TEST_P(IntegrationTest, Http10WithHostandKeepAlive) { testHttp10WithHostAndKeepA
 
 TEST_P(IntegrationTest, NoHost) { testNoHost(); }
 
-TEST_P(IntegrationTest, DefaultHost) { testDefaultHost(); }
-
 TEST_P(IntegrationTest, BadPath) { testBadPath(); }
 
 TEST_P(IntegrationTest, AbsolutePath) { testAbsolutePath(); }

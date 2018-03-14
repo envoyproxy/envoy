@@ -52,7 +52,7 @@ void setAllowAbsoluteUrl(
 void setAllowHttp10WithDefaultHost(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   hcm.mutable_http_protocol_options()->set_accept_http_10(true);
-  hcm.mutable_http_protocol_options()->set_default_host("default.com");
+  hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
@@ -1069,21 +1069,6 @@ void HttpIntegrationTest::testBadPath() {
                                 "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
                                 true);
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
-}
-
-void HttpIntegrationTest::testDefaultHost() {
-  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  Http::TestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
-
-  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
-
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Host)->value() ==
-              "default.com");
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
 void HttpIntegrationTest::testNoHost() {

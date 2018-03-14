@@ -471,6 +471,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
+    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
+    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
+    // HTTP/1.1.
+    //
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
@@ -493,11 +497,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   if (!request_headers_->Host()) {
-    if ((protocol == Protocol::Http10 || protocol == Protocol::Http11) &&
-        !connection_manager_.config_.http1Settings().default_host_.empty()) {
+    if ((protocol == Protocol::Http10) &&
+        !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
       // Add a default host if configured to do so.
       request_headers_->insertHost().value(
-          connection_manager_.config_.http1Settings().default_host_);
+          connection_manager_.config_.http1Settings().default_host_for_http_10_);
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
       HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};

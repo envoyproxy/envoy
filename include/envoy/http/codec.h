@@ -195,8 +195,8 @@ struct Http1Settings {
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.
   bool accept_http_10_{false};
-  // Set a default host if no Host: header is present for HTTP/1.0 or HTTP/1.1 requests.`
-  std::string default_host_;
+  // Set a default host if no Host: header is present for HTTP/1.0 requests.`
+  std::string default_host_for_http_10_;
 };
 
 /**
