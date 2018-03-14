@@ -42,6 +42,7 @@ public:
       std::shared_ptr<C> ret{edf_entry.entry_};
       ASSERT(edf_entry.deadline_ >= current_time_);
       current_time_ = edf_entry.deadline_;
+      order_offset_ = 0;
       queue_.pop();
       EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
       return ret;
