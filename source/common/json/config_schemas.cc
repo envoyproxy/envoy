@@ -1378,6 +1378,11 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "no_traffic_interval_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
       "unhealthy_threshold" : {
         "type" : "integer",
         "minimum" : 0,

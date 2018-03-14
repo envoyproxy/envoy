@@ -157,6 +157,7 @@ private:
 
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
+  const std::chrono::milliseconds no_traffic_interval_;
   const std::chrono::milliseconds interval_jitter_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
