@@ -39,14 +39,6 @@ function bazel_debug_binary_build() {
 }
 
 if [[ "$1" == "bazel.release" ]]; then
-  # The release build step still runs during tag events. Avoid rebuilding for no reason.
-  # TODO(mattklein123): Consider moving this into its own "build".
-  if [[ -n "$CIRCLE_TAG" ]]
-  then
-    echo 'Ignoring build for git tag event'
-    exit 0
-  fi
-
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
