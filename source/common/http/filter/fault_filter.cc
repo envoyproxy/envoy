@@ -73,14 +73,13 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
   // by folks using filter level configuration in the fault filter (mainly Lyft folks).
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
     const auto metadata = callbacks_->route()->routeEntry()->metadata();
-    const auto filter_it = metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().FAULT);
+    const auto filter_it =
+        metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().FAULT);
     if (filter_it != metadata.filter_metadata().end()) {
       envoy::config::filter::http::fault::v2::HTTPFault proto_config;
       MessageUtil::jsonConvert(filter_it->second, proto_config);
-      config_.reset(
-          new Http::FaultFilterConfig(proto_config, config_->runtime(), config_->statsPrefix(),
-                                      config_->scope()));
-
+      config_.reset(new Http::FaultFilterConfig(proto_config, config_->runtime(),
+                                                config_->statsPrefix(), config_->scope()));
     }
   }
 

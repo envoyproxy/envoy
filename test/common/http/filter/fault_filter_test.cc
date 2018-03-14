@@ -8,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -21,7 +22,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "common/config/well_known_names.h"
 
 using testing::DoAll;
 using testing::Invoke;
@@ -113,16 +113,19 @@ public:
     }
     )EOF";
 
-  const std::string fault_in_route_metadata_json = R"EOF(
+  const std::string v2_fault_in_route_metadata_json = R"EOF(
     {
-      "envoy.fault" : {
-        "delay" : {
-          "type" : "fixed",
-          "fixed_delay_percent" : 100,
-          "fixed_duration_ms" : 5000
-        },
-        "upstream_cluster" : "www1"
-      }
+      "delay" : {
+        "type" : "FIXED",
+        "percent" : 100,
+        "fixedDelay" : "5s"
+      },
+      "upstreamCluster" : "www1"
+    }
+    )EOF";
+
+  const std::string empty_listener_level_fault_json = R"EOF(
+    {
     }
     )EOF";
 
@@ -141,6 +144,8 @@ public:
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
     EXPECT_CALL(*timer_, disableTimer());
   }
+
+  void TestRouteLevelFault(); // utility function
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -739,20 +744,14 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-TEST_F(FaultFilterTest, FaultWithMetadataConfigOnly) {
-  envoy::config::filter::http::fault::v2::HTTPFault fault;
-  config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
-  filter_.reset(new FaultFilter(config_));
-  filter_->setDecoderFilterCallbacks(filter_callbacks_);
-
-
-  google::protobuf::Struct filter_config;
-  MessageUtil::loadFromJson(fault_with_target_cluster_json, filter_config);
+void FaultFilterTest::TestRouteLevelFault() {
+  google::protobuf::Struct route_level_fault;
+  MessageUtil::loadFromJson(v2_fault_in_route_metadata_json, route_level_fault);
   envoy::api::v2::core::Metadata metadata;
-  (*metadata.mutable_filter_metadata())[Envoy::Config::HttpFilterNames::get().FAULT] = filter_config;
+  (*metadata.mutable_filter_metadata())[Envoy::Config::HttpFilterNames::get().FAULT] =
+      route_level_fault;
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_, metadata())
-      .WillOnce(ReturnRef(metadata));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillOnce(ReturnRef(metadata));
 
   const std::string upstream_cluster("www1");
 
@@ -766,7 +765,7 @@ TEST_F(FaultFilterTest, FaultWithMetadataConfigOnly) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(5000UL));
 
-  SCOPED_TRACE("FaultWithMetadataConfigOnly");
+  SCOPED_TRACE("RouteLevelFault");
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
@@ -777,12 +776,6 @@ TEST_F(FaultFilterTest, FaultWithMetadataConfigOnly) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
       .WillOnce(Return(false));
 
-  // Delay only case
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
-      .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   timer_->callback_();
 
@@ -791,6 +784,16 @@ TEST_F(FaultFilterTest, FaultWithMetadataConfigOnly) {
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, OnlyRouteLevelFault) {
+  SetUpTest(empty_listener_level_fault_json);
+  TestRouteLevelFault();
+}
+
+TEST_F(FaultFilterTest, RouteLevelFaultOverridesListenerLevelFault) {
+  SetUpTest(abort_only_json); // This is a valid listener level fault
+  TestRouteLevelFault();
 }
 
 } // namespace Http
