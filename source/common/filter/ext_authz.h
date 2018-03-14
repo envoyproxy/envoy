@@ -49,7 +49,7 @@ public:
         failure_mode_allow_(config.failure_mode_allow()) {}
 
   const InstanceStats& stats() { return stats_; }
-  bool failOpen() const { return failure_mode_allow_; }
+  bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
 
 private:
@@ -99,7 +99,7 @@ private:
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_check_{};
-  envoy::service::auth::v2::CheckRequest checkRequest_{};
+  envoy::service::auth::v2::CheckRequest check_request_{};
 };
 
 } // TcpFilter

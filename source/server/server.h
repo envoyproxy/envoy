@@ -7,7 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/optional.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -26,6 +25,8 @@
 #include "server/listener_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -148,7 +149,7 @@ public:
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
+  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
     return config_->rateLimitClientFactory().create(timeout);
   }
   Runtime::Loader& runtime() override;
@@ -168,7 +169,7 @@ private:
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
-  void loadServerFlags(const Optional<std::string>& flags_path);
+  void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
   void terminate();

@@ -11,9 +11,9 @@ envoy_package()
 envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":message_interface",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
     ],
 )

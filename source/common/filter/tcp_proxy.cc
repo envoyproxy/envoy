@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/config/well_known_names.h"
 
 namespace Envoy {
 namespace Filter {
@@ -41,8 +42,8 @@ TcpProxyConfig::SharedConfig::SharedConfig(
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
-    idle_timeout_.value(std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
+    idle_timeout_ = std::chrono::milliseconds(
+        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout()));
   }
 }
 
@@ -60,10 +61,6 @@ TcpProxyConfig::TcpProxyConfig(
   if (config.has_deprecated_v1()) {
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
              route_desc : config.deprecated_v1().routes()) {
-      if (!context.clusterManager().get(route_desc.cluster())) {
-        throw EnvoyException(
-            fmt::format("tcp proxy: unknown cluster '{}' in TCP route", route_desc.cluster()));
-      }
       routes_.emplace_back(Route(route_desc));
     }
   }
@@ -72,6 +69,17 @@ TcpProxyConfig::TcpProxyConfig(
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
     default_route.set_cluster(config.cluster());
     routes_.emplace_back(default_route);
+  }
+
+  if (config.has_metadata_match()) {
+    const auto& filter_metadata = config.metadata_match().filter_metadata();
+
+    const auto filter_it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it != filter_metadata.end()) {
+      cluster_metadata_match_criteria_ =
+          std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
   }
 
   for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
@@ -120,6 +128,8 @@ TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& clu
       upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
 TcpProxy::~TcpProxy() {
+  request_info_.onRequestComplete();
+
   if (config_ != nullptr) {
     for (const auto& access_log : config_->accessLogs()) {
       access_log->log(nullptr, nullptr, request_info_);
@@ -462,7 +472,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
 
-    if (config_ != nullptr && config_->idleTimeout().valid()) {
+    if (config_ != nullptr && config_->idleTimeout()) {
       // The idle_timer_ can be moved to a TcpProxyDrainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
       // the call to either TcpProxy or to TcpProxyDrainer, depending on the current state.
@@ -487,7 +497,7 @@ void TcpProxy::onIdleTimeout() {
 
 void TcpProxy::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
-    ASSERT(config_->idleTimeout().valid());
+    ASSERT(config_->idleTimeout());
     idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 }

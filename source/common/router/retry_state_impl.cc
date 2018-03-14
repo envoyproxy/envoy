@@ -130,9 +130,10 @@ void RetryStateImpl::resetRetry() {
 }
 
 RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
-                                        const Optional<Http::StreamResetReason>& reset_reason,
+                                        const absl::optional<Http::StreamResetReason>& reset_reason,
                                         DoRetryCallback callback) {
-  ASSERT((response_headers != nullptr) ^ reset_reason.valid());
+
+  ASSERT((response_headers != nullptr) ^ reset_reason.has_value());
 
   if (callback_ && !wouldRetry(response_headers, reset_reason)) {
     cluster_.stats().upstream_rq_retry_success_.inc();
@@ -167,14 +168,14 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 }
 
 bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
-                                const Optional<Http::StreamResetReason>& reset_reason) {
+                                const absl::optional<Http::StreamResetReason>& reset_reason) {
   // We never retry if the overloaded header is set.
   if (response_headers != nullptr && response_headers->EnvoyOverloaded() != nullptr) {
     return false;
   }
 
   // we never retry if the reset reason is overflow.
-  if (reset_reason.valid() && reset_reason.value() == Http::StreamResetReason::Overflow) {
+  if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {
     return false;
   }
 
@@ -195,12 +196,12 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     }
   }
 
-  if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) && reset_reason.valid() &&
+  if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) && reset_reason &&
       reset_reason.value() == Http::StreamResetReason::RemoteRefusedStreamReset) {
     return true;
   }
 
-  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) && reset_reason.valid() &&
+  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) && reset_reason &&
       reset_reason.value() == Http::StreamResetReason::ConnectionFailure) {
     return true;
   }
@@ -216,8 +217,9 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
           (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
            RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) &&
       response_headers) {
-    Optional<Grpc::Status::GrpcStatus> status = Grpc::Common::getGrpcStatus(*response_headers);
-    if (status.valid()) {
+    absl::optional<Grpc::Status::GrpcStatus> status =
+        Grpc::Common::getGrpcStatus(*response_headers);
+    if (status) {
       if ((status.value() == Grpc::Status::Canceled &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_CANCELLED)) ||
           (status.value() == Grpc::Status::DeadlineExceeded &&

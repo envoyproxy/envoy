@@ -118,9 +118,15 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
-   * @param return TRUE if successful, FALSE otherwise.
+   * @param return true if successful, false otherwise.
    */
   static bool atoul(const char* str, uint64_t& out, int base = 10);
+
+  /**
+   * Convert a string to a long, checking for error.
+   * @param return true if successful, false otherwise.
+   */
+  static bool atol(const char* str, int64_t& out, int base = 10);
 
   /**
    * Perform a case insensitive compare of 2 strings.

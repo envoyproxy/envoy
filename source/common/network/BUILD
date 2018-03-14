@@ -38,12 +38,12 @@ envoy_cc_library(
     name = "connection_lib",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":filter_manager_lib",
         ":raw_buffer_socket_lib",
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",

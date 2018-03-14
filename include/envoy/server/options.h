@@ -28,7 +28,12 @@ enum class Mode {
    */
   Validate,
 
-  // TODO(rlazarus): Add a third option for "light validation": Mock out access to the filesystem.
+  /**
+   * Completely load and initialize the config, and then exit without running the listener loop.
+   */
+  InitOnly,
+
+  // TODO(rlazarus): Add a fourth option for "light validation": Mock out access to the filesystem.
   // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
   // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
   // to be validated in a non-prod environment.

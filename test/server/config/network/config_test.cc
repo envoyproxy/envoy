@@ -540,21 +540,17 @@ TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
 }
 
 TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
-  std::string json = R"EOF(
-    {
-      "grpc_service": {
-          "google_grpc": {
-             "target_uri": "ext_authz_server",
-             "stat_prefix": "google"
-           }
-      },
-      "failure_mode_allow": false,
-      "stat_prefix": "name"
-    }
-    )EOF";
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  stat_prefix: name
+)EOF";
 
   envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromJson(json, proto_config);
+  MessageUtil::loadFromYaml(yaml, proto_config);
 
   NiceMock<MockFactoryContext> context;
   ExtAuthzConfigFactory factory;

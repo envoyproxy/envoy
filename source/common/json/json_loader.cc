@@ -307,6 +307,10 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
     }
     break;
   }
+  case Type::Null: {
+    value.SetNull();
+    break;
+  }
   default:
     NOT_REACHED;
   }

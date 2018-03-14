@@ -3,9 +3,10 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/common/optional.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -140,7 +141,7 @@ public:
    *         handle should just be used to cancel.
    */
   virtual Request* send(MessagePtr&& request, Callbacks& callbacks,
-                        const Optional<std::chrono::milliseconds>& timeout) PURE;
+                        const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * Start an HTTP stream asynchronously.
@@ -156,7 +157,7 @@ public:
    *         the handle can be used to send more messages or close the stream.
    */
   virtual Stream* start(StreamCallbacks& callbacks,
-                        const Optional<std::chrono::milliseconds>& timeout,
+                        const absl::optional<std::chrono::milliseconds>& timeout,
                         bool buffer_body_for_retry) PURE;
 
   /**

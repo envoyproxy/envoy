@@ -18,6 +18,7 @@ exports_files([
     "server_proxy_proto.json",
     "server_ssl.json",
     "server_uds.json",
+    "server_unix_listener.json",
     "server_xfcc.json",
     "tcp_proxy.json",
 ])
@@ -37,6 +38,7 @@ filegroup(
     name = "server_config_files",
     srcs = [
         "server.json",
+        "server_unix_listener.json",
     ],
 )
 

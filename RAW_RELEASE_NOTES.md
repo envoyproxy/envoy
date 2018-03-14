@@ -60,6 +60,9 @@ final version.
 * Added DOWNSTREAM_LOCAL_ADDRESS, DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT header formatters, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
 * Added support for HTTPS redirects on specific routes.
+* access log: added less than or equal (LE) comparison filter.
+* access log: added configuration to runtime filter to set default sampling rate, divisor, and
+  whether to use independent randomness or not.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
 * Added support for abstract unix domain sockets on linux. The abstract
   namespace can be used by prepending '@' to a socket path.
@@ -71,3 +74,7 @@ final version.
 * Added :ref:`HTTP IP Tagging filter<config_http_filters_ip_tagging>`.
 * Added support for prefix_rewrite for redirects.
 * Added support for stripping query string for redirects.
+* Added support for specifying a metadata matcher for upstream clusters in the tcp filter
+* Added support for listening on UNIX domain sockets.
+* Added support for downstream request/upstream response header manipulation in weighted cluster.
+* Added support for range based header matching for request routing.

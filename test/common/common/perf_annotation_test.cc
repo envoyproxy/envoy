@@ -28,13 +28,13 @@ TEST_F(PerfAnnotationTest, testMacros) {
   PERF_RECORD(perf, "beta", "3");
   std::string report = PERF_TO_STRING();
   EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 0\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 0 ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 1\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 1 ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" alpha ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 2\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 2 ") != std::string::npos) << report;
   EXPECT_TRUE(report.find(" beta ") != std::string::npos) << report;
-  EXPECT_TRUE(report.find(" 3\n") != std::string::npos) << report;
+  EXPECT_TRUE(report.find(" 3 ") != std::string::npos) << report;
   PERF_DUMP();
 }
 
@@ -51,9 +51,9 @@ TEST_F(PerfAnnotationTest, testFormat) {
   std::string report = context->toString();
   EXPECT_EQ(
       "Duration(us)  # Calls  Mean(ns)  StdDev(ns)  Min(ns)  Max(ns)  Category  Description\n"
-      "        4600        4   1150000      129099  1000000  1300000     alpha            1\n"
-      "         200        1    200000         nan   200000   200000     gamma            2\n"
-      "          87        3     29000        1000    28000    30000      beta            3\n",
+      "        4600        4   1150000      129099  1000000  1300000  alpha     1          \n"
+      "         200        1    200000         nan   200000   200000  gamma     2          \n"
+      "          87        3     29000        1000    28000    30000  beta      3          \n",
       context->toString());
 }
 

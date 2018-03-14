@@ -334,8 +334,9 @@ public:
                 setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
-    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
-                                                active_span, Optional<std::chrono::milliseconds>());
+    request->grpc_request_ =
+        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
+                           absl::optional<std::chrono::milliseconds>());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {

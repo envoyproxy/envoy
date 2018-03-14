@@ -17,55 +17,55 @@ namespace Envoy {
 namespace RequestInfo {
 namespace {
 
-class RequestInfoTimingWrapper {
-public:
-  RequestInfoTimingWrapper()
-      : pre_start_(std::chrono::steady_clock::now()), request_info_(Http::Protocol::Http2),
-        post_start_(std::chrono::steady_clock::now()) {}
-
-  void checkTimingBounds(
-      const std::function<std::chrono::microseconds(RequestInfoImpl&)>& measure_duration,
-      const std::string& duration_name) {
-    MonotonicTime pre_measurement = std::chrono::steady_clock::now();
-    std::chrono::microseconds duration = measure_duration(request_info_);
-    MonotonicTime post_measurement = std::chrono::steady_clock::now();
-
-    std::chrono::microseconds lower_bound =
-        std::chrono::duration_cast<std::chrono::microseconds>(pre_measurement - post_start_);
-    EXPECT_LE(lower_bound, duration)
-        << fmt::format("Duration {} was lower than expected", duration_name);
-
-    std::chrono::microseconds upper_bound =
-        std::chrono::duration_cast<std::chrono::microseconds>(post_measurement - pre_start_);
-    EXPECT_GE(upper_bound, duration)
-        << fmt::format("Duration: {} was higher than expected", duration_name);
-  }
-
-private:
-  const MonotonicTime pre_start_;
-  RequestInfoImpl request_info_;
-  const MonotonicTime post_start_;
-};
+std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
+                                       absl::optional<std::chrono::nanoseconds> timing) {
+  EXPECT_TRUE(timing);
+  EXPECT_LE(last, timing.value());
+  return timing.value();
+}
 
 TEST(RequestInfoImplTest, TimingTest) {
-  RequestInfoTimingWrapper wrapper;
+  MonotonicTime pre_start = std::chrono::steady_clock::now();
+  RequestInfoImpl info(Http::Protocol::Http2);
+  MonotonicTime post_start = std::chrono::steady_clock::now();
 
-  wrapper.checkTimingBounds(
-      [](RequestInfoImpl& request_info) {
-        request_info.requestReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.requestReceivedDuration().value();
-      },
-      "request received");
+  const MonotonicTime& start = info.startTimeMonotonic();
 
-  wrapper.checkTimingBounds(
-      [](RequestInfoImpl& request_info) {
-        request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-        return request_info.responseReceivedDuration().value();
-      },
-      "response received");
+  EXPECT_LE(pre_start, start) << "Start time was lower than expected";
+  EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
-  wrapper.checkTimingBounds([](RequestInfoImpl& request_info) { return request_info.duration(); },
-                            "stream duration");
+  EXPECT_FALSE(info.lastDownstreamRxByteReceived());
+  info.onLastDownstreamRxByteReceived();
+  std::chrono::nanoseconds dur =
+      checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
+
+  EXPECT_FALSE(info.firstUpstreamTxByteSent());
+  info.onFirstUpstreamTxByteSent();
+  dur = checkDuration(dur, info.firstUpstreamTxByteSent());
+
+  EXPECT_FALSE(info.lastUpstreamTxByteSent());
+  info.onLastUpstreamTxByteSent();
+  dur = checkDuration(dur, info.lastUpstreamTxByteSent());
+
+  EXPECT_FALSE(info.firstUpstreamRxByteReceived());
+  info.onFirstUpstreamRxByteReceived();
+  dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
+
+  EXPECT_FALSE(info.lastUpstreamRxByteReceived());
+  info.onLastUpstreamRxByteReceived();
+  dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
+
+  EXPECT_FALSE(info.firstDownstreamTxByteSent());
+  info.onFirstDownstreamTxByteSent();
+  dur = checkDuration(dur, info.firstDownstreamTxByteSent());
+
+  EXPECT_FALSE(info.lastDownstreamTxByteSent());
+  info.onLastDownstreamTxByteSent();
+  dur = checkDuration(dur, info.lastDownstreamTxByteSent());
+
+  EXPECT_FALSE(info.requestComplete());
+  info.onRequestComplete();
+  dur = checkDuration(dur, info.requestComplete());
 }
 
 TEST(RequestInfoImplTest, BytesTest) {
@@ -113,9 +113,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, request_info.protocol().value());
 
-    EXPECT_FALSE(request_info.responseCode().valid());
+    EXPECT_FALSE(request_info.responseCode());
     request_info.response_code_ = 200;
-    ASSERT_TRUE(request_info.responseCode().valid());
+    ASSERT_TRUE(request_info.responseCode());
     EXPECT_EQ(200, request_info.responseCode().value());
 
     EXPECT_EQ(nullptr, request_info.upstreamHost());
@@ -131,22 +131,6 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     NiceMock<Router::MockRouteEntry> route_entry;
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
-  }
-
-  {
-    RequestInfoImpl request_info;
-
-    // If no value is set, these should be not valid
-    EXPECT_FALSE(request_info.protocol().valid());
-    EXPECT_FALSE(request_info.requestReceivedDuration().valid());
-    EXPECT_FALSE(request_info.responseReceivedDuration().valid());
-
-    request_info.protocol(Http::Protocol::Http10);
-    request_info.requestReceivedDuration(std::chrono::steady_clock::now());
-    request_info.responseReceivedDuration(std::chrono::steady_clock::now());
-    EXPECT_TRUE(request_info.protocol().valid());
-    EXPECT_TRUE(request_info.requestReceivedDuration().valid());
-    EXPECT_TRUE(request_info.responseReceivedDuration().valid());
   }
 }
 
