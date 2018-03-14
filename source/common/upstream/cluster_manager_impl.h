@@ -191,6 +191,9 @@ public:
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
+  void addClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+  void removeClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
@@ -260,6 +263,7 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::set<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
 

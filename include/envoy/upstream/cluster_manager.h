@@ -23,6 +23,29 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * ClusterUpdateCallbacks provide a way to exposes Cluster lifecycle events in the
+ * ClusterManager.
+ */
+class ClusterUpdateCallbacks {
+public:
+  virtual ~ClusterUpdateCallbacks() {}
+
+  /**
+   * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
+   * is updated in the ClusterManager.
+   * @param cluster is the ThreadLocalCluster that represents the updated
+   * cluster.
+   */
+  virtual void onClusterAddOrUpdate(ThreadLocalCluster& cluster) PURE;
+
+  /**
+   * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
+   * @param cluster_name is the name of the removed cluster.
+   */
+  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+};
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  */
@@ -147,6 +170,17 @@ public:
    * @return std::string the local cluster name, or "" if no local cluster was configured.
    */
   virtual const std::string& localClusterName() const PURE;
+
+  /**
+   * These two methods allow to register and unregister callbacks for cluster lifecycle events
+   * in the ClusterManager.
+   * The callbacks will be registered in a thread local slot and the callbacks will be executed
+   * on the thread that registered them.
+   *
+   * @param callbacks are the ClusterUpdateCallbacks to add or remove to the cluster manager.
+   */
+  virtual void addClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+  virtual void removeClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
