@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Upstream {
 
 // It's not sufficient to use trace level logging, since it becomes far too noisy for a number of
-// tests, so we can kill EDF trace debug here.
+// tests, so we can kill trace debug here.
 #define EDF_DEBUG 0
 
 #if EDF_DEBUG
@@ -16,8 +16,10 @@ namespace Upstream {
 #define EDF_TRACE(fmt...)
 #endif
 
-// EDF scheduler. Entries have deadlines set at current time + 1 / weight, providing weighted round
-// robin behavior.
+// Earliest Deadline First (EDF) scheduler
+// (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) used for weighted round robin.
+// Each pick from the schedule has the earliest deadline entry selected. Entries have deadlines set
+// at current time + 1 / weight, providing weighted round robin behavior.
 template <class C> class EdfScheduler {
 public:
   /**

@@ -402,18 +402,17 @@ RoundRobinLoadBalancer::RoundRobinLoadBalancer(
   for (uint32_t priority = 0; priority < priority_set.hostSetsPerPriority().size(); ++priority) {
     refresh(priority);
   }
-  // We fully recompute the schedulers for a given host set here on membership
-  // change, which is consistent with what other LB implementations do (e.g.
-  // thread aware).
-  // TODO(htuch): By fully recomputing the host set schedulers on each membership
-  // update, we lose RR history, so on an EDS update, for example, we reset the
-  // schedule. This is likely a reasonable approximation when there are many
-  // more LB picks than host set updates. We could be a bit finer grained and
-  // only modify the schedulers for hosts that have changed health status,
-  // locality, been added/removed, etc. but this is quite a bit more complicated
-  // and will require some additional addMemberUpdateCb parameters to track
-  // efficiently. The other downside of a full recompute is that time complexity
-  // is O(n * log n), so we will need to do better at delta tracking to scale.
+  // We fully recompute the schedulers for a given host set here on membership change, which is
+  // consistent with what other LB implementations do (e.g. thread aware).
+  // TODO(htuch): By fully recomputing the host set schedulers on each membership update, we lose RR
+  // history, so on an EDS update, for example, we reset the schedule. This is likely a reasonable
+  // approximation when there are many more LB picks than host set updates. Otherwise, we will bias
+  // towards heavily weighted hosts further than weighted RR should allow. We could be a bit finer
+  // grained and only modify the schedulers for hosts that have changed health status, locality,
+  // been added/removed, etc. but this is quite a bit more complicated and will require some
+  // additional addMemberUpdateCb parameters to track efficiently. The other downside of a full
+  // recompute is that time complexity is O(n * log n), so we will need to do better at delta
+  // tracking to scale.
   priority_set.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
@@ -426,12 +425,12 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
     for (const auto& host : hosts) {
       // We use a fixed weight here. While the weight may change without
       // notification, this will only be stale until this host is next picked,
-      // at which point it is reinserted into the EDF scheduler with its new
+      // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
       scheduler_[source].add(host->weight(), host);
     }
   };
-  // Populate EDF schedulers for each valid HostsSource value for the host set
+  // Populate EdfSchedulers for each valid HostsSource value for the host set
   // at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());

@@ -116,6 +116,7 @@ protected:
 
   struct HostsSourceHash {
     size_t operator()(const HostsSource& hs) const {
+      // This is only used for std::unordered_map keys, so we don't need a deterministic hash.
       size_t hash = std::hash<uint32_t>()(hs.priority_);
       hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
       hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
@@ -215,7 +216,7 @@ public:
 private:
   void refresh(uint32_t priority);
 
-  // EDF scheduler for each valid HostsSource.
+  // EdfScheduler for each valid HostsSource.
   std::unordered_map<HostsSource, EdfScheduler<const Host>, HostsSourceHash> scheduler_;
 };
 
