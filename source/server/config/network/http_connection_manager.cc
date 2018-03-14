@@ -171,7 +171,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
-    user_agent_.value(context_.localInfo().clusterName());
+    user_agent_ = context_.localInfo().clusterName();
   }
 
   if (config.has_tracing()) {
@@ -202,7 +202,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_idle_timeout()) {
-    idle_timeout_.value(std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, idle_timeout)));
+    idle_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, idle_timeout));
   }
 
   for (const auto& access_log : config.access_log()) {

@@ -58,16 +58,16 @@ public:
 
     MonotonicTime now = std::chrono::steady_clock::now();
     start_time_monotonic_ = now;
-    end_time_.value(now + std::chrono::milliseconds(3));
+    end_time_ = now + std::chrono::milliseconds(3);
   }
 
   SystemTime startTime() const override { return start_time_; }
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
   uint64_t bytesReceived() const override { return 1; }
-  Optional<Http::Protocol> protocol() const override { return protocol_; }
+  absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
-  Optional<uint32_t> responseCode() const override { return response_code_; }
+  absl::optional<uint32_t> responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
 
   bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
@@ -94,8 +94,9 @@ public:
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
-  Optional<std::chrono::nanoseconds> duration(const Optional<MonotonicTime>& time) const {
-    if (!time.valid()) {
+  absl::optional<std::chrono::nanoseconds>
+  duration(const absl::optional<MonotonicTime>& time) const {
+    if (!time) {
       return {};
     }
 
@@ -103,89 +104,89 @@ public:
                                                                 start_time_monotonic_);
   }
 
-  Optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_rx_byte_received_);
   }
 
   void onLastDownstreamRxByteReceived() override {
-    last_rx_byte_received_.value(std::chrono::steady_clock::now());
+    last_rx_byte_received_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(first_upstream_tx_byte_sent_);
   }
 
   void onFirstUpstreamTxByteSent() override {
-    first_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    first_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
     return duration(last_upstream_tx_byte_sent_);
   }
 
   void onLastUpstreamTxByteSent() override {
-    last_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    last_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
     return duration(first_upstream_rx_byte_received_);
   }
 
   void onFirstUpstreamRxByteReceived() override {
-    first_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
+    first_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
     return duration(last_upstream_rx_byte_received_);
   }
 
   void onLastUpstreamRxByteReceived() override {
-    last_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
+    last_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
     return duration(first_downstream_tx_byte_sent_);
   }
 
   void onFirstDownstreamTxByteSent() override {
-    first_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    first_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
     return duration(last_downstream_tx_byte_sent_);
   }
 
   void onLastDownstreamTxByteSent() override {
-    last_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    last_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  void onRequestComplete() override { end_time_.value(std::chrono::steady_clock::now()); }
+  void onRequestComplete() override { end_time_ = std::chrono::steady_clock::now(); }
 
   void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
+    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
   }
 
-  Optional<std::chrono::nanoseconds> requestComplete() const override {
+  absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
   }
 
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
-  Optional<MonotonicTime> last_rx_byte_received_;
-  Optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  Optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  Optional<MonotonicTime> first_upstream_rx_byte_received_;
-  Optional<MonotonicTime> last_upstream_rx_byte_received_;
-  Optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  Optional<MonotonicTime> last_downstream_tx_byte_sent_;
-  Optional<MonotonicTime> end_time_;
+  absl::optional<MonotonicTime> last_rx_byte_received_;
+  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> end_time_;
 
-  Optional<Http::Protocol> protocol_{Http::Protocol::Http11};
-  Optional<uint32_t> response_code_;
+  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
@@ -307,7 +308,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
+  request_info_.response_code_ = 200;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -329,12 +330,12 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
-  request_info_.end_time_.value(request_info_.startTimeMonotonic() +
-                                std::chrono::microseconds(1001000000000000));
+  request_info_.response_code_ = 200;
+  request_info_.end_time_ =
+      request_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -577,7 +578,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -607,7 +608,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -640,7 +641,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -699,21 +700,19 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
-  request_info.end_time_.value(request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(100000));
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 
-  request_info.end_time_.value(request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(100000001000));
+  request_info.end_time_ =
+      request_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
-  request_info.end_time_.value(request_info.startTimeMonotonic() +
-                               std::chrono::microseconds(10000));
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 }
@@ -736,7 +735,7 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
-  info.response_code_.value(400);
+  info.response_code_ = 400;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers));
 
@@ -760,12 +759,12 @@ config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
-  request_info_.response_code_.value(499);
+  request_info_.response_code_ = 499;
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
   EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);

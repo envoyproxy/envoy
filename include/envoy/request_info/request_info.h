@@ -4,11 +4,12 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -75,7 +76,7 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual Optional<Http::Protocol> protocol() const PURE;
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
 
   /**
    * @param protocol the request's protocol.
@@ -85,7 +86,7 @@ public:
   /**
    * @return the response code.
    */
-  virtual Optional<uint32_t> responseCode() const PURE;
+  virtual absl::optional<uint32_t> responseCode() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -102,7 +103,7 @@ public:
    * @return the duration between the last byte of the request was received and the start of the
    * request.
    */
-  virtual Optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
 
   /**
    * Sets the time when the last byte of the request was received.
@@ -114,7 +115,7 @@ public:
    * the request. There may be a considerable delta between lastDownstreamByteReceived and this
    * value due to filters.
    */
-  virtual Optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
 
   /**
    * Sets the time when the first byte of the request was sent upstream.
@@ -125,7 +126,7 @@ public:
    * @return the duration between the last bye of the request was sent upstream and the start of the
    * request.
    */
-  virtual Optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
 
   /**
    * Sets the time when the last bye of the request was sent upstream.
@@ -136,7 +137,7 @@ public:
    * @return the duration between the first byte of the response is received from upstream and the
    * start of the request.
    */
-  virtual Optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
 
   /**
    * Sets the time when the first byte of the response is received from
@@ -148,7 +149,7 @@ public:
    * @return the duration between the last byte of the response is received from upstream and the
    * start of the request.
    */
-  virtual Optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
 
   /**
    * Sets the time when the last byte of the response is received from
@@ -161,7 +162,7 @@ public:
    * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
    * due to filters.
    */
-  virtual Optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
 
   /**
    * Sets the time when the first byte of the response is sent downstream.
@@ -172,7 +173,7 @@ public:
    * @return the duration between the last byte of the response is sent downstream and the start of
    * the request.
    */
-  virtual Optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
 
   /**
    * Sets the time when the last byte of the response is sent downstream.
@@ -183,7 +184,7 @@ public:
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
-  virtual Optional<std::chrono::nanoseconds> requestComplete() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> requestComplete() const PURE;
 
   /**
    * Sets the end time for the request. This method is called once the request has been fully

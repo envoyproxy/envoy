@@ -185,7 +185,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   }
 
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
-    eds_config_.value(bootstrap.dynamic_resources().deprecated_v1().sds_config());
+    eds_config_ = bootstrap.dynamic_resources().deprecated_v1().sds_config();
   }
 
   if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
@@ -253,10 +253,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
   }
 
-  Optional<std::string> local_cluster_name;
+  absl::optional<std::string> local_cluster_name;
   if (!cm_config.local_cluster_name().empty()) {
     local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name.value(cm_config.local_cluster_name());
+    local_cluster_name = cm_config.local_cluster_name();
     if (primary_clusters_.find(local_cluster_name.value()) == primary_clusters_.end()) {
       throw EnvoyException(
           fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
@@ -550,23 +550,23 @@ const std::string ClusterManagerImpl::versionInfo() const {
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
     ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-    const Optional<std::string>& local_cluster_name)
+    const absl::optional<std::string>& local_cluster_name)
     : parent_(parent), thread_local_dispatcher_(dispatcher) {
   // If local cluster is defined then we need to initialize it first.
-  if (local_cluster_name.valid()) {
+  if (local_cluster_name) {
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.primary_clusters_.at(local_cluster_name.value());
     thread_local_clusters_[local_cluster_name.value()].reset(new ClusterEntry(
         *this, local_cluster.cluster_->info(), local_cluster.loadBalancerFactory()));
   }
 
-  local_priority_set_ = local_cluster_name.valid()
+  local_priority_set_ = local_cluster_name
                             ? &thread_local_clusters_[local_cluster_name.value()]->priority_set_
                             : nullptr;
 
   for (auto& cluster : parent.primary_clusters_) {
     // If local cluster name is set then we already initialized this cluster.
-    if (local_cluster_name.valid() && local_cluster_name.value() == cluster.first) {
+    if (local_cluster_name && local_cluster_name.value() == cluster.first) {
       continue;
     }
 
@@ -758,7 +758,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  Optional<uint32_t> hash_key;
+  absl::optional<uint32_t> hash_key;
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -767,16 +767,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
-      hash_key.value(options->hashKey());
+      hash_key = options->hashKey();
     }
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  const auto key = container.key(priority, protocol, hash_key.valid() ? hash_key.value() : 0);
+  const auto key = container.key(priority, protocol, hash_key ? hash_key.value() : 0);
   if (!container.pools_[key]) {
     container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
-        hash_key.valid() ? context->downstreamConnection()->socketOptions() : nullptr);
+        hash_key ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
   return container.pools_[key].get();
@@ -811,10 +811,9 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
                                  outlier_event_logger, added_via_api);
 }
 
-CdsApiPtr
-ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                     const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                                     ClusterManager& cm) {
+CdsApiPtr ProdClusterManagerFactory::createCds(
+    const envoy::api::v2::core::ConfigSource& cds_config,
+    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
   return CdsApiImpl::create(cds_config, eds_config, cm, primary_dispatcher_, random_, local_info_,
                             stats_);
 }

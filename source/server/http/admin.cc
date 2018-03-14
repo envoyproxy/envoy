@@ -559,7 +559,7 @@ std::string AdminImpl::runtimeAsJson(
     entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
 
     Value entry_value;
-    if (entry.second.uint_value_.valid()) {
+    if (entry.second.uint_value_) {
       entry_value.SetUint64(entry.second.uint_value_.value());
     } else {
       entry_value.SetString(entry.second.string_value_.c_str(), allocator);

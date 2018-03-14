@@ -54,7 +54,7 @@ public:
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                      const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                      const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
 
 protected:
@@ -241,7 +241,7 @@ private:
     typedef std::unique_ptr<ClusterEntry> ClusterEntryPtr;
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
-                                  const Optional<std::string>& local_cluster_name);
+                                  const absl::optional<std::string>& local_cluster_name);
     ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
@@ -293,7 +293,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
   std::unordered_map<std::string, PrimaryClusterData> primary_clusters_;
-  Optional<envoy::api::v2::core::ConfigSource> eds_config_;
+  absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;

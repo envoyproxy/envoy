@@ -42,8 +42,8 @@ TcpProxyConfig::SharedConfig::SharedConfig(
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
-    idle_timeout_.value(std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout())));
+    idle_timeout_ = std::chrono::milliseconds(
+        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout()));
   }
 }
 
@@ -472,7 +472,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
 
-    if (config_ != nullptr && config_->idleTimeout().valid()) {
+    if (config_ != nullptr && config_->idleTimeout()) {
       // The idle_timer_ can be moved to a TcpProxyDrainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
       // the call to either TcpProxy or to TcpProxyDrainer, depending on the current state.
@@ -497,7 +497,7 @@ void TcpProxy::onIdleTimeout() {
 
 void TcpProxy::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
-    ASSERT(config_->idleTimeout().valid());
+    ASSERT(config_->idleTimeout());
     idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 }
