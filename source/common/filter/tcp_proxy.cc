@@ -498,7 +498,7 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
 void TcpProxy::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
-  // This results in also closing the upstream connection
+  // This results in also closing the upstream connection.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
