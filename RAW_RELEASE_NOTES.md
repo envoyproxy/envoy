@@ -8,7 +8,7 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
-* Added support for specifying idle timeout for upstream clusters.
+* Added support for specifying idle timeout for upstream HTTP connections.
 * Added support for sending error details as grpc.rpc.Status in DiscoveryRequest.
 * Added support for specifying alternate stats name while emitting stats for clusters.
 * Added support for inline delivery of TLS certificates and private keys.

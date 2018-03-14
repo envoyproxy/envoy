@@ -13,8 +13,6 @@ public:
   void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
 
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
-
-  void simultaneousRequestsWithIdleTimeout();
 };
 
 class Http2RingHashIntegrationTest : public Http2IntegrationTest {

@@ -14,7 +14,7 @@ namespace Http {
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
-    : type_(type), connection_(std::move(connection)), host_(host), dispatcher_(dispatcher) {
+    : type_(type), connection_(std::move(connection)), host_(host) {
   // Make sure upstream connections process data and then the FIN, rather than processing
   // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for details)
   connection_->detectEarlyCloseWhenReadDisabled(false);
@@ -24,7 +24,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
   if (host != nullptr && host_->cluster().idleTimeout().valid()) {
-    idle_timer_ = dispatcher_.createTimer([this]() -> void { onIdleTimeout(); });
+    idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
     idle_timeout_ = host_->cluster().idleTimeout().value();
   }
   // We just universally set no delay on connections. Theoretically we might at some point want

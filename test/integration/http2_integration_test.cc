@@ -195,16 +195,16 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
+// Tests idle timeout behaviour with single request and validates that idle timer kicks in
+// after given timeout.
 TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 
+// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
+// after both the requests are done.
 TEST_P(Http2IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
-TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
-  simultaneousRequestsWithIdleTimeout();
-}
-
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
-void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
+TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::StreamEncoder* encoder1;
@@ -227,11 +227,6 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
   });
 
   initialize();
-
-  // Validate that timeout is set and is as per expectation.
-  bool has_idle_timeout =
-      config_helper_.bootstrap().static_resources().clusters(0).has_common_http_protocol_options();
-  EXPECT_TRUE(has_idle_timeout);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -289,7 +284,6 @@ void Http2IntegrationTest::simultaneousRequestsWithIdleTimeout() {
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 0);
 
   // Cleanup both downstream and upstream
   codec_client_->close();

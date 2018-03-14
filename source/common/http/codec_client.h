@@ -128,13 +128,13 @@ protected:
   }
 
   void disableIdleTimer() {
-    if (idle_timer_) {
+    if (idle_timer_ != nullptr) {
       idle_timer_->disableTimer();
     }
   }
 
   void enableIdleTimer() {
-    if (idle_timer_) {
+    if (idle_timer_ != nullptr) {
       idle_timer_->enableTimer(idle_timeout_);
     }
   }
@@ -143,7 +143,6 @@ protected:
   ClientConnectionPtr codec_;
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
-  Event::Dispatcher& dispatcher_;
   Event::TimerPtr idle_timer_;
   std::chrono::milliseconds idle_timeout_;
 

@@ -854,10 +854,6 @@ void HttpIntegrationTest::testIdleTimeoutBasic() {
     idle_time_out->set_seconds(seconds.count());
   });
   initialize();
-  // Validate that timeout is set and is as per expectation.
-  bool has_idle_timeout =
-      config_helper_.bootstrap().static_resources().clusters(0).has_common_http_protocol_options();
-  EXPECT_TRUE(has_idle_timeout);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -878,7 +874,6 @@ void HttpIntegrationTest::testIdleTimeoutBasic() {
 
   // Do not send any requests and validate if idle time out kicks in.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 0);
 }
 
 void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
@@ -893,11 +888,6 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   });
 
   initialize();
-
-  // Validate that timeout is set and is as per expectation.
-  bool has_idle_timeout =
-      config_helper_.bootstrap().static_resources().clusters(0).has_common_http_protocol_options();
-  EXPECT_TRUE(has_idle_timeout);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -937,7 +927,6 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
 
   // Do not send any requests and validate if idle time out kicks in.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 0);
 }
 
 void HttpIntegrationTest::testTwoRequests() {
