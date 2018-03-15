@@ -20,6 +20,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -28,7 +29,9 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::Not;
 using testing::_;
 
 namespace Envoy {
@@ -45,6 +48,12 @@ void setAllowAbsoluteUrl(
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
+
+void setAllowHttp10WithDefaultHost(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+  hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+}
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
@@ -912,18 +921,65 @@ void HttpIntegrationTest::testInvalidVersion() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void HttpIntegrationTest::testHttp10Request() {
+void HttpIntegrationTest::testHttp10Disabled() {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
-void HttpIntegrationTest::testNoHost() {
+// Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
+void HttpIntegrationTest::testHttp10Enabled() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+}
+
+// Verify for HTTP/1.0 a keep-alive header results in no connection: close.
+// Also verify existing host headers are passed through for the HTTP/1.0 case.
+void HttpIntegrationTest::testHttp10WithHostAndKeepAlive() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.0\r\nHost: foo.com\r\nConnection:Keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("connection: close")));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+}
+
+// Turn HTTP/1.0 support on and verify 09 style requests work.
+void HttpIntegrationTest::testHttp09Enabled() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 }
 
 void HttpIntegrationTest::testAbsolutePath() {
@@ -1013,6 +1069,19 @@ void HttpIntegrationTest::testBadPath() {
                                 "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
                                 true);
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void HttpIntegrationTest::testNoHost() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+  response_->waitForEndStream();
+
+  ASSERT_TRUE(response_->complete());
+  EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
 }
 
 void HttpIntegrationTest::testValidZeroLengthContent() {

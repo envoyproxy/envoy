@@ -479,19 +479,43 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
+    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
+    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
+    // HTTP/1.1.
+    //
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
+    if (!connection_manager_.config_.http1Settings().accept_http_10_) {
+      // Send "Upgrade Required" if HTTP/1.0 support is not expliictly configured on.
+      HeaderMapImpl headers{
+          {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
+      encodeHeaders(nullptr, headers, true);
+      return;
+    } else {
+      // HTTP/1.0 defaults to single-use connections. Make sure the connection
+      // will be closed unless Keep-Alive is present.
+      state_.saw_connection_close_ = true;
+      if (request_headers_->Connection() &&
+          0 == StringUtil::caseInsensitiveCompare(
+                   request_headers_->Connection()->value().c_str(),
+                   Http::Headers::get().ConnectionValues.KeepAlive.c_str())) {
+        state_.saw_connection_close_ = false;
+      }
+    }
   }
 
-  // Require host header. For HTTP/1.1 Host has already been translated to :authority.
   if (!request_headers_->Host()) {
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
+    if ((protocol == Protocol::Http10) &&
+        !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
+      // Add a default host if configured to do so.
+      request_headers_->insertHost().value(
+          connection_manager_.config_.http1Settings().default_host_for_http_10_);
+    } else {
+      // Require host header. For HTTP/1.1 Host has already been translated to :authority.
+      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+      encodeHeaders(nullptr, headers, true);
+      return;
+    }
   }
 
   // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
