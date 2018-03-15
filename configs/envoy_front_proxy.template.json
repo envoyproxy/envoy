@@ -24,7 +24,6 @@
     {
       "name": "http_connection_manager",
       "config": {
-        "codec_type": "auto",
         "add_user_agent": true,
         "tracing": {
           "operation_name": "ingress"

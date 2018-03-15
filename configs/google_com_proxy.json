@@ -4,7 +4,6 @@
         "filters": [{
             "name": "http_connection_manager",
             "config": {
-                "codec_type": "auto",
                 "stat_prefix": "ingress_http",
                 "route_config": {
                     "virtual_hosts": [{
