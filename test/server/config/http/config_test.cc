@@ -253,19 +253,13 @@ TEST(HttpFilterConfigTest, FaultFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, InvalidFaultFilterInProto) {
-  envoy::config::filter::http::fault::v2::HTTPFault config{};
-  NiceMock<MockFactoryContext> context;
-  FaultFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
-}
-
 TEST(HttpFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<MockFactoryContext> context;
   FaultFilterConfig factory;
-  EXPECT_THROW(
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
-      EnvoyException);
+  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {

@@ -235,6 +235,7 @@ public:
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
+  envoy::api::v2::core::Metadata metadata_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;

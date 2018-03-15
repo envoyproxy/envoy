@@ -58,6 +58,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/config:well_known_names",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

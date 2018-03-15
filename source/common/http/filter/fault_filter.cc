@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/config/well_known_names.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -33,10 +34,6 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Stats::Scope& scope)
     : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
       scope_(scope) {
-
-  if (!fault.has_abort() && !fault.has_delay()) {
-    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
-  }
 
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
@@ -69,6 +66,23 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
+  // Route-level configuration overrides filter-level configuration
+  // TODO (rshriram): We should not be using Runtimes when reading from route-level
+  // faults until we parameterize the runtime keys for faults based on the route name.
+  // Its okay for the moment, since the only use case of faults with runtimes is
+  // by folks using filter level configuration in the fault filter (mainly Lyft folks).
+  if (callbacks_->route() && callbacks_->route()->routeEntry()) {
+    const auto metadata = callbacks_->route()->routeEntry()->metadata();
+    const auto filter_it =
+        metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().FAULT);
+    if (filter_it != metadata.filter_metadata().end()) {
+      envoy::config::filter::http::fault::v2::HTTPFault proto_config;
+      MessageUtil::jsonConvert(filter_it->second, proto_config);
+      config_.reset(new Http::FaultFilterConfig(proto_config, config_->runtime(),
+                                                config_->statsPrefix(), config_->scope()));
+    }
+  }
+
   if (!matchesTargetUpstreamCluster()) {
     return FilterHeadersStatus::Continue;
   }

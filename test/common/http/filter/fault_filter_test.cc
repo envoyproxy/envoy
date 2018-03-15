@@ -8,6 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
+#include "common/config/well_known_names.h"
 #include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -112,6 +113,22 @@ public:
     }
     )EOF";
 
+  const std::string v2_fault_in_route_metadata_json = R"EOF(
+    {
+      "delay" : {
+        "type" : "FIXED",
+        "percent" : 100,
+        "fixedDelay" : "5s"
+      },
+      "upstreamCluster" : "www1"
+    }
+    )EOF";
+
+  const std::string empty_listener_level_fault_json = R"EOF(
+    {
+    }
+    )EOF";
+
   void SetUpTest(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::fault::v2::HTTPFault fault;
@@ -127,6 +144,8 @@ public:
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
     EXPECT_CALL(*timer_, disableTimer());
   }
+
+  void TestRouteLevelFault(); // utility function
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -707,7 +726,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   SetUpTest(fault_with_target_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -723,6 +742,58 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+void FaultFilterTest::TestRouteLevelFault() {
+  google::protobuf::Struct route_level_fault;
+  MessageUtil::loadFromJson(v2_fault_in_route_metadata_json, route_level_fault);
+  envoy::api::v2::core::Metadata metadata;
+  (*metadata.mutable_filter_metadata())[Envoy::Config::HttpFilterNames::get().FAULT] =
+      route_level_fault;
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillOnce(ReturnRef(metadata));
+
+  const std::string upstream_cluster("www1");
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(ReturnRef(upstream_cluster));
+
+  // Delay related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("RouteLevelFault");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  timer_->callback_();
+
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, OnlyRouteLevelFault) {
+  SetUpTest(empty_listener_level_fault_json);
+  TestRouteLevelFault();
+}
+
+TEST_F(FaultFilterTest, RouteLevelFaultOverridesListenerLevelFault) {
+  SetUpTest(abort_only_json); // This is a valid listener level fault
+  TestRouteLevelFault();
 }
 
 } // namespace Http
