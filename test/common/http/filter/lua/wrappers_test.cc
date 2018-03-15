@@ -76,7 +76,7 @@ filter_metadata:
       type: grass_fed
       expensive: false
     ingredients:
-      - fluor
+      - flour
       - milk
   make.delicious.cookie:
     name: chewy
@@ -100,7 +100,7 @@ filter_metadata:
   EXPECT_CALL(*this, testPrint("grass_fed"));
   EXPECT_CALL(*this, testPrint("false"));
 
-  EXPECT_CALL(*this, testPrint("fluor"));
+  EXPECT_CALL(*this, testPrint("flour"));
   EXPECT_CALL(*this, testPrint("milk"));
 
   start("callMe");
