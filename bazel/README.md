@@ -22,10 +22,9 @@ As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/bl
 version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
-up-to-date with the latest security patches. You may override the location and/or version of a dependency
-by modifying the corresponding entry in
-[the repository locations file](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl).
-Overrides can be local or remote. See that file for details.
+up-to-date with the latest security patches. See 
+[this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
+for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Install external dependencies libtool, cmake, and realpath libraries separately.

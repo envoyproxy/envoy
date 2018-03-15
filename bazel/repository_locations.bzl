@@ -1,7 +1,3 @@
-# Use a "local_path" key to build against a local checkout of a repository.
-# The path must be absolute. Other keys are ignored when using a local repository.
-# The current working tree at the given path will be used.
-# DO NOT PUSH a "local_path" override upstream.
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
