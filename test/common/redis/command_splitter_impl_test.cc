@@ -201,6 +201,21 @@ INSTANTIATE_TEST_CASE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTe
 INSTANTIATE_TEST_CASE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                         RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
 
+TEST_F(RedisSingleServerRequestTest, PingSuccess) {
+  InSequence s;
+
+  RespValue request;
+  makeBulkStringArray(request, {"ping"});
+
+  RespValue response;
+  response.type(RespType::SimpleString);
+  response.asString() = "PONG";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(request, callbacks_);
+  EXPECT_EQ(nullptr, handle_);
+};
+
 TEST_F(RedisSingleServerRequestTest, EvalSuccess) {
   InSequence s;
 

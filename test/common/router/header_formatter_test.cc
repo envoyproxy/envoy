@@ -75,7 +75,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamLocalAddressWitho
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   testFormatting(request_info, "PROTOCOL", "HTTP/1.1");
@@ -247,8 +247,8 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 TEST(HeaderParserTest, TestParseInternal) {
   struct TestCase {
     std::string input_;
-    Optional<std::string> expected_output_;
-    Optional<std::string> expected_exception_;
+    absl::optional<std::string> expected_output_;
+    absl::optional<std::string> expected_exception_;
   };
 
   static const TestCase test_cases[] = {
@@ -388,7 +388,7 @@ TEST(HeaderParserTest, TestParseInternal) {
   };
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
@@ -410,8 +410,8 @@ TEST(HeaderParserTest, TestParseInternal) {
     header->mutable_header()->set_key("x-header");
     header->mutable_header()->set_value(test_case.input_);
 
-    if (test_case.expected_exception_.valid()) {
-      EXPECT_FALSE(test_case.expected_output_.valid());
+    if (test_case.expected_exception_) {
+      EXPECT_FALSE(test_case.expected_output_);
       EXPECT_THROW_WITH_MESSAGE(HeaderParser::configure(to_add), EnvoyException,
                                 test_case.expected_exception_.value());
       continue;
@@ -425,7 +425,7 @@ TEST(HeaderParserTest, TestParseInternal) {
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
     EXPECT_TRUE(headerMap.has("x-header")) << descriptor;
-    EXPECT_TRUE(test_case.expected_output_.valid()) << descriptor;
+    EXPECT_TRUE(test_case.expected_output_) << descriptor;
     EXPECT_EQ(test_case.expected_output_.value(), headerMap.get_("x-header")) << descriptor;
   }
 }
@@ -538,7 +538,7 @@ route:
       HeaderParser::configure(parseRouteFromV2Yaml(yaml).route().request_headers_to_add());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  Optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
+  absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(

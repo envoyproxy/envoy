@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/time.h"
 
 #include "common/network/utility.h"
@@ -17,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -217,7 +217,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -228,7 +228,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -302,7 +302,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -313,7 +313,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -396,7 +396,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -407,7 +407,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again but with a mix of 500s and 503s to trigger 5xx ejection first
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -743,8 +743,8 @@ TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
 
   EXPECT_EQ(0UL, null_sink.numEjections());
-  EXPECT_FALSE(null_sink.lastEjectionTime().valid());
-  EXPECT_FALSE(null_sink.lastUnejectionTime().valid());
+  EXPECT_FALSE(null_sink.lastEjectionTime());
+  EXPECT_FALSE(null_sink.lastUnejectionTime());
 }
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
@@ -755,8 +755,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
   NiceMock<MockSystemTimeSource> time_source;
   NiceMock<MockMonotonicTimeSource> monotonic_time_source;
-  Optional<SystemTime> time;
-  Optional<MonotonicTime> monotonic_time;
+  absl::optional<SystemTime> time;
+  absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
@@ -784,8 +784,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
-  time.value(time_source.currentTime() - std::chrono::seconds(30));
-  monotonic_time.value(monotonic_time_source.currentTime() - std::chrono::seconds(30));
+  time = (time_source.currentTime() - std::chrono::seconds(30));
+  monotonic_time = (monotonic_time_source.currentTime() - std::chrono::seconds(30));
 
   std::string log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));

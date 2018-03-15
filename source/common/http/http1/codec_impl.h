@@ -150,6 +150,7 @@ public:
 
   void readDisable(bool disable) { connection_.readDisable(disable); }
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
+  virtual bool supports_http_10() { return false; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
@@ -267,6 +268,8 @@ class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
                        Http1Settings settings);
+
+  virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
 private:
   /**

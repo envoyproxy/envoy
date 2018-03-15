@@ -136,7 +136,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
   admin_.address_ = Network::Address::resolveProtoAddress(admin.address());
 
   if (!bootstrap.flags_path().empty()) {
-    flags_path_.value(bootstrap.flags_path());
+    flags_path_ = bootstrap.flags_path();
   }
 
   if (bootstrap.has_runtime()) {

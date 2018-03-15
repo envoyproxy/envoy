@@ -38,7 +38,7 @@ typedef ConstSingleton<ConstantValues> Constants;
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const Optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
   // ExtAuthz::Client
@@ -57,7 +57,7 @@ private:
   const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncRequest* request_{};
-  Optional<std::chrono::milliseconds> timeout_;
+  absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
 };
 

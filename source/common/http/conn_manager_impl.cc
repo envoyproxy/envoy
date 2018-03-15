@@ -81,7 +81,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (config_.idleTimeout().valid()) {
+  if (config_.idleTimeout()) {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     idle_timer_->enableTimer(config_.idleTimeout().value());
@@ -361,6 +361,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
+  request_info_.downstream_local_address_ =
+      connection_manager_.read_callbacks_->connection().localAddress();
+  // Initially, the downstream remote address is the source address of the
+  // downstream connection. That can change later in the request's lifecycle,
+  // based on XFF processing, but setting the downstream remote address here
+  // prevents surprises for logging code in edge cases.
+  request_info_.downstream_remote_address_ =
+      connection_manager_.read_callbacks_->connection().remoteAddress();
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -405,7 +413,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_.value(response_code);
+  request_info_.response_code_ = response_code;
 
   if (request_info_.hc_request_) {
     return;
@@ -471,19 +479,43 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // Make sure we are getting a codec version we support.
   Protocol protocol = connection_manager_.codec_->protocol();
   if (protocol == Protocol::Http10) {
+    // Assume this is HTTP/1.0. This is fine for HTTP/0.9 but this code will also affect any
+    // requests with non-standard version numbers (0.9, 1.3), basically anything which is not
+    // HTTP/1.1.
+    //
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
-    HeaderMapImpl headers{
-        {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
+    if (!connection_manager_.config_.http1Settings().accept_http_10_) {
+      // Send "Upgrade Required" if HTTP/1.0 support is not expliictly configured on.
+      HeaderMapImpl headers{
+          {Headers::get().Status, std::to_string(enumToInt(Code::UpgradeRequired))}};
+      encodeHeaders(nullptr, headers, true);
+      return;
+    } else {
+      // HTTP/1.0 defaults to single-use connections. Make sure the connection
+      // will be closed unless Keep-Alive is present.
+      state_.saw_connection_close_ = true;
+      if (request_headers_->Connection() &&
+          0 == StringUtil::caseInsensitiveCompare(
+                   request_headers_->Connection()->value().c_str(),
+                   Http::Headers::get().ConnectionValues.KeepAlive.c_str())) {
+        state_.saw_connection_close_ = false;
+      }
+    }
   }
 
-  // Require host header. For HTTP/1.1 Host has already been translated to :authority.
   if (!request_headers_->Host()) {
-    HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
-    encodeHeaders(nullptr, headers, true);
-    return;
+    if ((protocol == Protocol::Http10) &&
+        !connection_manager_.config_.http1Settings().default_host_for_http_10_.empty()) {
+      // Add a default host if configured to do so.
+      request_headers_->insertHost().value(
+          connection_manager_.config_.http1Settings().default_host_for_http_10_);
+    } else {
+      // Require host header. For HTTP/1.1 Host has already been translated to :authority.
+      HeaderMapImpl headers{{Headers::get().Status, std::to_string(enumToInt(Code::BadRequest))}};
+      encodeHeaders(nullptr, headers, true);
+      return;
+    }
   }
 
   // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
@@ -519,18 +551,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  // TODO(mattklein123): We should set downstream_local_address_ and downstream_remote_address_
-  // as early as possible in this function since there are various places where we can return and
-  // still log before we get here.
-  request_info_.downstream_local_address_ =
-      connection_manager_.read_callbacks_->connection().localAddress();
+  // Modify the downstream remote address depending on configuration and headers.
   request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_);
   ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
-  ASSERT(!cached_route_.valid());
+  ASSERT(!cached_route_);
   refreshCachedRoute();
 
   // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
@@ -792,7 +820,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
   request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_.value(std::move(route));
+  cached_route_ = std::move(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1251,7 +1279,7 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.valid()) {
+  if (!parent_.cached_route_) {
     parent_.refreshCachedRoute();
   }
 
@@ -1259,7 +1287,7 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
-  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
+  parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {

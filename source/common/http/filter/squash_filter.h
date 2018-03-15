@@ -4,7 +4,6 @@
 #include <regex>
 #include <string>
 
-#include "envoy/common/optional.h"
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
@@ -12,6 +11,8 @@
 
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
