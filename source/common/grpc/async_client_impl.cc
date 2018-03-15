@@ -11,8 +11,9 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
-                                 const std::string& remote_cluster_name)
-    : cm_(cm), remote_cluster_name_(remote_cluster_name) {}
+                                 const envoy::api::v2::core::GrpcService& config)
+    : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      initial_metadata_(config.initial_metadata()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -23,7 +24,7 @@ AsyncClientImpl::~AsyncClientImpl() {
 AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
                                     const Protobuf::Message& request,
                                     AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                    const Optional<std::chrono::milliseconds>& timeout) {
+                                    const absl::optional<std::chrono::milliseconds>& timeout) {
   auto* const async_request =
       new AsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
   std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
@@ -39,7 +40,7 @@ AsyncRequest* AsyncClientImpl::send(const Protobuf::MethodDescriptor& service_me
 
 AsyncStream* AsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
                                     AsyncStreamCallbacks& callbacks) {
-  const Optional<std::chrono::milliseconds> no_timeout;
+  const absl::optional<std::chrono::milliseconds> no_timeout;
   auto grpc_stream =
       std::make_unique<AsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
 
@@ -55,13 +56,13 @@ AsyncStream* AsyncClientImpl::start(const Protobuf::MethodDescriptor& service_me
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
                                  const Protobuf::MethodDescriptor& service_method,
                                  AsyncStreamCallbacks& callbacks,
-                                 const Optional<std::chrono::milliseconds>& timeout)
+                                 const absl::optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
   dispatcher_ = &http_async_client.dispatcher();
-  stream_ = http_async_client.start(*this, Optional<std::chrono::milliseconds>(timeout_),
+  stream_ = http_async_client.start(*this, absl::optional<std::chrono::milliseconds>(timeout_),
                                     buffer_body_for_retry);
 
   if (stream_ == nullptr) {
@@ -74,6 +75,11 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ = Common::prepareHeaders(
       parent_.remote_cluster_name_, service_method_.service()->full_name(), service_method_.name());
+  // Fill service-wide initial metadata.
+  for (const auto& header_value : parent_.initial_metadata_) {
+    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
+                                        header_value.value());
+  }
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
@@ -88,7 +94,7 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   if (http_response_status != enumToInt(Http::Code::OK)) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
-    if (end_stream && grpc_status.valid()) {
+    if (end_stream && grpc_status) {
       onTrailers(std::move(headers));
       return;
     }
@@ -137,8 +143,8 @@ void AsyncStreamImpl::onTrailers(Http::HeaderMapPtr&& trailers) {
   auto grpc_status = Common::getGrpcStatus(*trailers);
   const std::string grpc_message = Common::getGrpcMessage(*trailers);
   callbacks_.onReceiveTrailingMetadata(std::move(trailers));
-  if (!grpc_status.valid()) {
-    grpc_status.value(Status::GrpcStatus::Unknown);
+  if (!grpc_status) {
+    grpc_status = Status::GrpcStatus::Unknown;
   }
   callbacks_.onRemoteClose(grpc_status.value(), grpc_message);
   cleanup();
@@ -188,7 +194,7 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent,
                                    const Protobuf::MethodDescriptor& service_method,
                                    const Protobuf::Message& request,
                                    AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                   const Optional<std::chrono::milliseconds>& timeout)
+                                   const absl::optional<std::chrono::milliseconds>& timeout)
     : AsyncStreamImpl(parent, service_method, *this, timeout), request_(request),
       callbacks_(callbacks) {
 

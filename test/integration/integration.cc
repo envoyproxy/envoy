@@ -273,7 +273,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1);
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1);
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options();
         });
@@ -304,9 +304,15 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    registerPort(*port_it, listener_it->get().socket().localAddress()->ip()->port());
+    const auto listen_addr = listener_it->get().socket().localAddress();
+    if (listen_addr->type() == Network::Address::Type::Ip) {
+      registerPort(*port_it, listen_addr->ip()->port());
+    }
   }
-  registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
+  const auto admin_addr = test_server_->server().admin().socket().localAddress();
+  if (admin_addr->type() == Network::Address::Type::Ip) {
+    registerPort("admin", admin_addr->ip()->port());
+  }
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,

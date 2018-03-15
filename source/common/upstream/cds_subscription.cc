@@ -12,12 +12,11 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsSubscription::CdsSubscription(Config::SubscriptionStats stats,
-                                 const envoy::api::v2::core::ConfigSource& cds_config,
-                                 const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                                 ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                 Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info)
+CdsSubscription::CdsSubscription(
+    Config::SubscriptionStats stats, const envoy::api::v2::core::ConfigSource& cds_config,
+    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm,
+    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    const LocalInfo::LocalInfo& local_info)
     : RestApiFetcher(cm, cds_config.api_config_source().cluster_names()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source())),
       local_info_(local_info), stats_(stats), eds_config_(eds_config) {

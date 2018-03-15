@@ -62,7 +62,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
-  Optional<std::string> user_agent_;
+  absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -136,7 +136,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -257,7 +257,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
 
@@ -272,7 +272,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers;
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -498,6 +498,33 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be", headers.get_("x-forwarded-client-cert"));
+}
+
+// The server (local) dentity is foo.com/be. The client does not set XFCC.
+TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
+  NiceMock<Ssl::MockConnection> ssl;
+  ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("test://foo.com/fe"));
+  std::string expected_pem("%3D%3Dabc%0Ade%3D");
+  EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
+  std::vector<Http::ClientCertDetailsType> details = std::vector<Http::ClientCertDetailsType>();
+  details.push_back(Http::ClientCertDetailsType::SAN);
+  details.push_back(Http::ClientCertDetailsType::Cert);
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/"
+            "be;Hash=abcdefg;SAN=test://foo.com/fe;Cert=\"%3D%3Dabc%0Ade%3D\"",
+            headers.get_("x-forwarded-client-cert"));
 }
 
 // This test assumes the following scenario:

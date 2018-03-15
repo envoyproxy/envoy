@@ -71,12 +71,14 @@ envoy_cc_test(
     srcs = ["ip_tagging_filter_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/config:filter_json_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http/filter:fault_filter_lib",
         "//source/common/http/filter:ip_tagging_filter_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -99,6 +101,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )
 
@@ -114,5 +117,30 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "ext_authz_test",
+    srcs = ["ext_authz_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:empty_string",
+        "//source/common/config:filter_json_lib",
+        "//source/common/ext_authz:ext_authz_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http/filter:ext_authz_includes",
+        "//source/common/http/filter:ext_authz_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/network:address_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/ext_authz:ext_authz_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

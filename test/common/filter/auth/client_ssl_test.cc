@@ -96,9 +96,9 @@ public:
   void setupRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                          Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
+        .WillOnce(Invoke(
+            [this](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                   absl::optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -249,9 +249,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   // Interval timer fires, cannot obtain async client.
   EXPECT_CALL(cm_, httpAsyncClientForCluster("vpn")).WillOnce(ReturnRef(cm_.async_client_));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
                 Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
             return nullptr;

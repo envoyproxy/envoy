@@ -43,6 +43,14 @@ namespace Envoy {
     EXPECT_THAT(e.what(), ::testing::ContainsRegex(regex_str));                                    \
   }
 
+#define EXPECT_THROW_WITHOUT_REGEX(statement, expected_exception, regex_str)                       \
+  try {                                                                                            \
+    statement;                                                                                     \
+    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
+  } catch (expected_exception & e) {                                                               \
+    EXPECT_THAT(e.what(), ::testing::Not(::testing::ContainsRegex(regex_str)));                    \
+  }
+
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \
     statement;                                                                                     \

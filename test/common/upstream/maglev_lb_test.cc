@@ -11,11 +11,11 @@ public:
   TestLoadBalancerContext(uint64_t hash_key) : hash_key_(hash_key) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return hash_key_; }
+  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
-  Optional<uint64_t> hash_key_;
+  absl::optional<uint64_t> hash_key_;
 };
 
 // Note: ThreadAwareLoadBalancer base is heavily tested by RingHashLoadBalancerTest. Only basic

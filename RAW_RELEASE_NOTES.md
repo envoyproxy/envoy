@@ -8,6 +8,8 @@ will make it substantially easier for the releaser to "linkify" all of the relea
 final version.
 
 ## 1.6.0
+* Added support for sending error details as grpc.rpc.Status in DiscoveryRequest.
+* Added support for specifying alternate stats name while emitting stats for clusters.
 * Added support for inline delivery of TLS certificates and private keys.
 * Added gRPC healthcheck based on [grpc.health.v1.Health](https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto) service.
 * Added Metrics Service implementation.
@@ -58,10 +60,23 @@ final version.
 * Added DOWNSTREAM_LOCAL_ADDRESS, DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT header formatters, and
   DOWNSTREAM_LOCAL_ADDRESS access log formatter.
 * Added support for HTTPS redirects on specific routes.
+* access log: added less than or equal (LE) comparison filter.
+* access log: added configuration to runtime filter to set default sampling rate, divisor, and
+  whether to use independent randomness or not.
 * Added the ability to pass a URL encoded Pem encoded peer certificate in the x-forwarded-client-cert header.
 * Added support for abstract unix domain sockets on linux. The abstract
   namespace can be used by prepending '@' to a socket path.
+* Added support for dynamically loading a tracer.
 * Added `GEORADIUS_RO` and `GEORADIUSBYMEMBER_RO` to the Redis command splitter whitelist.
 * Added support for trusting additional hops in the X-Forwarded-For request header.
 * Added setting host header value for http health check request.
-
+* Added SIGTERM propagation to children to hot-restarter.py, which enables using it as a parent of containers.
+* Added :ref:`HTTP IP Tagging filter<config_http_filters_ip_tagging>`.
+* Added support for prefix_rewrite for redirects.
+* Added support for stripping query string for redirects.
+* Added support for incoming HTTP/1.0
+* Added support for specifying a metadata matcher for upstream clusters in the tcp filter
+* Added support for listening on UNIX domain sockets.
+* Added support for downstream request/upstream response header manipulation in weighted cluster.
+* Added support for range based header matching for request routing.
+* Added local `PING` support to the Redis filter.

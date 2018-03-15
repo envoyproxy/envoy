@@ -43,9 +43,10 @@ class EnvoyGoogleAsyncClientImplTest : public testing::Test {
 public:
   EnvoyGoogleAsyncClientImplTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::api::v2::core::GrpcService::GoogleGrpc config;
-    config.set_target_uri("fake_address");
-    config.set_stat_prefix("test_cluster");
+    envoy::api::v2::core::GrpcService config;
+    auto* google_grpc = config.mutable_google_grpc();
+    google_grpc->set_target_uri("fake_address");
+    google_grpc->set_stat_prefix("test_cluster");
     tls_ = std::make_unique<GoogleAsyncClientThreadLocal>();
     grpc_client_ = std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *tls_, stub_factory_,
                                                            stats_store_, config);
@@ -55,7 +56,7 @@ public:
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_store_ = std::make_shared<Stats::IsolatedStoreImpl>();
   std::unique_ptr<GoogleAsyncClientImpl> grpc_client_;
 };
 
@@ -92,7 +93,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 

@@ -47,8 +47,8 @@ public:
   const Ip* ip() const;
 
   /**
-   * TODO(jamessynge) Consider making this Optional<int> length, or modifying the create() methods
-   *                  below to return Optional<CidrRange> (the latter is probably better).
+   * TODO(jamessynge) Consider making this absl::optional<int> length, or modifying the create()
+   * methods below to return absl::optional<CidrRange> (the latter is probably better).
    * @return the number of bits of the address that are included in the mask. -1 if uninitialized
    *         or invalid, else in the range 0 to 32 for IPv4, and 0 to 128 for IPv6.
    */
@@ -75,6 +75,7 @@ public:
   bool isValid() const { return length_ >= 0; }
 
   /**
+   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length, modified so that the only
    *         bits that might be non-zero are in the high-order length bits, and so that length is
    *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the the address or
@@ -87,6 +88,7 @@ public:
    * Constructs an CidrRange from a string with this format (same as returned
    * by CidrRange::asString above):
    *      <address>/<length>    e.g. "10.240.0.0/16" or "1234:5678::/64"
+   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length if parsed successfully,
    *         else with no address and a length of -1.
    */
@@ -94,6 +96,7 @@ public:
 
   /**
    * Constructs a CidrRange from envoy::api::v2::core::CidrRange.
+   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
   static CidrRange create(const envoy::api::v2::core::CidrRange& cidr);
 

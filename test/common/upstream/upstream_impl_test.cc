@@ -377,6 +377,29 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
+TEST(StaticClusterImplTest, AltStatName) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    alt_stat_name: staticcluster_stats
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  StaticClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager, cm,
+                            false);
+  cluster.initialize([] {});
+  // Increment a stat and verify it is emitted with alt_stat_name
+  cluster.info()->stats().upstream_rq_total_.inc();
+  EXPECT_EQ(1UL, stats.counter("cluster.staticcluster_stats.upstream_rq_total").value());
+}
+
 TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;

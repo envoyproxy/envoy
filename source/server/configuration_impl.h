@@ -54,6 +54,11 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * Returns true if the tracing driver requires cluster name to be defined.
+   */
+  virtual bool requiresClusterName() const { return true; }
 };
 
 /**
@@ -168,7 +173,7 @@ public:
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
-  Optional<std::string> flagsPath() override { return flags_path_; }
+  absl::optional<std::string> flagsPath() override { return flags_path_; }
   Runtime* runtime() override { return runtime_.get(); }
 
 private:
@@ -195,7 +200,7 @@ private:
   };
 
   AdminImpl admin_;
-  Optional<std::string> flags_path_;
+  absl::optional<std::string> flags_path_;
   std::unique_ptr<RuntimeImpl> runtime_;
 };
 

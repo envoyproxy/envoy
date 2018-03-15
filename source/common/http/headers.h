@@ -39,6 +39,7 @@ public:
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
+  const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
@@ -94,6 +95,7 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string KeepAlive{"keep-alive"};
     const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 

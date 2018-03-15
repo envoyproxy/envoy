@@ -14,20 +14,21 @@ class AsyncStreamImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const std::string& remote_cluster_name);
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::api::v2::core::GrpcService& config);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
   AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                      const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                      Tracing::Span& parent_span,
-                     const Optional<std::chrono::milliseconds>& timeout) override;
+                     const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
+  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
 
   friend class AsyncRequestImpl;
@@ -41,7 +42,7 @@ class AsyncStreamImpl : public AsyncStream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
                   AsyncStreamCallbacks& callbacks,
-                  const Optional<std::chrono::milliseconds>& timeout);
+                  const absl::optional<std::chrono::milliseconds>& timeout);
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -63,14 +64,15 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
-  void trailerResponse(Optional<Status::GrpcStatus> grpc_status, const std::string& grpc_message);
+  void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
+                       const std::string& grpc_message);
 
   Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
   AsyncClientImpl& parent_;
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
-  const Optional<std::chrono::milliseconds>& timeout_;
+  const absl::optional<std::chrono::milliseconds>& timeout_;
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
   Decoder decoder_;
@@ -84,7 +86,8 @@ class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, AsyncStrea
 public:
   AsyncRequestImpl(AsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
                    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
-                   Tracing::Span& parent_span, const Optional<std::chrono::milliseconds>& timeout);
+                   Tracing::Span& parent_span,
+                   const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
 

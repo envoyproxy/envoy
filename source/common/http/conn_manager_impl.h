@@ -215,7 +215,7 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual const Optional<std::chrono::milliseconds>& idleTimeout() PURE;
+  virtual const absl::optional<std::chrono::milliseconds>& idleTimeout() PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
@@ -272,7 +272,7 @@ public:
    *         be enabled. User agent will only overwritten if it doesn't already exist. If enabled,
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
-  virtual const Optional<std::string>& userAgent() PURE;
+  virtual const absl::optional<std::string>& userAgent() PURE;
 
   /**
    * @return tracing config.
@@ -288,6 +288,11 @@ public:
    * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
    */
   virtual bool proxy100Continue() const PURE;
+
+  /**
+   * @return supplies the http1 settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
 };
 
 /**
@@ -514,6 +519,7 @@ private:
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
@@ -620,7 +626,7 @@ private:
     Stats::TimespanPtr request_timer_;
     State state_;
     RequestInfo::RequestInfoImpl request_info_;
-    Optional<Router::RouteConstSharedPtr> cached_route_;
+    absl::optional<Router::RouteConstSharedPtr> cached_route_;
     DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
