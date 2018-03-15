@@ -46,19 +46,9 @@ public:
   uint64_t id() const { return id_; }
 
   /**
-   * @return the span id as a 16-character hexadecimal string.
-   */
-  std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
-
-  /**
    * @return the span's parent id as an integer.
    */
   uint64_t parent_id() const { return parent_id_; }
-
-  /**
-   * @return the parent id as a 16-character hexadecimal string.
-   */
-  std::string parentIdAsHexString() const { return Hex::uint64ToHex(parent_id_); }
 
   /**
    * @return the trace id as an integer.
@@ -66,21 +56,9 @@ public:
   uint64_t trace_id() const { return trace_id_; }
 
   /**
-   * @return the trace id as a 16-character hexadecimal string.
-   */
-  std::string traceIdAsHexString() const { return Hex::uint64ToHex(trace_id_); }
-
-  /**
    * @return the sampled flag.
    */
   bool sampled() const { return sampled_; }
-
-  /**
-   * @return the sampled flag as a 1-character string.
-   */
-  std::string sampledAsString() const {
-    return sampled_ ? ZipkinCoreConstants::get().SAMPLED : ZipkinCoreConstants::get().NOT_SAMPLED;
-  }
 
 private:
   uint64_t trace_id_;
