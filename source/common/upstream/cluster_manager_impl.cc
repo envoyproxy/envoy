@@ -769,7 +769,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
         context->downstreamConnection()->socketOptions();
     if (options) {
       for (const auto& option : *options) {
-	have_options = true;
+        have_options = true;
         option->hashKey(hash_key);
       }
     }
