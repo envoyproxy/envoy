@@ -538,10 +538,9 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
-  bool will_bind = (source_address != nullptr);
   if (options) {
     for (const auto& option : *options) {
-      if (!option->setOption(*socket_, will_bind)) {
+      if (!option->setOption(*socket_, Socket::SocketState::PreBind)) {
         // Set a special error state to ensure asynchronous close to give the owner of the
         // ConnectionImpl a chance to add callbacks and detect the "disconnect".
         immediate_error_event_ = ConnectionEvent::LocalClose;
@@ -551,7 +550,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       }
     }
   }
-  if (will_bind) {
+  if (source_address != nullptr) {
     const int rc = source_address->bind(fd());
     if (rc < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),

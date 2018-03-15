@@ -273,7 +273,7 @@ public:
   MockSocketOption();
   ~MockSocketOption();
 
-  MOCK_CONST_METHOD2(setOption, bool(Socket&, bool pre_bind));
+  MOCK_CONST_METHOD2(setOption, bool(Socket&, Network::Socket::SocketState state));
   MOCK_CONST_METHOD1(hashKey, void(std::vector<uint8_t>&));
 };
 

@@ -135,7 +135,7 @@ public:
   /**
    * Store socket options to be set on the listen socket before listening.
    */
-  virtual void setListenSocketOption(const Network::Socket::OptionSharedPtr& options) PURE;
+  virtual void setListenSocketOption(const Network::Socket::OptionSharedPtr& option) PURE;
 };
 
 /**

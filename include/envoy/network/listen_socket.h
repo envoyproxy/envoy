@@ -31,6 +31,8 @@ public:
    */
   virtual void close() PURE;
 
+  enum class SocketState { PreBind, PostBind };
+
   /**
    * Visitor class for setting socket options.
    */
@@ -40,12 +42,11 @@ public:
 
     /**
      * @param socket the socket on which to apply options.
-     * @param pre_bind 'true' if socket has has not been bound yet, and is going to be bound
-     *        after the options are set. This an be used to determine whether to set options
-     *        that only make sense for bound sockets if set before the bind() call.
+     * @param state the current state of the socket. Significant for options that can only be
+     *        set for some particular state of the socket.
      * @return true if succeeded, false otherwise.
      */
-    virtual bool setOption(Socket& socket, bool pre_bind) const PURE;
+    virtual bool setOption(Socket& socket, SocketState state) const PURE;
 
     /**
      * @param vector of bits that can be used to separate connections based on the options. Should
@@ -64,7 +65,7 @@ public:
   virtual void setOption(const OptionSharedPtr&) PURE;
 
   /**
-   * @return the socket options stored earlier with setOptions(), if any.
+   * @return the socket options stored earlier with setOption() calls, if any.
    */
   virtual const OptionsSharedPtr& options() const PURE;
 };

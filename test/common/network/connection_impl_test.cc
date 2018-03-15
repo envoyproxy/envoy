@@ -254,7 +254,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, false)).WillOnce(Return(true));
+  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOption(option);
@@ -302,7 +302,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, false)).WillOnce(Return(false));
+  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         socket->setOption(option);

@@ -49,7 +49,7 @@ protected:
       : SocketImpl(fd, local_address) {}
 
   void doBind();
-  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options, bool pre_bind);
+  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
 };
 
 /**

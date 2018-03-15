@@ -109,25 +109,38 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 // This same object can be extended to handle additional listener socket options.
 class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerSocketOption(bool transparent) : transparent_(transparent) {}
+  ListenerSocketOption(const envoy::api::v2::Listener& config)
+      : transparent_(config.transparent()) {}
 
   // Network::Socket::Option
-  bool setOption(Network::Socket& socket, bool pre_bind) const override {
-    // IP_TRANSPARENT makes a difference only for the following bind(). Set it before the bind
-    // and ignore it after.
-    if (transparent_ && pre_bind) {
+  bool setOption(Network::Socket& socket, Network::Socket::SocketState state) const override {
+    // IP_TRANSPARENT has an effect on bind() (allowing bind() to non-local addresses), but
+    // also after bind(), controlling whether new connections with non-local addresses are
+    // redirected to the listening socket or not, so we need to set it in either case, as
+    // it is possible to, e.g., set it on a listener and then change the listener configuration
+    // to not set it.
+    // This has the side effect of setting the option twice after the socket is first created,
+    // both before and after bind().
+    UNREFERENCED_PARAMETER(state);
+    int transparent = transparent_;
+
 #ifdef SOL_IP
-      int on = 1;
-      if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &on, sizeof(on)) == -1) {
-        ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(errno));
-        throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
-      }
-#else
-      UNREFERENCED_PARAMETER(socket);
-      throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
-#endif
+    int rc = setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &transparent, sizeof(transparent));
+    // If we are unable to set the option we still return success for the default value (0),
+    // as we never changed the option to begin with. This also prevents failures in all current
+    // test cases that do not set the transparent option.
+    if (rc == 0 || transparent == 0) {
+      return true;
     }
-    return true;
+    ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}", transparent,
+              strerror(errno));
+#else
+    if (transparent == 0) {
+      return true;
+    }
+#endif
+    throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
+    return false;
   }
   void hashKey(std::vector<uint8_t>&) const override{}; // Not used for listener sockets.
 
@@ -156,11 +169,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
 
-  // Add listen socket options, if any.
-  bool transparent = config.transparent();
-  if (transparent) {
-    setListenSocketOption(std::make_shared<ListenerSocketOption>(transparent));
-  }
+  // Add listen socket options from the config.
+  setListenSocketOption(std::make_shared<ListenerSocketOption>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
@@ -310,15 +320,11 @@ Init::Manager& ListenerImpl::initManager() {
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   ASSERT(!socket_);
   socket_ = socket;
-}
-
-void ListenerImpl::setSocketAndOptions(const Network::SocketSharedPtr& socket) {
-  setSocket(socket);
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
     for (const auto& option : *listen_socket_options_) {
-      bool ok = option->setOption(*socket_, false);
+      bool ok = option->setOption(*socket_, Network::Socket::SocketState::PostBind);
       const std::string message =
           fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
       if (!ok) {
@@ -394,12 +400,12 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocketAndOptions((*existing_warming_listener)->getSocket());
+    new_listener->setSocket((*existing_warming_listener)->getSocket());
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocketAndOptions((*existing_active_listener)->getSocket());
+    new_listener->setSocket((*existing_active_listener)->getSocket());
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -438,14 +444,11 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
     }
 
-    if (draining_listener_socket) {
-      new_listener->setSocketAndOptions(draining_listener_socket);
-    } else {
-      // Options set by createListenSocket().
-      new_listener->setSocket(factory_.createListenSocket(new_listener->address(),
-                                                          new_listener->listenSocketOptions(),
-                                                          new_listener->bindToPort()));
-    }
+    new_listener->setSocket(draining_listener_socket
+                                ? draining_listener_socket
+                                : factory_.createListenSocket(new_listener->address(),
+                                                              new_listener->listenSocketOptions(),
+                                                              new_listener->bindToPort()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));

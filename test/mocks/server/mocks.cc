@@ -61,10 +61,10 @@ MockListenerComponentFactory::MockListenerComponentFactory()
   ON_CALL(*this, createListenSocket(_, _, _))
       .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
                                 const Network::Socket::OptionsSharedPtr& options,
-                                bool bind_to_port) -> Network::SocketSharedPtr {
+                                bool) -> Network::SocketSharedPtr {
         if (options) {
           for (const auto& option : *options) {
-            if (!option->setOption(*socket_, bind_to_port)) {
+            if (!option->setOption(*socket_, Network::Socket::SocketState::PreBind)) {
               throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
             }
           }

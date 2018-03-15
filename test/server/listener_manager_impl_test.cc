@@ -1273,8 +1273,10 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
-      EXPECT_CALL(*option_, setOption(_, true))
-          .WillOnce(Invoke([](Network::Socket& socket, bool) -> bool {
+      EXPECT_CALL(*option_, setOption(_, Network::Socket::SocketState::PreBind))
+          .WillOnce(Return(true));
+      EXPECT_CALL(*option_, setOption(_, Network::Socket::SocketState::PostBind))
+          .WillOnce(Invoke([](Network::Socket& socket, Network::Socket::SocketState) -> bool {
             fd = socket.fd();
             return true;
           }));
@@ -1349,7 +1351,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
     Configuration::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
-      EXPECT_CALL(*option_, setOption(_, true)).WillOnce(Return(false));
+      EXPECT_CALL(*option_, setOption(_, Network::Socket::SocketState::PreBind))
+          .WillOnce(Return(false));
       context.setListenSocketOption(option_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
