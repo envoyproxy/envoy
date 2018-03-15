@@ -122,27 +122,45 @@ public:
     // This has the side effect of setting the option twice after the socket is first created,
     // both before and after bind().
     UNREFERENCED_PARAMETER(state);
+
+    const auto* ip = socket.localAddress()->ip();
+    if (!ip) {
+      return false;
+    }
+#ifdef SOL_IP
+    int rc;
     int transparent = transparent_;
 
-#ifdef SOL_IP
-    int rc = setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &transparent, sizeof(transparent));
+    if (ip->version() == Network::Address::IpVersion::v4) {
+      rc = setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &transparent, sizeof(transparent));
+    } else {
+#if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
+      rc = setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &transparent, sizeof(transparent));
+#else
+      rc = -1;
+      errno = ENOTSUPP;
+#endif
+    }
     // If we are unable to set the option we still return success for the default value (0),
     // as we never changed the option to begin with. This also prevents failures in all current
     // test cases that do not set the transparent option.
-    if (rc == 0 || transparent == 0) {
+    if (rc == 0 || !transparent_) {
       return true;
     }
+#else
+    UNREFERENCED_PARAMETER(socket);
+
+    if (!transparent_) {
+      return true;
+    }
+    errno = ENOTSUPP;
+#endif
     ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}", transparent,
               strerror(errno));
-#else
-    if (transparent == 0) {
-      return true;
-    }
-#endif
-    throw EnvoyException("ListenSocketOption: Error setting IP_TRANSPARENT socket option");
-    return false;
+    // Throw a specific message we can verify in testing.
+    throw EnvoyException("ListenSocketOption: Error setting transparent socket option");
   }
-  void hashKey(std::vector<uint8_t>&) const override{}; // Not used for listener sockets.
+  void hashKey(std::vector<uint8_t>&) const override {} // Not used for listener sockets.
 
 private:
   bool transparent_;

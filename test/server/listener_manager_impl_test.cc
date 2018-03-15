@@ -1410,7 +1410,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
   // MockListenerSocket is not a real socket, so this always fails in testing.
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
                             EnvoyException,
-                            "ListenSocketOption: Error setting IP_TRANSPARENT socket option");
+                            "ListenSocketOption: Error setting transparent socket option");
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
