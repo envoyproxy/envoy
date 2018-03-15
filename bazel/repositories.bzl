@@ -12,9 +12,7 @@ def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
     # users can override dependency versions by using standard Bazel repository
-    # rules in their WORKSPACE files. Giving a `local_path` in
-    # `repository_locations.bzl` is the easiest way to override a dependency with
-    # a local checkout.
+    # rules in their WORKSPACE files.
     existing_rule_keys = native.existing_rules().keys()
     if name in existing_rule_keys:
         # This repository has already been defined, probably because the user
@@ -30,29 +28,7 @@ def _repository_impl(name, **kwargs):
             "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead."
             % (location["tag"], name))
 
-    if "local_path" in location:
-        # local_repository() does not use any parameter besides local_path.
-        # If any are present, warn that they're ignored.
-        if len(location) > 1:
-            other_keys = []
-            for k in location:
-                if k != "local_path":
-                    other_keys.append(k)
-
-            print(("Warning: overriding external dependency %r with repository at local path %r. " +
-                  "The following location specifiers will be ignored: %r") % \
-                  (name, location["local_path"], other_keys))
-
-        # Local repository at given path. Add a BUILD file if requested.
-        if "build_file" in kwargs:
-            native.new_local_repository(
-                name = name,
-                path = location["local_path"])
-        else:
-            native.local_repository(
-                name = name,
-                path = location["local_path"])
-    elif "commit" in location:
+    if "commit" in location:
         # Git repository at given commit ID. Add a BUILD file if requested.
         if "build_file" in kwargs:
             new_git_repository(

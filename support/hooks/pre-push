@@ -47,16 +47,6 @@ do
       exit 1
     fi
 
-    # Check if any commits look like they (likely accidentally) included a
-    # local repository entry in repository_locations.bzl
-    LOCAL_PATH_DEPS=$(git log -p --pickaxe-regex -S "local_path" "$RANGE" -- "bazel/repository_locations.bzl")
-    if [ -n "$LOCAL_PATH_DEPS" ]
-    then
-      echo >&2 "ERROR: The following commit(s) added local dependencies to bazel/repository_locations.bzl"
-      echo >&2 "$LOCAL_PATH_DEPS"
-      exit 1
-    fi
-
     # NOTE: The `tools` directory will be the same relative to the support
     # directory, independent of whether we're in a submodule, so no need to use
     # our `relpath` helper.
