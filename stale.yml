@@ -9,7 +9,7 @@ daysUntilClose: 7
 
 # Issues or Pull Requests with these labels will never be considered stale. Set to `[]` to disable
 exemptLabels:
-  - [help+wanted]
+  - []
 
 # Set to true to ignore issues in a project (defaults to false)
 exemptProjects: false
@@ -32,22 +32,22 @@ markComment: >
 #   Your comment here.
 
 # Comment to post when closing a stale Issue or Pull Request.
-closeComment: >
+#closeComment: >
 #   Your comment here.
 
 # Limit the number of actions per hour, from 1-30. Default is 30
 limitPerRun: 1
 
 # Limit to only `issues` or `pulls`
-# only: issues
+only: pulls
 
 # Optionally, specify configuration settings that are specific to just 'issues' or 'pulls':
-issues:
-  daysUntilStale: 30
-  markComment: >
-    This issue has been automatically marked as stale because it has not had activity in the
-    last 30 days. It will be closed unless it is tagged "help wanted" or other activity
-    occurs. Thank you for your contributions.
+#issues:
+#  daysUntilStale: 30
+#  markComment: >
+#    This issue has been automatically marked as stale because it has not had activity in the
+#    last 30 days. It will be closed unless it is tagged "help wanted" or other activity
+#    occurs. Thank you for your contributions.
 
 # issues:
 #   exemptLabels:
