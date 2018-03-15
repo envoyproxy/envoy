@@ -159,14 +159,14 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   }
 }
 
-Optional<Http::Code>
+absl::optional<Http::Code>
 ConfigUtility::parseDirectResponseCode(const envoy::api::v2::route::Route& route) {
   if (route.has_redirect()) {
     return parseRedirectResponseCode(route.redirect().response_code());
   } else if (route.has_direct_response()) {
     return static_cast<Http::Code>(route.direct_response().status());
   }
-  return Optional<Http::Code>();
+  return absl::optional<Http::Code>();
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::api::v2::route::Route& route) {

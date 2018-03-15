@@ -95,8 +95,8 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
   }
 
-  Optional<uint64_t> duration_ms = delayDuration();
-  if (duration_ms.valid()) {
+  absl::optional<uint64_t> duration_ms = delayDuration();
+  if (duration_ms) {
     delay_timer_ = callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
     recordDelaysInjectedStats();
@@ -136,8 +136,8 @@ bool FaultFilter::isAbortEnabled() {
   return enabled;
 }
 
-Optional<uint64_t> FaultFilter::delayDuration() {
-  Optional<uint64_t> ret;
+absl::optional<uint64_t> FaultFilter::delayDuration() {
+  absl::optional<uint64_t> ret;
 
   if (!isDelayEnabled()) {
     return ret;
@@ -152,7 +152,7 @@ Optional<uint64_t> FaultFilter::delayDuration() {
 
   // Delay only if the duration is >0ms
   if (duration > 0) {
-    ret.value(duration);
+    ret = duration;
   }
 
   return ret;

@@ -81,7 +81,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   read_callbacks_->connection().addConnectionCallbacks(*this);
 
-  if (config_.idleTimeout().valid()) {
+  if (config_.idleTimeout()) {
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     idle_timer_->enableTimer(config_.idleTimeout().value());
@@ -361,6 +361,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
+  request_info_.downstream_local_address_ =
+      connection_manager_.read_callbacks_->connection().localAddress();
+  // Initially, the downstream remote address is the source address of the
+  // downstream connection. That can change later in the request's lifecycle,
+  // based on XFF processing, but setting the downstream remote address here
+  // prevents surprises for logging code in edge cases.
+  request_info_.downstream_remote_address_ =
+      connection_manager_.read_callbacks_->connection().remoteAddress();
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -405,7 +413,7 @@ void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) {
   uint64_t response_code = Utility::getResponseStatus(headers);
-  request_info_.response_code_.value(response_code);
+  request_info_.response_code_ = response_code;
 
   if (request_info_.hc_request_) {
     return;
@@ -519,18 +527,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  // TODO(mattklein123): We should set downstream_local_address_ and downstream_remote_address_
-  // as early as possible in this function since there are various places where we can return and
-  // still log before we get here.
-  request_info_.downstream_local_address_ =
-      connection_manager_.read_callbacks_->connection().localAddress();
+  // Modify the downstream remote address depending on configuration and headers.
   request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_);
   ASSERT(request_info_.downstream_remote_address_ != nullptr);
 
-  ASSERT(!cached_route_.valid());
+  ASSERT(!cached_route_);
   refreshCachedRoute();
 
   // Check for WebSocket upgrade request if the route exists, and supports WebSockets.
@@ -792,7 +796,7 @@ void ConnectionManagerImpl::startDrainSequence() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
   request_info_.route_entry_ = route ? route->routeEntry() : nullptr;
-  cached_route_.value(std::move(route));
+  cached_route_ = std::move(route);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1251,7 +1255,7 @@ Tracing::Span& ConnectionManagerImpl::ActiveStreamFilterBase::activeSpan() {
 Tracing::Config& ConnectionManagerImpl::ActiveStreamFilterBase::tracingConfig() { return parent_; }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.valid()) {
+  if (!parent_.cached_route_) {
     parent_.refreshCachedRoute();
   }
 
@@ -1259,7 +1263,7 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
-  parent_.cached_route_ = Optional<Router::RouteConstSharedPtr>();
+  parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {

@@ -76,4 +76,6 @@ final version.
 * Added support for stripping query string for redirects.
 * Added support for specifying a metadata matcher for upstream clusters in the tcp filter
 * Added support for listening on UNIX domain sockets.
+* Added support for downstream request/upstream response header manipulation in weighted cluster.
 * Added support for range based header matching for request routing.
+* Added local `PING` support to the Redis filter.

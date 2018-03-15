@@ -52,6 +52,11 @@ struct SupportedCommands {
    * @return mset command
    */
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
+
+  /**
+   * @return ping command
+   */
+  static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
 };
 
 } // namespace Redis

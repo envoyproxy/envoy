@@ -98,7 +98,7 @@ void CdsJson::translateOutlierDetection(
 }
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
-                               const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                               const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                                envoy::api::v2::Cluster& cluster) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
@@ -140,6 +140,9 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
     cluster.set_type(envoy::api::v2::Cluster::ORIGINAL_DST);
   } else {
     ASSERT(string_type == "sds");
+    if (!eds_config) {
+      throw EnvoyException("cannot create sds cluster with no sds config");
+    }
     cluster.set_type(envoy::api::v2::Cluster::EDS);
     cluster.mutable_eds_cluster_config()->mutable_eds_config()->CopyFrom(eds_config.value());
     JSON_UTIL_SET_STRING(json_cluster, *cluster.mutable_eds_cluster_config(), service_name);
