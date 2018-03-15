@@ -12,9 +12,11 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = ["nghttp2"],
+    external_deps = [
+        "nghttp2",
+        "abseil_optional",
+    ],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/http:codec_interface",

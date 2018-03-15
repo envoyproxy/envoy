@@ -975,6 +975,13 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
         },
         {
           "prefix": "/",
+          "cluster": "local_service_with_header_range",
+          "headers" : [
+            {"name": "test_header_range", "range_match": {"start" : 1, "end" : 10}}
+          ]
+        },
+        {
+          "prefix": "/",
           "cluster": "local_service_without_headers"
         }
       ]
@@ -1030,6 +1037,20 @@ TEST(RouteMatcherTest, HeaderMatchedRouting) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9");
+    EXPECT_EQ("local_service_with_header_range",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "19");
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
@@ -1268,15 +1289,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeaders) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("foo_header", "bar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar", "GET");
@@ -1297,24 +1316,21 @@ TEST_F(RouterMatcherCookieHashPolicyTest, NoTtl) {
     // With no cookie, no hash is generated.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // With no matching cookie, no hash is generated.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // Matching cookie produces a valid hash.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; hash=brown");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     // The hash policy is per-route.
@@ -1355,20 +1371,20 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; hash=brown");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie).valid());
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie));
   }
   {
     uint64_t hash_1, hash_2;
@@ -1398,16 +1414,13 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_TRUE(route->routeEntry()
-                    ->hashPolicy()
-                    ->generateHash("1.2.3.4", headers, add_cookie_nop_)
-                    .valid());
+    EXPECT_TRUE(
+        route->routeEntry()->hashPolicy()->generateHash("1.2.3.4", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -1448,8 +1461,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_FALSE(
-        route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_).valid());
+    EXPECT_FALSE(route->routeEntry()->hashPolicy()->generateHash("", headers, add_cookie_nop_));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
@@ -2853,6 +2865,74 @@ TEST(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
                EnvoyException);
 }
 
+TEST(RouteMatcherTest, TestWeightedClusterHeaderManipulation) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster1
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster1
+                response_headers_to_remove: [ "x-remove-cluster1" ]
+              - name: cluster2
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster2
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster2
+                response_headers_to_remove: [ "x-remove-cluster2" ]
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::TestHeaderMapImpl resp_headers({{"x-remove-cluster1", "value"}});
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, request_info);
+    EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
+
+    route->finalizeResponseHeaders(resp_headers, request_info);
+    EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
+  }
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Http::TestHeaderMapImpl resp_headers({{"x-remove-cluster2", "value"}});
+    const RouteEntry* route = config.route(headers, 55)->routeEntry();
+    EXPECT_EQ("cluster2", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, request_info);
+    EXPECT_EQ("cluster2", headers.get_("x-req-cluster"));
+
+    route->finalizeResponseHeaders(resp_headers, request_info);
+    EXPECT_EQ("cluster2", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster2"));
+  }
+}
+
 TEST(NullConfigImplTest, All) {
   NullConfigImpl config;
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
@@ -3819,6 +3899,308 @@ virtual_hosts:
   EXPECT_EQ("foo", route_entry->virtualHost().routeConfig().name());
 }
 
+// Test to check Prefix Rewrite for redirects
+TEST(RouteConfigurationV2, RedirectPrefixRewrite) {
+  std::string RedirectPrefixRewrite = R"EOF(
+name: AllRedirects
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/prefix"}
+        redirect: { prefix_rewrite: "/new/prefix" }
+      - match: { path: "/path/" }
+        redirect: { prefix_rewrite: "/new/path/" }
+      - match: { prefix: "/host/prefix" }
+        redirect: { host_redirect: new.lyft.com, prefix_rewrite: "/new/prefix"}
+      - match: { regex: "/[r][e][g][e][x].*"}
+        redirect: { prefix_rewrite: "/new/regex-prefix/" }
+      - match: { prefix: "/http/prefix"}
+        redirect: { prefix_rewrite: "/https/prefix" , https_redirect: true }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RedirectPrefixRewrite), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/prefix/some/path/?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/prefix/some/path/?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/new/path/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host/prefix/1", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://new.lyft.com/new/prefix/1", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/regex/hello/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/regex-prefix/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/http/prefix/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+  }
+}
+
+// Test to check Strip Query for redirect messages
+TEST(RouteConfigurationV2, RedirectStripQuery) {
+  std::string RouteDynPathRedirect = R"EOF(
+name: AllRedirects
+virtual_hosts:
+  - name: redirect
+    domains: [redirect.lyft.com]
+    routes:
+      - match: { prefix: "/query/true"}
+        redirect: { prefix_rewrite: "/new/prefix", strip_query: "true" }
+      - match: { prefix: "/query/false" }
+        redirect: { prefix_rewrite: "/new/prefix", strip_query: "false" }
+      - match: { path: "/host/query-default" }
+        redirect: { host_redirect: new.lyft.com }
+      - match: { path: "/path/redirect/"}
+        redirect: { path_redirect: "/new/path-redirect/" }
+      - match: { prefix: "/all/combinations"}
+        redirect: { host_redirect: "new.lyft.com", prefix_rewrite: "/new/prefix" , https_redirect: "true", strip_query: "true" }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RouteDynPathRedirect), runtime, cm, true);
+
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/query/true?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/new/prefix", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/query/false/some/path?lang=eng&con=US", true, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://redirect.lyft.com/new/prefix/some/path?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host/query-default?lang=eng&con=US", true, false);
+    EXPECT_EQ("https://new.lyft.com/host/query-default?lang=eng&con=US",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path/redirect/", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new/path-redirect/",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/all/combinations/here/we/go?key=value", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("https://new.lyft.com/new/prefix/here/we/go", redirect->newPath(headers));
+  }
+}
+
+TEST(RouteMatcherTest, HeaderMatchedRoutingV2) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: local_service
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header
+              exact_match: test
+        route:
+          cluster: local_service_with_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_multiple1
+              exact_match: test1
+            - name: test_header_multiple2
+              exact_match: test2
+        route:
+          cluster: local_service_with_multiple_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_presence
+        route:
+          cluster: local_service_with_empty_headers
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_pattern
+              regex_match: "^user=test-\\d+$"
+        route:
+          cluster: local_service_with_header_pattern_set_regex
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_pattern
+              exact_match: "^customer=test-\\d+$"
+        route:
+          cluster: local_service_with_header_pattern_unset_regex
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: -9223372036854775808
+                 end: -10
+        route:
+          cluster: local_service_with_header_range_test1
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_multiple_range
+              range_match:
+                 start: -10
+                 end: 1
+            - name: test_header_multiple_exact
+              exact_match: test
+        route:
+          cluster: local_service_with_header_range_test2
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: 1
+                 end: 10
+        route:
+          cluster: local_service_with_header_range_test3
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              range_match:
+                 start: 9223372036854775801
+                 end: 9223372036854775807
+        route:
+          cluster: local_service_with_header_range_test4
+      - match:
+          prefix: "/"
+          headers:
+            - name: test_header_range
+              exact_match: "9223372036854775807"
+        route:
+          cluster: local_service_with_header_range_test5
+      - match:
+          prefix: "/"
+        route:
+          cluster: local_service_without_headers
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  {
+    EXPECT_EQ("local_service_without_headers",
+              config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header", "test");
+    EXPECT_EQ("local_service_with_headers", config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple1", "test1");
+    headers.addCopy("test_header_multiple2", "test2");
+    EXPECT_EQ("local_service_with_multiple_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("non_existent_header", "foo");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_presence", "test");
+    EXPECT_EQ("local_service_with_empty_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_pattern", "user=test-1223");
+    EXPECT_EQ("local_service_with_header_pattern_set_regex",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_pattern", "customer=test-1223");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "-9223372036854775808");
+    EXPECT_EQ("local_service_with_header_range_test1",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple_range", "-9");
+    headers.addCopy("test_header_multiple_exact", "test");
+    EXPECT_EQ("local_service_with_header_range_test2",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9");
+    EXPECT_EQ("local_service_with_header_range_test3",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "9223372036854775807");
+    EXPECT_EQ("local_service_with_header_range_test5",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_multiple_range", "-9");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
+    headers.addCopy("test_header_range", "19");
+    EXPECT_EQ("local_service_without_headers",
+              config.route(headers, 0)->routeEntry()->clusterName());
+  }
+}
 } // namespace
 } // namespace Router
 } // namespace Envoy

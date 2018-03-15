@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Http {
 
 const std::list<std::string> AsyncStreamImpl::NullCorsPolicy::allow_origin_;
-const Optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
+const absl::optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
@@ -43,8 +43,9 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                                            const Optional<std::chrono::milliseconds>& timeout) {
+AsyncClient::Request*
+AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+                      const absl::optional<std::chrono::milliseconds>& timeout) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, timeout);
   async_request->initialize();
@@ -60,9 +61,10 @@ AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::C
   }
 }
 
-AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                                            const Optional<std::chrono::milliseconds>& timeout,
-                                            bool buffer_body_for_retry) {
+AsyncClient::Stream*
+AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
+                       const absl::optional<std::chrono::milliseconds>& timeout,
+                       bool buffer_body_for_retry) {
   std::unique_ptr<AsyncStreamImpl> new_stream{
       new AsyncStreamImpl(*this, callbacks, timeout, buffer_body_for_retry)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);
@@ -70,7 +72,7 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const Optional<std::chrono::milliseconds>& timeout,
+                                 const absl::optional<std::chrono::milliseconds>& timeout,
                                  bool buffer_body_for_retry)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
       router_(parent.config_), request_info_(Protocol::Http11),
@@ -184,7 +186,7 @@ void AsyncStreamImpl::resetStream() {
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const Optional<std::chrono::milliseconds>& timeout)
+                                   const absl::optional<std::chrono::milliseconds>& timeout)
     // We tell the underlying stream to not buffer because we already have the full request and
     // and can handle any buffered body requests.
     : AsyncStreamImpl(parent, *this, timeout, false), request_(std::move(request)),

@@ -29,6 +29,12 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
+
+  /**
+   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
+   * a RouteConfiguration, based on the underlying resource type.
+   */
+  virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
 };
 
 /**

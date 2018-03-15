@@ -17,7 +17,7 @@ DOCS_SUFFIX = (".md", ".rst")
 GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
-BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
+BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(

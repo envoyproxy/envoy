@@ -21,7 +21,7 @@ if ! brew update; then
     exit 1
 fi
 
-DEPS="coreutils wget cmake libtool go bazel"
+DEPS="automake bazel cmake coreutils go libtool wget"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"

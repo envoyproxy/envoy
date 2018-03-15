@@ -50,8 +50,7 @@
   forward. To reiterate, it is *not* the responsibility of the on-call maintainer to answer all
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
-* The on-call rotation is currently tracked in a [spreadsheet](https://docs.google.com/spreadsheets/d/11RIjkGZIe_lQQMeJbxRc-YTGuGG7yPU15Gx8uu-k2No/edit#gid=0).
-  In the future we will move to a service such as PagerDuty once CNCF sets it up for us.
+* The on-call rotation is tracked at PagerDuty. The calendar is visible [here](https://pagerduty.github.io/addons/PDcal/index.html?iCalURL=https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH) or you can subscribe to the iCal feed [here](https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH).
 
 ## When does a maintainer lose maintainer status
 

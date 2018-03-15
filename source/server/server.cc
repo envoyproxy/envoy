@@ -289,8 +289,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   }
 }
 
-void InstanceImpl::loadServerFlags(const Optional<std::string>& flags_path) {
-  if (!flags_path.valid()) {
+void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path) {
+  if (!flags_path) {
     return;
   }
 

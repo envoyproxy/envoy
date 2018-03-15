@@ -54,6 +54,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dynamic_opentracing_driver_lib",
+    srcs = [
+        "dynamic_opentracing_driver_impl.cc",
+    ],
+    hdrs = [
+        "dynamic_opentracing_driver_impl.h",
+    ],
+    deps = [
+        ":http_tracer_lib",
+        ":opentracing_driver_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "lightstep_tracer_lib",
     srcs = [
         "lightstep_tracer_impl.cc",

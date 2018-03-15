@@ -288,5 +288,15 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED;
 }
 
+void Utility::appendToHeader(HeaderString& header, const std::string& data) {
+  if (data.empty()) {
+    return;
+  }
+  if (!header.empty()) {
+    header.append(",", 1);
+  }
+  header.append(data.c_str(), data.size());
+}
+
 } // namespace Http
 } // namespace Envoy

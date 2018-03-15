@@ -13,6 +13,8 @@
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -137,7 +139,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     }
   }
 
-  if (config.userAgent().valid()) {
+  if (config.userAgent()) {
     request_headers.insertEnvoyDownstreamServiceCluster().value(config.userAgent().value());
     HeaderEntry& user_agent_header = request_headers.insertUserAgent();
     if (user_agent_header.value().empty()) {
@@ -231,15 +233,10 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     }
   }
 
-  std::string client_cert_details_str = StringUtil::join(client_cert_details, ";");
+  const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
-    if (request_headers.ForwardedClientCert() &&
-        !request_headers.ForwardedClientCert()->value().empty()) {
-      request_headers.ForwardedClientCert()->value().append(("," + client_cert_details_str).c_str(),
-                                                            client_cert_details_str.length() + 1);
-    } else {
-      request_headers.insertForwardedClientCert().value(client_cert_details_str);
-    }
+    Utility::appendToHeader(request_headers.insertForwardedClientCert().value(),
+                            client_cert_details_str);
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
   } else {

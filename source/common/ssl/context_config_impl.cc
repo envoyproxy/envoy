@@ -3,8 +3,8 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/config/datasource.h"
 #include "common/config/tls_context_json.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "openssl/ssl.h"
@@ -41,22 +41,28 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      ca_cert_(readDataSource(config.validation_context().trusted_ca(), true)),
-      ca_cert_path_(getDataSourcePath(config.validation_context().trusted_ca())),
-      certificate_revocation_list_(readDataSource(config.validation_context().crl(), true)),
-      certificate_revocation_list_path_(getDataSourcePath(config.validation_context().crl())),
-      cert_chain_(config.tls_certificates().empty()
-                      ? ""
-                      : readDataSource(config.tls_certificates()[0].certificate_chain(), true)),
-      cert_chain_path_(config.tls_certificates().empty()
-                           ? ""
-                           : getDataSourcePath(config.tls_certificates()[0].certificate_chain())),
-      private_key_(config.tls_certificates().empty()
-                       ? ""
-                       : readDataSource(config.tls_certificates()[0].private_key(), true)),
-      private_key_path_(config.tls_certificates().empty()
-                            ? ""
-                            : getDataSourcePath(config.tls_certificates()[0].private_key())),
+      ca_cert_(Config::DataSource::read(config.validation_context().trusted_ca(), true)),
+      ca_cert_path_(Config::DataSource::getPath(config.validation_context().trusted_ca())),
+      certificate_revocation_list_(
+          Config::DataSource::read(config.validation_context().crl(), true)),
+      certificate_revocation_list_path_(
+          Config::DataSource::getPath(config.validation_context().crl())),
+      cert_chain_(
+          config.tls_certificates().empty()
+              ? ""
+              : Config::DataSource::read(config.tls_certificates()[0].certificate_chain(), true)),
+      cert_chain_path_(
+          config.tls_certificates().empty()
+              ? ""
+              : Config::DataSource::getPath(config.tls_certificates()[0].certificate_chain())),
+      private_key_(
+          config.tls_certificates().empty()
+              ? ""
+              : Config::DataSource::read(config.tls_certificates()[0].private_key(), true)),
+      private_key_path_(
+          config.tls_certificates().empty()
+              ? ""
+              : Config::DataSource::getPath(config.tls_certificates()[0].private_key())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
@@ -72,30 +78,6 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
     throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
                                      certificateRevocationListPath()));
   }
-}
-
-const std::string ContextConfigImpl::readDataSource(const envoy::api::v2::core::DataSource& source,
-                                                    bool allow_empty) {
-  switch (source.specifier_case()) {
-  case envoy::api::v2::core::DataSource::kFilename:
-    return Filesystem::fileReadToEnd(source.filename());
-  case envoy::api::v2::core::DataSource::kInlineBytes:
-    return source.inline_bytes();
-  case envoy::api::v2::core::DataSource::kInlineString:
-    return source.inline_string();
-  default:
-    if (!allow_empty) {
-      throw EnvoyException(
-          fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
-    }
-    return "";
-  }
-}
-
-const std::string
-ContextConfigImpl::getDataSourcePath(const envoy::api::v2::core::DataSource& source) {
-  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename ? source.filename()
-                                                                                : "";
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
@@ -143,7 +125,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         switch (config.session_ticket_keys_type_case()) {
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeys:
           for (const auto& datasource : config.session_ticket_keys().keys()) {
-            validateAndAppendKey(ret, readDataSource(datasource, false));
+            validateAndAppendKey(ret, Config::DataSource::read(datasource, false));
           }
           break;
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:

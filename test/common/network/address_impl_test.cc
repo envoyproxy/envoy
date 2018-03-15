@@ -300,6 +300,29 @@ TEST(PipeInstanceTest, AbstractNamespace) {
 #endif
 }
 
+TEST(PipeInstanceTest, BadAddress) {
+  std::string long_address(1000, 'X');
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
+                          "exceeds maximum UNIX domain socket path size");
+}
+
+TEST(PipeInstanceTest, UnlinksExistingFile) {
+  const auto bind_uds_socket = [](const std::string& path) {
+    PipeInstance address(path);
+    const int listen_fd = address.socket(SocketType::Stream);
+    ASSERT_GE(listen_fd, 0) << address.asString();
+    ScopedFdCloser closer(listen_fd);
+
+    const int rc = address.bind(listen_fd);
+    const int err = errno;
+    ASSERT_EQ(rc, 0) << address.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+  };
+
+  const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");
+  bind_uds_socket(path);
+  bind_uds_socket(path); // after closing, second bind to the same path should succeed.
+}
+
 TEST(AddressFromSockAddr, IPv4) {
   sockaddr_storage ss;
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);

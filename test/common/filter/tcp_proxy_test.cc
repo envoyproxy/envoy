@@ -53,26 +53,6 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
   EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
 }
 
-TEST(TcpProxyConfigTest, NoCluster) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "cluster": "fake_cluster"
-          }
-        ]
-      }
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_CALL(factory_context.cluster_manager_, get("fake_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
-}
-
 TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
   std::string json_string = R"EOF(
   {
@@ -464,7 +444,7 @@ public:
                                : Network::FilterStatus::StopIteration,
               filter_->onNewConnection());
 
-    EXPECT_EQ(Optional<uint64_t>(), filter_->computeHashKey());
+    EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
     EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
     EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
   }
@@ -509,11 +489,31 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
   upstream_read_filter_->onData(response, true);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
-  EXPECT_CALL(*upstream_connections_.at(0), close(_));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(TcpProxyTest, UpstreamDisconnect) {
+// Test that downstream is closed after an upstream LocalClose.
+TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
+  setup(1);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_read_filter_->onData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Test that downstream is closed after an upstream RemoteClose.
+TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
   setup(1);
 
   Buffer::OwnedImpl buffer("hello");
@@ -530,13 +530,30 @@ TEST_F(TcpProxyTest, UpstreamDisconnect) {
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that reconnect is attempted after a connect failure
-TEST_F(TcpProxyTest, ConnectAttemptsUpstreamFail) {
+// Test that reconnect is attempted after a local connect failure
+TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
   setup(2, config);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
+  upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::LocalClose);
+  raiseEventUpstreamConnected(1);
+
+  EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+}
+
+// Test that reconnect is attempted after a remote connect failure
+TEST_F(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempts()->set_value(2);
+  setup(2, config);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+              deferredDelete_(upstream_connections_.at(0)));
   upstream_connections_.at(0)->raiseEvent(Network::ConnectionEvent::RemoteClose);
   raiseEventUpstreamConnected(1);
 
@@ -569,8 +586,12 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   {
     testing::InSequence sequence;
     EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-    EXPECT_CALL(*upstream_connections_.at(1), close(Network::ConnectionCloseType::NoFlush));
-    EXPECT_CALL(*upstream_connections_.at(2), close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(0)));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(1)));
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_,
+                deferredDelete_(upstream_connections_.at(2)));
     EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   }
 
@@ -696,6 +717,39 @@ TEST_F(TcpProxyTest, NoHost) {
   EXPECT_EQ(access_log_data_, "UH");
 }
 
+TEST_F(TcpProxyTest, WithMetadataMatch) {
+  auto v1 = ProtobufWkt::Value();
+  v1.set_string_value("v1");
+  auto v2 = ProtobufWkt::Value();
+  v2.set_number_value(2.0);
+  auto v3 = ProtobufWkt::Value();
+  v3.set_bool_value(true);
+
+  std::vector<Router::MetadataMatchCriterionImpl> criteria = {{"a", v1}, {"b", v2}, {"c", v3}};
+
+  auto metadata_struct = ProtobufWkt::Struct();
+  auto mutable_fields = metadata_struct.mutable_fields();
+
+  for (const auto& criterion : criteria) {
+    mutable_fields->insert({criterion.name(), criterion.value().value()});
+  }
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_metadata_match()->mutable_filter_metadata()->insert(
+      {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
+
+  configure(config);
+  filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+
+  const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
+
+  EXPECT_EQ(metadata_criteria.size(), criteria.size());
+  for (size_t i = 0; i < criteria.size(); ++i) {
+    EXPECT_EQ(metadata_criteria[i]->name(), criteria[i].name());
+    EXPECT_EQ(metadata_criteria[i]->value(), criteria[i].value());
+  }
+}
+
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
   filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
@@ -766,9 +820,9 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
-  EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->callback_();
 }
 

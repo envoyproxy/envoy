@@ -30,6 +30,9 @@ public:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+  }
 
 private:
   void updateHostsPerLocality(HostSet& host_set, HostVector& new_hosts);

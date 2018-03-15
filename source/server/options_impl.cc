@@ -92,6 +92,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                              " the cluster name)",
                                              false, ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH, "uint64_t",
                                              cmd);
+  TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
+                                       "Disable hot restart functionality", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -118,10 +120,12 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     throw MalformedArgvException(message);
   }
 
+  hot_restart_disabled_ = disable_hot_restart.getValue();
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(max_stats.getValue(),
                                         max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength());
+                                            Stats::RawStatData::maxStatSuffixLength(),
+                                        !hot_restart_disabled_);
     throw NoServingException();
   }
 
@@ -136,6 +140,8 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
     mode_ = Server::Mode::Serve;
   } else if (mode.getValue() == "validate") {
     mode_ = Server::Mode::Validate;
+  } else if (mode.getValue() == "init_only") {
+    mode_ = Server::Mode::InitOnly;
   } else {
     const std::string message = fmt::format("error: unknown mode '{}'", mode.getValue());
     std::cerr << message << std::endl;

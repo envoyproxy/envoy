@@ -53,11 +53,11 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
-  Optional<uint64_t> hash;
+  absl::optional<uint64_t> hash;
   if (context) {
     hash = context->computeHashKey();
   }
-  const uint64_t h = hash.valid() ? hash.value() : random_.random();
+  const uint64_t h = hash ? hash.value() : random_.random();
 
   const uint32_t priority = LoadBalancerBase::choosePriority(h, *per_priority_load_);
   const auto& per_priority_state = (*per_priority_state_)[priority];

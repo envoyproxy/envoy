@@ -1,4 +1,13 @@
+# Use a "local_path" key to build against a local checkout of a repository.
+# The path must be absolute. Other keys are ignored when using a local repository.
+# The current working tree at the given path will be used.
+# DO NOT PUSH a "local_path" override upstream.
 REPOSITORY_LOCATIONS = dict(
+    boringssl = dict(
+        # Use commits from branch "chromium-stable-with-bazel"
+        commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
+        remote = "https://boringssl.googlesource.com/boringssl",
+    ),
     com_google_absl = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
         remote = "https://github.com/abseil/abseil-cpp",
@@ -21,21 +30,21 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "2081e5df5e87402398847431e16b87c71dd5c4d632314bb976ace8161f4d32de",
-        strip_prefix = "spdlog-0.16.2",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.16.2.tar.gz"],
+        sha256 = "b88d7be261d9089c817fc8cee6c000d69f349b357828e4c7f66985bc5d5360b8",
+        strip_prefix = "spdlog-0.16.3",
+        urls = ["https://github.com/gabime/spdlog/archive/v0.16.3.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_grpc_grpc = dict(
-        commit = "04ecc18e3a5b8de5bb7ffa20700364ad88dc16f9", # v1.9.0-pre3
+        commit = "474c5950686e3962bd339c93d27e369bf64f568f", # v1.10.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "e57161e2a4bd1f9d3a8d3edf23185f033bb45f17",
-        remote = "https://github.com/opentracing/opentracing-cpp", # v1.2.0
+        commit = "f3c1f42601d13504c68e2bc81c60604f0de055dd",
+        remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
         commit = "6a198acd328f976984699f7272bbec7c8b220f65",
@@ -46,7 +55,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "feae95a3a69f111bc1897b9048d9acbc290992f9",  # v2.7.1
+        commit = "dd74753cf5cf8944438d6f49ddf46f9659993dfb",  # v2.8.0
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -71,7 +80,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "258bfddfddaad4d6a1da7b4476c98b060d57bcc1",
+        commit = "15dc537b6078988ac6f7de5ffec697e876a4652f",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
@@ -79,7 +88,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "4374be38e9a75ff5957c3922adb155d32086fe14",
+        commit = "0.10.1",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

@@ -8,6 +8,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
+#include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpc++/generic/generic_stub.h"
@@ -150,15 +151,15 @@ public:
 class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-                        GoogleStubFactory& stub_factory, Stats::Scope& scope,
-                        const envoy::api::v2::core::GrpcService::GoogleGrpc& config);
+                        GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
+                        const envoy::api::v2::core::GrpcService& config);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
   AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                      const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                      Tracing::Span& parent_span,
-                     const Optional<std::chrono::milliseconds>& timeout) override;
+                     const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
@@ -174,7 +175,8 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
-  Stats::Scope& scope_;
+  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
+  Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
 
   friend class GoogleAsyncClientThreadLocal;
@@ -190,7 +192,7 @@ public:
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                         const Protobuf::MethodDescriptor& service_method,
                         AsyncStreamCallbacks& callbacks,
-                        const Optional<std::chrono::milliseconds>& timeout);
+                        const absl::optional<std::chrono::milliseconds>& timeout);
   ~GoogleAsyncStreamImpl();
 
   virtual void initialize(bool buffer_body_for_retry);
@@ -244,7 +246,7 @@ private:
     PendingMessage() : end_stream_(true) {}
 
     const grpc::Slice slice_;
-    const Optional<grpc::ByteBuffer> buf_;
+    const absl::optional<grpc::ByteBuffer> buf_;
     const bool end_stream_;
   };
 
@@ -267,7 +269,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   const Protobuf::MethodDescriptor& service_method_;
   AsyncStreamCallbacks& callbacks_;
-  const Optional<std::chrono::milliseconds>& timeout_;
+  const absl::optional<std::chrono::milliseconds>& timeout_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -289,7 +291,8 @@ private:
   uint32_t inflight_tags_{};
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
-  std::deque<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops_;
+  std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
+      completed_ops_ GUARDED_BY(completed_ops_lock_);
   std::mutex completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
@@ -304,7 +307,7 @@ public:
                          const Protobuf::MethodDescriptor& service_method,
                          const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                          Tracing::Span& parent_span,
-                         const Optional<std::chrono::milliseconds>& timeout);
+                         const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
 
