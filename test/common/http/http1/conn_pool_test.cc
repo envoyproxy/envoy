@@ -129,6 +129,7 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
+   
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
     }
