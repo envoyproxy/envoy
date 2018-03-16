@@ -19,7 +19,7 @@ namespace Tracing {
 
 // TODO(mattklein123) PERF: Avoid string creations/copies in this entire file.
 static std::string buildResponseCode(const RequestInfo::RequestInfo& info) {
-  return info.responseCode().valid() ? std::to_string(info.responseCode().value()) : "0";
+  return info.responseCode() ? std::to_string(info.responseCode().value()) : "0";
 }
 
 static std::string valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
@@ -156,7 +156,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.setTag(Tracing::Tags::get().RESPONSE_FLAGS,
               RequestInfo::ResponseFlagUtils::toShortString(request_info));
 
-  if (!request_info.responseCode().valid() ||
+  if (!request_info.responseCode() ||
       Http::CodeUtility::is5xx(request_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
   }

@@ -10,7 +10,6 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
@@ -19,6 +18,8 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -111,9 +112,9 @@ public:
   virtual const std::string& maxAge() const PURE;
 
   /**
-   * @return const Optional<bool>& Whether access-control-allow-credentials should be true.
+   * @return const absl::optional<bool>& Whether access-control-allow-credentials should be true.
    */
-  virtual const Optional<bool>& allowCredentials() const PURE;
+  virtual const absl::optional<bool>& allowCredentials() const PURE;
 
   /**
    * @return bool Whether CORS is enabled for the route or virtual host.
@@ -186,7 +187,7 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
-                                  const Optional<Http::StreamResetReason>& reset_reason,
+                                  const absl::optional<Http::StreamResetReason>& reset_reason,
                                   DoRetryCallback callback) PURE;
 };
 
@@ -282,12 +283,12 @@ public:
    * @param headers stores the HTTP headers for the stream
    * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
    * host
-   * @return Optional<uint64_t> an optional hash value to route on. A hash value might not be
+   * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
    * returned if for example the specified HTTP header does not exist.
    */
-  virtual Optional<uint64_t> generateHash(const std::string& downstream_address,
-                                          const Http::HeaderMap& headers,
-                                          AddCookieCallback add_cookie) const PURE;
+  virtual absl::optional<uint64_t> generateHash(const std::string& downstream_address,
+                                                const Http::HeaderMap& headers,
+                                                AddCookieCallback add_cookie) const PURE;
 };
 
 class MetadataMatchCriterion {

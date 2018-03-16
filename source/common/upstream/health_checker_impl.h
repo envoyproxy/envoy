@@ -234,7 +234,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  Optional<std::string> service_name_;
+  absl::optional<std::string> service_name_;
 };
 
 /**
@@ -515,7 +515,7 @@ private:
   }
 
   const Protobuf::MethodDescriptor& service_method_;
-  Optional<std::string> service_name_;
+  absl::optional<std::string> service_name_;
 };
 
 /**

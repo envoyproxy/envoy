@@ -268,7 +268,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // end the local stream.
   if (local_end_stream_ && !local_end_stream_sent_) {
     parent_.pending_deferred_reset_ = true;
-    deferred_reset_.value(reason);
+    deferred_reset_ = reason;
     ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
   } else {
     resetStreamWorker(reason);
@@ -399,7 +399,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     case NGHTTP2_HCAT_HEADERS: {
       // It's possible that we are waiting to send a deferred reset, so only raise headers/trailers
       // if local is not complete.
-      if (!stream->deferred_reset_.valid()) {
+      if (!stream->deferred_reset_) {
         if (!stream->waiting_for_non_informational_headers_) {
           if (!stream->remote_end_stream_) {
             // This indicates we have received more headers frames than Envoy
@@ -441,7 +441,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
-    if (!stream->deferred_reset_.valid()) {
+    if (!stream->deferred_reset_) {
       stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
@@ -583,7 +583,7 @@ void ConnectionImpl::sendPendingFrames() {
   if (pending_deferred_reset_) {
     pending_deferred_reset_ = false;
     for (auto& stream : active_streams_) {
-      if (stream->deferred_reset_.valid()) {
+      if (stream->deferred_reset_) {
         stream->resetStreamWorker(stream->deferred_reset_.value());
       }
     }

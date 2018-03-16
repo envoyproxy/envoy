@@ -148,7 +148,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override {
+  absl::optional<uint64_t> computeHashKey() override {
     if (route_entry_ && downstream_headers_) {
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
@@ -265,7 +265,7 @@ private:
     Event::TimerPtr per_try_timeout_;
     Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
     Http::StreamEncoder* request_encoder_{};
-    Optional<Http::StreamResetReason> deferred_reset_reason_;
+    absl::optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
@@ -307,7 +307,7 @@ private:
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
-                       const Optional<Http::StreamResetReason>& reset_reason);
+                       const absl::optional<Http::StreamResetReason>& reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   void doRetry();

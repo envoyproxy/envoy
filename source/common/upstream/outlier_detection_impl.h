@@ -31,12 +31,12 @@ public:
   void putHttpResponseCode(uint64_t) override {}
   void putResult(Result) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
-  const Optional<MonotonicTime>& lastEjectionTime() override { return time_; }
-  const Optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
+  const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
+  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
   double successRate() const override { return -1; }
 
 private:
-  const Optional<MonotonicTime> time_;
+  const absl::optional<MonotonicTime> time_;
 };
 
 /**
@@ -87,10 +87,10 @@ public:
    * implementation it is a fixed time window.
    * @param success_rate_request_volume the threshold of requests an accumulator has to have in
    *                                    order to be able to return a significant success rate value.
-   * @return a valid Optional<double> with the success rate. If there were not enough requests, an
-   *         invalid Optional<double> is returned.
+   * @return a valid absl::optional<double> with the success rate. If there were not enough
+   * requests, an invalid absl::optional<double> is returned.
    */
-  Optional<double> getSuccessRate(uint64_t success_rate_request_volume);
+  absl::optional<double> getSuccessRate(uint64_t success_rate_request_volume);
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
@@ -124,8 +124,10 @@ public:
   void putHttpResponseCode(uint64_t response_code) override;
   void putResult(Result result) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  const Optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
-  const Optional<MonotonicTime>& lastUnejectionTime() override { return last_unejection_time_; }
+  const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
+  const absl::optional<MonotonicTime>& lastUnejectionTime() override {
+    return last_unejection_time_;
+  }
   double successRate() const override { return success_rate_; }
 
 private:
@@ -133,8 +135,8 @@ private:
   std::weak_ptr<Host> host_;
   std::atomic<uint32_t> consecutive_5xx_{0};
   std::atomic<uint32_t> consecutive_gateway_failure_{0};
-  Optional<MonotonicTime> last_ejection_time_;
-  Optional<MonotonicTime> last_unejection_time_;
+  absl::optional<MonotonicTime> last_ejection_time_;
+  absl::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
@@ -269,7 +271,7 @@ public:
 
 private:
   std::string typeToString(EjectionType type);
-  int secsSinceLastAction(const Optional<MonotonicTime>& lastActionTime, MonotonicTime now);
+  int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
 
   Filesystem::FileSharedPtr file_;
   SystemTimeSource& time_source_;

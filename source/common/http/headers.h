@@ -95,6 +95,7 @@ public:
 
   struct {
     const std::string Close{"close"};
+    const std::string KeepAlive{"keep-alive"};
     const std::string Upgrade{"upgrade"};
   } ConnectionValues;
 

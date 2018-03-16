@@ -34,11 +34,11 @@ void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   num_ejections_++;
-  last_ejection_time_.value(ejection_time);
+  last_ejection_time_ = ejection_time;
 }
 
 void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
-  last_unejection_time_.value(unejection_time);
+  last_unejection_time_ = (unejection_time);
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
@@ -399,10 +399,10 @@ void DetectorImpl::processSuccessRateEjections() {
   for (const auto& host : host_monitors_) {
     // Don't do work if the host is already ejected.
     if (!host.first->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-      Optional<double> host_success_rate =
+      absl::optional<double> host_success_rate =
           host.second->successRateAccumulator().getSuccessRate(success_rate_request_volume);
 
-      if (host_success_rate.valid()) {
+      if (host_success_rate) {
         valid_success_rate_hosts.emplace_back(
             HostSuccessRatePair(host.first, host_success_rate.value()));
         success_rate_sum += host_success_rate.value();
@@ -542,9 +542,9 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
   NOT_REACHED;
 }
 
-int EventLoggerImpl::secsSinceLastAction(const Optional<MonotonicTime>& lastActionTime,
+int EventLoggerImpl::secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime,
                                          MonotonicTime now) {
-  if (lastActionTime.valid()) {
+  if (lastActionTime) {
     return std::chrono::duration_cast<std::chrono::seconds>(now - lastActionTime.value()).count();
   }
   return -1;
@@ -560,13 +560,14 @@ SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
   return current_success_rate_bucket_.get();
 }
 
-Optional<double> SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
+absl::optional<double>
+SuccessRateAccumulator::getSuccessRate(uint64_t success_rate_request_volume) {
   if (backup_success_rate_bucket_->total_request_counter_ < success_rate_request_volume) {
-    return Optional<double>();
+    return absl::optional<double>();
   }
 
-  return Optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-                          backup_success_rate_bucket_->total_request_counter_);
+  return absl::optional<double>(backup_success_rate_bucket_->success_request_counter_ * 100.0 /
+                                backup_success_rate_bucket_->total_request_counter_);
 }
 
 } // namespace Outlier

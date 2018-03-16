@@ -170,44 +170,44 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
               request_info.startTime().time_since_epoch())
               .count()));
 
-  Optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
-  if (dur.valid()) {
+  absl::optional<std::chrono::nanoseconds> dur = request_info.lastDownstreamRxByteReceived();
+  if (dur) {
     common_properties->mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.firstUpstreamTxByteSent();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.lastUpstreamTxByteSent();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_last_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.firstUpstreamRxByteReceived();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.lastUpstreamRxByteReceived();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_last_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.firstDownstreamTxByteSent();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_first_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
   dur = request_info.lastDownstreamTxByteSent();
-  if (dur.valid()) {
+  if (dur) {
     common_properties->mutable_time_to_last_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
@@ -224,7 +224,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, request_info);
 
-  if (request_info.protocol().valid()) {
+  if (request_info.protocol()) {
     switch (request_info.protocol().value()) {
     case Http::Protocol::Http10:
       log_entry->set_protocol_version(
@@ -275,7 +275,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // HTTP response properties.
   // TODO(mattklein123): Populate custom response headers.
   auto* response_properties = log_entry->mutable_response();
-  if (request_info.responseCode().valid()) {
+  if (request_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(request_info.responseCode().value());
   }
   response_properties->set_response_headers_bytes(response_headers->byteSize());

@@ -18,8 +18,8 @@ envoy_cc_test(
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
+    external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/common:time_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
