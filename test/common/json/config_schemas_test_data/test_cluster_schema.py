@@ -12,7 +12,6 @@ CLUSTER_BLOB = {
         "type": "http",
         "timeout_ms": 2000,
         "interval_ms": 10000,
-        "no_traffic_interval_ms": 30000,
         "interval_jitter_ms": 10000,
         "unhealthy_threshold": 2,
         "healthy_threshold": 2,
