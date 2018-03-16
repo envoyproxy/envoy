@@ -277,8 +277,11 @@ public:
               uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
-              return new CodecClientForTest(std::move(conn_data.connection_), test_session.codec_,
-                                            nullptr, nullptr);
+              std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                  new NiceMock<Upstream::MockClusterInfo>()};
+              return new CodecClientForTest(
+                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"));
             }));
   }
 
@@ -1830,8 +1833,12 @@ public:
               uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
+              std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                  new NiceMock<Upstream::MockClusterInfo>()};
+
               test_session.codec_client_ = new CodecClientForTest(
-                  std::move(conn_data.connection_), test_session.codec_, nullptr, nullptr);
+                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"));
               return test_session.codec_client_;
             }));
   }
