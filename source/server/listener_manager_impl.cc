@@ -125,7 +125,8 @@ public:
 
     const auto* ip = socket.localAddress()->ip();
     if (!ip) {
-      return false;
+      // Do not fail when transparent option is not requested.
+      return transparent_ ? false : true;
     }
 #ifdef SOL_IP
     int rc;
