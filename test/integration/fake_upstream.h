@@ -245,7 +245,7 @@ private:
       try {
         parent_.codec_->dispatch(data);
       } catch (Http::CodecProtocolException& e) {
-        ASSERT(end_stream);
+        EXPECT_TRUE(end_stream);
         parent_.connection_.close(Network::ConnectionCloseType::NoFlush);
       }
       return Network::FilterStatus::StopIteration;
