@@ -201,7 +201,11 @@ private:
  * pick and insertion time complexity, O(n) memory use. The key insight is that if we schedule with
  * 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
- * where m is the weight range.
+ * where m is the weight range. We also explicitly check for the unweighted special case and use a
+ * simple index to acheive O(1) scheduling in that case.
+ * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
+ * support large ranges of weights or arbitrary precision floating weights, we could construct an
+ * explicit schedule, since m will be a small constant factor in O(m * n).
  */
 class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
@@ -216,8 +220,16 @@ public:
 private:
   void refresh(uint32_t priority);
 
-  // EdfScheduler for each valid HostsSource.
-  std::unordered_map<HostsSource, EdfScheduler<const Host>, HostsSourceHash> scheduler_;
+  struct Scheduler {
+    // EdfScheduler for weighted RR.
+    EdfScheduler<const Host> edf_;
+    // Simple clock hand for when we do unweighted.
+    size_t rr_index_{};
+    bool weighted_{};
+  };
+
+  // Scheduler for each valid HostsSource.
+  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
 };
 
 /**

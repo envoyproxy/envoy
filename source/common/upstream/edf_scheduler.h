@@ -19,7 +19,8 @@ namespace Upstream {
 // Earliest Deadline First (EDF) scheduler
 // (https://en.wikipedia.org/wiki/Earliest_deadline_first_scheduling) used for weighted round robin.
 // Each pick from the schedule has the earliest deadline entry selected. Entries have deadlines set
-// at current time + 1 / weight, providing weighted round robin behavior.
+// at current time + 1 / weight, providing weighted round robin behavior with floating point
+// weights and an O(log n) pick time.
 template <class C> class EdfScheduler {
 public:
   /**

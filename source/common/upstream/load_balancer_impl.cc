@@ -419,15 +419,27 @@ RoundRobinLoadBalancer::RoundRobinLoadBalancer(
 
 void RoundRobinLoadBalancer::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
-    // Nuke existing scheduler if it exists.
-    scheduler_[source] = EdfScheduler<const Host>{};
-    // Populate scheduler with host list.
+    bool weighted = false;
+
     for (const auto& host : hosts) {
-      // We use a fixed weight here. While the weight may change without
-      // notification, this will only be stale until this host is next picked,
-      // at which point it is reinserted into the EdfScheduler with its new
-      // weight in chooseHost().
-      scheduler_[source].add(host->weight(), host);
+      if (host->weight() != hosts[0]->weight()) {
+        weighted = true;
+        break;
+      }
+    }
+
+    // Nuke existing scheduler if it exists.
+    scheduler_[source] = Scheduler{};
+    scheduler_[source].weighted_ = weighted;
+    if (weighted) {
+      // Populate scheduler with host list.
+      for (const auto& host : hosts) {
+        // We use a fixed weight here. While the weight may change without
+        // notification, this will only be stale until this host is next picked,
+        // at which point it is reinserted into the EdfScheduler with its new
+        // weight in chooseHost().
+        scheduler_[source].edf_.add(host->weight(), host);
+      }
     }
   };
   // Populate EdfSchedulers for each valid HostsSource value for the host set
@@ -445,17 +457,26 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
-  const HostsSource hostsSource = hostSourceToUse();
-  auto scheduler_it = scheduler_.find(hostsSource);
+  const HostsSource hosts_source = hostSourceToUse();
+  auto scheduler_it = scheduler_.find(hosts_source);
   if (scheduler_it == scheduler_.end()) {
     return nullptr;
   }
-  auto host = scheduler_it->second.pick();
-  if (host == nullptr) {
-    return nullptr;
+  auto& scheduler = scheduler_it->second;
+  if (scheduler.weighted_) {
+    auto host = scheduler.edf_.pick();
+    if (host == nullptr) {
+      return nullptr;
+    }
+    scheduler.edf_.add(host->weight(), host);
+    return host;
+  } else {
+    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
+    if (hosts_to_use.size() == 0) {
+      return nullptr;
+    }
+    return hosts_to_use[scheduler.rr_index_++ % hosts_to_use.size()];
   }
-  scheduler_it->second.add(host->weight(), host);
-  return host;
 }
 
 LeastRequestLoadBalancer::LeastRequestLoadBalancer(
