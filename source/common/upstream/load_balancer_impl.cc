@@ -459,15 +459,15 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
 HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
   const HostsSource hosts_source = hostSourceToUse();
   auto scheduler_it = scheduler_.find(hosts_source);
-  if (scheduler_it == scheduler_.end()) {
-    return nullptr;
-  }
+  // We should always have a scheduler for any return value from
+  // hostSourceToUse() via the construction in refresh();
+  ASSERT(scheduler_it != scheduler_.end());
   auto& scheduler = scheduler_it->second;
   if (scheduler.weighted_) {
     auto host = scheduler.edf_.pick();
-    if (host == nullptr) {
-      return nullptr;
-    }
+    // We should always succeed if weighted, since when we compute the scheduler
+    // in refresh() above, any empty host vector will be treated as unweighted.
+    ASSERT(host != nullptr);
     scheduler.edf_.add(host->weight(), host);
     return host;
   } else {
