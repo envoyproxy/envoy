@@ -289,12 +289,12 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
     ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
 
     Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
-    return Runtime::LoaderPtr{new Runtime::LoaderImpl(
+    return Runtime::LoaderPtr{new Runtime::DiskBackedLoaderImpl(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
         config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
         std::move(os_sys_calls))};
   } else {
-    return Runtime::LoaderPtr{new Runtime::NullLoaderImpl(server.random())};
+    return Runtime::LoaderPtr{new Runtime::LoaderImpl(server.random(), server.threadLocal())};
   }
 }
 

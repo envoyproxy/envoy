@@ -135,6 +135,13 @@ public:
    *         fetched again when needed.
    */
   virtual Snapshot& snapshot() PURE;
+
+  /**
+   * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
+   * a key, use an empty string as the value.
+   * @param values the values to merge
+   */
+  virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
 };
 
 typedef std::unique_ptr<Loader> LoaderPtr;

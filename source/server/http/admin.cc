@@ -566,6 +566,21 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   return rc;
 }
 
+Http::Code AdminImpl::handlerRuntimeModify(const std::string& url, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  if (params.empty()) {
+    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+    response.add("use an empty value to remove a previously added override");
+    return Http::Code::BadRequest;
+  }
+  std::unordered_map<std::string, std::string> overrides;
+  overrides.insert(params.begin(), params.end());
+  server_.runtime().mergeValues(overrides);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
     const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
   std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
@@ -681,7 +696,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
+          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
+           false, true}},
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {

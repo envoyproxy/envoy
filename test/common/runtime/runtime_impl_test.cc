@@ -64,7 +64,7 @@ TEST(UUID, sanityCheckOfUniqueness) {
   EXPECT_EQ(num_of_uuids, uuids.size());
 }
 
-class RuntimeImplTest : public testing::Test {
+class DiskBackedLoaderImplTest : public testing::Test {
 public:
   static void SetUpTestCase() {
     TestEnvironment::exec(
@@ -83,8 +83,9 @@ public:
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
     Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
-    loader.reset(new LoaderImpl(dispatcher, tls, TestEnvironment::temporaryPath(primary_dir),
-                                "envoy", override_dir, store, generator, std::move(os_sys_calls)));
+    loader.reset(new DiskBackedLoaderImpl(dispatcher, tls,
+                                          TestEnvironment::temporaryPath(primary_dir), "envoy",
+                                          override_dir, store, generator, std::move(os_sys_calls)));
   }
 
   Event::MockDispatcher dispatcher;
@@ -96,7 +97,7 @@ public:
   std::unique_ptr<LoaderImpl> loader;
 };
 
-TEST_F(RuntimeImplTest, All) {
+TEST_F(DiskBackedLoaderImplTest, All) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -134,7 +135,7 @@ TEST_F(RuntimeImplTest, All) {
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
 }
 
-TEST_F(RuntimeImplTest, GetAll) {
+TEST_F(DiskBackedLoaderImplTest, GetAll) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override");
 
@@ -160,33 +161,83 @@ TEST_F(RuntimeImplTest, GetAll) {
   EXPECT_TRUE(entry == values.end());
 }
 
-TEST_F(RuntimeImplTest, BadDirectory) {
+TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
   setup();
   run("/baddir", "/baddir");
 }
 
-TEST_F(RuntimeImplTest, BadStat) {
+TEST_F(DiskBackedLoaderImplTest, BadStat) {
   setup();
   EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(-1));
   run("test/common/runtime/test_data/current", "envoy_override");
   EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
 }
 
-TEST_F(RuntimeImplTest, OverrideFolderDoesNotExist) {
+TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
 }
 
-TEST(NullRuntimeImplTest, All) {
+void testNewOverrides(Loader& loader) {
+  // New string
+  loader.mergeValues({{"foo", "bar"}});
+  EXPECT_EQ("bar", loader.snapshot().get("foo"));
+
+  // Remove new string
+  loader.mergeValues({{"foo", ""}});
+  EXPECT_EQ("", loader.snapshot().get("foo"));
+
+  // New integer
+  loader.mergeValues({{"baz", "42"}});
+  EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
+
+  // Remove new integer
+  loader.mergeValues({{"baz", ""}});
+  EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
+}
+
+TEST_F(DiskBackedLoaderImplTest, mergeValues) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+  testNewOverrides(*loader);
+
+  // Override string
+  loader->mergeValues({{"file2", "new world"}});
+  EXPECT_EQ("new world", loader->snapshot().get("file2"));
+
+  // Remove overridden string
+  loader->mergeValues({{"file2", ""}});
+  EXPECT_EQ("world", loader->snapshot().get("file2"));
+
+  // Override integer
+  loader->mergeValues({{"file3", "42"}});
+  EXPECT_EQ(42, loader->snapshot().getInteger("file3", 1));
+
+  // Remove overridden integer
+  loader->mergeValues({{"file3", ""}});
+  EXPECT_EQ(2, loader->snapshot().getInteger("file3", 1));
+
+  // Override override string
+  loader->mergeValues({{"file1", "hello overridden override"}});
+  EXPECT_EQ("hello overridden override", loader->snapshot().get("file1"));
+
+  // Remove overridden override string
+  loader->mergeValues({{"file1", ""}});
+  EXPECT_EQ("hello override", loader->snapshot().get("file1"));
+}
+
+TEST(LoaderImplTest, All) {
   MockRandomGenerator generator;
-  NullLoaderImpl loader(generator);
+  NiceMock<ThreadLocal::MockInstance> tls;
+  LoaderImpl loader(generator, tls);
   EXPECT_EQ("", loader.snapshot().get("foo"));
   EXPECT_EQ(1UL, loader.snapshot().getInteger("foo", 1));
   EXPECT_CALL(generator, random()).WillOnce(Return(49));
   EXPECT_TRUE(loader.snapshot().featureEnabled("foo", 50));
   EXPECT_TRUE(loader.snapshot().getAll().empty());
+  testNewOverrides(loader);
 }
 
 } // namespace Runtime

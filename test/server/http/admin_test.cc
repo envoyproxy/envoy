@@ -18,6 +18,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -296,6 +297,36 @@ TEST_P(AdminInstanceTest, RuntimeBadFormat) {
   EXPECT_EQ(Http::Code::BadRequest,
             admin_.runCallback("/runtime?format=foo", header_map, response));
   EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
+}
+
+TEST_P(AdminInstanceTest, RuntimeModify) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
+  Runtime::MockSnapshot snapshot;
+  Runtime::MockLoader loader;
+
+  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+
+  std::unordered_map<std::string, std::string> overrides;
+  overrides["foo"] = "bar";
+  overrides["x"] = "42";
+  overrides["nothing"] = "";
+  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
+  EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
+}
+
+TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  EXPECT_EQ(Http::Code::BadRequest, admin_.runCallback("/runtime_modify", header_map, response));
+  EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {
