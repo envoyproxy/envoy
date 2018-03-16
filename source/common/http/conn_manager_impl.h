@@ -288,6 +288,11 @@ public:
    * @return bool supplies if the HttpConnectionManager should proxy the Expect: 100-Continue
    */
   virtual bool proxy100Continue() const PURE;
+
+  /**
+   * @return supplies the http1 settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
 };
 
 /**

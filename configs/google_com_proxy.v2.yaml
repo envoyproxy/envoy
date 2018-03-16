@@ -13,7 +13,6 @@ static_resources:
       - name: envoy.http_connection_manager
         config:
           stat_prefix: ingress_http
-          codec_type: AUTO
           route_config:
             name: local_route
             virtual_hosts:

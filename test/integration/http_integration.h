@@ -132,8 +132,10 @@ protected:
   void testMissingDelimiter();
   void testInvalidCharacterInFirstline();
   void testInvalidVersion();
-  void testHttp10Request();
-  void testNoHost();
+  void testHttp10Disabled();
+  void testHttp09Enabled();
+  void testHttp10Enabled();
+  void testHttp10WithHostAndKeepAlive();
   void testUpstreamProtocolError();
   void testBadPath();
   void testAbsolutePath();
@@ -144,6 +146,8 @@ protected:
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled
   void testEquivalent(const std::string& request);
+  void testNoHost();
+  void testDefaultHost();
   void testValidZeroLengthContent();
   void testInvalidContentLength();
   void testMultipleContentLengths();
