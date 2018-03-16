@@ -77,3 +77,4 @@ final version.
 * Added support for specifying a metadata matcher for upstream clusters in the tcp filter
 * Added support for listening on UNIX domain sockets.
 * Added support for range based header matching for request routing.
+* Added setting "no traffic interval" for health check config.
