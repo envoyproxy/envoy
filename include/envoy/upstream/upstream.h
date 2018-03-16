@@ -387,7 +387,7 @@ public:
   /**
    * @return the idle timeout for upstream connection pool connections.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& idleTimeout() const PURE;
+  virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.

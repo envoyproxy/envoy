@@ -135,7 +135,7 @@ protected:
 
   void enableIdleTimer() {
     if (idle_timer_ != nullptr) {
-      idle_timer_->enableTimer(idle_timeout_);
+      idle_timer_->enableTimer(idle_timeout_.value());
     }
   }
 
@@ -144,7 +144,7 @@ protected:
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Event::TimerPtr idle_timer_;
-  std::chrono::milliseconds idle_timeout_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
 
 private:
   /**

@@ -23,9 +23,10 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
-  if (host != nullptr && host_->cluster().idleTimeout()) {
+  if (host_ != nullptr && host_->cluster().idleTimeout()) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
-    idle_timeout_ = host_->cluster().idleTimeout().value();
+    idle_timeout_ = host_->cluster().idleTimeout();
+    enableIdleTimer();
   }
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.

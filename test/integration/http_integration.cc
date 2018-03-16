@@ -69,7 +69,6 @@ IntegrationCodecClient::IntegrationCodecClient(
       codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  setCodecClientCallbacks(*this);
   dispatcher.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(connected_);
 }
@@ -122,8 +121,6 @@ void IntegrationCodecClient::sendReset(Http::StreamEncoder& encoder) {
 
 Http::StreamEncoder& IntegrationCodecClient::startRequest(const Http::HeaderMap& headers,
                                                           IntegrationStreamDecoder& response) {
-  num_active_requests_++;
-  disableIdleTimer();
   Http::StreamEncoder& encoder = newStream(response);
   encoder.getStream().addCallbacks(response);
   encoder.encodeHeaders(headers, false);
@@ -134,7 +131,6 @@ Http::StreamEncoder& IntegrationCodecClient::startRequest(const Http::HeaderMap&
 void IntegrationCodecClient::waitForDisconnect() {
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(disconnected_);
-  enableIdleTimer();
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
@@ -873,6 +869,7 @@ void HttpIntegrationTest::testIdleTimeoutBasic() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
   // Do not send any requests and validate if idle time out kicks in.
+  fake_upstream_connection_->waitForDisconnect();
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
@@ -926,6 +923,7 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 
   // Do not send any requests and validate if idle time out kicks in.
+  fake_upstream_connection_->waitForDisconnect();
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 

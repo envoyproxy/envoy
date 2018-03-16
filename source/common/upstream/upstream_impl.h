@@ -307,7 +307,7 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() const override {
+  const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
   }
   uint32_t perConnectionBufferLimitBytes() const override {
