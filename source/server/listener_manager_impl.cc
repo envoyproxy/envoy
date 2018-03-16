@@ -124,42 +124,45 @@ public:
     UNREFERENCED_PARAMETER(state);
 
     const auto* ip = socket.localAddress()->ip();
-    if (!ip) {
+    if (ip == nullptr) {
       // Do not fail when transparent option is not requested.
-      return transparent_ ? false : true;
+      return transparent_ == false ? true : false; // Easier to read than just '!transparent_'
     }
-#ifdef SOL_IP
-    int rc;
-    int transparent = transparent_;
+
+    int error = 0;
 
     if (ip->version() == Network::Address::IpVersion::v4) {
-      rc = setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &transparent, sizeof(transparent));
-    } else {
-#if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
-      rc = setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &transparent, sizeof(transparent));
+#if defined(SOL_IP) && defined(IP_TRANSPARENT)
+      int option = transparent_;
+      if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) == -1) {
+        error = errno;
+      }
 #else
-      rc = -1;
-      errno = ENOTSUP;
+      UNREFERENCED_PARAMETER(socket);
+      error = ENOTSUP;
 #endif
+    } else if (ip->version() == Network::Address::IpVersion::v6) {
+#if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
+      int option = transparent_;
+      if (setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option, sizeof(option)) == -1) {
+        error = errno;
+      }
+#else
+      UNREFERENCED_PARAMETER(socket);
+      error = ENOTSUP;
+#endif
+    } else {
+      NOT_REACHED;
     }
-    // If we are unable to set the option we still return success for the default value (0),
+    // If we are unable to set the option we still return success for the default value (false),
     // as we never changed the option to begin with. This also prevents failures in all current
     // test cases that do not set the transparent option.
-    if (rc == 0 || !transparent_) {
+    // We would not need this if the transparent option in the API would be optional.
+    if (error == 0 || !transparent_) {
       return true;
     }
-#else
-    UNREFERENCED_PARAMETER(socket);
-
-    if (!transparent_) {
-      return true;
-    }
-    errno = ENOTSUPP;
-#endif
-    ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}", transparent,
-              strerror(errno));
-    // Throw a specific message we can verify in testing.
-    throw EnvoyException("ListenSocketOption: Error setting transparent socket option");
+    ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
+    return false;
   }
   void hashKey(std::vector<uint8_t>&) const override {} // Not used for listener sockets.
 

@@ -1405,12 +1405,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
-
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           bool) -> Network::SocketSharedPtr {
+        EXPECT_NE(options.get(), nullptr);
+        EXPECT_EQ(options->size(), 1);
+        if (options) {
+          for (const auto& option : *options) {
+            // Setting an IP socket option on a non-IP testing socket never succeeds.
+            bool ok = option->setOption(*listener_factory_.socket_,
+                                        Network::Socket::SocketState::PreBind);
+            EXPECT_FALSE(ok);
+            if (!ok) {
+              throw EnvoyException("ListenSocket: Setting socket options failed");
+            }
+          }
+        }
+        return listener_factory_.socket_;
+      }));
   // MockListenerSocket is not a real socket, so this always fails in testing.
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
-                            EnvoyException,
-                            "ListenSocketOption: Error setting transparent socket option");
+                            EnvoyException, "ListenSocket: Setting socket options failed");
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
