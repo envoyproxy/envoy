@@ -32,13 +32,13 @@ public:
 
   /**
    * Add or update a cluster via API. The semantics of this API are:
-   * 1) The hash of the config is used to determine if an already existing cluser has changed.
+   * 1) The hash of the config is used to determine if an already existing cluster has changed.
    *    Nothing is done if the hash matches the previously running configuration.
    * 2) Statically defined clusters (those present when Envoy starts) can not be updated via API.
    *
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdatePrimaryCluster(const envoy::api::v2::Cluster& cluster) PURE;
+  virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
@@ -97,13 +97,13 @@ public:
   virtual Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) PURE;
 
   /**
-   * Remove a primary cluster via API. Only clusters added via addOrUpdatePrimaryCluster() can
+   * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
    * removed.
    *
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removePrimaryCluster(const std::string& cluster) PURE;
+  virtual bool removeCluster(const std::string& cluster) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.

@@ -193,6 +193,10 @@ struct Http1Settings {
   // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
+  // Allow HTTP/1.0 from downstream.
+  bool accept_http_10_{false};
+  // Set a default host if no Host: header is present for HTTP/1.0 requests.`
+  std::string default_host_for_http_10_;
 };
 
 /**

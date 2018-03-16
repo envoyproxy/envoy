@@ -63,7 +63,7 @@ public:
   }
 
   void expectAdd(const std::string& cluster_name) {
-    EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
+    EXPECT_CALL(cm_, addOrUpdateCluster(_))
         .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& cluster) -> bool {
           EXPECT_EQ(cluster_name, cluster.name());
           return true;
@@ -181,7 +181,7 @@ TEST_F(CdsApiImplTest, Basic) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
   expectAdd("cluster1");
   expectAdd("cluster3");
-  EXPECT_CALL(cm_, removePrimaryCluster("cluster2"));
+  EXPECT_CALL(cm_, removeCluster("cluster2"));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

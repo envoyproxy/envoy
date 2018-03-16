@@ -2,6 +2,8 @@
 
 namespace Envoy {
 
+class AutonomousUpstream;
+
 // A stream which automatically responds when the downstream request is
 // completely read. By default the response is 200: OK with 10 bytes of
 // payload. This behavior can be overriden with custom request headers defined below.
@@ -16,13 +18,15 @@ public:
   // sending a response.
   static const char RESET_AFTER_REQUEST[];
 
-  AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
-      : FakeStream(parent, encoder) {}
+  AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+                   AutonomousUpstream& upstream)
+      : FakeStream(parent, encoder), upstream_(upstream) {}
   ~AutonomousStream();
 
   void setEndStream(bool set) override;
 
 private:
+  AutonomousUpstream& upstream_;
   void sendResponse();
 };
 
@@ -30,12 +34,13 @@ private:
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
   AutonomousHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store,
-                           Type type)
-      : FakeHttpConnection(std::move(connection_wrapper), store, type) {}
+                           Type type, AutonomousUpstream& upstream)
+      : FakeHttpConnection(std::move(connection_wrapper), store, type), upstream_(upstream) {}
 
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
 
 private:
+  AutonomousUpstream& upstream_;
   std::vector<FakeStreamPtr> streams_;
 };
 
@@ -51,7 +56,12 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
 
+  void setLastRequestHeaders(const Http::HeaderMap& headers);
+  std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
+
 private:
+  std::mutex headers_lock_;
+  std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
 };
 
