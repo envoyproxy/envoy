@@ -138,7 +138,7 @@ public:
       rc = setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &transparent, sizeof(transparent));
 #else
       rc = -1;
-      errno = ENOTSUPP;
+      errno = ENOTSUP;
 #endif
     }
     // If we are unable to set the option we still return success for the default value (0),
