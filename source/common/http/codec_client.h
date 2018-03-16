@@ -144,7 +144,7 @@ protected:
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
   Event::TimerPtr idle_timer_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  const absl::optional<std::chrono::milliseconds> idle_timeout_;
 
 private:
   /**

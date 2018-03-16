@@ -75,11 +75,13 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+    std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
 
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ =
         new CodecClientForTest(std::move(connection), test_client.codec_,
-                               [this](CodecClient*) -> void { onClientDestroy(); }, nullptr);
+                               [this](CodecClient*) -> void { onClientDestroy(); },
+                               Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"));
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));

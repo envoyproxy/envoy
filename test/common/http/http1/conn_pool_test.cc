@@ -75,20 +75,21 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
+    std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
 
     Network::ClientConnectionPtr connection{test_client.connection_};
-    test_client.codec_client_ = new CodecClientForTest(std::move(connection), test_client.codec_,
-                                                       [this](CodecClient* codec_client) -> void {
-                                                         for (auto i = test_clients_.begin();
-                                                              i != test_clients_.end(); i++) {
-                                                           if (i->codec_client_ == codec_client) {
-                                                             onClientDestroy();
-                                                             test_clients_.erase(i);
-                                                             return;
-                                                           }
-                                                         }
-                                                       },
-                                                       nullptr);
+    test_client.codec_client_ = new CodecClientForTest(
+        std::move(connection), test_client.codec_,
+        [this](CodecClient* codec_client) -> void {
+          for (auto i = test_clients_.begin(); i != test_clients_.end(); i++) {
+            if (i->codec_client_ == codec_client) {
+              onClientDestroy();
+              test_clients_.erase(i);
+              return;
+            }
+          }
+        },
+        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"));
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
@@ -128,7 +129,6 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
-
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
     }
