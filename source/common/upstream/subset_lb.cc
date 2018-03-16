@@ -149,8 +149,8 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every
 // unique LbSubsetEntryPtr found, it either invokes new_cb or update_cb depending on whether the
 // LbSubsetEntryPtr is already initialized (update_cb) or not (new_cb). In addition, update_cb is
-// invoked for any other other unmodified, but initialized LbSubsetEntryPtr to allow host health to
-// be updated.
+// invoked for any otherwise unmodified but active and initialized LbSubsetEntryPtr to allow host
+// health to be updated.
 void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
     std::function<void(LbSubsetEntryPtr)> update_cb,
