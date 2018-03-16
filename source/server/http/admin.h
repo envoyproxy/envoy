@@ -88,6 +88,7 @@ public:
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
+  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
 private:
   /**
@@ -207,6 +208,7 @@ private:
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   AdminListener listener_;
+  Http::Http1Settings http1_settings_;
 };
 
 /**
@@ -249,10 +251,11 @@ public:
   /**
    * Extracts counters and gauges and relevant tags, appending them to
    * the response buffer after sanitizing the metric / label names.
+   * @return uint64_t total number of metric types inserted in response.
    */
-  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                const std::list<Stats::GaugeSharedPtr>& gauges,
-                                Buffer::Instance& response);
+  static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                    const std::list<Stats::GaugeSharedPtr>& gauges,
+                                    Buffer::Instance& response);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
