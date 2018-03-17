@@ -882,6 +882,40 @@ void HttpIntegrationTest::testIdleTimeoutBasic() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
+void HttpIntegrationTest::testIdleTimerDisabled() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(2000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     1024, *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Close the Codec Client and validate Idle timer is also disabled.
+  codec_client_->close();
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value(), 0);
+}
+
 void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();

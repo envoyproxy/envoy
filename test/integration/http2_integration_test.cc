@@ -203,6 +203,10 @@ TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 // after both the requests are done.
 TEST_P(Http2IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
+// Tests idle timer is disabled when client is closed while the timer is active and no active
+// requests.
+TEST_P(Http2IntegrationTest, IdleTimerDisabled) { testIdleTimerDisabled(); }
+
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
 TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   FakeHttpConnectionPtr fake_upstream_connection1;

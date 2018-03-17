@@ -36,7 +36,11 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
 CodecClient::~CodecClient() {}
 
-void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void CodecClient::close() {
+  connection_->close(Network::ConnectionCloseType::NoFlush);
+  ENVOY_CONN_LOG(debug, "closing connection", *connection_);
+  disableIdleTimer();
+}
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));

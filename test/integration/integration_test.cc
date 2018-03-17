@@ -143,6 +143,10 @@ TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 // after both the requests are done.
 TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
+// Tests idle timer is disabled when client is closed while the timer is active and no active
+// requests.
+TEST_P(IntegrationTest, IdleTimerDisabled) { testIdleTimerDisabled(); }
+
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a 500.
 TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
