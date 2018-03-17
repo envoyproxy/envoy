@@ -284,12 +284,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
-
-  // Cleanup both downstream and upstream
-  codec_client_->close();
-  fake_upstream_connection1->close();
   fake_upstream_connection1->waitForDisconnect();
-  fake_upstream_connection2->close();
   fake_upstream_connection2->waitForDisconnect();
 }
 

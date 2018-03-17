@@ -25,7 +25,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
 
-  if (host_->cluster().idleTimeout()) {
+  if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
     enableIdleTimer();
   }
