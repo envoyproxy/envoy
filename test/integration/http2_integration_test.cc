@@ -287,9 +287,9 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   EXPECT_EQ(request2_bytes, response1->body().size());
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
   fake_upstream_connection1->waitForDisconnect();
   fake_upstream_connection2->waitForDisconnect();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
