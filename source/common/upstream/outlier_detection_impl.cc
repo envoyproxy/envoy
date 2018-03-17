@@ -466,7 +466,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
     "\"type\": \"{}\", " +
-    "\"num_ejections\": \"{}\", " +
+    "\"num_ejections\": {}, " +
     "\"enforced\": \"{}\"" +
     "}}\n";
 
@@ -478,7 +478,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
     "\"type\": \"{}\", " +
-    "\"num_ejections\": \"{}\", " +
+    "\"num_ejections\": {}, " +
     "\"enforced\": \"{}\", " +
     "\"host_success_rate\": \"{}\", " +
     "\"cluster_average_success_rate\": \"{}\", " +
