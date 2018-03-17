@@ -12,6 +12,8 @@ import os
 import os.path
 import sys
 
+ENVOY_ROOT = "/envoy/"
+
 # We want to search the file from the leaf up for 'envoy', which is the name of the
 # top level directory in the git repo.  However, it's also the name of a subdirectory
 # of 'include' -- the only subdirectory of 'include' currently, so it's easier just
@@ -20,10 +22,10 @@ fname = sys.argv[1].replace("/include/envoy/", "/include/")
 
 # Parse out the absolute location of this repo, its relative path, and file extension,
 # aborting along they way any time there is trouble.
-envoy_index = fname.rfind("/envoy/")
+envoy_index = fname.rfind(ENVOY_ROOT)
 if envoy_index == -1:
     sys.exit(0)
-envoy_index += 7
+envoy_index += len(ENVOY_ROOT)
 absolute_location = fname[0:envoy_index]  # "/path/to/gitroot/envoy/"
 path = fname[envoy_index:]
 path_elements = path.split("/")
