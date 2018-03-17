@@ -26,8 +26,6 @@ static_resources:
   clusters:
   - name: service_google
     connect_timeout: 0.25s
-    # Comment out the following line to test on v6 networks
-    dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
     tls_context: { sni: www.google.com }
