@@ -37,6 +37,18 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
+* During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
+  to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
+  is somewhat subjective so just use your best judgment. A few of the most important labels that are
+  not self explanatory are:
+  * **beginner**: Mark any issue that can reasonably be accomplished by a new contributor with
+    this label.
+  * **help wanted**: Unless it is immediately obvious that someone is going to work on an issue (and
+    if so assign it), mark it help wanted.
+  * **question**: If it's unclear if an issue is immediately actionable, mark it with the
+    question label. Questions are easy to search for and close out at a later time. Questions
+    can be promoted to other issue types once it's clear they are actionable (at which point the
+    question label should be removed).
 * Make sure that ongoing PRs are moving forward at the right pace or closing them.
 * Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
   that although this should be a rare occurrence, if a serious vulnerability is found, the process
