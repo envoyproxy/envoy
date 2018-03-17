@@ -63,7 +63,7 @@ public:
   TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
-    deferredDelete_(to_delete);
+    deferredDelete_(to_delete.get());
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
     }
@@ -95,7 +95,7 @@ public:
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
   MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
-  MOCK_METHOD1(deferredDelete_, void(DeferredDeletablePtr& to_delete));
+  MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
   MOCK_METHOD1(post, void(std::function<void()> callback));

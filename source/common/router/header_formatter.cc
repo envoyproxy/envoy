@@ -2,8 +2,6 @@
 
 #include <string>
 
-#include "envoy/common/optional.h"
-
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
@@ -11,6 +9,8 @@
 #include "common/config/metadata.h"
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {

@@ -1,6 +1,9 @@
 #include "common/grpc/google_async_client_impl.h"
 
+#include "envoy/grpc/google_async_site.h"
+
 #include "common/common/empty_string.h"
+#include "common/config/datasource.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -56,35 +59,56 @@ void GoogleAsyncClientThreadLocal::completionThread() {
   ENVOY_LOG(debug, "completionThread exiting");
 }
 
-GoogleAsyncClientImpl::GoogleAsyncClientImpl(
-    Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
-    GoogleStubFactory& stub_factory, Stats::Scope& scope,
-    const envoy::api::v2::core::GrpcService::GoogleGrpc& config)
-    : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.stat_prefix()), scope_(scope) {
+GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
+                                             GoogleAsyncClientThreadLocal& tls,
+                                             GoogleStubFactory& stub_factory,
+                                             Stats::ScopeSharedPtr scope,
+                                             const envoy::api::v2::core::GrpcService& config)
+    : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
+      initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::Channel> channel = createChannel(config);
+  const auto& google_grpc = config.google_grpc();
+  std::shared_ptr<grpc::ChannelCredentials> creds = GoogleSite::channelCredentials(google_grpc);
+  // TODO(htuch): add support for OAuth2, GCP, etc. credentials.
+  if (creds == nullptr) {
+    if (google_grpc.has_ssl_credentials()) {
+      const grpc::SslCredentialsOptions ssl_creds = {
+          .pem_root_certs =
+              Config::DataSource::read(google_grpc.ssl_credentials().root_certs(), true),
+          .pem_private_key =
+              Config::DataSource::read(google_grpc.ssl_credentials().private_key(), true),
+          .pem_cert_chain =
+              Config::DataSource::read(google_grpc.ssl_credentials().cert_chain(), true),
+      };
+      creds = grpc::SslCredentials(ssl_creds);
+    } else {
+      creds = grpc::InsecureChannelCredentials();
+    }
+  }
+  std::shared_ptr<grpc::Channel> channel = CreateChannel(google_grpc.target_uri(), creds);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
-  stats_.streams_total_ = &scope_.counter("streams_total");
+  stats_.streams_total_ = &scope_->counter("streams_total");
   for (uint32_t i = 0; i <= Status::GrpcStatus::MaximumValid; ++i) {
-    stats_.streams_closed_[i] = &scope_.counter(fmt::format("streams_closed_{}", i));
+    stats_.streams_closed_[i] = &scope_->counter(fmt::format("streams_closed_{}", i));
   }
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
+  ENVOY_LOG(debug, "Client teardown, resetting streams");
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }
 }
 
-AsyncRequest* GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
-                                          const Protobuf::Message& request,
-                                          AsyncRequestCallbacks& callbacks,
-                                          Tracing::Span& parent_span,
-                                          const Optional<std::chrono::milliseconds>& timeout) {
+AsyncRequest*
+GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
+                            const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
+                            Tracing::Span& parent_span,
+                            const absl::optional<std::chrono::milliseconds>& timeout) {
   auto* const async_request =
       new GoogleAsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
@@ -100,7 +124,7 @@ AsyncRequest* GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& serv
 
 AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
                                           AsyncStreamCallbacks& callbacks) {
-  const Optional<std::chrono::milliseconds> no_timeout;
+  const absl::optional<std::chrono::milliseconds> no_timeout;
   auto grpc_stream =
       std::make_unique<GoogleAsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
 
@@ -113,10 +137,9 @@ AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& serv
   return active_streams_.front().get();
 }
 
-GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
-                                             const Protobuf::MethodDescriptor& service_method,
-                                             AsyncStreamCallbacks& callbacks,
-                                             const Optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
+    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
+    AsyncStreamCallbacks& callbacks, const absl::optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
@@ -129,10 +152,14 @@ GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
 void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   parent_.stats_.streams_total_->inc();
   gpr_timespec abs_deadline =
-      timeout_.valid() ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
-                                      gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
-                       : gpr_inf_future(GPR_CLOCK_REALTIME);
+      timeout_ ? gpr_time_add(gpr_now(GPR_CLOCK_REALTIME),
+                              gpr_time_from_millis(timeout_.value().count(), GPR_TIMESPAN))
+               : gpr_inf_future(GPR_CLOCK_REALTIME);
   ctxt_.set_deadline(abs_deadline);
+  // Fill service-wide initial metadata.
+  for (const auto& header_value : parent_.initial_metadata_) {
+    ctxt_.AddMetadata(header_value.key(), header_value.value());
+  }
   // Due to the different HTTP header implementations, we effectively double
   // copy headers here.
   Http::HeaderMapImpl initial_metadata;
@@ -196,7 +223,7 @@ void GoogleAsyncStreamImpl::writeQueued() {
   write_pending_ = true;
   const PendingMessage& msg = write_pending_queue_.front();
 
-  if (!msg.buf_.valid()) {
+  if (!msg.buf_) {
     ASSERT(msg.end_stream_);
     rw_->WritesDone(&write_last_tag_);
     ++inflight_tags_;
@@ -376,12 +403,10 @@ void GoogleAsyncStreamImpl::cleanup() {
   }
 }
 
-GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent,
-                                               const Protobuf::MethodDescriptor& service_method,
-                                               const Protobuf::Message& request,
-                                               AsyncRequestCallbacks& callbacks,
-                                               Tracing::Span& parent_span,
-                                               const Optional<std::chrono::milliseconds>& timeout)
+GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
+    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
+    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+    const absl::optional<std::chrono::milliseconds>& timeout)
     : GoogleAsyncStreamImpl(parent, service_method, *this, timeout), request_(request),
       callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),

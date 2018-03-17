@@ -59,8 +59,15 @@ private:
    * @return Base* a pointer to the previously registered value.
    */
   static Base* replaceFactoryForTest(Base& factory) {
-    auto displaced = getFactory(factory.name());
-    factories().emplace(std::make_pair(factory.name(), &factory));
+    auto it = factories().find(factory.name());
+    Base* displaced = nullptr;
+    if (it != factories().end()) {
+      displaced = it->second;
+      factories().erase(it);
+    }
+
+    factories().emplace(factory.name(), &factory);
+    RELEASE_ASSERT(getFactory(factory.name()) == &factory);
     return displaced;
   }
 

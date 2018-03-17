@@ -17,7 +17,7 @@ DOCS_SUFFIX = (".md", ".rst")
 GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
-BUILDIFIER_PATH = os.getenv("BUILDIFIER", "/usr/lib/go/bin/buildifier")
+BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(
@@ -94,7 +94,7 @@ def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
-    print "%s" % (line.replace('.  ', '. ').rstrip())
+    sys.stdout.write("%s" % (line.replace('.  ', '. ')))
 
 
 def checkFilePath(file_path):

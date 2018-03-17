@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/common/optional.h"
 
 #include "common/config/metadata.h"
 #include "common/upstream/subset_lb.h"
@@ -16,6 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -69,7 +69,7 @@ public:
             new TestMetadataMatchCriteria(std::map<std::string, std::string>(metadata_matches))) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return {}; }
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
     return matches_.get();
@@ -191,7 +191,7 @@ public:
     return default_subset;
   }
 
-  void modifyHosts(HostVector add, HostVector remove, Optional<uint32_t> add_in_locality = {},
+  void modifyHosts(HostVector add, HostVector remove, absl::optional<uint32_t> add_in_locality = {},
                    uint32_t priority = 0) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
@@ -220,7 +220,7 @@ public:
       host_set.hosts_.emplace_back(host);
       host_set.healthy_hosts_ = host_set.hosts_;
 
-      if (add_in_locality.valid()) {
+      if (add_in_locality) {
         std::vector<HostVector> locality_hosts_copy = host_set.hosts_per_locality_->get();
         locality_hosts_copy[add_in_locality.value()].emplace_back(host);
         host_set.hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
@@ -822,7 +822,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
                    0);
@@ -943,7 +943,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
@@ -1062,7 +1062,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
                    0);

@@ -35,6 +35,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/server:configuration_lib",
+        "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",

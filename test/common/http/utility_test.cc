@@ -260,5 +260,30 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
+TEST(HttpUtility, TestAppendHeader) {
+  // Test appending to a string with a value.
+  {
+    HeaderString value1;
+    value1.setCopy("some;", 5);
+    Utility::appendToHeader(value1, "test");
+    EXPECT_EQ(value1, "some;,test");
+  }
+
+  // Test appending to an empty string.
+  {
+    HeaderString value2;
+    Utility::appendToHeader(value2, "my tag data");
+    EXPECT_EQ(value2, "my tag data");
+  }
+
+  // Test empty data case.
+  {
+    HeaderString value3;
+    value3.setCopy("empty", 5);
+    Utility::appendToHeader(value3, "");
+    EXPECT_EQ(value3, "empty");
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

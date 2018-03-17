@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -20,6 +19,7 @@
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
 
+#include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
@@ -195,7 +195,7 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
-    Optional<StreamResetReason> deferred_reset_;
+    absl::optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
     bool remote_end_stream_ : 1;

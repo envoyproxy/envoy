@@ -17,13 +17,6 @@ cc_library(
 )
 
 cc_library(
-    name = "crypto",
-    srcs = ["thirdparty_build/lib/libcrypto.a"],
-    hdrs = glob(["thirdparty_build/include/openssl/**/*.h"]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "event",
     srcs = ["thirdparty_build/lib/libevent.a"],
     hdrs = glob(["thirdparty_build/include/event2/**/*.h"]),
@@ -50,12 +43,6 @@ cc_library(
     srcs = ["thirdparty_build/lib/libnghttp2.a"],
     hdrs = glob(["thirdparty_build/include/nghttp2/**/*.h"]),
     includes = ["thirdparty_build/include"],
-)
-
-cc_library(
-    name = "ssl",
-    srcs = ["thirdparty_build/lib/libssl.a"],
-    deps = [":crypto"],
 )
 
 cc_library(

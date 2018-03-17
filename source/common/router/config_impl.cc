@@ -55,7 +55,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   expose_headers_ = config.expose_headers();
   max_age_ = config.max_age();
   if (config.has_allow_credentials()) {
-    allow_credentials_.value(PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials));
+    allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
   enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
@@ -73,13 +73,13 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback) const override {
+    absl::optional<uint64_t> hash;
 
     const Http::HeaderEntry* header = headers.get(header_name_);
     if (header) {
-      hash.value(HashUtil::xxHash64(header->value().c_str()));
+      hash = HashUtil::xxHash64(header->value().c_str());
     }
     return hash;
   }
@@ -92,17 +92,17 @@ class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
   CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
 
-  Optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
-                              const HashPolicy::AddCookieCallback add_cookie) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback add_cookie) const override {
+    absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
     if (value.empty() && ttl_ != std::chrono::seconds(0)) {
       value = add_cookie(key_, ttl_);
-      hash.value(HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
-      hash.value(HashUtil::xxHash64(value));
+      hash = HashUtil::xxHash64(value);
     }
     return hash;
   }
@@ -114,11 +114,11 @@ private:
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  Optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
-                              const HashPolicy::AddCookieCallback) const override {
-    Optional<uint64_t> hash;
+  absl::optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+                                    const HashPolicy::AddCookieCallback) const override {
+    absl::optional<uint64_t> hash;
     if (!downstream_addr.empty()) {
-      hash.value(HashUtil::xxHash64(downstream_addr));
+      hash = HashUtil::xxHash64(downstream_addr);
     }
     return hash;
   }
@@ -151,17 +151,18 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-Optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                const Http::HeaderMap& headers,
-                                                const AddCookieCallback add_cookie) const {
-  Optional<uint64_t> hash;
+absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
+                                                      const Http::HeaderMap& headers,
+                                                      const AddCookieCallback add_cookie) const {
+  absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const Optional<uint64_t> new_hash = hash_impl->evaluate(downstream_addr, headers, add_cookie);
-    if (new_hash.valid()) {
+    const absl::optional<uint64_t> new_hash =
+        hash_impl->evaluate(downstream_addr, headers, add_cookie);
+    if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy
-      const uint64_t old_value = hash.valid() ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
-      hash.value(old_value ^ new_hash.value());
+      const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
+      hash = old_value ^ new_hash.value();
     }
   }
   return hash;
@@ -230,7 +231,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       runtime_(loadRuntimeData(route.match())), loader_(loader),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
-      https_redirect_(route.redirect().https_redirect()), retry_policy_(route.route()),
+      https_redirect_(route.redirect().https_redirect()),
+      prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
+      strip_query_(route.redirect().strip_query()), retry_policy_(route.route()),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -266,26 +269,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      const std::string& cluster_name = cluster.name();
-
-      MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria;
-      if (cluster.has_metadata_match()) {
-        const auto filter_it = cluster.metadata_match().filter_metadata().find(
-            Envoy::Config::MetadataFilters::get().ENVOY_LB);
-        if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-          if (metadata_match_criteria_) {
-            cluster_metadata_match_criteria =
-                metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
-          } else {
-            cluster_metadata_match_criteria.reset(new MetadataMatchCriteriaImpl(filter_it->second));
-          }
-        }
-      }
-
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(
-          new WeightedClusterEntry(this, runtime_key_prefix + "." + cluster_name, loader_,
-                                   cluster_name, PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight),
-                                   std::move(cluster_metadata_match_criteria)));
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(
+          this, runtime_key_prefix + "." + cluster.name(), loader_, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -322,7 +307,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t random_value) const {
   bool matches = true;
 
-  if (runtime_.valid()) {
+  if (runtime_) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
                                                  random_value);
   }
@@ -359,14 +344,14 @@ void RouteEntryImplBase::finalizeResponseHeaders(
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
 }
 
-Optional<RouteEntryImplBase::RuntimeData>
+absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
-  Optional<RuntimeData> runtime;
+  absl::optional<RuntimeData> runtime;
   if (route_match.has_runtime()) {
     RuntimeData data;
     data.key_ = route_match.runtime().runtime_key();
     data.default_ = route_match.runtime().default_value();
-    runtime.value(data);
+    runtime = data;
   }
 
   return runtime;
@@ -374,21 +359,22 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             const std::string& matched_path) const {
-  if (prefix_rewrite_.empty()) {
+  const auto& rewrite = (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  if (rewrite.empty()) {
     return;
   }
 
   std::string path = headers.Path()->value().c_str();
   headers.insertEnvoyOriginalPath().value(*headers.Path());
   ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
-  headers.Path()->value(path.replace(0, matched_path.size(), prefix_rewrite_));
+  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
   const char* final_host;
-  const char* final_path;
+  absl::string_view final_path;
   const char* final_scheme;
   if (!host_redirect_.empty()) {
     final_host = host_redirect_.c_str();
@@ -401,7 +387,13 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_path = path_redirect_.c_str();
   } else {
     ASSERT(headers.Path());
-    final_path = headers.Path()->value().c_str();
+    final_path = absl::string_view(headers.Path()->value().c_str(), headers.Path()->value().size());
+    if (strip_query_) {
+      size_t path_end = final_path.find("?");
+      if (path_end != absl::string_view::npos) {
+        final_path = final_path.substr(0, path_end);
+      }
+    }
   }
 
   if (https_redirect_) {
@@ -527,6 +519,28 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   }
 }
 
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const RouteEntryImplBase* parent, const std::string runtime_key, Runtime::Loader& loader,
+    const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster)
+    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key), loader_(loader),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
+      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
+      response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
+                                                       cluster.response_headers_to_remove())) {
+  if (cluster.has_metadata_match()) {
+    const auto filter_it = cluster.metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != cluster.metadata_match().filter_metadata().end()) {
+      if (parent->metadata_match_criteria_) {
+        cluster_metadata_match_criteria_ =
+            parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+      } else {
+        cluster_metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
+      }
+    }
+  }
+}
+
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                            const envoy::api::v2::route::Route& route,
                                            Runtime::Loader& loader)
@@ -536,6 +550,10 @@ void PrefixRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
+  finalizePathHeader(headers, prefix_);
+}
+
+void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
   finalizePathHeader(headers, prefix_);
 }
 
@@ -557,6 +575,10 @@ void PathRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
   RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
 
+  finalizePathHeader(headers, path_);
+}
+
+void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
   finalizePathHeader(headers, path_);
 }
 
@@ -595,15 +617,19 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
       regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
       regex_str_(route.match().regex()) {}
 
-void RegexRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
-
+void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
   const Http::HeaderString& path = headers.Path()->value();
   const char* query_string_start = Http::Utility::findQueryStringStart(path);
   ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
   std::string matched_path(path.c_str(), query_string_start);
+
   finalizePathHeader(headers, matched_path);
+}
+
+void RegexRouteEntryImpl::finalizeRequestHeaders(
+    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
+  rewritePathHeader(headers);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
@@ -799,7 +825,7 @@ const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     bool method_matches =
-        !entry.method_.valid() || headers.Method()->value().c_str() == entry.method_.value();
+        !entry.method_ || headers.Method()->value().c_str() == entry.method_.value();
 
     if (method_matches && std::regex_match(headers.Path()->value().c_str(), entry.pattern_)) {
       return &entry;

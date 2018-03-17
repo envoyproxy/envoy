@@ -24,7 +24,7 @@ class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
-                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+                       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                        const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
 private:
@@ -34,7 +34,7 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    Ring(const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          const HostVector& hosts);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
@@ -49,7 +49,7 @@ private:
     return std::make_shared<Ring>(config_, hosts);
   }
 
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
 };
 
 } // namespace Upstream

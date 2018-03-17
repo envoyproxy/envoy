@@ -7,7 +7,7 @@
 #include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
-bool UuidUtils::uuidModBy(const std::string& uuid, uint16_t& out, uint16_t mod) {
+bool UuidUtils::uuidModBy(const std::string& uuid, uint64_t& out, uint64_t mod) {
   if (uuid.length() < 8) {
     return false;
   }

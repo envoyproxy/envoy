@@ -116,9 +116,31 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
   return Network::Utility::getIpv6LoopbackAddress();
 }
 
-Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version) {
+namespace {
+// There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
+// helper function instead.
+sockaddr_in6 sockaddrIn6Any() {
+  sockaddr_in6 v6any = {};
+  v6any.sin6_family = AF_INET6;
+  v6any.sin6_addr = in6addr_any;
+
+  return v6any;
+}
+} // namespace
+
+Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {
   if (version == Address::IpVersion::v4) {
     return Network::Utility::getIpv4AnyAddress();
+  }
+  if (v4_compat) {
+    // This will return an IPv6 ANY address ("[::]:0") like the getIpv6AnyAddress() below, but
+    // with the internal 'v6only' member set to false. This will allow a socket created from this
+    // address to accept IPv4 connections. IPv4 connections received on IPv6 sockets will have
+    // Ipv4-mapped IPv6 addresses, which we will then internally interpret as IPv4 addresses so
+    // that, for example, access logging will show IPv4 address format for IPv4 connections even
+    // if they were received on an IPv6 socket.
+    static Address::InstanceConstSharedPtr any(new Address::Ipv6Instance(sockaddrIn6Any(), false));
+    return any;
   }
   return Network::Utility::getIpv6AnyAddress();
 }

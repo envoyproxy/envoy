@@ -6,7 +6,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/optional.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -16,6 +15,8 @@
 #include "common/event/libevent.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/ssl/ssl_socket.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {

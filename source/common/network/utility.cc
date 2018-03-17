@@ -373,6 +373,20 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
   return result;
 }
 
+Address::InstanceConstSharedPtr
+Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address) {
+  switch (proto_address.address_case()) {
+  case envoy::api::v2::core::Address::kSocketAddress:
+    return Network::Utility::parseInternetAddress(proto_address.socket_address().address(),
+                                                  proto_address.socket_address().port_value(),
+                                                  !proto_address.socket_address().ipv4_compat());
+  case envoy::api::v2::core::Address::kPipe:
+    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
+  default:
+    NOT_REACHED;
+  }
+}
+
 void Utility::addressToProtobufAddress(const Address::Instance& address,
                                        envoy::api::v2::core::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {

@@ -14,7 +14,7 @@
 #include "common/common/hash.h"
 
 #include "absl/strings/ascii.h"
-#include "absl/strings/internal/memutil.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
@@ -71,8 +71,24 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 
   char* end_ptr;
+  errno = 0;
   out = strtoul(str, &end_ptr, base);
   if (*end_ptr != '\0' || (out == ULONG_MAX && errno == ERANGE)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+bool StringUtil::atol(const char* str, int64_t& out, int base) {
+  if (strlen(str) == 0) {
+    return false;
+  }
+
+  char* end_ptr;
+  errno = 0;
+  out = strtol(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;
@@ -134,7 +150,7 @@ bool StringUtil::caseCompare(absl::string_view lhs, absl::string_view rhs) {
   if (rhs.size() != lhs.size()) {
     return false;
   }
-  return absl::strings_internal::memcasecmp(rhs.data(), lhs.data(), rhs.size()) == 0;
+  return absl::StartsWithIgnoreCase(rhs, lhs);
 }
 
 absl::string_view StringUtil::cropRight(absl::string_view source, absl::string_view delimiter) {
@@ -330,6 +346,29 @@ std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type
   } catch (const std::regex_error& e) {
     throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
   }
+}
+
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+void WelfordStandardDeviation::update(double newValue) {
+  ++count_;
+  const double delta = newValue - mean_;
+  mean_ += delta / count_;
+  const double delta2 = newValue - mean_;
+  m2_ += delta * delta2;
+}
+
+double WelfordStandardDeviation::computeVariance() const {
+  if (count_ < 2) {
+    return std::nan("");
+  }
+  return m2_ / (count_ - 1);
+}
+
+double WelfordStandardDeviation::computeStandardDeviation() const {
+  const double variance = computeVariance();
+  // It seems very difficult for variance to go negative, but from the calculation in update()
+  // above, I can't quite convince myself it's impossible, so put in a guard to be sure.
+  return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
 }
 
 } // namespace Envoy

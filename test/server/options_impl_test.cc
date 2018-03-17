@@ -27,7 +27,7 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     argv.push_back(s.c_str());
   }
   return std::unique_ptr<OptionsImpl>(new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]),
-                                                      [](uint64_t, uint64_t) { return "1"; },
+                                                      [](uint64_t, uint64_t, bool) { return "1"; },
                                                       spdlog::level::warn));
 }
 
@@ -63,7 +63,7 @@ TEST(OptionsImplTest, All) {
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only");
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -79,6 +79,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
+  EXPECT_EQ(true, options->hotRestartDisabled());
 }
 
 TEST(OptionsImplTest, DefaultParams) {
@@ -88,6 +89,7 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
+  EXPECT_EQ(false, options->hotRestartDisabled());
 }
 
 TEST(OptionsImplTest, BadCliOption) {

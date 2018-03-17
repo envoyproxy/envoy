@@ -43,9 +43,10 @@ public:
 
   // Http::AsyncClient
   Request* send(MessagePtr&& request, Callbacks& callbacks,
-                const Optional<std::chrono::milliseconds>& timeout) override;
+                const absl::optional<std::chrono::milliseconds>& timeout) override;
 
-  Stream* start(StreamCallbacks& callbacks, const Optional<std::chrono::milliseconds>& timeout,
+  Stream* start(StreamCallbacks& callbacks,
+                const absl::optional<std::chrono::milliseconds>& timeout,
                 bool buffer_body_for_retry) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
@@ -71,7 +72,8 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  const Optional<std::chrono::milliseconds>& timeout, bool buffer_body_for_retry);
+                  const absl::optional<std::chrono::milliseconds>& timeout,
+                  bool buffer_body_for_retry);
 
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
@@ -92,11 +94,11 @@ private:
     const std::string& allowHeaders() const override { return EMPTY_STRING; };
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };
     const std::string& maxAge() const override { return EMPTY_STRING; };
-    const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
+    const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
     bool enabled() const override { return false; };
 
     static const std::list<std::string> allow_origin_;
-    static const Optional<bool> allow_credentials_;
+    static const absl::optional<bool> allow_credentials_;
   };
 
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
@@ -158,7 +160,7 @@ private:
 
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
-                   const Optional<std::chrono::milliseconds>& timeout)
+                   const absl::optional<std::chrono::milliseconds>& timeout)
         : cluster_name_(cluster_name), timeout_(timeout) {}
 
     // Router::RouteEntry
@@ -179,7 +181,7 @@ private:
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
     const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
     std::chrono::milliseconds timeout() const override {
-      if (timeout_.valid()) {
+      if (timeout_) {
         return timeout_.value();
       } else {
         return std::chrono::milliseconds(0);
@@ -209,11 +211,12 @@ private:
     static const NullPathMatchCriterion path_match_criterion_;
 
     const std::string& cluster_name_;
-    Optional<std::chrono::milliseconds> timeout_;
+    absl::optional<std::chrono::milliseconds> timeout_;
   };
 
   struct RouteImpl : public Router::Route {
-    RouteImpl(const std::string& cluster_name, const Optional<std::chrono::milliseconds>& timeout)
+    RouteImpl(const std::string& cluster_name,
+              const absl::optional<std::chrono::milliseconds>& timeout)
         : route_entry_(cluster_name, timeout) {}
 
     // Router::Route
@@ -273,7 +276,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent, AsyncClient::Callbacks& callbacks,
-                   const Optional<std::chrono::milliseconds>& timeout);
+                   const absl::optional<std::chrono::milliseconds>& timeout);
 
   // AsyncClient::Request
   virtual void cancel() override;

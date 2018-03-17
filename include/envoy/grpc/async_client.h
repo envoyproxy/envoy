@@ -2,13 +2,14 @@
 
 #include <chrono>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/protobuf/protobuf.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -194,7 +195,7 @@ public:
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                              const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                              Tracing::Span& parent_span,
-                             const Optional<std::chrono::milliseconds>& timeout) PURE;
+                             const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * Start a gRPC stream asynchronously.

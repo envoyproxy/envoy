@@ -108,6 +108,9 @@ public:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
+  std::string resourceName(const ProtobufWkt::Any& resource) override {
+    return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+  }
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

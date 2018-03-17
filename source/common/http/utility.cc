@@ -205,6 +205,8 @@ Http1Settings
 Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config) {
   Http1Settings ret;
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, false);
+  ret.accept_http_10_ = config.accept_http_10();
+  ret.default_host_for_http_10_ = config.default_host_for_http_10();
   return ret;
 }
 
@@ -286,6 +288,16 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
+}
+
+void Utility::appendToHeader(HeaderString& header, const std::string& data) {
+  if (data.empty()) {
+    return;
+  }
+  if (!header.empty()) {
+    header.append(",", 1);
+  }
+  header.append(data.c_str(), data.size());
 }
 
 } // namespace Http

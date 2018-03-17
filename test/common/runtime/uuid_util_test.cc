@@ -7,7 +7,7 @@
 
 namespace Envoy {
 TEST(UUIDUtilsTest, mod) {
-  uint16_t result;
+  uint64_t result;
   EXPECT_TRUE(UuidUtils::uuidModBy("00000000-0000-0000-0000-000000000000", result, 100));
   EXPECT_EQ(0, result);
 
@@ -50,7 +50,7 @@ TEST(UUIDUtilsTest, checkDistribution) {
     ASSERT_TRUE(uuid[14] == '4');                              // UUID version 4 (random)
     ASSERT_TRUE(c == '8' || c == '9' || c == 'a' || c == 'b'); // UUID variant 1 (RFC4122)
 
-    uint16_t value;
+    uint64_t value;
     ASSERT_TRUE(UuidUtils::uuidModBy(uuid, value, mod));
 
     if (value < required_percentage) {

@@ -44,7 +44,10 @@ def GenerateNewConfig(original_json, admin_address, updated_json):
     if len(discovered_listeners) != len(original_listeners):
       return False
     for discovered, original in zip(discovered_listeners, original_listeners):
-      original['address'] = 'tcp://' + discovered
+      if discovered.startswith('/'):
+        original['address'] = 'unix://' + discovered
+      else:
+        original['address'] = 'tcp://' + discovered
     with open(updated_json, 'w') as outfile:
       json.dump(OrderedDict(parsed_json), outfile, indent=2, separators=(',',':'))
   finally:

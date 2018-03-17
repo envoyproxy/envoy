@@ -68,7 +68,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override {
     return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
@@ -84,10 +84,11 @@ public:
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override;
-  const Optional<std::string>& userAgent() override { return user_agent_; }
+  const absl::optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
+  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
 private:
   /**
@@ -202,11 +203,12 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
-  Optional<std::string> user_agent_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   AdminListener listener_;
+  Http::Http1Settings http1_settings_;
 };
 
 /**
@@ -249,10 +251,11 @@ public:
   /**
    * Extracts counters and gauges and relevant tags, appending them to
    * the response buffer after sanitizing the metric / label names.
+   * @return uint64_t total number of metric types inserted in response.
    */
-  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                const std::list<Stats::GaugeSharedPtr>& gauges,
-                                Buffer::Instance& response);
+  static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                    const std::list<Stats::GaugeSharedPtr>& gauges,
+                                    Buffer::Instance& response);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.

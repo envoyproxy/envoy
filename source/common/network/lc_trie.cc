@@ -32,13 +32,14 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
   ipv6_trie_.reset(new LcTrieInternal<Ipv6>(ipv6_prefixes, fill_factor, root_branching_factor));
 }
 
-std::string LcTrie::getTag(const Network::Address::InstanceConstSharedPtr& ip_address) const {
+std::vector<std::string>
+LcTrie::getTags(const Network::Address::InstanceConstSharedPtr& ip_address) const {
   if (ip_address->ip()->version() == Address::IpVersion::v4) {
     Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
-    return ipv4_trie_->getTag(ip);
+    return ipv4_trie_->getTags(ip);
   } else {
     Ipv6 ip = Utility::Ip6ntohl(ip_address->ip()->ipv6()->address());
-    return ipv6_trie_->getTag(ip);
+    return ipv6_trie_->getTags(ip);
   }
 }
 
