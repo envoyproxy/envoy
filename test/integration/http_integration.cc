@@ -149,9 +149,6 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
-  } else if (event == Network::ConnectionEvent::LocalClose) {
-    parent_.disconnected_ = true;
-    parent_.connection_->dispatcher().exit();
   }
 }
 
@@ -916,7 +913,6 @@ void HttpIntegrationTest::testIdleTimerDisabled() {
 
   // Close the Codec Client and validate Idle timer is also disabled.
   codec_client_->close();
-  codec_client_->waitForDisconnect();
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value(), 0);
 }
 
