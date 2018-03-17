@@ -41,17 +41,18 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = "foo.bar";
+          const std::string key = Envoy::Config::HttpFilterNames::get().LUA;
           const std::string yaml =
               R"EOF(
-            foo: bar
-            baz: bat
+            foo.bar:
+              foo: bar
+              baz: bat
           )EOF";
 
           ProtobufWkt::Struct value;
           MessageUtil::loadFromYaml(yaml, value);
 
-          // Sets the route metadata.
+          // Sets the route's metadata.
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)

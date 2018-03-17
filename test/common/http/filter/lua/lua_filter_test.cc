@@ -67,8 +67,8 @@ public:
 
   void setupMetadata(const std::string& yaml) {
     MessageUtil::loadFromYaml(yaml, metadata_);
-    ON_CALL(decoder_callbacks_.route_->route_entry_, metadata())
-        .WillByDefault(testing::ReturnRef(metadata_));
+    EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
+        .WillOnce(testing::ReturnRef(metadata_));
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -1374,12 +1374,13 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
 
   const std::string METADATA{R"EOF(
     filter_metadata:
-      foo.bar:
-        name: foo
-        prop: bar
-      baz.bat:
-        name: baz
-        prop: bat
+      envoy.lua:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
   )EOF"};
 
   InSequence s;

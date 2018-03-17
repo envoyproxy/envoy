@@ -2,6 +2,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/config/well_known_names.h"
 #include "common/lua/lua.h"
 
 namespace Envoy {
@@ -112,7 +113,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  ProtobufWkt::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
 };
 
 /**
@@ -120,7 +121,7 @@ private:
  */
 class MetadataMapWrapper : public Envoy::Lua::BaseLuaObject<MetadataMapWrapper> {
 public:
-  MetadataMapWrapper(const envoy::api::v2::core::Metadata& metadata) : metadata_{metadata} {}
+  MetadataMapWrapper(const ProtobufWkt::Struct& metadata) : metadata_{metadata} {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"get", static_luaGet}, {"__pairs", static_luaPairs}};
@@ -150,7 +151,7 @@ private:
   void createTable(lua_State* state,
                    const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
 
-  const envoy::api::v2::core::Metadata metadata_;
+  const ProtobufWkt::Struct metadata_;
   Envoy::Lua::LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;

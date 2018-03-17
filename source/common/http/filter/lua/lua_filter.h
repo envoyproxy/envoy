@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/well_known_names.h"
 #include "common/http/filter/lua/wrappers.h"
 #include "common/lua/wrappers.h"
 
@@ -10,6 +11,21 @@ namespace Envoy {
 namespace Http {
 namespace Filter {
 namespace Lua {
+
+namespace {
+const ProtobufWkt::Struct& getMetadata(StreamFilterCallbacks* callbacks,
+                                       const std::string& filter) {
+  if (callbacks && callbacks->route() && callbacks->route()->routeEntry()) {
+    const auto& metadata = callbacks->route()->routeEntry()->metadata();
+    const auto& filter_it = metadata.filter_metadata().find(filter);
+    if (filter_it == metadata.filter_metadata().end()) {
+      return ProtobufWkt::Struct::default_instance();
+    }
+    return filter_it->second;
+  }
+  return ProtobufWkt::Struct::default_instance();
+}
+} // namespace
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -49,9 +65,9 @@ public:
   virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata the metadata of current route
+   * @return const ProtobufWkt::Struct& the value of metadata of current route entry.
    */
-  virtual const envoy::api::v2::core::Metadata routeEntryMetadata() const PURE;
+  virtual const ProtobufWkt::Struct& metadata() const PURE;
 };
 
 class Filter;
@@ -292,11 +308,9 @@ private:
     void continueIteration() override { return callbacks_->continueDecoding(); }
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
-    const envoy::api::v2::core::Metadata routeEntryMetadata() const override {
-      if (callbacks_ && callbacks_->route() && callbacks_->route()->routeEntry()) {
-        return callbacks_->route()->routeEntry()->metadata();
-      }
-      return envoy::api::v2::core::Metadata{};
+
+    const ProtobufWkt::Struct& metadata() const override {
+      return getMetadata(callbacks_, Envoy::Config::HttpFilterNames::get().LUA);
     }
 
     Filter& parent_;
@@ -314,11 +328,9 @@ private:
     void continueIteration() override { return callbacks_->continueEncoding(); }
     void onHeadersModified() override {}
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
-    const envoy::api::v2::core::Metadata routeEntryMetadata() const override {
-      if (callbacks_ && callbacks_->route() && callbacks_->route()->routeEntry()) {
-        return callbacks_->route()->routeEntry()->metadata();
-      }
-      return envoy::api::v2::core::Metadata{};
+
+    const ProtobufWkt::Struct& metadata() const override {
+      return getMetadata(callbacks_, Envoy::Config::HttpFilterNames::get().LUA);
     }
 
     Filter& parent_;

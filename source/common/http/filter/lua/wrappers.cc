@@ -151,29 +151,29 @@ void MetadataMapWrapper::createTable(
 }
 
 MetadataMapIterator::MetadataMapIterator(MetadataMapWrapper& parent)
-    : parent_{parent}, current_{parent.metadata_.filter_metadata().begin()} {}
+    : parent_{parent}, current_{parent.metadata_.fields().begin()} {}
 
 int MetadataMapIterator::luaPairsIterator(lua_State* state) {
-  if (current_ == parent_.metadata_.filter_metadata().end()) {
+  if (current_ == parent_.metadata_.fields().end()) {
     parent_.iterator_.reset();
     return 0;
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.createTable(state, std::move(current_->second.fields()));
+  parent_.setValue(state, std::move(current_->second));
 
   current_++;
   return 2;
 }
 
 int MetadataMapWrapper::luaGet(lua_State* state) {
-  const char* filter = luaL_checkstring(state, 2);
-  const auto filter_it = metadata_.filter_metadata().find(filter);
-  if (filter_it == metadata_.filter_metadata().end()) {
+  const char* key = luaL_checkstring(state, 2);
+  const auto filter_it = metadata_.fields().find(key);
+  if (filter_it == metadata_.fields().end()) {
     return 0;
   }
 
-  createTable(state, std::move(filter_it->second.fields()));
+  setValue(state, std::move(filter_it->second));
   return 1;
 }
 

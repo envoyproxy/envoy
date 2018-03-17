@@ -58,35 +58,38 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
         testPrint(ingredient)
       end
     end
-  )EOF"};
+    )EOF"};
 
   InSequence s;
   setup(SCRIPT);
 
   const std::string yaml = R"EOF(
-filter_metadata:
-  make.delicious.bread:
-    name: pulla
-    origin: finland
-    lactose: true
-    nut: false
-    portion: 5
-    minutes: 30.5
-    butter:
-      type: grass_fed
-      expensive: false
-    ingredients:
-      - flour
-      - milk
-  make.delicious.cookie:
-    name: chewy
-)EOF";
+    filter_metadata:
+      envoy.lua:
+        make.delicious.bread:
+          name: pulla
+          origin: finland
+          lactose: true
+          nut: false
+          portion: 5
+          minutes: 30.5
+          butter:
+            type: grass_fed
+            expensive: false
+          ingredients:
+            - flour
+            - milk
+        make.delicious.cookie:
+          name: chewy
+    )EOF";
 
   envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
-  MetadataMapWrapper::create(coroutine_->luaState(), metadata);
+  const auto filter_metadata =
+      metadata.filter_metadata().at(Envoy::Config::HttpFilterNames::get().LUA);
+  MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
-  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
   EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
+  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
 
   EXPECT_CALL(*this, testPrint("pulla"));
   EXPECT_CALL(*this, testPrint("finland"));

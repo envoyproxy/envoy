@@ -360,8 +360,7 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   if (metadata_wrapper_.get() != nullptr) {
     metadata_wrapper_.pushStack();
   } else {
-    metadata_wrapper_.reset(MetadataMapWrapper::create(state, callbacks_.routeEntryMetadata()),
-                            true);
+    metadata_wrapper_.reset(MetadataMapWrapper::create(state, callbacks_.metadata()), true);
   }
   return 1;
 }
