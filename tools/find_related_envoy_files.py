@@ -15,14 +15,24 @@ import os
 import os.path
 import sys
 
+# Name of top level git directory.
 ENVOY_ROOT = "/envoy/"
+
+SOURCE_ROOT = "source"
+TEST_ROOT = "test"
+INTERFACE_REAL_ROOT = "include/envoy"
+
+# Synthetic name for /include/envoy/, which helps us disambiguate
+# the 'envoy' underneath include from the top level of the git repo.
+INTERFACE_SYNTHETIC_ROOT = "include-envoy"
 
 # We want to search the file from the leaf up for 'envoy', which is
 # the name of the top level directory in the git repo. However, it's
 # also the name of a subdirectory of 'include' -- the only
-# subdirectory of 'include' currently, so it's easier just to remove
-# it from the input.
-fname = sys.argv[1].replace("/include/envoy/", "/include/")
+# subdirectory of 'include' currently, so it's easier just to treat
+# that as a single element.
+fname = sys.argv[1].replace("/" + INTERFACE_REAL_ROOT + "/",
+                            "/" + INTERFACE_SYNTHETIC_ROOT + "/")
 
 # Parse the absolute location of this repo, its relative path, and
 # file extension, exiting with no output along the way any time there
@@ -46,7 +56,7 @@ ext = leaf[dot:]
 # is emitted if the input path or extension does not match the expected pattern,
 # or if the file doesn't exist.
 def emit(source_path, dest_path, source_ending, dest_ending):
-    if fname.endswith(source_ending) and path.startswith(source_path):
+    if fname.endswith(source_ending) and path.startswith(source_path + "/"):
         path_len = len(path) - len(source_path) - len(source_ending)
         new_path = absolute_location + dest_path + \
           path[len(source_path):-len(source_ending)] + dest_ending
@@ -56,19 +66,19 @@ def emit(source_path, dest_path, source_ending, dest_ending):
 # Depending on which type of file is passed into the script: test, cc,
 # h, or interface, emit any related ones in cyclic order.
 root = path_elements[0]
-if root == "test":
-    emit("test/common/", "include/envoy/", "_impl_test.cc", ".h")
-    emit("test/", "source/", "_test.cc", ".cc")
-    emit("test/", "source/", "_test.cc", ".h")
-elif root == "source" and ext == ".cc":
-    emit("source/", "source/", ".cc", ".h")
-    emit("source/", "test/", ".cc", "_test.cc")
-    emit("source/common/", "include/envoy/", "_impl.cc", ".h")
-elif root == "source" and ext == ".h":
-    emit("source/", "test/", ".h", "_test.cc")
-    emit("source/common/", "include/envoy/", "_impl.h", ".h")
-    emit("source/", "source/", ".h", ".cc")
-elif root == "include":
-    emit("include/", "source/common/", ".h", "_impl.cc")
-    emit("include/", "source/common/", ".h", "_impl.h")
-    emit("include/", "test/common/", ".h", "_impl_test.cc")
+if root == TEST_ROOT:
+    emit("test/common", INTERFACE_REAL_ROOT, "_impl_test.cc", ".h")
+    emit(TEST_ROOT, SOURCE_ROOT, "_test.cc", ".cc")
+    emit(TEST_ROOT, SOURCE_ROOT, "_test.cc", ".h")
+elif root == SOURCE_ROOT and ext == ".cc":
+    emit(SOURCE_ROOT, SOURCE_ROOT, ".cc", ".h")
+    emit(SOURCE_ROOT, TEST_ROOT, ".cc", "_test.cc")
+    emit("source/common", INTERFACE_REAL_ROOT, "_impl.cc", ".h")
+elif root == SOURCE_ROOT and ext == ".h":
+    emit(SOURCE_ROOT, TEST_ROOT, ".h", "_test.cc")
+    emit("source/common", INTERFACE_REAL_ROOT, "_impl.h", ".h")
+    emit(SOURCE_ROOT, SOURCE_ROOT, ".h", ".cc")
+elif root == INTERFACE_SYNTHETIC_ROOT:
+    emit(INTERFACE_SYNTHETIC_ROOT, "source/common", ".h", "_impl.cc")
+    emit(INTERFACE_SYNTHETIC_ROOT, "source/common", ".h", "_impl.h")
+    emit(INTERFACE_SYNTHETIC_ROOT, "test/common", ".h", "_impl_test.cc")
