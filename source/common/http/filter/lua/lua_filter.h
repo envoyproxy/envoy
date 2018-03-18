@@ -13,17 +13,17 @@ namespace Filter {
 namespace Lua {
 
 namespace {
-const ProtobufWkt::Struct& getMetadata(StreamFilterCallbacks* callbacks,
-                                       const std::string& filter) {
-  if (callbacks && callbacks->route() && callbacks->route()->routeEntry()) {
-    const auto& metadata = callbacks->route()->routeEntry()->metadata();
-    const auto& filter_it = metadata.filter_metadata().find(filter);
-    if (filter_it == metadata.filter_metadata().end()) {
-      return ProtobufWkt::Struct::default_instance();
-    }
-    return filter_it->second;
+const ProtobufWkt::Struct& getMetadata(StreamFilterCallbacks* callbacks) {
+  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
   }
-  return ProtobufWkt::Struct::default_instance();
+  const auto& metadata = callbacks->route()->routeEntry()->metadata();
+  const auto& filter_it =
+      metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().LUA);
+  if (filter_it == metadata.filter_metadata().end()) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+  return filter_it->second;
 }
 } // namespace
 
@@ -309,9 +309,7 @@ private:
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override {
-      return getMetadata(callbacks_, Envoy::Config::HttpFilterNames::get().LUA);
-    }
+    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
 
     Filter& parent_;
     StreamDecoderFilterCallbacks* callbacks_{};
@@ -329,9 +327,7 @@ private:
     void onHeadersModified() override {}
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override {
-      return getMetadata(callbacks_, Envoy::Config::HttpFilterNames::get().LUA);
-    }
+    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
 
     Filter& parent_;
     StreamEncoderFilterCallbacks* callbacks_{};
