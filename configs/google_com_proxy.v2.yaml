@@ -26,6 +26,7 @@ static_resources:
   clusters:
   - name: service_google
     connect_timeout: 0.25s
+    type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
     tls_context: { sni: www.google.com }
