@@ -29,6 +29,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
     enableIdleTimer();
   }
+
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
@@ -78,13 +79,14 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
+    disableIdleTimer();
+    idle_timer_.reset();
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
       active_requests_.front()->encoder_->getStream().resetStream(
           connected_ ? StreamResetReason::ConnectionTermination
                      : StreamResetReason::ConnectionFailure);
     }
-    disableIdleTimer(true);
   }
 }
 

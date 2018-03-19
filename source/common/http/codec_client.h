@@ -127,12 +127,9 @@ protected:
     close();
   }
 
-  void disableIdleTimer(bool reset = false) {
+  void disableIdleTimer() {
     if (idle_timer_ != nullptr) {
       idle_timer_->disableTimer();
-      if (reset) {
-        idle_timer_.reset();
-      }
     }
   }
 

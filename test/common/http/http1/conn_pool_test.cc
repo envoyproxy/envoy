@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/http/codec_client.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/network/utility.h"
@@ -57,6 +58,7 @@ public:
     Network::MockClientConnection* connection_;
     CodecClient* codec_client_;
     Event::MockTimer* connect_timer_;
+    Event::DispatcherPtr client_dispatcher_;
   };
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
@@ -76,7 +78,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-
+    test_client.client_dispatcher_.reset(new Event::DispatcherImpl);
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_,
@@ -89,8 +91,7 @@ public:
             }
           }
         },
-        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"));
-
+        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
@@ -136,7 +137,6 @@ struct ActiveTestRequest {
     if (type == Type::Immediate) {
       expectNewStream();
     }
-
     handle_ = parent.conn_pool_.newStream(outer_decoder_, callbacks_);
 
     if (type == Type::Immediate) {

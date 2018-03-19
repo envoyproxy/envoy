@@ -29,7 +29,7 @@ MockClusterInfo::MockClusterInfo()
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
 
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
-  ON_CALL(*this, idleTimeout()).WillByDefault(Return(idle_timeout_));
+  ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::chrono::milliseconds(1000)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, http2Settings()).WillByDefault(ReturnRef(http2_settings_));
   ON_CALL(*this, maxRequestsPerConnection())

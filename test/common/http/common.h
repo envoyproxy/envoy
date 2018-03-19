@@ -17,9 +17,9 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   typedef std::function<void(CodecClient*)> DestroyCb;
-  Event::MockDispatcher dispatcher;
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
+                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
+                     Event::Dispatcher& dispatcher)
       : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
@@ -32,7 +32,7 @@ public:
   }
 
   void raiseGoAway() { onGoAway(); }
-
+  Event::TimerPtr idleTimer() { return std::move(idle_timer_); }
   DestroyCb destroy_cb_;
 };
 

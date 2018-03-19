@@ -79,7 +79,6 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
 };
 
 } // namespace Upstream
