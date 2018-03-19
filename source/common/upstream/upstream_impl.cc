@@ -482,10 +482,10 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(
-        HostSharedPtr{new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
-                                   envoy::api::v2::core::Metadata::default_instance(), 1,
-                                   envoy::api::v2::core::Locality().default_instance())});
+    initial_hosts_->emplace_back(HostSharedPtr{
+        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host, info_->type()),
+                     envoy::api::v2::core::Metadata::default_instance(), 1,
+                     envoy::api::v2::core::Locality().default_instance())});
   }
 }
 

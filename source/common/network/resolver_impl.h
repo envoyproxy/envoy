@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
@@ -16,6 +17,10 @@ namespace Address {
  * @return pointer to the Instance.
  */
 Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address);
+
+Address::InstanceConstSharedPtr
+resolveProtoAddress(const envoy::api::v2::core::Address& address,
+                    const envoy::api::v2::Cluster::DiscoveryType& cluster_type);
 
 /**
  * Create an Instance from a envoy::api::v2::core::SocketAddress.
