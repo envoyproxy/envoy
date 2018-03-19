@@ -87,6 +87,65 @@ HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
   return shared_filtered_clone;
 }
 
+void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
+                              HostVectorConstSharedPtr healthy_hosts,
+                              HostsPerLocalityConstSharedPtr hosts_per_locality,
+                              HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                              LocalityWeightsConstSharedPtr locality_weights,
+                              const HostVector& hosts_added, const HostVector& hosts_removed) {
+  hosts_ = std::move(hosts);
+  healthy_hosts_ = std::move(healthy_hosts);
+  hosts_per_locality_ = std::move(hosts_per_locality);
+  healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
+  locality_weights_ = std::move(locality_weights);
+  // Rebuild the locality scheduler.
+  if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
+      !locality_weights_->empty()) {
+    locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
+    locality_entries_.clear();
+    for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {
+      const double effective_weight = effectiveLocalityWeight(i);
+      if (effective_weight > 0) {
+        locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+        locality_scheduler_->add(effective_weight, locality_entries_.back());
+      }
+    }
+  } else {
+    locality_scheduler_ = nullptr;
+  }
+  runUpdateCallbacks(hosts_added, hosts_removed);
+}
+
+absl::optional<uint32_t> HostSetImpl::chooseLocality() {
+  if (locality_scheduler_ == nullptr) {
+    return {};
+  }
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
+  // We don't build a schedule if there are no weighted localities, so we should always succeed.
+  ASSERT(locality != nullptr);
+  // If we picked it before, its weight must have been positive.
+  ASSERT(locality->effective_weight_ > 0);
+  locality_scheduler_->add(locality->effective_weight_, locality);
+  return locality->index_;
+}
+
+double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
+  if (locality_weights_ == nullptr || hosts_per_locality_ == nullptr) {
+    return 0;
+  }
+  const auto& locality_hosts = hosts_per_locality_->get()[index];
+  if (locality_hosts.empty()) {
+    return 0;
+  }
+  const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
+  if (locality_healthy_hosts.empty()) {
+    return 0;
+  }
+  const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
+  const uint32_t weight = (*locality_weights_)[index];
+  return weight * std::min(1.0, 1.4 * locality_healthy_ratio);
+}
+
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
@@ -420,11 +479,12 @@ void ClusterImplBase::reloadHealthyHosts() {
   }
 
   for (auto& host_set : prioritySet().hostSetsPerPriority()) {
+    // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-    host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
-                          hosts_per_locality_copy,
-                          createHealthyHostLists(host_set->hostsPerLocality()), {}, {});
+    host_set->updateHosts(
+        hosts_copy, createHealthyHostList(host_set->hosts()), hosts_per_locality_copy,
+        createHealthyHostLists(host_set->hostsPerLocality()), host_set->localityWeights(), {}, {});
   }
 }
 
@@ -521,7 +581,7 @@ void StaticClusterImpl::startPreInit() {
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
                              *initial_hosts_, {});
   initial_hosts_ = nullptr;
 
@@ -664,7 +724,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
                              hosts_added, hosts_removed);
 }
 

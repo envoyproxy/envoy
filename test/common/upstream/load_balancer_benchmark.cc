@@ -23,7 +23,7 @@ public:
       hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256)));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
-    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, hosts, {});
+    host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {});
   }
 
   PrioritySetImpl priority_set_;

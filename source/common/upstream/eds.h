@@ -5,6 +5,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 
+#include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -35,7 +36,10 @@ public:
   }
 
 private:
-  void updateHostsPerLocality(HostSet& host_set, HostVector& new_hosts);
+  using LocalityWeightsMap =
+      std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+  void updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                              LocalityWeightsMap& locality_weights_map);
 
   // ClusterImplBase
   void startPreInit() override;
@@ -44,6 +48,7 @@ private:
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
+  LocalityWeightsMap current_locality_weights_map_;
 };
 
 } // namespace Upstream

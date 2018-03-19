@@ -46,10 +46,13 @@ public:
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
-  MOCK_METHOD6(updateHosts, void(std::shared_ptr<const HostVector> hosts,
+  MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
+  MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
+  MOCK_METHOD7(updateHosts, void(std::shared_ptr<const HostVector> hosts,
                                  std::shared_ptr<const HostVector> healthy_hosts,
                                  HostsPerLocalityConstSharedPtr hosts_per_locality,
                                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                 LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed));
   MOCK_CONST_METHOD0(priority, uint32_t());
 
@@ -57,6 +60,7 @@ public:
   HostVector healthy_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
+  LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
 };

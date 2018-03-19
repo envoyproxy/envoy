@@ -463,7 +463,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
       original_host_set_.hostsPerLocality().filter(
           [&predicate](const Host& host) { return predicate(host) && host.healthy(); });
 
-  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality, {},
                            filtered_added, filtered_removed);
 }
 

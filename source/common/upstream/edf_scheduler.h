@@ -53,10 +53,10 @@ public:
 
   /**
    * Insert entry into queue with a given weight. The deadline will be current_time_ + 1 / weight.
-   * @param weight integer weight.
+   * @param weight floating point weight.
    * @param entry shared pointer to entry, only a weak reference will be retained.
    */
-  void add(uint64_t weight, std::shared_ptr<C> entry) {
+  void add(double weight, std::shared_ptr<C> entry) {
     ASSERT(weight > 0);
     const double deadline = current_time_ + 1.0 / weight;
     EDF_TRACE("Insertion {} in queue with deadline {} and weight {}.",

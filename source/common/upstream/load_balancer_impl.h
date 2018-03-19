@@ -39,7 +39,7 @@ protected:
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the per_priority_load_;
-  const HostSet& chooseHostSet();
+  HostSet& chooseHostSet();
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 

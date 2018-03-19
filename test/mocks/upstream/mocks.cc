@@ -28,6 +28,9 @@ MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
   ON_CALL(*this, healthyHostsPerLocality())
       .WillByDefault(
           Invoke([this]() -> const HostsPerLocality& { return *healthy_hosts_per_locality_; }));
+  ON_CALL(*this, localityWeights()).WillByDefault(Invoke([this]() -> LocalityWeightsConstSharedPtr {
+    return locality_weights_;
+  }));
 }
 
 MockPrioritySet::MockPrioritySet() {

@@ -95,7 +95,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   }
 }
 
-const HostSet& LoadBalancerBase::chooseHostSet() {
+HostSet& LoadBalancerBase::chooseHostSet() {
   const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
   return *priority_set_.hostSetsPerPriority()[priority];
 }
@@ -341,7 +341,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 }
 
 ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUse() {
-  const HostSet& host_set = chooseHostSet();
+  HostSet& host_set = chooseHostSet();
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 
@@ -349,6 +349,14 @@ ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUs
   if (isGlobalPanic(host_set)) {
     stats_.lb_healthy_panic_.inc();
     hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+    return hosts_source;
+  }
+
+  // If we're doing locality weighted balancing, pick locality.
+  const absl::optional<uint32_t> locality = host_set.chooseLocality();
+  if (locality.has_value()) {
+    hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+    hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
 
