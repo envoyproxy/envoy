@@ -18,7 +18,7 @@ public:
   /**
    * Default constructor. Creates an empty context.
    */
-  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false), sampled_(true) {}
+  SpanContext() : trace_id_(0), id_(0), parent_id_(0), is_initialized_(false), sampled_(false) {}
 
   /**
    * Constructor that creates a context object from the supplied trace, span and

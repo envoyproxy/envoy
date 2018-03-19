@@ -229,6 +229,7 @@ TEST(ZipkinTracerTest, finishSpan) {
 
   // Creates a root-span with a CS annotation
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
+  span->setSampled(true);
 
   // Finishing a root span with a CS annotation must add a CR annotation
   span->finish();

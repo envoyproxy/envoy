@@ -302,7 +302,7 @@ public:
    * Default constructor. Creates an empty span.
    */
   Span()
-      : trace_id_(0), name_(), id_(0), debug_(false), sampled_(true), monotonic_start_time_(0),
+      : trace_id_(0), name_(), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
         tracer_(nullptr) {}
 
   /**
