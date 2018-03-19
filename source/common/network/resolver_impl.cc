@@ -67,7 +67,17 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_addr
   if (resolver == nullptr) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-  return resolver->resolve(socket_address);
+
+  try {
+    return resolver->resolve(socket_address);
+  } catch (EnvoyException& e) {
+    // resolver_name.empty() means resolver tries to resolve using IP address.
+    if (resolver_name.empty()) {
+      throw EnvoyException(fmt::format(
+          "{}. Please try to use 'STRICT_DNS' or 'LOGICAL_DNS' cluster type instead", e.what()));
+    }
+    throw e;
+  }
 }
 
 } // namespace Address
