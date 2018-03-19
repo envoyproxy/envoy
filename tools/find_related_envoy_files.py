@@ -52,7 +52,7 @@ if dot == -1 or dot == len(leaf) - 1:
     sys.exit(0)
 ext = leaf[dot:]
 
-# Transforms the input filename based on some transformation rules.  Nothing
+# Transforms the input filename based on some transformation rules. Nothing
 # is emitted if the input path or extension does not match the expected pattern,
 # or if the file doesn't exist.
 def emit(source_path, dest_path, source_ending, dest_ending):
