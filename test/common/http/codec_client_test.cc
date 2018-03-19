@@ -106,6 +106,28 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
   inner_decoder->decodeData(buffer, true);
 }
 
+TEST_F(CodecClientTest, RemoteClosedAfterResponse) {
+  Http::StreamDecoder* inner_decoder;
+  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockStreamDecoder outer_decoder;
+  client_->newStream(outer_decoder);
+
+  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_CALL(*codec_, dispatch(_));
+  Buffer::OwnedImpl data;
+  filter_->onData(data, true);
+  EXPECT_TRUE(client_->remoteClosed());
+}
+
 TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   Http::StreamDecoder* inner_decoder;
   NiceMock<Http::MockStreamEncoder> inner_encoder;

@@ -795,8 +795,9 @@ TEST_P(ConnectionImplTest, ReadOnCloseTest) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterStatus {
         EXPECT_EQ(buffer_size, data.length());
+        EXPECT_TRUE(end_stream);
         return FilterStatus::StopIteration;
       }));
 
@@ -818,8 +819,9 @@ TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
   EXPECT_CALL(*read_filter_, onNewConnection());
   EXPECT_CALL(*read_filter_, onData(_, _))
       .Times(1)
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> FilterStatus {
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> FilterStatus {
         EXPECT_EQ(buffer_size, data.length());
+        EXPECT_FALSE(end_stream);
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));

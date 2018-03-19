@@ -61,7 +61,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
-    onData(empty);
+    onData(empty, true);
   }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
@@ -96,7 +96,8 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
   deleteRequest(request);
 }
 
-void CodecClient::onData(Buffer::Instance& data) {
+void CodecClient::onData(Buffer::Instance& data, bool end_stream) {
+  remote_closed_ |= end_stream;
   bool protocol_error = false;
   try {
     codec_->dispatch(data);

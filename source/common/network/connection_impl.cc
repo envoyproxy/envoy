@@ -432,12 +432,11 @@ void ConnectionImpl::onReadReady() {
   // If this connection doesn't have half-close semantics, translate end_stream into
   // a connection close.
   if ((!enable_half_close_ && result.end_stream_read_)) {
-    result.end_stream_read_ = false;
     result.action_ = PostIoAction::Close;
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_) {
+  if (result.bytes_processed_ != 0 || (enable_half_close_ && result.end_stream_read_)) {
     // Skip onRead if no bytes were processed. For instance, if the connection was closed without
     // producing more data.
     onRead(new_buffer_size);

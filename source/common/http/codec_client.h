@@ -135,8 +135,8 @@ private:
     CodecReadFilter(CodecClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.onData(data);
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
+      parent_.onData(data, end_stream);
       return Network::FilterStatus::StopIteration;
     }
 
@@ -178,7 +178,7 @@ private:
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
-  void onData(Buffer::Instance& data);
+  void onData(Buffer::Instance& data, bool end_stream);
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
