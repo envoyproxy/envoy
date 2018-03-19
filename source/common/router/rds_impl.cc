@@ -237,7 +237,7 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   for (const auto& provider : getStaticRouteConfigProviders()) {
     *(static_configs->Add()) = provider->configAsProto();
   }
-  return config_dump;
+  return ProtobufTypes::MessagePtr{config_dump.release()};
 }
 
 } // namespace Router
