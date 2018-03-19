@@ -75,6 +75,16 @@ public:
   bool hot_restart_disabled_{};
 };
 
+class MockConfigTracker : public ConfigTracker {
+public:
+  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
+  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
+  EntryOwner::Ptr add(std::string key, Cb callback) override {
+    return EntryOwner::Ptr{addReturnsRaw(key, std::move(callback))};
+  }
+  struct MockEntryOwner : public EntryOwner {};
+};
+
 class MockAdmin : public Admin {
 public:
   MockAdmin();
@@ -86,18 +96,8 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
-};
 
-class MockConfigTracker : public ConfigTracker {
-public:
-  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
-  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
-  EntryOwner::Ptr add(std::string key, Cb callback) override {
-    auto raw = addReturnsRaw(key, std::move(callback));
-    ENVOY_LOG_MISC(debug, "yo %d", raw == nullptr);
-    return EntryOwner::Ptr(raw);
-  }
-  class MockEntryOwner : public EntryOwner {};
+  NiceMock<MockConfigTracker> config_tracker;
 };
 
 class MockDrainManager : public DrainManager {

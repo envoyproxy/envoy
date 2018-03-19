@@ -47,8 +47,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 class RdsImplTest : public testing::Test {
 public:
   RdsImplTest() : request_(&cm_.async_client_) {
-    ON_CALL(admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
-    EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
+    EXPECT_CALL(admin_.config_tracker, addReturnsRaw("routes", _))
         .WillOnce(Return(new Server::MockConfigTracker::MockEntryOwner()));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
@@ -116,7 +115,6 @@ public:
   Http::MockAsyncClientRequest request_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<Server::MockConfigTracker> config_tracker_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};

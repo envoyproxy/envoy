@@ -79,7 +79,7 @@ struct RdsStats {
 class RouteConfigProviderManagerImpl;
 
 /**
- * Implementation of RdsRouteConfigProvider that fetches the route configuration dynamically using
+ * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl
