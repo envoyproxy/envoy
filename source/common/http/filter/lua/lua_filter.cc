@@ -360,7 +360,8 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   if (metadata_wrapper_.get() != nullptr) {
     metadata_wrapper_.pushStack();
   } else {
-    metadata_wrapper_.reset(MetadataMapWrapper::create(state, callbacks_.metadata()), true);
+    metadata_wrapper_.reset(Envoy::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()),
+                            true);
   }
   return 1;
 }
@@ -405,11 +406,11 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
   lua_state_.registerType<Envoy::Lua::BufferWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapIterator>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
-  lua_state_.registerType<MetadataMapWrapper>();
-  lua_state_.registerType<MetadataMapIterator>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {

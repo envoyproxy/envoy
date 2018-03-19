@@ -220,7 +220,7 @@ private:
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
   Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> body_wrapper_;
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
-  Envoy::Lua::LuaDeathRef<MetadataMapWrapper> metadata_wrapper_;
+  Envoy::Lua::LuaDeathRef<Envoy::Lua::MetadataMapWrapper> metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   AsyncClient::Request* http_request_{};
