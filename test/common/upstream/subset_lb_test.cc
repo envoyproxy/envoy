@@ -572,6 +572,41 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
 }
 
+TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"hardware"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  init({
+      {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+      {"tcp://127.0.0.1:81", {{"version", "1.0"}}},
+      {"tcp://127.0.0.1:82", {{"version", "1.1"}}},
+      {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+  });
+
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_11({{"version", "1.1"}});
+
+  // All hosts are healthy.
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host_set_.hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  host_set_.healthy_hosts_ = {host_set_.hosts_[1], host_set_.hosts_[3]};
+  host_set_.runCallbacks({}, {});
+
+  // Unhealthy hosts are excluded.
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+}
+
 TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
