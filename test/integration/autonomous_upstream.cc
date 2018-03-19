@@ -35,6 +35,7 @@ void AutonomousStream::setEndStream(bool end_stream) {
 // Check all the special headers and send a customized response based on them.
 void AutonomousStream::sendResponse() {
   Http::TestHeaderMapImpl headers(*headers_);
+  upstream_.setLastRequestHeaders(*headers_);
 
   int32_t request_body_length = -1;
   HeaderToInt(EXPECT_REQUEST_SIZE_BYTES, request_body_length, headers);
@@ -55,7 +56,7 @@ void AutonomousStream::sendResponse() {
 }
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
-  auto stream = new AutonomousStream(*this, response_encoder);
+  auto stream = new AutonomousStream(*this, response_encoder, upstream_);
   streams_.push_back(FakeStreamPtr{stream});
   return *(stream);
 }
@@ -69,12 +70,22 @@ AutonomousUpstream::~AutonomousUpstream() {
 bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection) {
   AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
       QueuedConnectionWrapperPtr{new QueuedConnectionWrapper(connection, true)}, stats_store_,
-      http_type_));
+      http_type_, *this));
   http_connection->initialize();
   http_connections_.push_back(std::move(http_connection));
   return true;
 }
 
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
+
+void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
+  std::unique_lock<std::mutex> lock(headers_lock_);
+  last_request_headers_ = std::make_unique<Http::TestHeaderMapImpl>(headers);
+}
+
+std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
+  std::unique_lock<std::mutex> lock(headers_lock_);
+  return std::move(last_request_headers_);
+}
 
 } // namespace Envoy

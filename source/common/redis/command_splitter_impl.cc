@@ -325,7 +325,25 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbacks& callbacks) {
-  if (request.type() != RespType::Array || request.asArray().size() < 2) {
+  if (request.type() != RespType::Array) {
+    onInvalidRequest(callbacks);
+    return nullptr;
+  }
+
+  std::string to_lower_string(request.asArray()[0].asString());
+  to_lower_table_.toLowerCase(to_lower_string);
+
+  if (to_lower_string == SupportedCommands::ping()) {
+    // Respond to PING locally.
+    RespValuePtr pong(new RespValue());
+    pong->type(RespType::SimpleString);
+    pong->asString() = "PONG";
+    callbacks.onResponse(std::move(pong));
+    return nullptr;
+  }
+
+  if (request.asArray().size() < 2) {
+    // Commands other than PING all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }
@@ -336,9 +354,6 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
       return nullptr;
     }
   }
-
-  std::string to_lower_string(request.asArray()[0].asString());
-  to_lower_table_.toLowerCase(to_lower_string);
 
   auto handler = command_map_.find(to_lower_string);
   if (handler == command_map_.end()) {

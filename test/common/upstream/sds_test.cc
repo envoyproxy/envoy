@@ -90,20 +90,23 @@ protected:
 
   void setupPoolFailure() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
-    EXPECT_CALL(cm_.async_client_,
-                send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
-        .WillOnce(Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                            Optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
-          callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
-              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
-          return nullptr;
-        }));
+    EXPECT_CALL(
+        cm_.async_client_,
+        send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
+        .WillOnce(
+            Invoke([](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      absl::optional<std::chrono::milliseconds>) -> Http::AsyncClient::Request* {
+              callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                  Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+              return nullptr;
+            }));
   }
 
   void setupRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
-    EXPECT_CALL(cm_.async_client_,
-                send_(_, _, Optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
+    EXPECT_CALL(
+        cm_.async_client_,
+        send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(1000))))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
   }
 

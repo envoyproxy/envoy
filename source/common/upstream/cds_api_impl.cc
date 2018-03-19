@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Upstream {
 
 CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                             const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                              ClusterManager& cm, Event::Dispatcher& dispatcher,
                              Runtime::RandomGenerator& random,
                              const LocalInfo::LocalInfo& local_info, Stats::Scope& scope) {
@@ -25,7 +25,7 @@ CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_confi
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
-                       const Optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                        ClusterManager& cm, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                        Stats::Scope& scope)
@@ -55,14 +55,14 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdatePrimaryCluster(cluster)) {
+    if (cm_.addOrUpdateCluster(cluster)) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
     }
   }
 
   for (auto cluster : clusters_to_remove) {
     const std::string cluster_name = cluster.first;
-    if (cm_.removePrimaryCluster(cluster_name)) {
+    if (cm_.removeCluster(cluster_name)) {
       ENVOY_LOG(debug, "cds: remove cluster '{}'", cluster_name);
     }
   }

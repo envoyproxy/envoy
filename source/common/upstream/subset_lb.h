@@ -6,7 +6,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/common/optional.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -15,17 +14,19 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 
 class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::upstream> {
 public:
-  SubsetLoadBalancer(LoadBalancerType lb_type, PrioritySet& priority_set,
-                     const PrioritySet* local_priority_set, ClusterStats& stats,
-                     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                     const LoadBalancerSubsetInfo& subsets,
-                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
-                     const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  SubsetLoadBalancer(
+      LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
+      ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const LoadBalancerSubsetInfo& subsets,
+      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -54,8 +55,7 @@ private:
   public:
     PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb, HostPredicate predicate);
 
-    void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed,
-                HostPredicate predicate);
+    void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);
 
     bool empty() { return empty_; }
 
@@ -79,6 +79,7 @@ private:
 
   private:
     const PrioritySet& original_priority_set_;
+    const HostPredicate predicate_;
     bool empty_ = true;
   };
 
@@ -113,6 +114,7 @@ private:
                             const HostVector& hosts_removed);
   void processSubsets(
       const HostVector& hosts_added, const HostVector& hosts_removed,
+      std::function<void(LbSubsetEntryPtr)> update_cb,
       std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
@@ -124,12 +126,13 @@ private:
 
   LbSubsetEntryPtr findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadata& kvs,
                                       uint32_t idx);
+  void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
   std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   const envoy::api::v2::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Runtime::Loader& runtime_;

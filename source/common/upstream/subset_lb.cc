@@ -20,7 +20,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LoadBalancerSubsetInfo& subsets,
-    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config), common_config_(common_config),
       stats_(stats), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
@@ -130,41 +130,39 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
     return;
   }
 
-  HostPredicate predicate;
-
-  bool fallback_any = (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) ||
-                      default_subset_metadata_.empty();
-
-  if (fallback_any) {
-    predicate = [](const Host&) -> bool { return true; };
-  } else {
-    predicate = std::bind(&SubsetLoadBalancer::hostMatches, this, default_subset_metadata_,
-                          std::placeholders::_1);
-  }
-
   if (fallback_subset_ == nullptr) {
-    if (fallback_any) {
+    // First update: create the default host subset.
+    HostPredicate predicate;
+    if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
+      predicate = [](const Host&) -> bool { return true; };
+
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
     } else {
+      predicate = std::bind(&SubsetLoadBalancer::hostMatches, this, default_subset_metadata_,
+                            std::placeholders::_1);
+
       ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
                 describeMetadata(default_subset_metadata_));
     }
 
-    // First update: create the default host subset.
     fallback_subset_.reset(new LbSubsetEntry());
     fallback_subset_->priority_subset_.reset(new PrioritySubsetImpl(*this, predicate));
-  } else {
-    // Subsequent updates: add/remove hosts.
-    fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed, predicate);
+    return;
   }
+
+  // Subsequent updates: add/remove hosts.
+  fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
 }
 
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every
-// unique LbSubsetEntryPtr found, it invokes cb with the LbSubsetEntryPtr, a HostPredicate that
-// selects hosts in the subset, and a flag indicating whether any hosts are being added.
+// unique LbSubsetEntryPtr found, it either invokes new_cb or update_cb depending on whether the
+// LbSubsetEntryPtr is already initialized (update_cb) or not (new_cb). In addition, update_cb is
+// invoked for any otherwise unmodified but active and initialized LbSubsetEntryPtr to allow host
+// health to be updated.
 void SubsetLoadBalancer::processSubsets(
     const HostVector& hosts_added, const HostVector& hosts_removed,
-    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb) {
+    std::function<void(LbSubsetEntryPtr)> update_cb,
+    std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> new_cb) {
   std::unordered_set<LbSubsetEntryPtr> subsets_modified;
 
   std::pair<const HostVector&, bool> steps[] = {{hosts_added, true}, {hosts_removed, false}};
@@ -186,14 +184,29 @@ void SubsetLoadBalancer::processSubsets(
           }
           subsets_modified.emplace(entry);
 
-          HostPredicate predicate =
-              std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
+          if (entry->initialized()) {
+            update_cb(entry);
+          } else {
+            HostPredicate predicate =
+                std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
 
-          cb(entry, predicate, kvs, adding_hosts);
+            new_cb(entry, predicate, kvs, adding_hosts);
+          }
         }
       }
     }
   }
+
+  forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
+    if (subsets_modified.find(entry) != subsets_modified.end()) {
+      // Already handled due to hosts being added or removed.
+      return;
+    }
+
+    if (entry->initialized() && entry->active()) {
+      update_cb(entry);
+    }
+  });
 }
 
 // Given the addition and/or removal of hosts, update all subsets for this priority level, creating
@@ -202,32 +215,33 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                                 const HostVector& hosts_removed) {
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
-  processSubsets(
-      hosts_added, hosts_removed,
-      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
-          bool adding_host) {
-        if (entry->initialized()) {
-          const bool active_before = entry->active();
-          entry->priority_subset_->update(priority, hosts_added, hosts_removed, predicate);
+  processSubsets(hosts_added, hosts_removed,
+                 [&](LbSubsetEntryPtr entry) {
+                   const bool active_before = entry->active();
+                   entry->priority_subset_->update(priority, hosts_added, hosts_removed);
 
-          if (active_before && !entry->active()) {
-            stats_.lb_subsets_active_.dec();
-            stats_.lb_subsets_removed_.inc();
-          } else if (!active_before && entry->active()) {
-            stats_.lb_subsets_active_.inc();
-            stats_.lb_subsets_created_.inc();
-          }
-        } else if (adding_host) {
-          ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
+                   if (active_before && !entry->active()) {
+                     stats_.lb_subsets_active_.dec();
+                     stats_.lb_subsets_removed_.inc();
+                   } else if (!active_before && entry->active()) {
+                     stats_.lb_subsets_active_.inc();
+                     stats_.lb_subsets_created_.inc();
+                   }
+                 },
+                 [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
+                     bool adding_host) {
+                   if (adding_host) {
+                     ENVOY_LOG(debug, "subset lb: creating load balancer for {}",
+                               describeMetadata(kvs));
 
-          // Initialize new entry with hosts and update stats. (An uninitialized entry
-          // with only removed hosts is a degenerate case and we leave the entry
-          // uninitialized.)
-          entry->priority_subset_.reset(new PrioritySubsetImpl(*this, predicate));
-          stats_.lb_subsets_active_.inc();
-          stats_.lb_subsets_created_.inc();
-        }
-      });
+                     // Initialize new entry with hosts and update stats. (An uninitialized entry
+                     // with only removed hosts is a degenerate case and we leave the entry
+                     // uninitialized.)
+                     entry->priority_subset_.reset(new PrioritySubsetImpl(*this, predicate));
+                     stats_.lb_subsets_active_.inc();
+                     stats_.lb_subsets_created_.inc();
+                   }
+                 });
 }
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
@@ -336,18 +350,31 @@ SubsetLoadBalancer::findOrCreateSubset(LbSubsetMap& subsets, const SubsetMetadat
   return findOrCreateSubset(entry->children_, kvs, idx);
 }
 
+// Invokes cb for each LbSubsetEntryPtr in subsets.
+void SubsetLoadBalancer::forEachSubset(LbSubsetMap& subsets,
+                                       std::function<void(LbSubsetEntryPtr)> cb) {
+  for (auto& vsm : subsets) {
+    for (auto& em : vsm.second) {
+      LbSubsetEntryPtr entry = em.second;
+      cb(entry);
+      forEachSubset(entry->children_, cb);
+    }
+  }
+}
+
 // Initialize a new HostSubsetImpl and LoadBalancer from the SubsetLoadBalancer, filtering hosts
 // with the given predicate.
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
                                                            HostPredicate predicate)
-    : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_) {
+    : PrioritySetImpl(), original_priority_set_(subset_lb.original_priority_set_),
+      predicate_(predicate) {
 
   for (size_t i = 0; i < original_priority_set_.hostSetsPerPriority().size(); ++i) {
     empty_ &= getOrCreateHostSet(i).hosts().empty();
   }
 
   for (size_t i = 0; i < subset_lb.original_priority_set_.hostSetsPerPriority().size(); ++i) {
-    update(i, subset_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(), {}, predicate);
+    update(i, subset_lb.original_priority_set_.hostSetsPerPriority()[i]->hosts(), {});
   }
 
   switch (subset_lb.lb_type_) {
@@ -417,10 +444,6 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  if (filtered_added.empty() && filtered_removed.empty()) {
-    return;
-  }
-
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
 
@@ -451,10 +474,9 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t pr
 
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostVector& hosts_added,
-                                                    const HostVector& hosts_removed,
-                                                    std::function<bool(const Host&)> predicate) {
+                                                    const HostVector& hosts_removed) {
   HostSubsetImpl* host_subset = getOrCreateHostSubset(priority);
-  host_subset->update(hosts_added, hosts_removed, predicate);
+  host_subset->update(hosts_added, hosts_removed, predicate_);
 
   if (host_subset->hosts().empty() != empty_) {
     empty_ = true;

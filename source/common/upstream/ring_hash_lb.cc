@@ -15,7 +15,7 @@ namespace Upstream {
 RingHashLoadBalancer::RingHashLoadBalancer(
     PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random,
-    const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       config_(config) {}
@@ -57,8 +57,9 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h) const {
   }
 }
 
-RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-                                 const HostVector& hosts) {
+RingHashLoadBalancer::Ring::Ring(
+    const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    const HostVector& hosts) {
   ENVOY_LOG(trace, "ring hash: building ring");
   if (hosts.empty()) {
     return;
@@ -73,8 +74,7 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
   //       to generate the rings centrally and then just RCU them out to each thread. This is
   //       sufficient for getting started.
   const uint64_t min_ring_size =
-      config.valid() ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024)
-                     : 1024;
+      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size, 1024) : 1024;
 
   uint64_t hashes_per_host = 1;
   if (hosts.size() < min_ring_size) {
@@ -88,9 +88,8 @@ RingHashLoadBalancer::Ring::Ring(const Optional<envoy::api::v2::Cluster::RingHas
   ring_.reserve(hosts.size() * hashes_per_host);
 
   const bool use_std_hash =
-      config.valid()
-          ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, true)
-          : true;
+      config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value().deprecated_v1(), use_std_hash, true)
+             : true;
 
   char hash_key_buffer[196];
   for (const auto& host : hosts) {

@@ -50,5 +50,21 @@ and install dependencies into a shared directory prefix.
 
 # Updating an external dependency version
 
-1. Update the build recipe in [`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
-2. `bazel test //test/...`
+1. If the dependency is a build recipe, update the build recipe in
+[`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
+2. If not, update the corresponding entry in
+[the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
+3. `bazel test //test/...`
+
+# Overriding an external dependency temporarily
+
+An external dependency built by genrule repository or native Bazel could be overridden by
+specifying Bazel option
+[`--override_repository`](https://docs.bazel.build/versions/master/command-line-reference.html)
+to point to a local copy. The option can used multiple times to override multiple dependencies.
+The name of the dependency can be found in
+[the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
+The path of the local copy has to be absolute path.
+
+For example you can point the data plane API to a local copy checked out in home directory and run tests:  
+`bazel test --override_repository="envoy_api={$HOME}/data-plane-api"`

@@ -91,18 +91,18 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   chargeStat(cluster, "grpc", grpc_service, grpc_method, success);
 }
 
-Optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
+absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
 
   uint64_t grpc_status_code;
   if (!grpc_status_header || grpc_status_header->value().empty()) {
-    return Optional<Status::GrpcStatus>();
+    return absl::optional<Status::GrpcStatus>();
   }
   if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::Unauthenticated) {
-    return Optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
+    return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
-  return Optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
+  return absl::optional<Status::GrpcStatus>(static_cast<Status::GrpcStatus>(grpc_status_code));
 }
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
@@ -248,13 +248,14 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
 
 void Common::checkForHeaderOnlyError(Http::Message& http_response) {
   // First check for grpc-status in headers. If it is here, we have an error.
-  Optional<Status::GrpcStatus> grpc_status_code = Common::getGrpcStatus(http_response.headers());
-  if (!grpc_status_code.valid()) {
+  absl::optional<Status::GrpcStatus> grpc_status_code =
+      Common::getGrpcStatus(http_response.headers());
+  if (!grpc_status_code) {
     return;
   }
 
   if (grpc_status_code.value() == Status::GrpcStatus::InvalidCode) {
-    throw Exception(Optional<uint64_t>(), "bad grpc-status header");
+    throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 
   const Http::HeaderEntry* grpc_status_message = http_response.headers().GrpcMessage();
@@ -264,19 +265,20 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
 
 void Common::validateResponse(Http::Message& http_response) {
   if (Http::Utility::getResponseStatus(http_response.headers()) != enumToInt(Http::Code::OK)) {
-    throw Exception(Optional<uint64_t>(), "non-200 response code");
+    throw Exception(absl::optional<uint64_t>(), "non-200 response code");
   }
 
   checkForHeaderOnlyError(http_response);
 
   // Check for existence of trailers.
   if (!http_response.trailers()) {
-    throw Exception(Optional<uint64_t>(), "no response trailers");
+    throw Exception(absl::optional<uint64_t>(), "no response trailers");
   }
 
-  Optional<Status::GrpcStatus> grpc_status_code = Common::getGrpcStatus(*http_response.trailers());
-  if (!grpc_status_code.valid() || grpc_status_code.value() < 0) {
-    throw Exception(Optional<uint64_t>(), "bad grpc-status trailer");
+  absl::optional<Status::GrpcStatus> grpc_status_code =
+      Common::getGrpcStatus(*http_response.trailers());
+  if (!grpc_status_code || grpc_status_code.value() < 0) {
+    throw Exception(absl::optional<uint64_t>(), "bad grpc-status trailer");
   }
 
   if (grpc_status_code.value() != 0) {

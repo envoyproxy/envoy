@@ -63,7 +63,7 @@ public:
   }
 
   void expectAdd(const std::string& cluster_name) {
-    EXPECT_CALL(cm_, addOrUpdatePrimaryCluster(_))
+    EXPECT_CALL(cm_, addOrUpdateCluster(_))
         .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& cluster) -> bool {
           EXPECT_EQ(cluster_name, cluster.name());
           return true;
@@ -73,9 +73,9 @@ public:
   void expectRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                       const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+        .WillOnce(Invoke(
+            [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
               EXPECT_EQ((Http::TestHeaderMapImpl{
                             {":method", v2_rest_ ? "POST" : "GET"},
                             {":path", v2_rest_ ? "/v2/discovery:clusters"
@@ -106,7 +106,7 @@ public:
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
-  Optional<envoy::api::v2::core::ConfigSource> eds_config_;
+  absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -181,7 +181,7 @@ TEST_F(CdsApiImplTest, Basic) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
   expectAdd("cluster1");
   expectAdd("cluster3");
-  EXPECT_CALL(cm_, removePrimaryCluster("cluster2"));
+  EXPECT_CALL(cm_, removeCluster("cluster2"));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

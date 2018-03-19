@@ -157,6 +157,7 @@ private:
 
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
+  const std::chrono::milliseconds no_traffic_interval_;
   const std::chrono::milliseconds interval_jitter_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
@@ -233,7 +234,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  Optional<std::string> service_name_;
+  absl::optional<std::string> service_name_;
 };
 
 /**
@@ -514,7 +515,7 @@ private:
   }
 
   const Protobuf::MethodDescriptor& service_method_;
-  Optional<std::string> service_name_;
+  absl::optional<std::string> service_name_;
 };
 
 /**

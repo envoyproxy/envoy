@@ -21,8 +21,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  Optional<std::chrono::nanoseconds> duration(Optional<MonotonicTime> time) const {
-    if (!time.valid()) {
+  absl::optional<std::chrono::nanoseconds> duration(absl::optional<MonotonicTime> time) const {
+    if (!time) {
       return {};
     }
 
@@ -30,92 +30,92 @@ struct RequestInfoImpl : public RequestInfo {
                                                                 start_time_monotonic_);
   }
 
-  Optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
     return duration(last_downstream_rx_byte_received);
   }
 
   void onLastDownstreamRxByteReceived() override {
-    ASSERT(!last_downstream_rx_byte_received.valid());
-    last_downstream_rx_byte_received.value(std::chrono::steady_clock::now());
+    ASSERT(!last_downstream_rx_byte_received);
+    last_downstream_rx_byte_received = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(first_upstream_tx_byte_sent_);
   }
 
   void onFirstUpstreamTxByteSent() override {
-    ASSERT(!first_upstream_tx_byte_sent_.valid());
-    first_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    ASSERT(!first_upstream_tx_byte_sent_);
+    first_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
     return duration(last_upstream_tx_byte_sent_);
   }
 
   void onLastUpstreamTxByteSent() override {
-    ASSERT(!last_upstream_tx_byte_sent_.valid());
-    last_upstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    ASSERT(!last_upstream_tx_byte_sent_);
+    last_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
     return duration(first_upstream_rx_byte_received_);
   }
 
   void onFirstUpstreamRxByteReceived() override {
-    ASSERT(!first_upstream_rx_byte_received_.valid());
-    first_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
+    ASSERT(!first_upstream_rx_byte_received_);
+    first_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
+  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
     return duration(last_upstream_rx_byte_received_);
   }
 
   void onLastUpstreamRxByteReceived() override {
-    ASSERT(!last_upstream_rx_byte_received_.valid());
-    last_upstream_rx_byte_received_.value(std::chrono::steady_clock::now());
+    ASSERT(!last_upstream_rx_byte_received_);
+    last_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
     return duration(first_downstream_tx_byte_sent_);
   }
 
   void onFirstDownstreamTxByteSent() override {
-    ASSERT(!first_downstream_tx_byte_sent_.valid());
-    first_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    ASSERT(!first_downstream_tx_byte_sent_);
+    first_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
+  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
     return duration(last_downstream_tx_byte_sent_);
   }
 
   void onLastDownstreamTxByteSent() override {
-    ASSERT(!last_downstream_tx_byte_sent_.valid());
-    last_downstream_tx_byte_sent_.value(std::chrono::steady_clock::now());
+    ASSERT(!last_downstream_tx_byte_sent_);
+    last_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
   }
 
-  Optional<std::chrono::nanoseconds> requestComplete() const override {
+  absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(final_time_);
   }
 
   void onRequestComplete() override {
-    ASSERT(!final_time_.valid());
-    final_time_.value(std::chrono::steady_clock::now());
+    ASSERT(!final_time_);
+    final_time_ = std::chrono::steady_clock::now();
   }
 
   void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = Optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = Optional<MonotonicTime>{};
+    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
   }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
 
-  Optional<Http::Protocol> protocol() const override { return protocol_; }
+  absl::optional<Http::Protocol> protocol() const override { return protocol_; }
 
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
-  Optional<uint32_t> responseCode() const override { return response_code_; }
+  absl::optional<uint32_t> responseCode() const override { return response_code_; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
@@ -149,18 +149,18 @@ struct RequestInfoImpl : public RequestInfo {
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
 
-  Optional<MonotonicTime> last_downstream_rx_byte_received;
-  Optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  Optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  Optional<MonotonicTime> first_upstream_rx_byte_received_;
-  Optional<MonotonicTime> last_upstream_rx_byte_received_;
-  Optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  Optional<MonotonicTime> last_downstream_tx_byte_sent_;
-  Optional<MonotonicTime> final_time_;
+  absl::optional<MonotonicTime> last_downstream_rx_byte_received;
+  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> final_time_;
 
-  Optional<Http::Protocol> protocol_;
+  absl::optional<Http::Protocol> protocol_;
   uint64_t bytes_received_{};
-  Optional<uint32_t> response_code_;
+  absl::optional<uint32_t> response_code_;
   uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
