@@ -110,7 +110,8 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerSocketOption(const envoy::api::v2::Listener& config)
-      : transparent_(config.transparent()) {}
+      : has_transparent_(config.has_transparent()),
+        transparent_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {}
 
   // Network::Socket::Option
   bool setOption(Network::Socket& socket, Network::Socket::SocketState state) const override {
@@ -123,50 +124,57 @@ public:
     // both before and after bind().
     UNREFERENCED_PARAMETER(state);
 
-    const auto* ip = socket.localAddress()->ip();
-    if (ip == nullptr) {
-      // Do not fail when transparent option is not requested.
-      return transparent_ == false ? true : false; // Easier to read than just '!transparent_'
-    }
+    // Only set the socket option if optional "transparent" was included in config.
+    if (has_transparent_) {
+      const auto* ip = socket.localAddress()->ip();
+      if (ip == nullptr) {
+        return false; // Not applicable on non-IP sockets.
+      }
 
-    int error = 0;
+      int error = 0;
 
-    if (ip->version() == Network::Address::IpVersion::v4) {
+      if (ip->version() == Network::Address::IpVersion::v4) {
 #if defined(SOL_IP) && defined(IP_TRANSPARENT)
-      int option = transparent_;
-      if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) == -1) {
-        error = errno;
-      }
+        int option = transparent_;
+        if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
+          error = errno;
+        }
 #else
-      UNREFERENCED_PARAMETER(socket);
-      error = ENOTSUP;
+        error = ENOTSUP;
 #endif
-    } else if (ip->version() == Network::Address::IpVersion::v6) {
+      } else if (ip->version() == Network::Address::IpVersion::v6) {
+        // Some systems have IPV6_TRANSPARENT option, use it if available.
+        // Otherwise try with IP_TRANSPARENT also for IPv6, as many systems allow it.
 #if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
-      int option = transparent_;
-      if (setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option, sizeof(option)) == -1) {
-        error = errno;
-      }
+        int option = transparent_;
+        if (setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option, sizeof(option)) != 0) {
+          error = errno;
+        }
+#elif defined(SOL_IP) && defined(IP_TRANSPARENT)
+        int option = transparent_;
+        if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
+          error = errno;
+        }
 #else
-      UNREFERENCED_PARAMETER(socket);
-      error = ENOTSUP;
+        error = ENOTSUP;
 #endif
-    } else {
-      NOT_REACHED;
+      } else {
+        NOT_REACHED;
+      }
+
+      if (error != 0) {
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}", transparent_,
+                  strerror(error));
+        return false;
+      }
     }
-    // If we are unable to set the option we still return success for the default value (false),
-    // as we never changed the option to begin with. This also prevents failures in all current
-    // test cases that do not set the transparent option.
-    // We would not need this if the transparent option in the API would be optional.
-    if (error == 0 || !transparent_) {
-      return true;
-    }
-    ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
-    return false;
+
+    return true;
   }
   void hashKey(std::vector<uint8_t>&) const override {} // Not used for listener sockets.
 
 private:
+  bool has_transparent_;
   bool transparent_;
 };
 
@@ -192,7 +200,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   // Add listen socket options from the config.
-  setListenSocketOption(std::make_shared<ListenerSocketOption>(config));
+  if (config.has_transparent()) {
+    setListenSocketOption(std::make_shared<ListenerSocketOption>(config));
+  }
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
