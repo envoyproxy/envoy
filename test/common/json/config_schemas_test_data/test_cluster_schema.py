@@ -2,28 +2,28 @@ from util import get_blob
 from util import true, false
 
 CLUSTER_BLOB = {
-    "name": "foo", 
-    "connect_timeout_ms": 250, 
-    "type": "sds", 
-    "lb_type": "least_request", 
+    "name": "foo",
+    "connect_timeout_ms": 250,
+    "type": "sds",
+    "lb_type": "least_request",
     "features": "http2",
-    "service_name": "foo", 
+    "service_name": "foo",
     "health_check": {
-        "type": "http", 
-        "timeout_ms": 2000, 
-        "interval_ms": 10000, 
-        "interval_jitter_ms": 10000, 
-        "unhealthy_threshold": 2, 
-        "healthy_threshold": 2, 
-        "path": "/healthcheck", 
+        "type": "http",
+        "timeout_ms": 2000,
+        "interval_ms": 10000,
+        "interval_jitter_ms": 10000,
+        "unhealthy_threshold": 2,
+        "healthy_threshold": 2,
+        "path": "/healthcheck",
         "service_name": "foo"
-    }, 
+    },
     "outlier_detection": {}
 }
 
 
 def test(writer):
-    
+
     writer.write_test_file(
         'Valid',
         schema='CLUSTER_SCHEMA',
