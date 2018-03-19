@@ -62,7 +62,9 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 }
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer)
-    : grpc_metrics_streamer_(grpc_metrics_streamer) {}
+    : grpc_metrics_streamer_(grpc_metrics_streamer) {
+      time_upstream_rq_time = hist_alloc();
+    }
 } // namespace Metrics
 } // namespace Stats
 } // namespace Envoy

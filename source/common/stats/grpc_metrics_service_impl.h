@@ -16,6 +16,8 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include <circllhist.h>
+
 namespace Envoy {
 namespace Stats {
 namespace Metrics {
@@ -143,13 +145,20 @@ public:
     }
   }
 
-  void onHistogramComplete(const Histogram&, uint64_t) override {
+  void onHistogramComplete(const Histogram& hist, uint64_t value) override {
     // TODO : Need to figure out how to map existing histogram to Proto Model
+    std::cout<<"Histogram name"<<hist.name()<<"\n";
+    std::cout<<"Histogram value"<<value<<"\n";
+    if (hist.name().compare("cluster.time.upstream_rq_time") == 0) {
+      hist_insert(time_upstream_rq_time,value,1);
+    }
   }
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::service::metrics::v2::StreamMetricsMessage message_;
+  histogram_t* time_upstream_rq_time;
+
 };
 
 } // namespace Metrics
