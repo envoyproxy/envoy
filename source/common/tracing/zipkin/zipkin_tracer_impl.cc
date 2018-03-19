@@ -33,11 +33,9 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 
   // Set the sampled header.
-  request_headers.insertXB3Sampled().value().setReference(ZipkinCoreConstants::get().ALWAYS_SAMPLE);
-
-  // Set the ot-span-context header with the new context.
-  SpanContext context(span_);
-  request_headers.insertOtSpanContext().value(context.serializeToString());
+  request_headers.insertXB3Sampled().value().setReference(
+      span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
+                      : ZipkinCoreConstants::get().NOT_SAMPLED);
 }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
@@ -81,30 +79,17 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
                                    const std::string&, SystemTime start_time) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
+  bool sampled(true);
 
-  if (request_headers.OtSpanContext()) {
-    // Get the open-tracing span context.
-    // This header contains a span's parent-child relationships set by the downstream Envoy.
-    // The context built from this header allows the Zipkin tracer to
-    // properly set the span id and the parent span id.
-    SpanContext context;
+  if (request_headers.XB3Sampled()) {
+    // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
+    // zipkin tracers may still use that value, although should be 0 or 1.
+    sampled =
+        request_headers.XB3Sampled()->value().getString() == ZipkinCoreConstants::get().SAMPLED ||
+        request_headers.XB3Sampled()->value().getString() == "true";
+  }
 
-    context.populateFromString(request_headers.OtSpanContext()->value().c_str());
-
-    // Create either a child or a shared-context Zipkin span.
-    //
-    // An all-new child span will be started if the current context carries the SR annotation. In
-    // this case, we are dealing with an egress operation that causally succeeds a previous
-    // ingress operation. This envoy instance will be the the client-side of the new span, to which
-    // it will add the CS annotation.
-    //
-    // Differently, a shared-context span will be created if the current context carries the CS
-    // annotation. In this case, we are dealing with an ingress operation. This envoy instance,
-    // being at the receiving end, will add the SR annotation to the shared span context.
-
-    new_zipkin_span =
-        tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
-  } else if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
+  if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
     uint64_t trace_id(0);
     uint64_t span_id(0);
     uint64_t parent_id(0);
@@ -115,13 +100,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    SpanContext context(trace_id, span_id, parent_id);
+    SpanContext context(trace_id, span_id, parent_id, sampled);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
   } else {
     // Create a root Zipkin span. No context was found in the headers.
     new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+    new_zipkin_span->setSampled(sampled);
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));

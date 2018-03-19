@@ -102,6 +102,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Keep the same trace id
   span_ptr->setTraceId(previous_context.trace_id());
 
+  // Keep the same sampled flag
+  span_ptr->setSampled(previous_context.sampled());
+
   int64_t start_time_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
@@ -114,7 +117,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 }
 
 void Tracer::reportSpan(Span&& span) {
-  if (reporter_) {
+  if (reporter_ && span.sampled()) {
     reporter_->reportSpan(std::move(span));
   }
 }
