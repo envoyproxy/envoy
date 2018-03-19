@@ -767,7 +767,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"-1\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", "
+                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0, "
                            "\"enforced\": \"true\"}\n"))
       .WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
@@ -795,7 +795,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
                            "\"30\", \"cluster\": "
                            "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": \"0\", "
+                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0, "
                            "\"enforced\": \"false\", "
                            "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
                            "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""

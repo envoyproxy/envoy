@@ -102,6 +102,7 @@ public:
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
+  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
   static const std::string DEFAULT_SERVER_STRING;
 

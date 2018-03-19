@@ -41,9 +41,12 @@ if your PR involves documentation changes. Please write in N/A if there were no
 documentation changes.
 
 *Release Notes*:
->If this change is user impacting you **must** add a release note to
-[RAW_RELEASE_NOTES.md](RAW_RELEASE_NOTES.md). Thank you! Please write in N/A if
-there are no release notes.
+>If this change is user impacting you **must** add a release note via a discrete PR to
+[version_history.rst](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst).
+Please include any relevant links. Each release note should be prefixed with the relevant subsystem
+in alphabetical order (see existing examples as a guide) and include links to relevant parts of
+the documentation. Often times, this PR can be done concurrently with the main documentation PR
+for the feature. Thank you! Please write in N/A if there are no release notes.
 
 [Optional Fixes #Issue]
 

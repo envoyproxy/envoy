@@ -427,22 +427,31 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
-void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                                 const std::list<Stats::GaugeSharedPtr>& gauges,
-                                                 Buffer::Instance& response) {
+uint64_t
+PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                            const std::list<Stats::GaugeSharedPtr>& gauges,
+                                            Buffer::Instance& response) {
+  std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
     const std::string tags = formattedTags(counter->tags());
     const std::string metric_name = metricName(counter->tagExtractedName());
-    response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
     const std::string tags = formattedTags(gauge->tags());
     const std::string metric_name = metricName(gauge->tagExtractedName());
-    response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
+  return metric_type_tracker.size();
 }
 
 std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
