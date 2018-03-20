@@ -424,7 +424,7 @@ void HttpIntegrationTest::testDrainClose() {
   response_->waitForEndStream();
 
   EXPECT_TRUE(response_->complete());
-
+  codec_client_->waitForDisconnect();
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
