@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/config:well_known_names",
         "//source/common/http:message_lib",
         "//source/common/lua:lua_lib",
         "//source/common/lua:wrappers_lib",
@@ -31,6 +32,7 @@ envoy_cc_library(
     hdrs = ["wrappers.h"],
     deps = [
         "//include/envoy/http:header_map_interface",
+        "//source/common/config:well_known_names",
         "//source/common/lua:lua_lib",
     ],
 )

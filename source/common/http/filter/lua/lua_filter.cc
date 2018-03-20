@@ -355,6 +355,17 @@ int StreamHandleWrapper::luaTrailers(lua_State* state) {
   }
 }
 
+int StreamHandleWrapper::luaMetadata(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Envoy::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()),
+                            true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
   const char* message = luaL_checkstring(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
@@ -395,6 +406,8 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
   lua_state_.registerType<Envoy::Lua::BufferWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapIterator>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
