@@ -84,6 +84,7 @@
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up
   [here](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+* Contact rdl@ on Slack so that the website can be updated for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact CNCF and have the Envoy account
   post).
