@@ -1280,7 +1280,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
             fd = socket.fd();
             return true;
           }));
-      context.setListenSocketOption(option_);
+      context.addListenSocketOption(option_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
       };
@@ -1353,7 +1353,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
                                  Configuration::ListenerFactoryContext& context) override {
       EXPECT_CALL(*option_, setOption(_, Network::Socket::SocketState::PreBind))
           .WillOnce(Return(false));
-      context.setListenSocketOption(option_);
+      context.addListenSocketOption(option_);
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
       };

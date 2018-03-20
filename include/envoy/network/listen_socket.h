@@ -60,12 +60,12 @@ public:
   typedef std::shared_ptr<std::vector<OptionSharedPtr>> OptionsSharedPtr;
 
   /**
-   * Set the socket options for later retrieval with options().
+   * Add a socket option visitor for later retrieval with options().
    */
-  virtual void setOption(const OptionSharedPtr&) PURE;
+  virtual void addOption(const OptionSharedPtr&) PURE;
 
   /**
-   * @return the socket options stored earlier with setOption() calls, if any.
+   * @return the socket options stored earlier with addOption() calls, if any.
    */
   virtual const OptionsSharedPtr& options() const PURE;
 };

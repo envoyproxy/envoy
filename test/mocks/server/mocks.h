@@ -374,7 +374,7 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
 
-  MOCK_METHOD1(setListenSocketOption, void(const Network::Socket::OptionSharedPtr&));
+  MOCK_METHOD1(addListenSocketOption, void(const Network::Socket::OptionSharedPtr&));
 };
 
 } // namespace Configuration

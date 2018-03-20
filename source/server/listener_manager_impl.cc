@@ -202,7 +202,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
 
   // Add listen socket options from the config.
   if (config.has_transparent()) {
-    setListenSocketOption(std::make_shared<ListenerSocketOption>(config));
+    addListenSocketOption(std::make_shared<ListenerSocketOption>(config));
   }
 
   if (!config.listener_filters().empty()) {

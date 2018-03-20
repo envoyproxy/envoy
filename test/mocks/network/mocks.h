@@ -261,7 +261,7 @@ public:
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
-  MOCK_METHOD1(setOption, void(const Socket::OptionSharedPtr& options));
+  MOCK_METHOD1(addOption, void(const Socket::OptionSharedPtr& option));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
   Address::InstanceConstSharedPtr local_address_;
@@ -287,7 +287,7 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD1(setOption, void(const Network::ConnectionSocket::OptionSharedPtr&));
+  MOCK_METHOD1(addOption, void(const Network::ConnectionSocket::OptionSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());

@@ -257,7 +257,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOption(option);
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -305,7 +305,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->setOption(option);
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
