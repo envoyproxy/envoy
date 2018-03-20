@@ -612,6 +612,26 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
       EnvoyException);
 }
 
+TEST(StaticClusterImplTest, MalformedHostIP) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com }}]
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl(parseClusterFromV2Yaml(yaml), runtime, stats,
+                                              ssl_context_manager, cm, false),
+                            EnvoyException,
+                            "malformed IP address: foo.bar.com. Consider setting resolver_name or "
+                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
 TEST(ClusterDefinitionTest, BadClusterConfig) {
   const std::string json = R"EOF(
   {
@@ -821,20 +841,6 @@ TEST(HostsPerLocalityImpl, Filter) {
     const std::vector<HostVector> expected_locality_hosts = {{}, {host_1}};
     EXPECT_EQ(expected_locality_hosts, filtered->get());
   }
-}
-
-TEST(NetworkAddressResolverWrapperTest, MalformedIP) {
-  envoy::api::v2::core::Address address;
-  auto socket = address.mutable_socket_address();
-  socket->set_address("foo.bar.io");
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address, envoy::api::v2::Cluster::STATIC),
-                            EnvoyException,
-                            "malformed IP address: foo.bar.io. Consider setting resolver_name or "
-                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address, envoy::api::v2::Cluster::EDS),
-                            EnvoyException,
-                            "malformed IP address: foo.bar.io. Consider setting resolver_name or "
-                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
 } // namespace

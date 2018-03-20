@@ -428,6 +428,21 @@ void ClusterImplBase::reloadHealthyHosts() {
   }
 }
 
+const Network::Address::InstanceConstSharedPtr
+ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& address) {
+  try {
+    return Network::Address::resolveProtoAddress(address);
+  } catch (EnvoyException& e) {
+    if (info_->type() == envoy::api::v2::Cluster::STATIC ||
+        info_->type() == envoy::api::v2::Cluster::EDS) {
+      throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
+                                       "to 'STRICT_DNS' or 'LOGICAL_DNS'",
+                                       e.what()));
+    }
+    throw e;
+  }
+}
+
 ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluster& config,
                                                     Runtime::Loader& runtime,
                                                     const std::string& cluster_name) {
@@ -487,10 +502,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(
-        HostSharedPtr{new HostImpl(info_, "", resolveProtoAddress(host, info_->type()),
-                                   envoy::api::v2::core::Metadata::default_instance(), 1,
-                                   envoy::api::v2::core::Locality().default_instance())});
+    initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
+        info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
+        envoy::api::v2::core::Locality().default_instance())});
   }
 }
 
@@ -703,22 +717,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
-}
-
-const Network::Address::InstanceConstSharedPtr
-resolveProtoAddress(const envoy::api::v2::core::Address& address,
-                    const envoy::api::v2::Cluster::DiscoveryType& cluster_type) {
-  try {
-    return Network::Address::resolveProtoAddress(address);
-  } catch (EnvoyException& e) {
-    if (cluster_type == envoy::api::v2::Cluster::STATIC ||
-        cluster_type == envoy::api::v2::Cluster::EDS) {
-      throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
-                                       "to 'STRICT_DNS' or 'LOGICAL_DNS'",
-                                       e.what()));
-    }
-    throw e;
-  }
 }
 
 } // namespace Upstream
