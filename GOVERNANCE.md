@@ -66,7 +66,8 @@
 
 ## Cutting a release
 
-* We do releases approximately every 3 months as described [here](CONTRIBUTING.md#release-cadence).
+* We do releases approximately every 3 months as described in the
+  [release cadence documentation](CONTRIBUTING.md#release-cadence).
 * Decide on the somewhat arbitrary time that a release will occur.
 * Begin marshalling the ongoing PR flow in both this repo and
   [data-plane-api](https://github.com/envoyproxy/data-plane-api). Try to push out any particularly
@@ -82,8 +83,8 @@
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0".
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
-  the final docs. The final documentation will end up
-  [here](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+  the final docs. The final documentation will end up in the
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
 * Contact rdl@ on Slack so that the website can be updated for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact CNCF and have the Envoy account
