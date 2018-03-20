@@ -191,8 +191,8 @@ public:
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
-  void addClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
-  void removeClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+  void addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+  void removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
 private:
   /**

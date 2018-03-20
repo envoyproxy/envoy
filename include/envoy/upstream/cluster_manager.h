@@ -176,11 +176,12 @@ public:
    * in the ClusterManager.
    * The callbacks will be registered in a thread local slot and the callbacks will be executed
    * on the thread that registered them.
+   * To be executed on all threads, Callbacks need to be registered on all threads.
    *
    * @param callbacks are the ClusterUpdateCallbacks to add or remove to the cluster manager.
    */
-  virtual void addClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
-  virtual void removeClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+  virtual void addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+  virtual void removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

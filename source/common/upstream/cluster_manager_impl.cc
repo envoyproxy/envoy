@@ -609,12 +609,12 @@ const std::string ClusterManagerImpl::versionInfo() const {
   return "static";
 }
 
-void ClusterManagerImpl::addClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+void ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
   cluster_manager.update_callbacks_.insert(&cb);
 }
 
-void ClusterManagerImpl::removeClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+void ClusterManagerImpl::removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
   cluster_manager.update_callbacks_.erase(&cb);
 }

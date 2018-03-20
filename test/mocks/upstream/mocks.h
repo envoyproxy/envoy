@@ -161,8 +161,8 @@ public:
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
-  MOCK_METHOD1(addClusterUpdateCallbacks, void(ClusterUpdateCallbacks& callbacks));
-  MOCK_METHOD1(removeClusterUpdateCallbacks, void(ClusterUpdateCallbacks& callbacks));
+  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks, void(ClusterUpdateCallbacks& callbacks));
+  MOCK_METHOD1(removeThreadLocalClusterUpdateCallbacks, void(ClusterUpdateCallbacks& callbacks));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
