@@ -62,10 +62,6 @@ TEST_F(LuaBufferWrapperTest, GetBytesInvalidParams) {
 TEST_F(LuaMetadataMapWrapperTest, Methods) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
-      for key, value in pairs(object) do
-        testPrint(string.format("'%s' '%s'", key, value["name"]))
-      end
-
       recipe = object:get("make.delicious.bread")
 
       testPrint(recipe["name"])
@@ -118,15 +114,14 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
         make.nothing:
           name: nothing
           value: ~
+        make.nothing1:
+          name: nothing
+          value: ~
     )EOF";
 
   envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
   const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
-
-  EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
-  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
-  EXPECT_CALL(*this, testPrint("'make.nothing' 'nothing'"));
 
   EXPECT_CALL(*this, testPrint("pulla"));
   EXPECT_CALL(*this, testPrint("finland"));
@@ -145,6 +140,50 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
 
   EXPECT_CALL(*this, testPrint("nil"));
   EXPECT_CALL(*this, testPrint("0"));
+
+  start("callMe");
+}
+
+// Iterate over the (unordered) underlying map.
+TEST_F(LuaMetadataMapWrapperTest, Iterators) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      for key, value in pairs(object) do
+        testPrint(string.format("'%s' '%s'", key, value["name"]))
+      end
+    end
+    )EOF"};
+
+  const std::string yaml = R"EOF(
+    filter_metadata:
+      envoy.lua:
+        make.delicious.bread:
+          name: pulla
+        make.delicious.cookie:
+          name: chewy
+        make.nothing0:
+          name: nothing
+          value: ~
+        make.nothing1:
+          name: nothing
+          value: ~
+        make.nothing2:
+          name: nothing
+          value: ~
+    )EOF";
+
+  // The underlying map is unordered.
+  setup(SCRIPT);
+
+  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
+
+  EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
+  EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
+  EXPECT_CALL(*this, testPrint("'make.nothing0' 'nothing'"));
+  EXPECT_CALL(*this, testPrint("'make.nothing1' 'nothing'"));
+  EXPECT_CALL(*this, testPrint("'make.nothing2' 'nothing'"));
 
   start("callMe");
 }
