@@ -70,13 +70,13 @@
   [release cadence documentation](CONTRIBUTING.md#release-cadence).
 * Decide on the somewhat arbitrary time that a release will occur.
 * Begin marshalling the ongoing PR flow in both this repo and
-  [data-plane-api](https://github.com/envoyproxy/data-plane-api). Try to push out any particularly
-  risky PRs until after the release is tagged. This is because we currently don't use release
-  branches and assume that master is RC quality at all times. At the same time, try to make sure
-  that data-plane-api doc PRs are only merged *after* the Envoy PR so that we don't wind up with
-  stale docs.
-* Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst).
-  Make any needed corrections.
+  [data-plane-api](https://github.com/envoyproxy/data-plane-api). Ask maintainers to hold off
+  merging any particularly risky PRs until after the release is tagged. This is because we currently
+  don't use release branches and assume that master is RC quality at all times. At the same time,
+  try to make sure that data-plane-api doc PRs are only merged *after* the Envoy PR so that we don't
+  wind up with stale docs.
+* Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
+  and make any needed corrections.
 * Update the [data-plane-api SHA in Envoy](https://github.com/envoyproxy/envoy/blob/ed312500ec38876446ce8ee70a06f7cda4adc937/bazel/repository_locations.bzl#L79)
   to the final release SHA. Get the PR approved and merge.
 * **Wait for tests to pass on master.**
@@ -87,8 +87,8 @@
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
 * Contact rdl@ on Slack so that the website can be updated for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
-* If possible post on Twitter (either have Matt do it or contact CNCF and have the Envoy account
-  post).
+* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the 
+  Envoy account post).
 
 ## When does a maintainer lose maintainer status
 
