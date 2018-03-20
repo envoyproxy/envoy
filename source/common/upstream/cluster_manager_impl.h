@@ -191,8 +191,8 @@ public:
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
-  void addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
-  void removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+  std::unique_ptr<CallbackRegistration>
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
 private:
   /**
@@ -263,7 +263,7 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
-    std::set<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
+    std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
 
@@ -286,6 +286,15 @@ private:
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  };
+
+  struct CallbackRegistrationImpl : public CallbackRegistration {
+    CallbackRegistrationImpl(ClusterUpdateCallbacks* cb, std::list<ClusterUpdateCallbacks*>& ll);
+    ~CallbackRegistrationImpl() override;
+
+  private:
+    std::list<ClusterUpdateCallbacks*>::iterator entry;
+    std::list<ClusterUpdateCallbacks*>& list;
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;

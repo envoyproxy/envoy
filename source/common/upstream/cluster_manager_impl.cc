@@ -422,7 +422,7 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
             auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
                 cluster_manager, new_cluster, thread_aware_lb_factory);
             cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-            for (auto* cb : cluster_manager.update_callbacks_) {
+            for (auto& cb : cluster_manager.update_callbacks_) {
               cb->onClusterAddOrUpdate(*thread_local_cluster);
             }
           });
@@ -445,7 +445,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
       cluster_manager.thread_local_clusters_.erase(cluster_name);
-      for (auto* cb : cluster_manager.update_callbacks_) {
+      for (auto& cb : cluster_manager.update_callbacks_) {
         cb->onClusterRemoval(cluster_name);
       }
     });
@@ -609,14 +609,21 @@ const std::string ClusterManagerImpl::versionInfo() const {
   return "static";
 }
 
-void ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+std::unique_ptr<CallbackRegistration>
+ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
-  cluster_manager.update_callbacks_.insert(&cb);
+  return std::make_unique<CallbackRegistrationImpl>(&cb, cluster_manager.update_callbacks_);
 }
 
-void ClusterManagerImpl::removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
-  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
-  cluster_manager.update_callbacks_.erase(&cb);
+ClusterManagerImpl::CallbackRegistrationImpl::CallbackRegistrationImpl(
+    ClusterUpdateCallbacks* cb, std::list<ClusterUpdateCallbacks*>& ll)
+    : list(ll) {
+  entry = ll.emplace(ll.begin(), cb);
+}
+
+ClusterManagerImpl::CallbackRegistrationImpl::~CallbackRegistrationImpl() {
+  ASSERT(std::find(list.begin(), list.end(), *entry) != list.end());
+  list.erase(entry);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(

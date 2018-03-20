@@ -46,6 +46,15 @@ public:
 };
 
 /**
+ * CallbackRegistration is a RAII wrapper for a ClusterUpdateCallbacks. Deleting
+ * the CallbackRegistration will remove the callbacks from ClusterManager in O(1).
+ */
+class CallbackRegistration {
+public:
+  virtual ~CallbackRegistration() {}
+};
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  */
@@ -172,16 +181,17 @@ public:
   virtual const std::string& localClusterName() const PURE;
 
   /**
-   * These two methods allow to register and unregister callbacks for cluster lifecycle events
-   * in the ClusterManager.
+   * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
    * The callbacks will be registered in a thread local slot and the callbacks will be executed
    * on the thread that registered them.
    * To be executed on all threads, Callbacks need to be registered on all threads.
    *
    * @param callbacks are the ClusterUpdateCallbacks to add or remove to the cluster manager.
+   * @return std::unique_ptr<CallbackRegistration> a RAII that needs to be deleted to unregister
+   *                                               the callback.
    */
-  virtual void addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
-  virtual void removeThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+  virtual std::unique_ptr<CallbackRegistration>
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
