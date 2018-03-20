@@ -32,7 +32,7 @@ public:
   }
 
   void raiseGoAway() { onGoAway(); }
-  Event::Timer* idleTimer() { return idle_timer_.get(); }
+  Event::TimerPtr idleTimer() { return std::move(idle_timer_); }
   DestroyCb destroy_cb_;
 };
 
