@@ -51,7 +51,19 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
 
     lua_createtable(state, values_size, 0);
     for (int i = 0; i < values_size; i++) {
+      // Here we want to push the value of list.values(i) to an array (or a list), which is in lua
+      // is just a name for a table used in a specific way (it treats an index as a key). Basically,
+      // we want to have: `elements[i] = list.value(i)`, where 'elements' is a 'table', and
+      // 'elements[i]' is also a table.
+      //
+      // Firstly, we need to push the value to the stack.
       setValue(state, list.values(i));
+
+      // Secondly, after the `list.value(i)` is pushed to the stack, we need to set that value to
+      // the 'current element' (it appears as a table). The `lua_rawseti(state, t, i)` helps us to
+      // set the value to table `t` with key `i`. Given the index of the current element in the
+      // stack is below the value i.e. -2 and the key (refers to where the element is in the table)
+      // is i + 1 (note that in lua index starts from 1), hence we have:
       lua_rawseti(state, -2, i + 1);
     }
     return;
