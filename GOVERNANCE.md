@@ -64,6 +64,32 @@
   being actively covered by someone.
 * The on-call rotation is tracked at PagerDuty. The calendar is visible [here](https://pagerduty.github.io/addons/PDcal/index.html?iCalURL=https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH) or you can subscribe to the iCal feed [here](https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH).
 
+## Cutting a release
+
+* We do releases approximately every 3 months as described in the
+  [release cadence documentation](CONTRIBUTING.md#release-cadence).
+* Decide on the somewhat arbitrary time that a release will occur.
+* Begin marshalling the ongoing PR flow in both this repo and
+  [data-plane-api](https://github.com/envoyproxy/data-plane-api). Ask maintainers to hold off
+  merging any particularly risky PRs until after the release is tagged. This is because we currently
+  don't use release branches and assume that master is RC quality at all times. At the same time,
+  try to make sure that data-plane-api doc PRs are only merged *after* the Envoy PR so that we don't
+  wind up with stale docs.
+* Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
+  and make any needed corrections.
+* Update the [data-plane-api SHA in Envoy](https://github.com/envoyproxy/envoy/blob/ed312500ec38876446ce8ee70a06f7cda4adc937/bazel/repository_locations.bzl#L79)
+  to the final release SHA. Get the PR approved and merge.
+* **Wait for tests to pass on master.**
+* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
+  start with "v" and be followed by the version number. E.g., "v1.6.0".
+* Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
+  the final docs. The final documentation will end up in the
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+* Contact rdl@ on Slack so that the website can be updated for the new release.
+* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
+* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the 
+  Envoy account post).
+
 ## When does a maintainer lose maintainer status
 
 If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they
