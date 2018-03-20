@@ -325,7 +325,7 @@ void ConnPoolImpl::ActiveClient::onConnectTimeout() {
 
 CodecClientPtr ConnPoolImplProd::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
-                                           data.host_description_)};
+                                           data.host_description_, dispatcher_)};
   return codec;
 }
 

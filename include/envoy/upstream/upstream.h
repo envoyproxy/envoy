@@ -283,6 +283,7 @@ public:
   COUNTER  (upstream_cx_http2_total)                                                               \
   COUNTER  (upstream_cx_connect_fail)                                                              \
   COUNTER  (upstream_cx_connect_timeout)                                                           \
+  COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
   COUNTER  (upstream_cx_overflow)                                                                  \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
@@ -382,6 +383,11 @@ public:
    * @return the connect timeout for upstream hosts that belong to this cluster.
    */
   virtual std::chrono::milliseconds connectTimeout() const PURE;
+
+  /**
+   * @return the idle timeout for upstream connection pool connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return soft limit on size of the cluster's connections read and write buffers.

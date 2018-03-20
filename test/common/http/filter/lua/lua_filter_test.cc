@@ -43,6 +43,7 @@ public:
         }));
 
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(decoder_callbacks_, route()).Times(AtLeast(0));
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
@@ -52,7 +53,6 @@ public:
           }
           encoder_callbacks_.buffer_->move(data);
         }));
-
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
   }
 
@@ -65,12 +65,19 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  void setupMetadata(const std::string& yaml) {
+    MessageUtil::loadFromYaml(yaml, metadata_);
+    EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
+        .WillOnce(testing::ReturnRef(metadata_));
+  }
+
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
   std::unique_ptr<TestFilter> filter_;
   MockStreamDecoderFilterCallbacks decoder_callbacks_;
   MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  envoy::api::v2::core::Metadata metadata_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1352,6 +1359,40 @@ TEST_F(LuaHttpFilterTest, BodyAfterStreamingHasStarted) {
       scriptLog(spdlog::level::err,
                 StrEq("[string \"...\"]:4: cannot call body() after body streaming has started")));
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+}
+
+// script touch metadata():get("key")
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["name"])
+      request_handle:logTrace(request_handle:metadata():get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.lua:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("baz")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bat")));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace Lua

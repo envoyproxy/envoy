@@ -195,6 +195,99 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
+// Tests idle timeout behaviour with single request and validates that idle timer kicks in
+// after given timeout.
+TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
+
+// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
+// after both the requests are done.
+TEST_P(Http2IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
+
+// Interleave two requests and responses and make sure that idle timeout is handled correctly.
+TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
+  FakeHttpConnectionPtr fake_upstream_connection1;
+  FakeHttpConnectionPtr fake_upstream_connection2;
+  Http::StreamEncoder* encoder1;
+  Http::StreamEncoder* encoder2;
+  IntegrationStreamDecoderPtr response1(new IntegrationStreamDecoder(*dispatcher_));
+  IntegrationStreamDecoderPtr response2(new IntegrationStreamDecoder(*dispatcher_));
+  FakeStreamPtr upstream_request1;
+  FakeStreamPtr upstream_request2;
+  int32_t request1_bytes = 1024;
+  int32_t request2_bytes = 512;
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(1000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start request 1
+  encoder1 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                  {":path", "/test/long/url"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "host"}},
+                                          *response1);
+
+  fake_upstream_connection1 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request1 = fake_upstream_connection1->waitForNewStream(*dispatcher_);
+
+  // Start request 2
+  response2.reset(new IntegrationStreamDecoder(*dispatcher_));
+  encoder2 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                  {":path", "/test/long/url"},
+                                                                  {":scheme", "http"},
+                                                                  {":authority", "host"}},
+                                          *response2);
+  fake_upstream_connection2 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request2 = fake_upstream_connection2->waitForNewStream(*dispatcher_);
+
+  // Finish request 1
+  codec_client_->sendData(*encoder1, request1_bytes, true);
+  upstream_request1->waitForEndStream(*dispatcher_);
+
+  // Finish request 2
+  codec_client_->sendData(*encoder2, request2_bytes, true);
+  upstream_request2->waitForEndStream(*dispatcher_);
+
+  // Respond to request 2
+  upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request2->encodeData(request2_bytes, true);
+  response2->waitForEndStream();
+  EXPECT_TRUE(upstream_request2->complete());
+  EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ(request2_bytes, response2->body().size());
+
+  // Validate that idle time is not kicked in.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_idle_timeout")->value());
+  EXPECT_NE(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  // Respond to request 1
+  upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request1->encodeData(request2_bytes, true);
+  response1->waitForEndStream();
+  EXPECT_TRUE(upstream_request1->complete());
+  EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ(request2_bytes, response1->body().size());
+
+  // Do not send any requests and validate idle timeout kicks in after both the requests are done.
+  fake_upstream_connection1->waitForDisconnect();
+  fake_upstream_connection2->waitForDisconnect();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+}
+
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
 void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
