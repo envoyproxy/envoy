@@ -422,7 +422,7 @@ void HttpIntegrationTest::testDrainClose() {
                                                                {":authority", "host"}},
                                        *response_);
   response_->waitForEndStream();
-  
+
   EXPECT_TRUE(response_->complete());
 
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
