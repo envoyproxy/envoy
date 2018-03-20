@@ -413,10 +413,10 @@ public:
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
   /**
-   * Wrapper around Network::Address::resolveProtoAddress() to catch the specific error in relation
-   * with envoy::api::v2::Cluster::DiscoveryType hence we can throw more meaningful message.
+   * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
+   * based on the cluster's type.
    * @param address supplies the address proto to resolve.
-   * @return pointer to the Instance from a envoy::api::v2::core::Address.
+   * @return Network::Address::InstanceConstSharedPtr the resolved address.
    */
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
