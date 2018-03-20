@@ -141,7 +141,10 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
       }));
 
   Http::MockStreamDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
   Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
@@ -155,6 +158,7 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
   // Close the client and validate idleTimer is reset
   EXPECT_EQ(client_->numActiveRequests(), 0);
   client_->close();
+  connection_cb_->onEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
 
