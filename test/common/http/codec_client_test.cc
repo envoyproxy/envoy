@@ -52,7 +52,9 @@ public:
     codec_ = new Http::MockClientConnection();
 
     Network::ClientConnectionPtr connection{connection_};
-    client_.reset(new CodecClientForTest(std::move(connection), codec_, nullptr, host_));
+    EXPECT_CALL(dispatcher_, createTimer_(_));
+    client_.reset(
+        new CodecClientForTest(std::move(connection), codec_, nullptr, host_, dispatcher_));
   }
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
@@ -63,7 +65,8 @@ public:
   std::unique_ptr<CodecClientForTest> client_;
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterSharedPtr filter_;
-  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
+      new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
 };
@@ -128,6 +131,82 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
   connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
+  Http::StreamDecoder* inner_decoder;
+  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockStreamDecoder outer_decoder;
+  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+
+  Http::HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
+  inner_decoder->decodeHeaders(std::move(response_headers), false);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(outer_decoder, decodeData(Ref(buffer), true));
+  inner_decoder->decodeData(buffer, true);
+  EXPECT_NE(client_->idleTimer(), nullptr);
+
+  // Close the client and validate idleTimer is reset
+  EXPECT_EQ(client_->numActiveRequests(), 0);
+  client_->close();
+  connection_cb_->onEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(client_->idleTimer(), nullptr);
+}
+
+TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
+  Http::StreamDecoder* inner_decoder;
+  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockStreamDecoder outer_decoder;
+  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+
+  // When we get a remote close with an active request validate idleTimer is reset after client
+  // close
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(*codec_, dispatch(_));
+  EXPECT_NE(client_->numActiveRequests(), 0);
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(client_->idleTimer(), nullptr);
+}
+
+TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
+  Http::StreamDecoder* inner_decoder;
+  NiceMock<Http::MockStreamEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder) -> Http::StreamEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockStreamDecoder outer_decoder;
+  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+
+  // When we get a local close with an active request validate idleTimer is reset after client close
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  connection_cb_->onEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(client_->idleTimer(), nullptr);
+}
+
 TEST_F(CodecClientTest, ProtocolError) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Throw(CodecProtocolException("protocol error")));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -186,7 +265,8 @@ public:
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_.reset(new CodecClientForTest(std::move(client_connection), codec_, nullptr, host_));
+    client_.reset(
+        new CodecClientForTest(std::move(client_connection), codec_, nullptr, host_, *dispatcher_));
 
     EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {

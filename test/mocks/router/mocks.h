@@ -244,6 +244,7 @@ public:
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
+  envoy::api::v2::core::Metadata metadata_;
 };
 
 class MockDecorator : public Decorator {

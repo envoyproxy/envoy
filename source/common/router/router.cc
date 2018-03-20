@@ -802,6 +802,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   }
   clearRequestEncoder();
 
+  request_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_, request_info_);
   }
@@ -814,6 +815,7 @@ void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& head
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   // TODO(rodaine): This is actually measuring after the headers are parsed and not the first byte.
+  request_info_.onFirstUpstreamRxByteReceived();
   parent_.callbacks_->requestInfo().onFirstUpstreamRxByteReceived();
   maybeEndDecode(end_stream);
 
@@ -836,6 +838,7 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
   if (end_stream) {
+    request_info_.onLastUpstreamRxByteReceived();
     parent_.callbacks_->requestInfo().onLastUpstreamRxByteReceived();
   }
 }
@@ -872,6 +875,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     request_info_.bytes_sent_ += data.length();
     request_encoder_->encodeData(data, end_stream);
     if (end_stream) {
+      request_info_.onLastUpstreamTxByteSent();
       parent_.callbacks_->requestInfo().onLastUpstreamTxByteSent();
     }
   }
@@ -887,6 +891,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   } else {
     ENVOY_STREAM_LOG(trace, "proxying trailers", *parent_.callbacks_);
     request_encoder_->encodeTrailers(trailers);
+    request_info_.onLastUpstreamTxByteSent();
     parent_.callbacks_->requestInfo().onLastUpstreamTxByteSent();
   }
 }
@@ -975,6 +980,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     span_->injectContext(*parent_.downstream_headers_);
   }
 
+  request_info_.onFirstUpstreamTxByteSent();
   parent_.callbacks_->requestInfo().onFirstUpstreamTxByteSent();
   request_encoder.encodeHeaders(*parent_.downstream_headers_,
                                 !buffered_request_body_ && encode_complete_ && !encode_trailers_);
@@ -998,6 +1004,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
     }
 
     if (encode_complete_) {
+      request_info_.onLastUpstreamTxByteSent();
       parent_.callbacks_->requestInfo().onLastUpstreamTxByteSent();
     }
   }

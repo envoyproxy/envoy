@@ -243,33 +243,68 @@ TEST_F(ZipkinDriverTest, FlushSpansTimer) {
   EXPECT_EQ(1U, stats_.counter("tracing.zipkin.spans_sent").value());
 }
 
-TEST_F(ZipkinDriverTest, SerializeAndDeserializeContext) {
+TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   setupValidDriver();
 
-  // Supply bogus context, that will be simply ignored.
-  const std::string invalid_context = "notvalidcontext";
-  request_headers_.insertOtSpanContext().value(invalid_context);
-  driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  EXPECT_EQ(nullptr, request_headers_.XB3SpanId());
+  EXPECT_EQ(nullptr, request_headers_.XB3TraceId());
 
-  std::string injected_ctx = request_headers_.OtSpanContext()->value().c_str();
-  EXPECT_FALSE(injected_ctx.empty());
-
-  // Supply empty context.
-  request_headers_.removeOtSpanContext();
+  // Only context header set is B3 sampled to indicate trace should not be sampled
+  request_headers_.insertXB3Sampled().value(ZipkinCoreConstants::get().NOT_SAMPLED);
   Tracing::SpanPtr span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
 
-  EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
+  request_headers_.removeXB3Sampled();
+
   span->injectContext(request_headers_);
 
-  injected_ctx = request_headers_.OtSpanContext()->value().c_str();
-  EXPECT_FALSE(injected_ctx.empty());
+  // Check B3 sampled flag is set to not sample
+  EXPECT_TRUE(ZipkinCoreConstants::get().NOT_SAMPLED.compare(
+                  request_headers_.XB3Sampled()->value().getString()) == 0);
+}
 
-  // Supply parent context, request_headers has properly populated x-ot-span-context.
-  Tracing::SpanPtr span_with_parent =
+TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
+  setupValidDriver();
+
+  EXPECT_EQ(nullptr, request_headers_.XB3SpanId());
+  EXPECT_EQ(nullptr, request_headers_.XB3TraceId());
+
+  // Only context header set is B3 sampled to indicate trace should not be sampled (using legacy
+  // 'false' value)
+  const std::string sampled = "false";
+  request_headers_.insertXB3Sampled().value(sampled);
+  Tracing::SpanPtr span =
       driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-  injected_ctx = request_headers_.OtSpanContext()->value().c_str();
-  EXPECT_FALSE(injected_ctx.empty());
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to not sample
+  EXPECT_TRUE(ZipkinCoreConstants::get().NOT_SAMPLED.compare(
+                  request_headers_.XB3Sampled()->value().getString()) == 0);
+}
+
+TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
+  setupValidDriver();
+
+  EXPECT_EQ(nullptr, request_headers_.XB3SpanId());
+  EXPECT_EQ(nullptr, request_headers_.XB3TraceId());
+
+  // Only context header set is B3 sampled to indicate trace should be sampled (using legacy
+  // 'true' value)
+  const std::string sampled = "true";
+  request_headers_.insertXB3Sampled().value(sampled);
+  Tracing::SpanPtr span =
+      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to sample
+  EXPECT_TRUE(ZipkinCoreConstants::get().SAMPLED.compare(
+                  request_headers_.XB3Sampled()->value().getString()) == 0);
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
@@ -334,29 +369,6 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
 }
 
-TEST_F(ZipkinDriverTest, ZipkinSpanContextFromOtSpanContextHeaderTest) {
-  setupValidDriver();
-
-  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string context =
-      trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
-
-  request_headers_.insertOtSpanContext().value(context);
-
-  // New span will have an SR annotation - so its span and parent ids will be
-  // the same as the supplied span context (i.e. shared context)
-  Tracing::SpanPtr span =
-      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
-
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-
-  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
-  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
-  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
-}
-
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   setupValidDriver();
 
@@ -378,6 +390,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
   EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
   EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->span().sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {

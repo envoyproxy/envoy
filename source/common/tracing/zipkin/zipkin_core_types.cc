@@ -148,6 +148,7 @@ Span::Span(const Span& span) {
     parent_id_ = span.parentId();
   }
   debug_ = span.debug();
+  sampled_ = span.sampled();
   annotations_ = span.annotations();
   binary_annotations_ = span.binaryAnnotations();
   if (span.isSetTimestamp()) {

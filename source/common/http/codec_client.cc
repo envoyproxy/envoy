@@ -12,8 +12,10 @@ namespace Envoy {
 namespace Http {
 
 CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
-                         Upstream::HostDescriptionConstSharedPtr host)
-    : type_(type), connection_(std::move(connection)), host_(host) {
+                         Upstream::HostDescriptionConstSharedPtr host,
+                         Event::Dispatcher& dispatcher)
+    : type_(type), connection_(std::move(connection)), host_(host),
+      idle_timeout_(host_->cluster().idleTimeout()) {
   // Make sure upstream connections process data and then the FIN, rather than processing
   // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for details)
   connection_->detectEarlyCloseWhenReadDisabled(false);
@@ -22,6 +24,11 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
 
   ENVOY_CONN_LOG(debug, "connecting", *connection_);
   connection_->connect();
+
+  if (idle_timeout_) {
+    idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
+    enableIdleTimer();
+  }
 
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
@@ -37,6 +44,9 @@ void CodecClient::deleteRequest(ActiveRequest& request) {
   if (codec_client_callbacks_) {
     codec_client_callbacks_->onStreamDestroy();
   }
+  if (numActiveRequests() == 0) {
+    enableIdleTimer();
+  }
 }
 
 StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
@@ -44,6 +54,7 @@ StreamEncoder& CodecClient::newStream(StreamDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   request->moveIntoList(std::move(request), active_requests_);
+  disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }
 
@@ -68,6 +79,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "disconnect. resetting {} pending requests", *connection_,
                    active_requests_.size());
+    disableIdleTimer();
+    idle_timer_.reset();
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
       active_requests_.front()->encoder_->getStream().resetStream(
@@ -121,8 +134,9 @@ void CodecClient::onData(Buffer::Instance& data) {
 }
 
 CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
-                                 Upstream::HostDescriptionConstSharedPtr host)
-    : CodecClient(type, std::move(connection), host) {
+                                 Upstream::HostDescriptionConstSharedPtr host,
+                                 Event::Dispatcher& dispatcher)
+    : CodecClient(type, std::move(connection), host, dispatcher) {
   switch (type) {
   case Type::HTTP1: {
     codec_.reset(new Http1::ClientConnectionImpl(*connection_, *this));

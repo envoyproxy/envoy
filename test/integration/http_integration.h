@@ -125,6 +125,9 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete();
   void testTwoRequests();
   void testOverlyLongHeaders();
+  void testIdleTimeoutBasic();
+  void testIdleTimeoutWithTwoRequests();
+  void testIdleTimerDisabled();
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
