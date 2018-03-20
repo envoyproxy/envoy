@@ -81,5 +81,11 @@ public:
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
 };
 
+class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo();
+};
+
 } // namespace Upstream
 } // namespace Envoy

@@ -65,7 +65,8 @@ public:
   std::unique_ptr<CodecClientForTest> client_;
   Network::ConnectionCallbacks* connection_cb_;
   Network::ReadFilterSharedPtr filter_;
-  std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
+      new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
       Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
 };
