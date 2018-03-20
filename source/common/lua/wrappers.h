@@ -84,9 +84,9 @@ private:
     iterator_.reset();
   }
 
-  void setValue(lua_State* state, const ProtobufWkt::Value&& value);
+  void setValue(lua_State* state, const ProtobufWkt::Value& value);
   void createTable(lua_State* state,
-                   const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields);
+                   const ProtobufWkt::Map<std::string, ProtobufWkt::Value>& fields);
 
   const ProtobufWkt::Struct metadata_;
   Envoy::Lua::LuaDeathRef<MetadataMapIterator> iterator_;

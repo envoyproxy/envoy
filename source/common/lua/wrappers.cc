@@ -23,7 +23,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
-void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& value) {
+void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
   switch (kind) {
@@ -42,7 +42,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& v
   }
 
   case ProtobufWkt::Value::kStructValue: {
-    return createTable(state, std::move(value.struct_value().fields()));
+    return createTable(state, value.struct_value().fields());
   }
 
   case ProtobufWkt::Value::kListValue: {
@@ -51,7 +51,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& v
 
     lua_createtable(state, values_size, 0);
     for (int i = 0; i < values_size; i++) {
-      setValue(state, std::move(list.values(i)));
+      setValue(state, list.values(i));
       lua_rawseti(state, -2, i + 1);
     }
     return;
@@ -63,12 +63,12 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value&& v
 }
 
 void MetadataMapWrapper::createTable(
-    lua_State* state, const ProtobufWkt::Map<std::string, ProtobufWkt::Value>&& fields) {
+    lua_State* state, const ProtobufWkt::Map<std::string, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
   for (const auto field : fields) {
     int top = lua_gettop(state);
     lua_pushstring(state, field.first.c_str());
-    setValue(state, std::move(field.second));
+    setValue(state, field.second);
     lua_settable(state, top);
   }
 }
@@ -83,7 +83,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.setValue(state, std::move(current_->second));
+  parent_.setValue(state, current_->second);
 
   current_++;
   return 2;
@@ -96,7 +96,7 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  setValue(state, std::move(filter_it->second));
+  setValue(state, filter_it->second);
   return 1;
 }
 
