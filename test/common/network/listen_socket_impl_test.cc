@@ -42,19 +42,21 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
   // bind failure (in the TcpListenSocket ctor) once isn't considered an error.
   EXPECT_EQ(0, close(addr_fd.second));
 
-  auto option = std::make_shared<MockSocketOption>();
-  auto options = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
-  options->emplace_back(option);
-  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
+  auto option = std::make_unique<MockSocketOption>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
+  EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PreBind))
+      .WillOnce(Return(true));
+  options->emplace_back(std::move(option));
   TcpListenSocket socket1(addr, options, true);
   EXPECT_EQ(0, listen(socket1.fd(), 0));
   EXPECT_EQ(addr->ip()->port(), socket1.localAddress()->ip()->port());
   EXPECT_EQ(addr->ip()->addressAsString(), socket1.localAddress()->ip()->addressAsString());
 
-  auto option2 = std::make_shared<MockSocketOption>();
-  auto options2 = std::make_shared<std::vector<Network::Socket::OptionSharedPtr>>();
-  options2->emplace_back(option2);
-  EXPECT_CALL(*option2, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
+  auto option2 = std::make_unique<MockSocketOption>();
+  auto options2 = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
+  EXPECT_CALL(*(option2.get()), setOption(_, Network::Socket::SocketState::PreBind))
+      .WillOnce(Return(true));
+  options2->emplace_back(std::move(option2));
   // The address and port are bound already, should throw exception.
   EXPECT_THROW(Network::TcpListenSocket socket2(addr, options2, true), EnvoyException);
 

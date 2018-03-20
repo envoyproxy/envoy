@@ -56,13 +56,13 @@ public:
      */
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
-  typedef std::shared_ptr<Option> OptionSharedPtr;
-  typedef std::shared_ptr<std::vector<OptionSharedPtr>> OptionsSharedPtr;
+  typedef std::unique_ptr<Option> OptionPtr;
+  typedef std::shared_ptr<std::vector<OptionPtr>> OptionsSharedPtr;
 
   /**
    * Add a socket option visitor for later retrieval with options().
    */
-  virtual void addOption(const OptionSharedPtr&) PURE;
+  virtual void addOption(OptionPtr&&) PURE;
 
   /**
    * @return the socket options stored earlier with addOption() calls, if any.

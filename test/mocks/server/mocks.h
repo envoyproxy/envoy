@@ -369,12 +369,16 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 };
 
-class MockListenerFactoryContext : public MockFactoryContext {
+class MockListenerFactoryContext : public virtual MockFactoryContext,
+                                   public virtual ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
 
-  MOCK_METHOD1(addListenSocketOption, void(const Network::Socket::OptionSharedPtr&));
+  void addListenSocketOption(Network::Socket::OptionPtr&& option) override {
+    addListenSocketOption_(option);
+  }
+  MOCK_METHOD1(addListenSocketOption_, void(Network::Socket::OptionPtr&));
 };
 
 } // namespace Configuration
