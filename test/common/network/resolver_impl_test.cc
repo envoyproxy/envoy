@@ -168,16 +168,6 @@ TEST(ResolverTest, NoSuchResolver) {
                             "Unknown address resolver: envoy.test.resolver");
 }
 
-TEST(ResolverTest, MalformedIp) {
-  envoy::api::v2::core::Address address;
-  auto socket = address.mutable_socket_address();
-  socket->set_address("foo.bar.io");
-  EXPECT_THROW_WITH_MESSAGE(resolveProtoAddress(address, envoy::api::v2::Cluster::STATIC),
-                            EnvoyException,
-                            "malformed IP address: foo.bar.io. Consider setting cluster type to "
-                            "'STRICT_DNS' or 'LOGICAL_DNS'");
-}
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

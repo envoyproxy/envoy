@@ -55,27 +55,6 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& 
 }
 
 InstanceConstSharedPtr
-resolveProtoAddress(const envoy::api::v2::core::Address& address,
-                    const envoy::api::v2::Cluster::DiscoveryType& cluster_type) {
-  switch (address.address_case()) {
-  case envoy::api::v2::core::Address::kSocketAddress:
-    try {
-      return resolveProtoSocketAddress(address.socket_address());
-    } catch (EnvoyException& e) {
-      if (cluster_type == envoy::api::v2::Cluster::STATIC) {
-        throw EnvoyException(fmt::format(
-            "{}. Consider setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'", e.what()));
-      }
-      throw e;
-    }
-  case envoy::api::v2::core::Address::kPipe:
-    return InstanceConstSharedPtr{new PipeInstance(address.pipe().path())};
-  default:
-    throw EnvoyException("Address must be a socket or pipe: " + address.DebugString());
-  }
-}
-
-InstanceConstSharedPtr
 resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_address) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address.resolver_name();
