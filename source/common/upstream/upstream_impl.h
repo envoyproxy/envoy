@@ -37,12 +37,6 @@
 namespace Envoy {
 namespace Upstream {
 
-// Wrapper around Network::Address::resolveProtoAddress() to catch the specific error in relation
-// with envoy::api::v2::Cluster::DiscoveryType hence we can throw more meaningful message.
-const Network::Address::InstanceConstSharedPtr
-resolveProtoAddress(const envoy::api::v2::core::Address& address,
-                    const envoy::api::v2::Cluster::DiscoveryType& cluster_type);
-
 // Wrapper around envoy::api::v2::core::Locality to make it easier to compare for ordering in
 // std::map and in tests to construct literals.
 // TODO(htuch): Consider making this reference based when we have a single string implementation.
