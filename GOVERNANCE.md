@@ -77,18 +77,25 @@
   wind up with stale docs.
 * Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
   and make any needed corrections.
+* Switch the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION) from a
+  "dev" variant to a final variant. E.g., "1.6.0-dev" to "1.6.0". Get a review and merge.
 * Update the [data-plane-api SHA in Envoy](https://github.com/envoyproxy/envoy/blob/ed312500ec38876446ce8ee70a06f7cda4adc937/bazel/repository_locations.bzl#L79)
   to the final release SHA. Get the PR approved and merge.
 * **Wait for tests to pass on master.**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
-  start with "v" and be followed by the version number. E.g., "v1.6.0".
+  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match
+  the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION).**
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
 * Contact rdl@ on Slack so that the website can be updated for the new release.
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
-* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the 
+* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
+* Do a new PR to update the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION)
+  to the next development release. E.g., "1.7.0-dev". At the same time, also add a new empty section
+  to the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
+  for the following version. E.g., "1.7.0".
 
 ## When does a maintainer lose maintainer status
 
