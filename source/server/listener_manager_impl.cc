@@ -109,9 +109,11 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 // This same object can be extended to handle additional listener socket options.
 class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerSocketOption(const envoy::api::v2::Listener& config)
-      : has_transparent_(config.has_transparent()),
-        transparent_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {}
+  ListenerSocketOption(const envoy::api::v2::Listener& config) {
+    if (config.has_transparent()) {
+      transparent_ = config.transparent().value();
+    }
+  }
 
   // Network::Socket::Option
   bool setOption(Network::Socket& socket, Network::Socket::SocketState state) const override {
@@ -125,7 +127,7 @@ public:
     UNREFERENCED_PARAMETER(state);
 
     // Only set the socket option if optional "transparent" was included in config.
-    if (has_transparent_) {
+    if (transparent_) {
       const auto* ip = socket.localAddress()->ip();
       if (ip == nullptr) {
         return false; // Not applicable on non-IP sockets.
@@ -135,7 +137,7 @@ public:
 
       if (ip->version() == Network::Address::IpVersion::v4) {
 #if defined(SOL_IP) && defined(IP_TRANSPARENT)
-        int option = transparent_;
+        int option = transparent_.value();
         if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
           error = errno;
         }
@@ -143,15 +145,15 @@ public:
         error = ENOTSUP;
 #endif
       } else if (ip->version() == Network::Address::IpVersion::v6) {
-        // Some systems have IPV6_TRANSPARENT option, use it if available.
-        // Otherwise try with IP_TRANSPARENT also for IPv6, as many systems allow it.
+      // Some systems have IPV6_TRANSPARENT option, use it if available.
+      // Otherwise try with IP_TRANSPARENT also for IPv6, as many systems allow it.
 #if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
-        int option = transparent_;
+        int option = transparent_.value();
         if (setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option, sizeof(option)) != 0) {
           error = errno;
         }
 #elif defined(SOL_IP) && defined(IP_TRANSPARENT)
-        int option = transparent_;
+        int option = transparent_.value();
         if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
           error = errno;
         }
@@ -163,8 +165,8 @@ public:
       }
 
       if (error != 0) {
-        ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}", transparent_,
-                  strerror(error));
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT to {} on listener socket failed: {}",
+                  transparent_.value(), strerror(error));
         return false;
       }
     }
@@ -174,8 +176,7 @@ public:
   void hashKey(std::vector<uint8_t>&) const override {} // Not used for listener sockets.
 
 private:
-  bool has_transparent_;
-  bool transparent_;
+  absl::optional<bool> transparent_;
 };
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
