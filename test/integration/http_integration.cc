@@ -1272,8 +1272,8 @@ void HttpIntegrationTest::testUpstreamProtocolError() {
   // be fixed.
   fake_upstream_connection->waitForData(187);
   fake_upstream_connection->write("bad protocol data!");
-  fake_upstream_connection->waitForDisconnect();
   codec_client_->waitForDisconnect();
+  fake_upstream_connection->waitForDisconnect();
 
   EXPECT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());

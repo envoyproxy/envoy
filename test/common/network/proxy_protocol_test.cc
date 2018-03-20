@@ -47,6 +47,7 @@ public:
                                                Network::Address::InstanceConstSharedPtr(),
                                                Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
+    conn_->addReadFilter(std::make_shared<NiceMock<MockReadFilter>>());
   }
 
   // Listener
@@ -107,6 +108,11 @@ public:
 
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool end_stream) -> FilterStatus {
+          EXPECT_TRUE(end_stream);
+          return Network::FilterStatus::Continue;
+        }));
     EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
@@ -390,6 +396,11 @@ public:
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
     conn_->close(ConnectionCloseType::NoFlush);
+    EXPECT_CALL(*read_filter_, onData(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance&, bool end_stream) -> FilterStatus {
+          EXPECT_TRUE(end_stream);
+          return Network::FilterStatus::Continue;
+        }));
     EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 

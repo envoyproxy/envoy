@@ -746,6 +746,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
+  client_connection->addReadFilter(std::make_shared<NiceMock<Network::MockReadFilter>>());
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
@@ -2032,6 +2033,7 @@ public:
         socket_.localAddress(), source_address_,
         client_ssl_socket_factory_->createTransportSocket(), nullptr);
     client_connection_->addConnectionCallbacks(client_callbacks_);
+    client_connection_->addReadFilter(std::make_shared<NiceMock<Network::MockReadFilter>>());
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
   }
@@ -2257,6 +2259,8 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
 
   EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Return(Network::FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_, onData(_, true)).WillOnce(Return(Network::FilterStatus::Continue));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());

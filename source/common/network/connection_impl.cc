@@ -432,7 +432,6 @@ void ConnectionImpl::onReadReady() {
   // If this connection doesn't have half-close semantics, translate end_stream into
   // a connection close.
   if ((!enable_half_close_ && result.end_stream_read_)) {
-    result.end_stream_read_ = false;
     result.action_ = PostIoAction::Close;
   }
 
