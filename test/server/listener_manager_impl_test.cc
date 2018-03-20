@@ -1272,9 +1272,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
           .WillOnce(Return(true));
-      EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PostBind))
+      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PostBind))
           .WillOnce(Invoke([](Network::Socket& socket, Network::Socket::SocketState) -> bool {
             fd = socket.fd();
             return true;
@@ -1347,7 +1347,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
           .WillOnce(Return(false));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {

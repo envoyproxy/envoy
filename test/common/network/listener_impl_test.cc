@@ -165,8 +165,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Event::DispatcherImpl dispatcher;
   auto option = std::make_unique<MockSocketOption>();
   auto options = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
-  EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PreBind))
-      .WillOnce(Return(true));
+  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   options->emplace_back(std::move(option));
 
   Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), options, true);

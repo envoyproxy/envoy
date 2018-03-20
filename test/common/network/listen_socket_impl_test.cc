@@ -44,8 +44,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
 
   auto option = std::make_unique<MockSocketOption>();
   auto options = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
-  EXPECT_CALL(*(option.get()), setOption(_, Network::Socket::SocketState::PreBind))
-      .WillOnce(Return(true));
+  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   options->emplace_back(std::move(option));
   TcpListenSocket socket1(addr, options, true);
   EXPECT_EQ(0, listen(socket1.fd(), 0));
@@ -54,8 +53,7 @@ TEST_P(ListenSocketImplTest, BindSpecificPort) {
 
   auto option2 = std::make_unique<MockSocketOption>();
   auto options2 = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
-  EXPECT_CALL(*(option2.get()), setOption(_, Network::Socket::SocketState::PreBind))
-      .WillOnce(Return(true));
+  EXPECT_CALL(*option2, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   options2->emplace_back(std::move(option2));
   // The address and port are bound already, should throw exception.
   EXPECT_THROW(Network::TcpListenSocket socket2(addr, options2, true), EnvoyException);
