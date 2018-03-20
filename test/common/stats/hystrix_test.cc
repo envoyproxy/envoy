@@ -38,11 +38,16 @@ public:
   IsolatedStoreImpl cluster_scope_;
 };
 
-std::string getStreamField(std::string dataMessage, std::string key) {
-  std::string actual = dataMessage.substr(dataMessage.find(key));
-  actual = actual.substr(actual.find(" ") + 1);
-  std::size_t length = actual.find(",");
-  actual = actual.substr(0, length);
+absl::string_view getStreamField(absl::string_view dataMessage, absl::string_view key) {
+  absl::string_view::size_type key_pos = dataMessage.find(key);
+  EXPECT_NE(absl::string_view::npos, key_pos);
+  absl::string_view trimDataBeforeKey = dataMessage.substr(key_pos);
+  key_pos = trimDataBeforeKey.find(" ");
+  EXPECT_NE(absl::string_view::npos, key_pos);
+  absl::string_view trimDataAfterValue = trimDataBeforeKey.substr(key_pos + 1);
+  key_pos = trimDataAfterValue.find(",");
+  EXPECT_NE(absl::string_view::npos, key_pos);
+  absl::string_view actual = trimDataAfterValue.substr(0, key_pos);
   // EXPECT_EQ(actual, std::to_string(expected));
   return actual;
 }

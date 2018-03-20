@@ -5,6 +5,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "absl/strings/str_cat.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
@@ -25,8 +27,9 @@ void Hystrix::pushNewValue(std::string key, uint64_t value) {
   }
 }
 
-uint64_t Hystrix::getRollingValue(std::string cluster_name, std::string stats) {
-  std::string key = "cluster." + cluster_name + "." + stats;
+uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_view stats) {
+  std::string key;
+  key = absl::StrCat("cluster.",cluster_name,".",stats);
   if (rolling_stats_map_.find(key) != rolling_stats_map_.end()) {
     // if the counter was reset, the result is negative
     // better return 0, will be back to normal once one rolling window passes
@@ -42,38 +45,52 @@ uint64_t Hystrix::getRollingValue(std::string cluster_name, std::string stats) {
   }
 }
 
-void Hystrix::updateRollingWindowMap(Stats::Store& stats, std::string cluster_name) {
-  std::string prefix = "cluster." + cluster_name + ".";
+void Hystrix::updateRollingWindowMap(Stats::Store& stats, absl::string_view cluster_name) {
+  std::string prefix;
+  prefix = absl::StrCat("cluster.",cluster_name,".");
 
   // combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1)
-  uint64_t timeouts = stats.counter(prefix + "upstream_rq_timeout").value() +
-                      stats.counter(prefix + "upstream_rq_per_try_timeout").value();
+  std::string upstream_rq_timeout_key = absl::StrCat(prefix,"upstream_rq_timeout");
+  std::string upstream_rq_per_try_timeout_key = absl::StrCat(prefix,"upstream_rq_per_try_timeout");
+  uint64_t timeouts = stats.counter(upstream_rq_timeout_key).value() +
+                      stats.counter(upstream_rq_per_try_timeout_key).value();
 
-  pushNewValue(prefix + "timeouts", timeouts);
+  std::string timeouts_key = absl::StrCat(prefix,"timeouts");
+  pushNewValue(timeouts_key,timeouts);
 
   // combining errors+retry errors - retries are counted as separate requests
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here.
   // timeout retries were not counted here anyway.
-  uint64_t errors = stats.counter(prefix + "upstream_rq_5xx").value() +
-                    stats.counter(prefix + "retry.upstream_rq_5xx").value() +
-                    stats.counter(prefix + "upstream_rq_4xx").value() +
-                    stats.counter(prefix + "retry.upstream_rq_4xx").value() -
-                    stats.counter(prefix + "upstream_rq_timeout").value();
+  std::string upstream_rq_5xx_key = absl::StrCat(prefix,"upstream_rq_5xx");
+  std::string retry_upstream_rq_5xx_key = absl::StrCat(prefix,"retry.upstream_rq_5xx");
+  std::string upstream_rq_4xx_key = absl::StrCat(prefix,"upstream_rq_4xx");
+  std::string retry_upstream_rq_4xx_key = absl::StrCat(prefix,"retry.upstream_rq_4xx");
+  uint64_t errors = stats.counter(upstream_rq_5xx_key).value() +
+                    stats.counter(retry_upstream_rq_5xx_key).value() +
+                    stats.counter(upstream_rq_4xx_key).value() +
+                    stats.counter(retry_upstream_rq_4xx_key).value() -
+                    stats.counter(upstream_rq_timeout_key).value();
 
-  pushNewValue(prefix + "errors", errors);
+  std::string errors_key = absl::StrCat(prefix,"errors");
+  pushNewValue(errors_key,errors);
 
-  uint64_t success = stats.counter(prefix + "upstream_rq_2xx").value();
-  pushNewValue(prefix + "success", success);
+  std::string upstream_rq_2xx_key = absl::StrCat(prefix,"upstream_rq_2xx");
+  uint64_t success = stats.counter(upstream_rq_2xx_key).value();
+  std::string success_key = absl::StrCat(prefix,"success");
+  pushNewValue(success_key,success);
 
-  uint64_t rejected = stats.counter(prefix + "upstream_rq_pending_overflow").value();
-  pushNewValue(prefix + "rejected", rejected);
+  std::string upstream_rq_pending_overflow_key = absl::StrCat(prefix,"upstream_rq_pending_overflow");
+  uint64_t rejected = stats.counter(upstream_rq_pending_overflow_key).value();
+  std::string rejected_key = absl::StrCat(prefix,"rejected");
+  pushNewValue(rejected_key, rejected);
 
   // should not take from upstream_rq_total since it is updated before its components,
   // leading to wrong results such as error percentage higher than 100%
   uint64_t total = errors + timeouts + success + rejected;
-  pushNewValue(prefix + "total", total);
+  std::string total_key = absl::StrCat(prefix,"total");
+  pushNewValue(total_key, total);
 
   // TODO (@trabetti) : why does it fail compilation?
   // ENVOY_LOG(trace, "{}", printRollingWindow());
@@ -81,22 +98,26 @@ void Hystrix::updateRollingWindowMap(Stats::Store& stats, std::string cluster_na
 
 void Hystrix::resetRollingWindow() { rolling_stats_map_.clear(); }
 
-void Hystrix::addStringToStream(std::string key, std::string value, std::stringstream& info) {
-  addInfoToStream(key, "\"" + value + "\"", info);
+void Hystrix::addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info) {
+  std::string quoted_value;
+  quoted_value = absl::StrCat("\"", value, "\"");
+  addInfoToStream(key, quoted_value, info);
 }
 
-void Hystrix::addIntToStream(std::string key, uint64_t value, std::stringstream& info) {
+void Hystrix::addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info) {
   addInfoToStream(key, std::to_string(value), info);
 }
 
-void Hystrix::addInfoToStream(std::string key, std::string value, std::stringstream& info) {
+void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info) {
   if (!info.str().empty()) {
     info << ", ";
   }
-  info << "\"" + key + "\": " + value;
+  std::string added_info;
+  added_info = absl::StrCat("\"",key,"\": ",value);
+  info << added_info;
 }
 
-void Hystrix::addHystrixCommand(std::stringstream& ss, std::string cluster_name,
+void Hystrix::addHystrixCommand(std::stringstream& ss, absl::string_view cluster_name,
                                 uint64_t max_concurrent_requests, uint64_t reporting_hosts) {
   std::stringstream cluster_info;
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -169,7 +190,7 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, std::string cluster_name,
   ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
 }
 
-void Hystrix::addHystrixThreadPool(std::stringstream& ss, std::string cluster_name,
+void Hystrix::addHystrixThreadPool(std::stringstream& ss, absl::string_view cluster_name,
                                    uint64_t queue_size, uint64_t reporting_hosts) {
   std::stringstream cluster_info;
 
@@ -193,13 +214,13 @@ void Hystrix::addHystrixThreadPool(std::stringstream& ss, std::string cluster_na
   ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
 }
 
-void Hystrix::getClusterStats(std::stringstream& ss, std::string cluster_name,
+void Hystrix::getClusterStats(std::stringstream& ss, absl::string_view cluster_name,
                               uint64_t max_concurrent_requests, uint64_t reporting_hosts) {
   addHystrixCommand(ss, cluster_name, max_concurrent_requests, reporting_hosts);
   addHystrixThreadPool(ss, cluster_name, max_concurrent_requests, reporting_hosts);
 }
 
-std::string Hystrix::printRollingWindow() {
+absl::string_view Hystrix::printRollingWindow() {
   std::stringstream out_str;
 
   for (std::map<std::string, RollingStats>::const_iterator it = rolling_stats_map_.begin();

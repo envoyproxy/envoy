@@ -34,7 +34,7 @@ public:
   /**
    * Generate the streams to be sent to hystrix dashboard
    */
-  void getClusterStats(std::stringstream& ss, std::string cluster_name,
+  void getClusterStats(std::stringstream& ss, absl::string_view cluster_name,
                        uint64_t max_concurrent_requests, uint64_t reporting_hosts);
 
   /**
@@ -49,47 +49,47 @@ public:
    */
   static uint64_t GetPingIntervalInMs() { return PING_INTERVAL_IN_MS; }
 
-  void updateRollingWindowMap(Stats::Store& stats, std::string cluster_name);
+  void updateRollingWindowMap(Stats::Store& stats, absl::string_view cluster_name);
 
   /**
    * clear map
    */
   void resetRollingWindow();
 
-  std::string printRollingWindow();
+  absl::string_view printRollingWindow();
 
 private:
   /**
    * Get the statistic's value change over the rolling window time frame
    */
-  uint64_t getRollingValue(std::string cluster_name, std::string stats);
+  uint64_t getRollingValue(absl::string_view cluster_name, absl::string_view stats);
 
   /**
-   * Format the given key and std::string value to "key"="value", and adding to the stringstream
+   * Format the given key and absl::string_view value to "key"="value", and adding to the stringstream
    */
-  void addStringToStream(std::string key, std::string value, std::stringstream& info);
+  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
 
   /**
    * Format the given key and uint64_t value to "key"=<string of uint64_t>, and adding to the
    * stringstream
    */
-  void addIntToStream(std::string key, uint64_t value, std::stringstream& info);
+  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info);
 
   /**
    * Format the given key and value to "key"=value, and adding to the stringstream
    */
-  void addInfoToStream(std::string key, std::string value, std::stringstream& info);
+  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
 
   /**
    * generate HystrixCommand event stream
    */
-  void addHystrixCommand(std::stringstream& ss, std::string cluster_name,
+  void addHystrixCommand(std::stringstream& ss, absl::string_view cluster_name,
                          uint64_t max_concurrent_requests, uint64_t reporting_hosts);
 
   /**
    * generate HystrixThreadPool event stream
    */
-  void addHystrixThreadPool(std::stringstream& ss, std::string cluster_name, uint64_t queue_size,
+  void addHystrixThreadPool(std::stringstream& ss, absl::string_view cluster_name, uint64_t queue_size,
                             uint64_t reporting_hosts);
 
   RollingStatsMap rolling_stats_map_;
