@@ -30,6 +30,22 @@ using testing::_;
 
 namespace Envoy {
 namespace Upstream {
+
+class SubsetLoadBalancerDescribeMetadataTester {
+public:
+  SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
+
+  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> MetadataVector;
+
+  void test(std::string expected, const MetadataVector& metadata) {
+    SubsetLoadBalancer::SubsetMetadata subset_metadata(metadata);
+    EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
+  }
+
+private:
+  std::shared_ptr<SubsetLoadBalancer> lb_;
+};
+
 namespace SubsetLoadBalancerTest {
 
 class TestMetadataMatchCriterion : public Router::MetadataMatchCriterion {
@@ -1115,48 +1131,23 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
-TEST_F(SubsetLoadBalancerTest, SubsetLogging) {
+TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+  init();
 
-  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "default"}});
-  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+  ProtobufWkt::Value str_value;
+  str_value.set_string_value("abc");
 
-  std::vector<std::set<std::string>> subset_keys = {{"version"}};
-  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+  ProtobufWkt::Value num_value;
+  num_value.set_number_value(100);
 
-  std::string expected_log_msgs[] = {
-      "subset lb: creating fallback load balancer for version=\"default\"\n",
-      "subset lb: creating load balancer for version=\"new\"\n",
-      "subset lb: creating load balancer for version=\"default\"\n",
-  };
-
-  std::shared_ptr<Envoy::Filesystem::MockFile> file(new Envoy::Filesystem::MockFile());
-  for (auto& expected : expected_log_msgs) {
-    EXPECT_CALL(*file, write(EndsWith(expected)));
-  }
-
-  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager;
-  EXPECT_CALL(log_manager, createAccessLog(_)).WillOnce(Return(file));
-
-  Logger::Registry::getSink()->logToFile("/dev/null", log_manager);
-  const Logger::Logger* upstream_logger = nullptr;
-  for (auto& logger : Logger::Registry::loggers()) {
-    if (logger.name() == "upstream") {
-      upstream_logger = &logger;
-      break;
-    }
-  }
-  ASSERT(upstream_logger != nullptr);
-  upstream_logger->setLevel(spdlog::level::debug);
-
-  init({
-      {"tcp://127.0.0.1:80", {{"version", "new"}}},
-      {"tcp://127.0.0.1:81", {{"version", "default"}}},
-  });
-
-  upstream_logger->setLevel(spdlog::level::err);
-  Logger::Registry::getSink()->logToStdErr();
+  auto tester = SubsetLoadBalancerDescribeMetadataTester(lb_);
+  tester.test("version=\"abc\"", {{"version", str_value}});
+  tester.test("number=100", {{"number", num_value}});
+  tester.test("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
+  tester.test("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
+  tester.test("<no metadata>", {});
 }
 
 INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,

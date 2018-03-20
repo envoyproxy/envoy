@@ -149,6 +149,8 @@ private:
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
+
+  friend class SubsetLoadBalancerDescribeMetadataTester;
 };
 
 } // namespace Upstream
