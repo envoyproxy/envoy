@@ -7,6 +7,7 @@
 #include "common/http/codec_client.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 
 namespace Envoy {
 /**
@@ -16,10 +17,10 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   typedef std::function<void(CodecClient*)> DestroyCb;
-
   CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host),
+                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
+                     Event::Dispatcher& dispatcher)
+      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
@@ -31,7 +32,7 @@ public:
   }
 
   void raiseGoAway() { onGoAway(); }
-
+  Event::Timer* idleTimer() { return idle_timer_.get(); }
   DestroyCb destroy_cb_;
 };
 

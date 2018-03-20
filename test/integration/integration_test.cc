@@ -135,6 +135,14 @@ TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit()
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
 
+// Tests idle timeout behaviour with single request and validates that idle timer kicks in
+// after given timeout.
+TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
+
+// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
+// after both the requests are done.
+TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
+
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a 500.
 TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
