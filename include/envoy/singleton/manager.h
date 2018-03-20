@@ -42,10 +42,10 @@ public:
  * SINGLETON_MANAGER_REGISTERED_NAME macro to access the name registered with the
  * singleton manager.
  */
-#define SINGLETON_MANAGER_REGISTRATION(NAME)                                                         \
-  static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                                \
-  static Envoy::Registry::RegisterFactory<Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, \
-                                          Envoy::Singleton::Registration>                            \
+#define SINGLETON_MANAGER_REGISTRATION(NAME)                                                       \
+  static constexpr char NAME##_singleton_name[] = #NAME "_singleton";                              \
+  static Envoy::Registry::RegisterFactory<                                                         \
+      Envoy::Singleton::RegistrationImpl<NAME##_singleton_name>, Envoy::Singleton::Registration>   \
       NAME##_singleton_registered_;
 
 #define SINGLETON_MANAGER_REGISTERED_NAME(NAME) NAME##_singleton_name
