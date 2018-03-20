@@ -88,7 +88,6 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_addr
   if (resolver == nullptr) {
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
-
   return resolver->resolve(socket_address);
 }
 

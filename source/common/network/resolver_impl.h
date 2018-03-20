@@ -18,6 +18,12 @@ namespace Address {
  */
 Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
+/**
+ * Create an Instance from a envoy::api::v2::core::Address.
+ * @param address supplies the address proto to resolve.
+ * @param cluster_type supplies the cluster type.
+ * @return pointer to the Instance.
+ */
 Address::InstanceConstSharedPtr
 resolveProtoAddress(const envoy::api::v2::core::Address& address,
                     const envoy::api::v2::Cluster::DiscoveryType& cluster_type);
