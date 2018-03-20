@@ -83,6 +83,14 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
       for i, ingredient in ipairs(recipe["ingredients"]) do
         testPrint(ingredient)
       end
+
+      testPrint(tostring(object:get("make.nothing")["value"]))
+
+      local function nRetVals(...)
+        return select('#',...)
+      end
+
+      testPrint(tostring(nRetVals(object:get("make.coffee"))))
     end
     )EOF"};
 
@@ -107,6 +115,9 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
             - milk
         make.delicious.cookie:
           name: chewy
+        make.nothing:
+          name: nothing
+          value: ~
     )EOF";
 
   envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
@@ -115,6 +126,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
 
   EXPECT_CALL(*this, testPrint("'make.delicious.bread' 'pulla'"));
   EXPECT_CALL(*this, testPrint("'make.delicious.cookie' 'chewy'"));
+  EXPECT_CALL(*this, testPrint("'make.nothing' 'nothing'"));
 
   EXPECT_CALL(*this, testPrint("pulla"));
   EXPECT_CALL(*this, testPrint("finland"));
@@ -131,7 +143,42 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
   EXPECT_CALL(*this, testPrint("flour"));
   EXPECT_CALL(*this, testPrint("milk"));
 
+  EXPECT_CALL(*this, testPrint("nil"));
+  EXPECT_CALL(*this, testPrint("0"));
+
   start("callMe");
+}
+
+// Don't finish iteration.
+TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      iterator = pairs(object)
+      key, value = iterator()
+      iterator2 = pairs(object)
+    end
+  )EOF"};
+
+  testing::InSequence s;
+  setup(SCRIPT);
+
+  const std::string yaml = R"EOF(
+    filter_metadata:
+      envoy.lua:
+        make.delicious.bread:
+          name: pulla
+        make.delicious.cookie:
+          name: chewy
+        make.nothing:
+          name: nothing
+    )EOF";
+
+  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
+  MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
+  EXPECT_THROW_WITH_MESSAGE(
+      start("callMe"), Envoy::Lua::LuaException,
+      "[string \"...\"]:5: cannot create a second iterator before completing the first");
 }
 
 } // namespace Lua
