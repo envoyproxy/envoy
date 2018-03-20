@@ -2,7 +2,6 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/config/well_known_names.h"
 #include "common/lua/lua.h"
 
 namespace Envoy {

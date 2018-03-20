@@ -65,7 +65,8 @@ public:
   virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the value of metadata of current route entry.
+   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * route entry.
    */
   virtual const ProtobufWkt::Struct& metadata() const PURE;
 };
