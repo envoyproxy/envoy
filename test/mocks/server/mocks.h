@@ -79,8 +79,8 @@ class MockConfigTracker : public ConfigTracker {
 public:
   MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
   MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
-  EntryOwner::Ptr add(std::string key, Cb callback) override {
-    return EntryOwner::Ptr{addReturnsRaw(key, std::move(callback))};
+  EntryOwnerPtr add(const std::string& key, Cb callback) override {
+    return EntryOwnerPtr{addReturnsRaw(key, std::move(callback))};
   }
   struct MockEntryOwner : public EntryOwner {};
 };

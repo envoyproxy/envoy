@@ -13,7 +13,7 @@ namespace Server {
  */
 class ConfigTrackerImpl : public ConfigTracker {
 public:
-  EntryOwner::Ptr add(std::string key, Cb cb) override;
+  EntryOwnerPtr add(const std::string& key, Cb cb) override;
   const CbsMap& getCallbacksMap() const override;
 
 private:

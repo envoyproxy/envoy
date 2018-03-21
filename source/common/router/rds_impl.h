@@ -185,7 +185,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotAllocator& tls_;
   Server::Admin& admin_;
-  Server::ConfigTracker::EntryOwner::Ptr config_tracker_entry_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigProviderImpl;
 };

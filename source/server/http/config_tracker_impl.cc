@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Server {
 
-ConfigTracker::EntryOwner::Ptr ConfigTrackerImpl::add(std::string key, Cb cb) {
+ConfigTracker::EntryOwnerPtr ConfigTrackerImpl::add(const std::string& key, Cb cb) {
   auto insert_result = map_->emplace(key, std::move(cb));
   return insert_result.second
              ? std::make_unique<ConfigTrackerImpl::EntryOwnerImpl>(map_, std::move(key))

@@ -62,7 +62,7 @@ TEST_F(ConfigTrackerImplTest, AddDuplicate) {
 }
 
 TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
-  ConfigTracker::EntryOwner::Ptr owner1, owner2;
+  ConfigTracker::EntryOwnerPtr owner1, owner2;
   owner1 = tracker.add("test_key", [&] {
     owner2 = tracker.add("test_key2", [&] {
       owner1.reset();
