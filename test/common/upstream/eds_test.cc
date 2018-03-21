@@ -499,8 +499,7 @@ TEST_F(EdsTest, MalformedIP) {
       "foo.bar.com");
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
 
-  bool initialized = false;
-  cluster_->initialize([&initialized] { initialized = true; });
+  cluster_->initialize([] {});
   EXPECT_THROW_WITH_MESSAGE(cluster_->onConfigUpdate(resources), EnvoyException,
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
