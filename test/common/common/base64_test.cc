@@ -159,8 +159,8 @@ TEST(Base64UrlTest, DecodeFailure) {
   EXPECT_EQ("", Base64Url::decode("Zg.."));
   EXPECT_EQ("", Base64Url::decode("..Zg"));
   EXPECT_EQ("", Base64Url::decode("A==="));
-  EXPECT_EQ("", Base64Url::decode("Zh"));   // 011001 100001 <- unused bit at tail
-  EXPECT_EQ("", Base64Url::decode("Zm9"));  // 011001 100110 111101 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("Zh"));  // 011001 100001 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("Zm9")); // 011001 100110 111101 <- unused bit at tail
   EXPECT_EQ("", Base64Url::decode("A"));
 }
 } // namespace Envoy
