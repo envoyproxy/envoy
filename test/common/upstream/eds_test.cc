@@ -487,5 +487,23 @@ TEST_F(EdsTest, PriorityAndLocality) {
   }
 }
 
+// Throw on adding a new resource with an invalid endpoint (since the given address is invalid).
+TEST_F(EdsTest, MalformedIP) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment->add_endpoints();
+
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+      "foo.bar.com");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+
+  cluster_->initialize([] {});
+  EXPECT_THROW_WITH_MESSAGE(cluster_->onConfigUpdate(resources), EnvoyException,
+                            "malformed IP address: foo.bar.com. Consider setting resolver_name or "
+                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
 } // namespace Upstream
 } // namespace Envoy

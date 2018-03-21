@@ -412,6 +412,15 @@ public:
    */
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
+  /**
+   * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
+   * based on the cluster's type.
+   * @param address supplies the address proto to resolve.
+   * @return Network::Address::InstanceConstSharedPtr the resolved address.
+   */
+  const Network::Address::InstanceConstSharedPtr
+  resolveProtoAddress(const envoy::api::v2::core::Address& address);
+
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }

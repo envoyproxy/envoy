@@ -77,9 +77,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       new_hosts[priority]->emplace_back(new HostImpl(
-          info_, "", Network::Address::resolveProtoAddress(lb_endpoint.endpoint().address()),
-          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
-          locality_lb_endpoint.locality()));
+          info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()), lb_endpoint.metadata(),
+          lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality()));
     }
   }
 

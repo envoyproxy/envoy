@@ -612,6 +612,26 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
       EnvoyException);
 }
 
+TEST(StaticClusterImplTest, MalformedHostIP) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com }}]
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl(parseClusterFromV2Yaml(yaml), runtime, stats,
+                                              ssl_context_manager, cm, false),
+                            EnvoyException,
+                            "malformed IP address: foo.bar.com. Consider setting resolver_name or "
+                            "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
 TEST(ClusterDefinitionTest, BadClusterConfig) {
   const std::string json = R"EOF(
   {
