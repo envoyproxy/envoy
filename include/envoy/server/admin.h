@@ -71,8 +71,8 @@ public:
    */
   virtual const Network::Socket& socket() PURE;
 
-  /*
-   * @return ConfigTracker& tracker for /config_dump endpoint
+  /**
+   * @return ConfigTracker& tracker for /config_dump endpoint.
    */
   virtual ConfigTracker& getConfigTracker() PURE;
 };

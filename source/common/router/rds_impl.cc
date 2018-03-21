@@ -149,6 +149,8 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
       tls_(tls), admin_(admin) {
   config_tracker_entry_ =
       admin_.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+  // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
+  // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_);
 }
 
@@ -170,17 +172,13 @@ RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
 std::vector<RouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
   std::vector<RouteConfigProviderSharedPtr> providers_strong;
-  providers_strong.reserve(static_route_config_providers_.size());
-  for (const auto& provider_weak : static_route_config_providers_) {
-    if (auto provider_strong = provider_weak.lock()) {
-      providers_strong.push_back(std::move(provider_strong));
-    }
-  }
-  static_route_config_providers_.clear();
-  for (const auto& provider_strong : providers_strong) {
-    static_route_config_providers_.emplace_back(
-        std::dynamic_pointer_cast<StaticRouteConfigProviderImpl>(provider_strong));
-  }
+  // Collect non-expired providers.
+  std::transform(static_route_config_providers_.begin(), static_route_config_providers_.end(),
+                 providers_strong.begin(), [](auto&& weak) { return weak.lock(); });
+
+  // Replace our stored list of weak_ptrs with the filtered list.
+  static_route_config_providers_.assign(providers_strong.begin(), providers_strong.begin());
+
   return providers_strong;
 };
 
@@ -237,7 +235,7 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   for (const auto& provider : getStaticRouteConfigProviders()) {
     *(static_configs->Add()) = provider->configAsProto();
   }
-  return ProtobufTypes::MessagePtr{config_dump.release()};
+  return config_dump;
 }
 
 } // namespace Router

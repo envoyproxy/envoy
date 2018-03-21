@@ -51,8 +51,8 @@ public:
   Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
-  // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker
-  // Wins would be no manual removeHandler() and code reuse
+  // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
+  // Wins would be no manual removeHandler() and code reuse.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
@@ -116,8 +116,8 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
-    envoy::api::v2::RouteConfiguration configAsProto() const override {
-      return envoy::api::v2::RouteConfiguration{};
+    const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+      return envoy::api::v2::RouteConfiguration::default_instance();
     }
     const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 

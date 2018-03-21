@@ -12,8 +12,8 @@
 namespace Envoy {
 namespace Server {
 
-/*
- * ConfigTracker is used by the `/config_dump` admin endpoint to manage storage * of
+/**
+ * ConfigTracker is used by the `/config_dump` admin endpoint to manage storage of
  * config-providing callbacks with weak ownership semantics. Callbacks added to ConfigTracker
  * only live as long as the returned EntryOwner object (or ConfigTracker itself, if shorter).
  * The advantages are twofold:
@@ -34,7 +34,7 @@ public:
   typedef std::function<ProtobufTypes::MessagePtr()> Cb;
   typedef std::map<std::string, Cb> CbsMap;
 
-  /*
+  /**
    * EntryOwner supplies RAII semantics for entries in the map.
    * The entry is not removed until the EntryOwner or the ConfigTracker itself is destroyed,
    * whichever happens first. When you add() an entry, you must hold onto the returned
@@ -46,20 +46,20 @@ public:
     virtual ~EntryOwner() {}
 
   protected:
-    EntryOwner() = default; // A sly way to make this class "abstract"
+    EntryOwner() = default; // A sly way to make this class "abstract."
   };
 
   virtual ~ConfigTracker() = default;
 
-  /*
-   * @return const CbsMap& The map of string keys to tracked callbacks
+  /**
+   * @return const CbsMap& The map of string keys to tracked callbacks.
    */
   virtual const CbsMap& getCallbacksMap() const PURE;
 
-  /*
+  /**
    * Add a new callback to the map under the given key
    * @param key the map key for the new callback.
-   * @param cb the callback to add. *must not* return nullptr
+   * @param cb the callback to add. *must not* return nullptr.
    * @return EntryOwner::Ptr the new entry's owner object. nullptr if the key is already present.
    */
   virtual EntryOwner::Ptr add(std::string key, Cb cb) PURE;

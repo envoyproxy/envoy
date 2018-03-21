@@ -19,7 +19,7 @@ ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(std::weak_ptr<ConfigTracker::C
 ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
   if (const auto map_strong = map_weak_.lock()) {
     size_t erased = map_strong->erase(key_);
-    RELEASE_ASSERT(erased == 1);
+    ASSERT(erased == 1);
   }
 }
 

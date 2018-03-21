@@ -27,7 +27,7 @@ public:
    * @return envoy::api::v2::RouteConfiguration the underlying RouteConfiguration object associated
    * with this provider.
    */
-  virtual envoy::api::v2::RouteConfiguration configAsProto() const PURE;
+  virtual const envoy::api::v2::RouteConfiguration& configAsProto() const PURE;
 
   /**
    * @return const std::string version info from last accepted config.

@@ -52,7 +52,9 @@ public:
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
   const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, "static"); }
-  envoy::api::v2::RouteConfiguration configAsProto() const override { return route_config_proto_; }
+  const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+    return route_config_proto_;
+  }
 
 private:
   ConfigConstSharedPtr config_;
@@ -98,7 +100,9 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
-  envoy::api::v2::RouteConfiguration configAsProto() const override { return route_config_proto_; }
+  const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+    return route_config_proto_;
+  }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
@@ -174,7 +178,7 @@ private:
   // in getRdsRouteConfigProviders()/getStaticRouteConfigProviders() goes away.
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
-  std::vector<std::weak_ptr<StaticRouteConfigProviderImpl>> static_route_config_providers_;
+  std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;

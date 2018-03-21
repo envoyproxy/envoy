@@ -8,8 +8,8 @@
 namespace Envoy {
 namespace Server {
 
-/*
- * Implementation of ConfigTracker
+/**
+ * Implementation of ConfigTracker.
  */
 class ConfigTrackerImpl : public ConfigTracker {
 public:
