@@ -158,6 +158,7 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
   // Close the client and validate idleTimer is reset
   EXPECT_EQ(client_->numActiveRequests(), 0);
   client_->close();
+  // TODO: This test does not use default connection mock handlers for raising events. Need to fix it.
   connection_cb_->onEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
@@ -203,6 +204,8 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   // When we get a local close with an active request validate idleTimer is reset after client close
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
+  // TODO: This test does not use default connection mock handlers for raising events. Need to fix it.
+  client_->close();
   connection_cb_->onEvent(Network::ConnectionEvent::LocalClose);
   EXPECT_EQ(client_->idleTimer(), nullptr);
 }
