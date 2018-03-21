@@ -1,0 +1,33 @@
+licenses(["notice"])  # Apache 2
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_library(
+    name = "jwt_lib",
+    srcs = [
+      "jwks.cc",
+      "jwt.cc",
+      "verifier.cc",
+      "status.cc",
+      "utils.cc",
+      ],
+    hdrs = [
+      "jwks.h",
+      "jwt.h",
+      "verifier.h",
+      "status.h",
+      "utils.h",
+      ],
+    repository = "@envoy",
+    deps = [
+        "//external:rapidjson",
+        "//external:ssl",
+        "//source/exe:envoy_common_lib",
+    ],
+)
