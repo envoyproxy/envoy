@@ -1,8 +1,9 @@
+#include "common/jwt_authn/jwt.h"
+
 #include <algorithm>
 
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
-#include "common/jwt_authn/jwt.h"
 #include "common/jwt_authn/utils.h"
 
 namespace Envoy {

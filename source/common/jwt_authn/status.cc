@@ -1,6 +1,6 @@
-#include <map>
-
 #include "common/jwt_authn/status.h"
+
+#include <map>
 
 namespace Envoy {
 namespace JwtAuthn {

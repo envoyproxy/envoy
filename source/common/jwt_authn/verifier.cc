@@ -1,5 +1,6 @@
-#include "common/jwt_authn/utils.h"
 #include "common/jwt_authn/verifier.h"
+
+#include "common/jwt_authn/utils.h"
 
 #include "openssl/bn.h"
 #include "openssl/ecdsa.h"
