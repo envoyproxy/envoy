@@ -826,7 +826,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
-  std::unique_ptr<CallbackRegistration> cb =
+  ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());

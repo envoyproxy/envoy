@@ -46,13 +46,15 @@ public:
 };
 
 /**
- * CallbackRegistration is a RAII wrapper for a ClusterUpdateCallbacks. Deleting
- * the CallbackRegistration will remove the callbacks from ClusterManager in O(1).
+ * ClusterUpdateCallbacksHandle is a RAII wrapper for a ClusterUpdateCallbacks. Deleting
+ * the ClusterUpdateCallbacksHandle will remove the callbacks from ClusterManager in O(1).
  */
-class CallbackRegistration {
+class ClusterUpdateCallbacksHandle {
 public:
-  virtual ~CallbackRegistration() {}
+  virtual ~ClusterUpdateCallbacksHandle() {}
 };
+
+typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -187,10 +189,10 @@ public:
    * To be executed on all threads, Callbacks need to be registered on all threads.
    *
    * @param callbacks are the ClusterUpdateCallbacks to add or remove to the cluster manager.
-   * @return std::unique_ptr<CallbackRegistration> a RAII that needs to be deleted to unregister
-   *                                               the callback.
+   * @return ClusterUpdateCallbacksHandlePtr a RAII that needs to be deleted to
+   * unregister the callback.
    */
-  virtual std::unique_ptr<CallbackRegistration>
+  virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 };
 

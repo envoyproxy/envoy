@@ -191,7 +191,7 @@ public:
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
-  std::unique_ptr<CallbackRegistration>
+  ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
 private:
@@ -288,9 +288,10 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
   };
 
-  struct CallbackRegistrationImpl : public CallbackRegistration {
-    CallbackRegistrationImpl(ClusterUpdateCallbacks* cb, std::list<ClusterUpdateCallbacks*>& ll);
-    ~CallbackRegistrationImpl() override;
+  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
+    ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
+                                     std::list<ClusterUpdateCallbacks*>& parent);
+    ~ClusterUpdateCallbacksHandleImpl() override;
 
   private:
     std::list<ClusterUpdateCallbacks*>::iterator entry;

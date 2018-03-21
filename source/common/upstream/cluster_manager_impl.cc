@@ -609,19 +609,19 @@ const std::string ClusterManagerImpl::versionInfo() const {
   return "static";
 }
 
-std::unique_ptr<CallbackRegistration>
+ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
-  return std::make_unique<CallbackRegistrationImpl>(&cb, cluster_manager.update_callbacks_);
+  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
-ClusterManagerImpl::CallbackRegistrationImpl::CallbackRegistrationImpl(
-    ClusterUpdateCallbacks* cb, std::list<ClusterUpdateCallbacks*>& ll)
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::ClusterUpdateCallbacksHandleImpl(
+    ClusterUpdateCallbacks& cb, std::list<ClusterUpdateCallbacks*>& ll)
     : list(ll) {
-  entry = ll.emplace(ll.begin(), cb);
+  entry = ll.emplace(ll.begin(), &cb);
 }
 
-ClusterManagerImpl::CallbackRegistrationImpl::~CallbackRegistrationImpl() {
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::~ClusterUpdateCallbacksHandleImpl() {
   ASSERT(std::find(list.begin(), list.end(), *entry) != list.end());
   list.erase(entry);
 }
