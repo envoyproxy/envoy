@@ -3,6 +3,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/config/well_known_names.h"
 #include "common/http/filter/lua/wrappers.h"
 #include "common/lua/wrappers.h"
 
@@ -10,6 +11,21 @@ namespace Envoy {
 namespace Http {
 namespace Filter {
 namespace Lua {
+
+namespace {
+const ProtobufWkt::Struct& getMetadata(StreamFilterCallbacks* callbacks) {
+  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+  const auto& metadata = callbacks->route()->routeEntry()->metadata();
+  const auto& filter_it =
+      metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().LUA);
+  if (filter_it == metadata.filter_metadata().end()) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+  return filter_it->second;
+}
+} // namespace
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -47,6 +63,12 @@ public:
    * @param state supplies the active Lua state.
    */
   virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
+
+  /**
+   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * route entry.
+   */
+  virtual const ProtobufWkt::Struct& metadata() const PURE;
 };
 
 class Filter;
@@ -95,12 +117,13 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},       {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks}, {"trailers", static_luaTrailers},
-            {"logTrace", static_luaLogTrace},     {"logDebug", static_luaLogDebug},
-            {"logInfo", static_luaLogInfo},       {"logWarn", static_luaLogWarn},
-            {"logErr", static_luaLogErr},         {"logCritical", static_luaLogCritical},
-            {"httpCall", static_luaHttpCall},     {"respond", static_luaRespond}};
+    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
+            {"respond", static_luaRespond}};
   }
 
 private:
@@ -150,6 +173,11 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
 
   /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -174,6 +202,7 @@ private:
     headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
+    metadata_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -192,6 +221,7 @@ private:
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
   Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> body_wrapper_;
   Envoy::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
+  Envoy::Lua::LuaDeathRef<Envoy::Lua::MetadataMapWrapper> metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   AsyncClient::Request* http_request_{};
@@ -280,6 +310,8 @@ private:
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
+    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+
     Filter& parent_;
     StreamDecoderFilterCallbacks* callbacks_{};
   };
@@ -295,6 +327,8 @@ private:
     void continueIteration() override { return callbacks_->continueEncoding(); }
     void onHeadersModified() override {}
     void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+
+    const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
 
     Filter& parent_;
     StreamEncoderFilterCallbacks* callbacks_{};

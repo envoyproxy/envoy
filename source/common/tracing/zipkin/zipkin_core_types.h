@@ -302,7 +302,8 @@ public:
    * Default constructor. Creates an empty span.
    */
   Span()
-      : trace_id_(0), name_(), id_(0), debug_(false), monotonic_start_time_(0), tracer_(nullptr) {}
+      : trace_id_(0), name_(), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
+        tracer_(nullptr) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -328,6 +329,11 @@ public:
    * @return Whether or not the parent_id attribute is set.
    */
   bool isSetParentId() const { return parent_id_.has_value(); }
+
+  /**
+   * Set the span's sampled flag.
+   */
+  void setSampled(const bool val) { sampled_ = val; }
 
   /**
    * @return a vector with all annotations added to the span.
@@ -453,6 +459,11 @@ public:
   bool debug() const { return debug_; }
 
   /**
+   * @return whether or not the sampled attribute is set
+   */
+  bool sampled() const { return sampled_; }
+
+  /**
    * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
    */
   int64_t timestamp() const { return timestamp_.value(); }
@@ -535,6 +546,7 @@ private:
   uint64_t id_;
   absl::optional<uint64_t> parent_id_;
   bool debug_;
+  bool sampled_;
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
   absl::optional<int64_t> timestamp_;

@@ -1,3 +1,6 @@
+#include <ctime>
+#include <regex>
+
 #include "common/config/filter_json.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -244,6 +247,44 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(), "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 abcdef\n");
+}
+
+// Test timestamps and durations are emitted.
+TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
+  const std::string json_string = R"EOF(
+  {
+    "path": "/dev/null",
+    "format": "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
+  }
+  )EOF";
+
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+
+  envoy::config::filter::accesslog::v2::AccessLog upstream_log;
+  Envoy::Config::FilterJson::translateAccessLog(*json_object_ptr, upstream_log);
+
+  init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log));
+  run(200, {{"x-envoy-original-path", "/foo"}}, {});
+
+  EXPECT_EQ(output_.size(), 1U);
+
+  // REQUEST_DURATION is "-" because it represents how long it took to receive the downstream
+  // request which is not known to the upstream request.
+  std::regex log_regex(
+      R"EOF(^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.\d{3}Z\] GET /foo HTTP/1.0 \d+ \d+ -$)EOF");
+  std::smatch matches;
+  EXPECT_TRUE(std::regex_match(output_.front(), matches, log_regex));
+
+  std::tm timestamp{};
+  std::istringstream ss(matches[1].str());
+  ss >> std::get_time(&timestamp, "%Y-%m-%dT%H:%M:%S");
+  EXPECT_FALSE(ss.fail());
+
+  std::time_t log_time = std::mktime(&timestamp);
+  std::time_t now = std::time(nullptr);
+
+  // Check that timestamp is close enough.
+  EXPECT_LE(std::abs(std::difftime(log_time, now)), 300);
 }
 
 } // namespace Router

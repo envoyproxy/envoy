@@ -7,6 +7,7 @@
 
 #include "common/tracing/zipkin/span_context.h"
 #include "common/tracing/zipkin/tracer_interface.h"
+#include "common/tracing/zipkin/zipkin_core_constants.h"
 #include "common/tracing/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
