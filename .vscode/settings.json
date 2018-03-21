@@ -1,0 +1,12 @@
+{
+  "files.associations": {
+    "__config": "cpp",
+    "cstddef": "cpp",
+    "exception": "cpp",
+    "initializer_list": "cpp",
+    "new": "cpp",
+    "stdexcept": "cpp",
+    "typeinfo": "cpp",
+    "type_traits": "cpp"
+  }
+}

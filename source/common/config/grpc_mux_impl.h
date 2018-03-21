@@ -23,9 +23,6 @@ struct GrpcMuxLoggerImpl : public GrpcMuxLogger, Logger::Loggable<Logger::Id::up
   void warn(const std::string& msg) const override { ENVOY_LOG(warn, "{}", msg); }
 };
 
-// Default GrpcMuxLoggerImpl instance.
-const GrpcMuxLoggerImpl GrpcMuxLogging{};
-
 } // namespace
 
 /**
@@ -37,7 +34,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              const GrpcMuxLogger& logger = GrpcMuxLogging);
+              const GrpcMuxLogger& logger = GrpcMuxLoggerImpl{});
   ~GrpcMuxImpl();
 
   void start() override;
@@ -100,10 +97,10 @@ private:
     bool subscribed_{};
     // Detects when Envoy is making too many requests.
     // Bucket contains 90 tokens max and refills at 5 tokens/sec.
-    TokenBucket limit_request{90, 5};
+    TokenBucket<std::ratio<1, 5>> limit_request{90};
     // Limits warning messages when too many requests is detected.
     // Bucket contains 1 token max and refills 1 token on every ~5 seconds.
-    TokenBucket limit_log{1, 0.2};
+    TokenBucket<std::ratio<5, 1>> limit_log{1};
   };
 
   envoy::api::v2::core::Node node_;

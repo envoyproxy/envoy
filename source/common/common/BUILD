@@ -201,4 +201,8 @@ envoy_cc_library(
     name = "token_bucket_lib",
     srcs = ["token_bucket.cc"],
     hdrs = ["token_bucket.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//source/common/common:utility_lib",
+    ]
 )
