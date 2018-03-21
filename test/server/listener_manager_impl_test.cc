@@ -1393,7 +1393,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  int fd;
 
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: "TransparentListener"
@@ -1414,6 +1413,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
         return listener_factory_.socket_;
       }));
 #if defined(SOL_IP) && defined(IP_TRANSPARENT)
+  int fd;
+
   EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_IP, IP_TRANSPARENT, _, sizeof(int)))
       .WillOnce(Invoke([&](int sockfd, int, int, const void*, socklen_t) -> int {
         fd = sockfd;
@@ -1429,7 +1430,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListener) {
 #else
   // MockListenerSocket is not a real socket, so this always fails in testing.
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
-                            EnvoyException, "ListenSocket: Setting socket options failed");
+                            EnvoyException, "TransparentListener: Setting socket options failed");
   EXPECT_EQ(0U, manager_->listeners().size());
 #endif
 }
