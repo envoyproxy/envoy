@@ -1,4 +1,5 @@
 #include "common/jwt_authn/jwks.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {

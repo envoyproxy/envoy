@@ -1,8 +1,7 @@
-#include "common/jwt_authn/jwks.h"
-
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/json/json_loader.h"
+#include "common/jwt_authn/jwks.h"
 #include "common/jwt_authn/utils.h"
 
 #include "openssl/bn.h"

@@ -8,9 +8,9 @@ namespace JwtAuthn {
 std::string Base64UrlDecode(std::string input);
 
 // A convinence inline cast function.
-inline const uint8_t *CastToUChar(const std::string &str) {
-  return reinterpret_cast<const uint8_t *>(str.c_str());
+inline const uint8_t* CastToUChar(const std::string& str) {
+  return reinterpret_cast<const uint8_t*>(str.c_str());
 }
 
-}  // namespace JwtAuthn
-}  // namespace Envoy
+} // namespace JwtAuthn
+} // namespace Envoy

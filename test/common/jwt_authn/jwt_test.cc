@@ -1,4 +1,5 @@
 #include "common/jwt_authn/jwt.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -129,13 +130,12 @@ TEST(JwtParseTest, BadFormatKid) {
   const std::string kJwtWithBadFormatKid =
       "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6MX0."
       "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
-    "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
 
   Jwt jwt;
   ASSERT_EQ(jwt.ParseFromString(kJwtWithBadFormatKid), Status::JWT_HEADER_BAD_KID);
 }
-  
-  
+
 TEST(JwtParseTest, InvalidSignature) {
   // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058,
   // aud: [aud1, aud2] }

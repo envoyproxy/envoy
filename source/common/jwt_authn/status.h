@@ -76,14 +76,11 @@ enum class Status {
   // "x" or "y" field of a JWK has a parse error or is missing.
   JWK_EC_PUBKEY_PARSE_ERROR = 22,
 
-  // Failed to create ECDSA_SIG object.
-  FAILED_CREATE_ECDSA_SIGNATURE = 23,
-
   // Audience is not allowed.
-  AUDIENCE_NOT_ALLOWED = 24,
+  AUDIENCE_NOT_ALLOWED = 23,
 
   // Failed to fetch public key
-  FAILED_FETCH_PUBKEY = 25,
+  FAILED_FETCH_PUBKEY = 24,
 };
 
 // Convert status to string.

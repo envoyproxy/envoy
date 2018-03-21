@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/jwt_authn/status.h"
 #include "envoy/json/json_object.h"
+
+#include "common/jwt_authn/status.h"
 
 namespace Envoy {
 namespace JwtAuthn {
@@ -36,10 +37,9 @@ struct Jwt {
   // expiration
   int64_t exp = 0;
 
-  // Parse from string 
+  // Parse from string
   Status ParseFromString(const std::string& jwt);
 };
 
- 
 } // namespace JwtAuthn
 } // namespace Envoy

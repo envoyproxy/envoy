@@ -1,6 +1,6 @@
-#include "common/jwt_authn/status.h"
-
 #include <map>
+
+#include "common/jwt_authn/status.h"
 
 namespace Envoy {
 namespace JwtAuthn {
@@ -30,7 +30,6 @@ std::string StatusToString(Status status) {
       {Status::JWK_RSA_PUBKEY_PARSE_ERROR, "JWK_RSA_PUBKEY_PARSE_ERROR"},
       {Status::FAILED_CREATE_EC_KEY, "FAILED_CREATE_EC_KEY"},
       {Status::JWK_EC_PUBKEY_PARSE_ERROR, "JWK_EC_PUBKEY_PARSE_ERROR"},
-      {Status::FAILED_CREATE_ECDSA_SIGNATURE, "FAILED_CREATE_ECDSA_SIGNATURE"},
       {Status::AUDIENCE_NOT_ALLOWED, "Audience doesn't match"},
       {Status::FAILED_FETCH_PUBKEY, "Failed to fetch public key"},
   };

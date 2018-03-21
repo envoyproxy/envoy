@@ -1,12 +1,14 @@
 #pragma once
 
-#include "common/jwt_authn/status.h"
-#include "envoy/json/json_object.h"
-#include "openssl/ec.h"
-#include "openssl/evp.h"
-
 #include <string>
 #include <vector>
+
+#include "envoy/json/json_object.h"
+
+#include "common/jwt_authn/status.h"
+
+#include "openssl/ec.h"
+#include "openssl/evp.h"
 
 namespace Envoy {
 namespace JwtAuthn {
@@ -25,7 +27,7 @@ public:
 
   // Create from string.
   static std::unique_ptr<Jwks> CreateFrom(const std::string& pkey, Type type);
-  
+
   // Struct for JSON Web Key
   struct Jwk {
     bssl::UniquePtr<EVP_PKEY> evp_pkey;
