@@ -31,7 +31,7 @@ public:
   }
   void raiseGoAway() { onGoAway(); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
-  
+
   DestroyCb destroy_cb_;
 };
 
