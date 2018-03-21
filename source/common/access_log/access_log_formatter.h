@@ -21,8 +21,12 @@ public:
   static std::vector<FormatterPtr> parse(const std::string& format);
 
 private:
-  static void parseCommand(const std::string& token, const size_t start, std::string& main_header,
-                           std::string& alternative_header, absl::optional<size_t>& max_length);
+  static void parseCommandHeader(const std::string& token, const size_t start,
+                                 std::string& main_header, std::string& alternative_header,
+                                 absl::optional<size_t>& max_length);
+  static void parseCommand(const std::string& token, const size_t start,
+                           const std::string& separator, std::string& main,
+                           std::vector<std::string>& subs, absl::optional<size_t>& max_length);
 };
 
 /**
@@ -124,6 +128,36 @@ public:
 
 private:
   std::function<std::string(const RequestInfo::RequestInfo&)> field_extractor_;
+};
+
+/**
+ * Base formatter for formatting Metadata objects
+ */
+class MetadataFormatter {
+public:
+  MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
+                    const absl::optional<size_t>& max_length);
+
+  std::string format(const envoy::api::v2::core::Metadata& metadata) const;
+
+private:
+  std::string filter_namespace_;
+  std::vector<std::string> path_;
+  absl::optional<size_t> max_length_;
+};
+
+/**
+ * Formatter based on the DynamicMetadata from RequestInfo.
+ */
+class DynamicMetadataFormatter : public Formatter, MetadataFormatter {
+public:
+  DynamicMetadataFormatter(const std::string& filter_namespace,
+                           const std::vector<std::string>& path,
+                           const absl::optional<size_t>& max_length);
+
+  // Formatter::format
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+                     const RequestInfo::RequestInfo& request_info) const override;
 };
 
 } // namespace AccessLog

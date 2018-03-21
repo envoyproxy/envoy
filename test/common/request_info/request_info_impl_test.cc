@@ -134,6 +134,34 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
   }
 }
 
+TEST(RequestInfoImplTest, DynamicMetadataTest) {
+  RequestInfoImpl request_info(Http::Protocol::Http2);
+  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
+  request_info.setDynamicMetadata("com.test", "test_key", "test_value");
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
+                .string_value());
+  ProtobufWkt::Struct structObj2;
+  ProtobufWkt::Value val2;
+  val2.set_string_value("another_value");
+  (*structObj2.mutable_fields())["another_key"] = val2;
+  request_info.setDynamicMetadata("com.test", structObj2);
+  EXPECT_EQ("another_value", Config::Metadata::metadataValue(request_info.dynamicMetadata(),
+                                                             "com.test", "another_key")
+                                 .string_value());
+  // make sure "test_key:test_value" still exists
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
+                .string_value());
+  std::string json;
+  const auto testStruct = request_info.dynamicMetadata().filter_metadata().at("com.test");
+  const auto status = Protobuf::util::MessageToJsonString(testStruct, &json);
+  EXPECT_TRUE(status.ok());
+  // check json contains the key and values we set
+  EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
+  EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
+}
+
 } // namespace
 } // namespace RequestInfo
 } // namespace Envoy

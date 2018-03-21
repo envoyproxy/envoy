@@ -230,6 +230,71 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   }
 }
 
+/**
+ * Populate a metadata object with the following test data:
+ * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
+ */
+void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
+  ProtobufWkt::Struct structObj;
+  ProtobufWkt::Value val;
+  auto& fieldsMap = *structObj.mutable_fields();
+  val.set_string_value("test_value");
+  fieldsMap["test_key"] = val;
+  val.set_string_value("inner_value");
+  ProtobufWkt::Struct structInner;
+  (*structInner.mutable_fields())["inner_key"] = val;
+  val.clear_string_value();
+  *val.mutable_struct_value() = structInner;
+  fieldsMap["test_obj"] = val;
+  (*metadata.mutable_filter_metadata())["com.test"] = structObj;
+}
+
+TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
+
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+  {
+    MetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test_value\"", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "inner_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"inner_value\"", json);
+  }
+  // not found cases
+  {
+    MetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  // size limit
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test", json);
+  }
+}
+
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
@@ -261,6 +326,18 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
     EXPECT_EQ("GET|G|PU|GET", formatter.format(request_header, response_header, request_info));
   }
+
+  {
+    envoy::api::v2::core::Metadata metadata;
+    populateMetadataTestData(metadata);
+    EXPECT_CALL(request_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
+                               "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+              formatter.format(request_header, response_header, request_info));
+  }
 }
 
 TEST(AccessLogFormatterTest, ParserFailures) {
@@ -282,7 +359,8 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(TEST):10",
       "REQ(:TEST):10%",
       "%REQ(TEST:10%",
-      "%REQ("};
+      "%REQ("
+      "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException);

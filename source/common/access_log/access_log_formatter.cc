@@ -61,11 +61,29 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
+void AccessLogFormatParser::parseCommandHeader(const std::string& token, const size_t start,
+                                               std::string& main_header,
+                                               std::string& alternative_header,
+                                               absl::optional<size_t>& max_length) {
+  std::vector<std::string> subs;
+  parseCommand(token, start, "?", main_header, subs, max_length);
+  if (subs.size() > 1) {
+    throw EnvoyException(
+        fmt::format("More than 1 alternative header specified in token: {}", token));
+  }
+  if (subs.size() == 1) {
+    alternative_header = subs.front();
+  } else {
+    alternative_header = "";
+  }
+}
+
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
-                                         std::string& main_header, std::string& alternative_header,
+                                         const std::string& separator, std::string& main,
+                                         std::vector<std::string>& subs,
                                          absl::optional<size_t>& max_length) {
   size_t end_request = token.find(')', start);
-
+  subs.clear();
   if (end_request != token.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
@@ -87,21 +105,26 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     max_length = length_value;
   }
 
-  std::string header_name = token.substr(start, end_request - start);
-  size_t separator = header_name.find('?');
+  std::string name_data = token.substr(start, end_request - start);
+  size_t separator_pos = name_data.find(separator);
 
-  if (separator == std::string::npos) {
-    main_header = header_name;
-    alternative_header = "";
+  if (separator_pos == std::string::npos) {
+    main = name_data;
   } else {
-    main_header = header_name.substr(0, separator);
-    alternative_header = header_name.substr(separator + 1, end_request - separator - 1);
+    main = name_data.substr(0, separator_pos);
+    do {
+      size_t next_separator_pos = name_data.find(separator, separator_pos + 1);
+      size_t end = next_separator_pos == std::string::npos ? name_data.size() : next_separator_pos;
+      subs.push_back(name_data.substr(separator_pos + 1, end - separator_pos - 1));
+      separator_pos = next_separator_pos;
+    } while (separator_pos != std::string::npos);
   }
 }
 
 std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterPtr> formatters;
+  const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
@@ -123,7 +146,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         absl::optional<size_t> max_length;
         const size_t start = 4;
 
-        parseCommand(token, start, main_header, alternative_header, max_length);
+        parseCommandHeader(token, start, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
@@ -132,10 +155,19 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         absl::optional<size_t> max_length;
         const size_t start = 5;
 
-        parseCommand(token, start, main_header, alternative_header, max_length);
+        parseCommandHeader(token, start, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
+      } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
+        std::string filter_namespace;
+        absl::optional<size_t> max_length;
+        std::vector<std::string> path;
+        const size_t start = DYNAMIC_META_TOKEN.size();
+
+        parseCommand(token, start, ":", filter_namespace, path, max_length);
+        formatters.emplace_back(
+            FormatterPtr(new DynamicMetadataFormatter(filter_namespace, path, max_length)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
       }
@@ -297,6 +329,53 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
                                            const Http::HeaderMap&,
                                            const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(request_headers);
+}
+
+MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
+                                     const std::vector<std::string>& path,
+                                     const absl::optional<size_t>& max_length)
+    : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
+
+std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& metadata) const {
+  const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
+  if (filter_it == metadata.filter_metadata().end()) {
+    return UnspecifiedValueString;
+  }
+  const ProtobufWkt::Struct* dataStruct = &(filter_it->second);
+  const Protobuf::Message* data = dataStruct;
+  // go through path to select sub entries
+  for (const auto p : path_) {
+    if (nullptr == dataStruct) { // sub entry not found
+      return UnspecifiedValueString;
+    }
+    const auto entry_it = dataStruct->fields().find(p);
+    if (entry_it == dataStruct->fields().end()) {
+      return UnspecifiedValueString;
+    }
+    const Protobuf::Value& val = entry_it->second;
+    data = &val;
+    if (val.has_struct_value()) {
+      dataStruct = &(val.struct_value());
+    } else {
+      dataStruct = nullptr;
+    }
+  }
+  std::string json;
+  Protobuf::util::MessageToJsonString(*data, &json);
+  if (max_length_ && json.length() > max_length_.value()) {
+    return json.substr(0, max_length_.value());
+  }
+  return json;
+}
+
+DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   const absl::optional<size_t>& max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                             const RequestInfo::RequestInfo& request_info) const {
+  return MetadataFormatter::format(request_info.dynamicMetadata());
 }
 
 } // namespace AccessLog

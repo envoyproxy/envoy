@@ -173,6 +173,21 @@ public:
     return duration(end_time_);
   }
 
+  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+
+  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+  };
+
+  void setDynamicMetadata(const std::string& name, const std::string& key,
+                          const std::string& value) override {
+    ProtobufWkt::Struct structObj;
+    ProtobufWkt::Value val;
+    val.set_string_value(value);
+    (*structObj.mutable_fields())[key] = val;
+    setDynamicMetadata(name, structObj);
+  };
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -194,6 +209,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
+  envoy::api::v2::core::Metadata metadata_{};
 };
 
 class AccessLogImplTest : public testing::Test {
