@@ -300,7 +300,7 @@ public:
                    Upstream::ClusterManager& cm, Stats::Scope& scope,
                    const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD3(getStaticRouteConfigProvider,
-               RouteConfigProviderSharedPtr(envoy::api::v2::RouteConfiguration route_config,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                             Runtime::Loader& runtime,
                                             Upstream::ClusterManager& cm));
 

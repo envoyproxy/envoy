@@ -166,7 +166,7 @@ public:
       Init::Manager& init_manager) override;
 
   RouteConfigProviderSharedPtr
-  getStaticRouteConfigProvider(envoy::api::v2::RouteConfiguration route_config,
+  getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
                                Runtime::Loader& runtime, Upstream::ClusterManager& cm) override;
 
 private:

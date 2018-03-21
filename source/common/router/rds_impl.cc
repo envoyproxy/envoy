@@ -217,7 +217,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
 };
 
 RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfigProvider(
-    envoy::api::v2::RouteConfiguration route_config, Runtime::Loader& runtime,
+    const envoy::api::v2::RouteConfiguration& route_config, Runtime::Loader& runtime,
     Upstream::ClusterManager& cm) {
   auto provider =
       std::make_shared<StaticRouteConfigProviderImpl>(std::move(route_config), runtime, cm);

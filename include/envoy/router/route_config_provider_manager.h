@@ -52,7 +52,7 @@ public:
    * @param cm supplies the ClusterManager.
    */
   virtual RouteConfigProviderSharedPtr
-  getStaticRouteConfigProvider(envoy::api::v2::RouteConfiguration route_config,
+  getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
                                Runtime::Loader& runtime, Upstream::ClusterManager& cm) PURE;
 
   /**
