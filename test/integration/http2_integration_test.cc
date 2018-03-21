@@ -221,7 +221,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
     auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
-    std::chrono::milliseconds timeout(5000);
+    std::chrono::milliseconds timeout(3000);
     auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
     idle_time_out->set_seconds(seconds.count());
   });
