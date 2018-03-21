@@ -73,6 +73,8 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
+  enum class BootstrapVersion { V1, V2 };
+
   /**
    * Default implementation of runtime loader creation used in the real server and in most
    * integration tests where a mock runtime is not needed.
@@ -94,8 +96,8 @@ public:
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
    */
-  static void loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  const std::string& config_path, bool v2_only);
+  static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                              Options& options);
 };
 
 /**

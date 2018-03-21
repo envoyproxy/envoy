@@ -150,25 +150,30 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                       const std::string& config_path, bool v2_only) {
-  bool v2_config_loaded = false;
+InstanceUtil::BootstrapVersion
+InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                  Options& options) {
   try {
-    MessageUtil::loadFromFileAndValidate(config_path, bootstrap);
-    v2_config_loaded = true;
-  } catch (const EnvoyException& e) {
-    if (v2_only) {
-      throw;
-    } else {
-      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    if (!options.configPath().empty()) {
+      MessageUtil::loadFromFileAndValidate(options.configPath(), bootstrap);
     }
+    if (!options.configYaml().empty()) {
+      auto bootstrap_override = envoy::config::bootstrap::v2::Bootstrap();
+      MessageUtil::loadFromYamlAndValidate(options.configYaml(), bootstrap_override);
+      bootstrap.MergeFrom(bootstrap_override);
+    }
+    return BootstrapVersion::V2;
+  } catch (const EnvoyException& e) {
+    if (options.v2ConfigOnly()) {
+      throw;
+    }
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
   }
-  if (!v2_config_loaded) {
-    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
-    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
-    MessageUtil::validate(bootstrap);
-  }
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  MessageUtil::validate(bootstrap);
+  return BootstrapVersion::V1;
 }
 
 void InstanceImpl::initialize(Options& options,
@@ -179,7 +184,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
+  InstanceUtil::loadBootstrapConfig(bootstrap, options);
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.

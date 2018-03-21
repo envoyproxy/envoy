@@ -28,7 +28,7 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path) : options_(file_path, Network::Address::IpVersion::v6) {
+  ConfigTest(Server::TestOptionsImpl options) : options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -36,8 +36,7 @@ public:
         .WillByDefault(Return("access_token"));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_.configPath(),
-                                              options_.v2ConfigOnly());
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
@@ -69,7 +68,8 @@ public:
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
-      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
+      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
+                                   ex.what());
     }
 
     server_.thread_local_.shutdownThread();
@@ -92,8 +92,17 @@ uint32_t run(const std::string& directory) {
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
-    ConfigTest config(filename);
+    Server::TestOptionsImpl options(filename, Network::Address::IpVersion::v6);
+    ConfigTest test1(options);
     num_tested++;
+
+    // Config flag --config-yaml is only supported for v2 configs.
+    envoy::config::bootstrap::v2::Bootstrap bootstrap;
+    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
+        Server::InstanceUtil::BootstrapVersion::V2) {
+      ConfigTest test2(options.asConfigYaml());
+      num_tested++;
+    }
   }
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0);
