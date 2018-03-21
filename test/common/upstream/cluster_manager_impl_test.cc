@@ -825,10 +825,15 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
   std::shared_ptr<MockCluster> cluster1(new NiceMock<MockCluster>());
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
@@ -854,6 +859,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         // Test inline init.
         initialize_callback();
       }));
+  EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
@@ -866,6 +872,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   // Now remove it. This should drain the connection pool.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
+  EXPECT_CALL(*callbacks, onClusterRemoval(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
@@ -879,6 +886,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster2.get()));
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(callbacks.get()));
 }
 
 TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
