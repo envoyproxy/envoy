@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -109,7 +110,8 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 // This same object can be extended to handle additional listener socket options.
 class ListenerSocketOption : public Network::Socket::Option, Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerSocketOption(const envoy::api::v2::Listener& config) {
+  ListenerSocketOption(const envoy::api::v2::Listener& config)
+      : os_sys_calls_(Api::OsSysCallsSingleton::get()) {
     if (config.has_transparent()) {
       transparent_ = config.transparent().value();
     }
@@ -138,7 +140,8 @@ public:
       if (ip->version() == Network::Address::IpVersion::v4) {
 #if defined(SOL_IP) && defined(IP_TRANSPARENT)
         int option = transparent_.value();
-        if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
           error = errno;
         }
 #else
@@ -149,12 +152,14 @@ public:
       // Otherwise try with IP_TRANSPARENT also for IPv6, as many systems allow it.
 #if defined(SOL_IPV6) && defined(IPV6_TRANSPARENT)
         int option = transparent_.value();
-        if (setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option, sizeof(option)) != 0) {
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IPV6, IPV6_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
           error = errno;
         }
 #elif defined(SOL_IP) && defined(IP_TRANSPARENT)
         int option = transparent_.value();
-        if (setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option, sizeof(option)) != 0) {
+        if (os_sys_calls_.setsockopt(socket.fd(), SOL_IP, IP_TRANSPARENT, &option,
+                                     sizeof(option)) != 0) {
           error = errno;
         }
 #else
@@ -177,6 +182,7 @@ public:
 
 private:
   absl::optional<bool> transparent_;
+  Api::OsSysCalls& os_sys_calls_;
 };
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
