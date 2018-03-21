@@ -190,7 +190,7 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
     return is_wildcard;
   }
 
-  return true;
+  return false;
 }
 
 bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
