@@ -25,7 +25,8 @@ public:
 
   // Create from string.
   static std::unique_ptr<Jwks> CreateFrom(const std::string& pkey, Type type);
-  // One JSON Web Key
+  
+  // Struct for JSON Web Key
   struct Jwk {
     bssl::UniquePtr<EVP_PKEY> evp_pkey;
     bssl::UniquePtr<EC_KEY> ec_key;
@@ -41,14 +42,19 @@ public:
   const std::vector<std::unique_ptr<Jwk>>& keys() const { return keys_; }
 
 private:
+  // Create Pem
   void CreateFromPemCore(const std::string& pkey_pem);
+  // Create Jwks
   void CreateFromJwksCore(const std::string& pkey_jwks);
 
   // Extracts the public key from a jwk key (jkey) and sets it to keys_;
   void ExtractJwk(Json::ObjectSharedPtr jwk_json);
+  // Create RSA Jwk
   void ExtractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json);
+  // Create EC Jwk
   void ExtractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json);
 
+  // List of Jwks
   std::vector<std::unique_ptr<Jwk>> keys_;
 };
 

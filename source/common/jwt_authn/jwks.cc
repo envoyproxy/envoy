@@ -106,6 +106,21 @@ private:
 
 } // namespace
 
+std::unique_ptr<Jwks> Jwks::CreateFrom(const std::string& pkey, Type type) {
+  std::unique_ptr<Jwks> keys(new Jwks());
+  switch (type) {
+  case Type::JWKS:
+    keys->CreateFromJwksCore(pkey);
+    break;
+  case Type::PEM:
+    keys->CreateFromPemCore(pkey);
+    break;
+  default:
+    PANIC("can not reach here");
+  }
+  return keys;
+}
+
 void Jwks::CreateFromPemCore(const std::string& pkey_pem) {
   keys_.clear();
   std::unique_ptr<Jwk> key_ptr(new Jwk());
@@ -195,7 +210,10 @@ void Jwks::ExtractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json) {
 
   EvpPkeyGetter e;
   jwk->evp_pkey = e.EvpPkeyFromJwkRSA(n_str, e_str);
-  keys_.push_back(std::move(jwk));
+  UpdateStatus(e.GetStatus());
+  if (e.GetStatus() == Status::OK) {
+    keys_.push_back(std::move(jwk));
+  }
 }
 
 void Jwks::ExtractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json) {
@@ -225,22 +243,10 @@ void Jwks::ExtractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json) {
 
   EvpPkeyGetter e;
   jwk->ec_key = e.EcKeyFromJwkEC(x_str, y_str);
-  keys_.push_back(std::move(jwk));
-}
-
-std::unique_ptr<Jwks> Jwks::CreateFrom(const std::string& pkey, Type type) {
-  std::unique_ptr<Jwks> keys(new Jwks());
-  switch (type) {
-  case Type::JWKS:
-    keys->CreateFromJwksCore(pkey);
-    break;
-  case Type::PEM:
-    keys->CreateFromPemCore(pkey);
-    break;
-  default:
-    PANIC("can not reach here");
+  UpdateStatus(e.GetStatus());
+  if (e.GetStatus() == Status::OK) {
+    keys_.push_back(std::move(jwk));
   }
-  return keys;
 }
 
 } // namespace JwtAuthn

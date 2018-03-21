@@ -220,20 +220,6 @@ class DatasetJwk {
       "Mwi8DgG_F0eyFKTSRWoaNQQXQruEK0YIcwDj9tkYOXq8cLAnRK9zSYc5-"
       "15Hlzfb8eE77pID0HZN-Axeui4IY22I_kYftd0OEqlwXJv_v5p6kNaHsQ9QbtAkw";
 
-  // JWT with bad-formatted kid
-  // Header:  {"alg":"RS256","typ":"JWT","kid":1}
-  // Payload:
-  // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-  const std::string kJwtWithBadFormatKid =
-      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6MX0."
-      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
-      "ImV4cCI6MTUwMTI4MTA1OH0."
-      "oYq0UkokShprH2YO5b84CI5fEu0sKWmEJimyJQ9YZbvaGtf6zaLbdVJBTbh6plBno-"
-      "miUhjqXZtDdmBexQzp5HPHoIUwQxlGggCuJRdEnmw65Ul9WFWtS7M9g8DqVKaCo9MO-"
-      "apCsylPZsRSzzZuaTPorZktELt6XcUIxeXOKOSZJ78sHsRrDeLhlELd9Q0b6hzAdDEYCvYE6"
-      "woc3DiRHk19nsEgdg5O1RWKjTAcdd3oD9ecznzvVmAZT8gXrGXPd49tn1qHkVr1G621Ypi9V"
-      "37BD2KXH3jN9_EBocxwcxhkPwSLtP3dgkfls_f5GoWCgmp-c5ycIskCDcIjxRnPjg";
-
   // JWT payload JSON with ES256
   const std::string kJwtPayloadEC =
       R"EOF({"iss":"628645741881-noabiu23f5a8m8ovd8ucv698lj78vv0l@developer.gserviceaccount.com",

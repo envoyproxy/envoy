@@ -121,6 +121,21 @@ TEST(JwtParseTest, InvalidAlg) {
   ASSERT_EQ(jwt.ParseFromString(kJwtWithInvalidAlg), Status::ALG_NOT_IMPLEMENTED);
 }
 
+TEST(JwtParseTest, BadFormatKid) {
+  // JWT with bad-formatted kid
+  // Header:  {"alg":"RS256","typ":"JWT","kid":1}
+  // Payload:
+  // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
+  const std::string kJwtWithBadFormatKid =
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6MX0."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.ParseFromString(kJwtWithBadFormatKid), Status::JWT_HEADER_BAD_KID);
+}
+  
+  
 TEST(JwtParseTest, InvalidSignature) {
   // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058,
   // aud: [aud1, aud2] }
