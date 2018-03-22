@@ -186,10 +186,10 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
         is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
     }
-    // if neither identity nor gzip codings are present, we return the wildcard.
+    // If neither identity nor gzip codings are present, we return the wildcard.
     return is_wildcard;
   }
-  // if no accept-encoding header is present, return false.
+  // If no accept-encoding header is present, return false.
   return false;
 }
 
