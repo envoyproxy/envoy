@@ -82,7 +82,7 @@ protected:
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }
 
-  std::unique_ptr<Jwks> jwks_;
+  JwksPtr jwks_;
 };
 
 TEST_F(VerifyJwkECTest, KidOK) {

@@ -102,8 +102,8 @@ private:
 
 } // namespace
 
-std::unique_ptr<Jwks> Jwks::createFrom(const std::string& pkey, Type type) {
-  std::unique_ptr<Jwks> keys(new Jwks());
+JwksPtr Jwks::createFrom(const std::string& pkey, Type type) {
+  JwksPtr keys(new Jwks());
   switch (type) {
   case Type::JWKS:
     keys->createFromJwksCore(pkey);
@@ -119,7 +119,7 @@ std::unique_ptr<Jwks> Jwks::createFrom(const std::string& pkey, Type type) {
 
 void Jwks::createFromPemCore(const std::string& pkey_pem) {
   keys_.clear();
-  std::unique_ptr<Pubkey> key_ptr(new Pubkey());
+  PubkeyPtr key_ptr(new Pubkey());
   EvpPkeyGetter e;
   key_ptr->evp_pkey_ = e.createEvpPkeyFromStr(pkey_pem);
   key_ptr->pem_format_ = true;
@@ -180,7 +180,7 @@ void Jwks::extractJwk(Json::ObjectSharedPtr jwk_json) {
 }
 
 void Jwks::extractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json) {
-  std::unique_ptr<Pubkey> jwk(new Pubkey());
+  PubkeyPtr jwk(new Pubkey());
   std::string n_str, e_str;
   try {
     // "kid" and "alg" are optional, if they do not exist, set them to "".
@@ -213,7 +213,7 @@ void Jwks::extractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json) {
 }
 
 void Jwks::extractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json) {
-  std::unique_ptr<Pubkey> jwk(new Pubkey());
+  PubkeyPtr jwk(new Pubkey());
   std::string x_str, y_str;
   try {
     // "kid" and "alg" are optional, if they do not exist, set them to "".

@@ -17,8 +17,8 @@ namespace JwtAuthn {
  *  Class to parse and a hold JSON Web Key Set.
  *
  *  Usage example:
- *  std::unique_ptr<Jwks> keys = Jwks::CreateFrom(jwks_string);
- *  if (keys->getStatus() == Status::Ok) { ... }
+ *    JwksPtr keys = Jwks::createFrom(jwks_string, type);
+ *    if (keys->getStatus() == Status::Ok) { ... }
  */
 class Jwks : public WithStatus {
 public:
