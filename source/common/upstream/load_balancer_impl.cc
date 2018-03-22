@@ -290,7 +290,7 @@ void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
   }
 }
 
-const HostVector& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) {
+uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& host_set) {
   PerPriorityState& state = *per_priority_state_[host_set.priority()];
   ASSERT(state.locality_routing_state_ != LocalityRoutingState::NoLocalityRouting);
 
@@ -302,7 +302,7 @@ const HostVector& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const H
   // Try to push all of the requests to the same locality first.
   if (state.locality_routing_state_ == LocalityRoutingState::LocalityDirect) {
     stats_.lb_zone_routing_all_directly_.inc();
-    return host_set.healthyHostsPerLocality().get()[0];
+    return 0;
   }
 
   ASSERT(state.locality_routing_state_ == LocalityRoutingState::LocalityResidual);
@@ -311,7 +311,7 @@ const HostVector& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const H
   // push to the local locality, check if we can push to local locality on current iteration.
   if (random_.random() % 10000 < state.local_percent_to_route_) {
     stats_.lb_zone_routing_sampled_.inc();
-    return host_set.healthyHostsPerLocality().get()[0];
+    return 0;
   }
 
   // At this point we must route cross locality as we cannot route to the local locality.
@@ -321,7 +321,7 @@ const HostVector& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const H
   // locality percentages. In this case just select random locality.
   if (state.residual_capacity_[number_of_localities - 1] == 0) {
     stats_.lb_zone_no_capacity_left_.inc();
-    return host_set.healthyHostsPerLocality().get()[random_.random() % number_of_localities];
+    return random_.random() % number_of_localities;
   }
 
   // Random sampling to select specific locality for cross locality traffic based on the additional
@@ -337,47 +337,149 @@ const HostVector& ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const H
     i++;
   }
 
-  return host_set.healthyHostsPerLocality().get()[i];
+  return i;
 }
 
-const HostVector& ZoneAwareLoadBalancerBase::hostsToUse() {
+ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUse() {
   const HostSet& host_set = chooseHostSet();
+  HostsSource hosts_source;
+  hosts_source.priority_ = host_set.priority();
 
   // If the selected host set has insufficient healthy hosts, return all hosts.
   if (isGlobalPanic(host_set)) {
     stats_.lb_healthy_panic_.inc();
-    return host_set.hosts();
+    hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+    return hosts_source;
   }
 
   // If we've latched that we can't do priority-based routing, return healthy hosts for the selected
   // host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    return host_set.healthyHosts();
+    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
-    return host_set.healthyHosts();
+    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    return hosts_source;
   }
 
   if (isGlobalPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, do not do locality
     // based routing.
-    return host_set.healthyHosts();
+    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    return hosts_source;
   }
 
-  return tryChooseLocalLocalityHosts(host_set);
+  hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+  hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
+  return hosts_source;
+}
+
+const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts_source) {
+  const HostSet& host_set = *priority_set_.hostSetsPerPriority()[hosts_source.priority_];
+  switch (hosts_source.source_type_) {
+  case HostsSource::SourceType::AllHosts:
+    return host_set.hosts();
+  case HostsSource::SourceType::HealthyHosts:
+    return host_set.healthyHosts();
+  case HostsSource::SourceType::LocalityHealthyHosts:
+    return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
+  default:
+    NOT_REACHED;
+  }
+}
+
+RoundRobinLoadBalancer::RoundRobinLoadBalancer(
+    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                                common_config) {
+  for (uint32_t priority = 0; priority < priority_set.hostSetsPerPriority().size(); ++priority) {
+    refresh(priority);
+  }
+  // We fully recompute the schedulers for a given host set here on membership change, which is
+  // consistent with what other LB implementations do (e.g. thread aware).
+  // TODO(htuch): By fully recomputing the host set schedulers on each membership update, we lose RR
+  // history, so on an EDS update, for example, we reset the schedule. This is likely a reasonable
+  // approximation when there are many more LB picks than host set updates. Otherwise, we will bias
+  // towards heavily weighted hosts further than weighted RR should allow. We could be a bit finer
+  // grained and only modify the schedulers for hosts that have changed health status, locality,
+  // been added/removed, etc. but this is quite a bit more complicated and will require some
+  // additional addMemberUpdateCb parameters to track efficiently. The other downside of a full
+  // recompute is that time complexity is O(n * log n), so we will need to do better at delta
+  // tracking to scale (see https://github.com/envoyproxy/envoy/issues/2874).
+  priority_set.addMemberUpdateCb(
+      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+}
+
+void RoundRobinLoadBalancer::refresh(uint32_t priority) {
+  const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
+    bool weighted = false;
+
+    for (const auto& host : hosts) {
+      if (host->weight() != hosts[0]->weight()) {
+        weighted = true;
+        break;
+      }
+    }
+
+    // Nuke existing scheduler if it exists.
+    scheduler_[source] = Scheduler{};
+    scheduler_[source].weighted_ = weighted;
+    if (weighted) {
+      // Populate scheduler with host list.
+      // TODO(htuch): We should add the ability to randomly offset into the host list to
+      // desynchronize the schedule across Envoys in large fleets.
+      for (const auto& host : hosts) {
+        // We use a fixed weight here. While the weight may change without
+        // notification, this will only be stale until this host is next picked,
+        // at which point it is reinserted into the EdfScheduler with its new
+        // weight in chooseHost().
+        scheduler_[source].edf_.add(host->weight(), host);
+      }
+    }
+  };
+  // Populate EdfSchedulers for each valid HostsSource value for the host set
+  // at this priority.
+  const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
+  add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
+  add_hosts_source(HostsSource(priority, HostsSource::SourceType::HealthyHosts),
+                   host_set->healthyHosts());
+  for (uint32_t locality_index = 0;
+       locality_index < host_set->healthyHostsPerLocality().get().size(); ++locality_index) {
+    add_hosts_source(
+        HostsSource(priority, HostsSource::SourceType::LocalityHealthyHosts, locality_index),
+        host_set->healthyHostsPerLocality().get()[locality_index]);
+  }
 }
 
 HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
-  const HostVector& hosts_to_use = hostsToUse();
-  if (hosts_to_use.empty()) {
-    return nullptr;
+  const HostsSource hosts_source = hostSourceToUse();
+  auto scheduler_it = scheduler_.find(hosts_source);
+  // We should always have a scheduler for any return value from
+  // hostSourceToUse() via the construction in refresh();
+  ASSERT(scheduler_it != scheduler_.end());
+  auto& scheduler = scheduler_it->second;
+  if (scheduler.weighted_) {
+    auto host = scheduler.edf_.pick();
+    // We should always succeed if weighted, since when we compute the scheduler
+    // in refresh() above, any empty host vector will be treated as unweighted.
+    // We do not expire any hosts from the host list without rebuilding the scheduler.
+    ASSERT(host != nullptr);
+    scheduler.edf_.add(host->weight(), host);
+    return host;
+  } else {
+    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
+    if (hosts_to_use.size() == 0) {
+      return nullptr;
+    }
+    return hosts_to_use[scheduler.rr_index_++ % hosts_to_use.size()];
   }
-
-  return hosts_to_use[rr_index_++ % hosts_to_use.size()];
 }
 
 LeastRequestLoadBalancer::LeastRequestLoadBalancer(
@@ -415,7 +517,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(LoadBalancerContext*) {
     last_host_.reset();
   }
 
-  const HostVector& hosts_to_use = hostsToUse();
+  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse());
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -438,7 +540,7 @@ HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(LoadBalancerContext*) {
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHost(LoadBalancerContext*) {
-  const HostVector& hosts_to_use = hostsToUse();
+  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse());
   if (hosts_to_use.empty()) {
     return nullptr;
   }

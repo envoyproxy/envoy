@@ -107,8 +107,8 @@ private:
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           hcm);
 
-  // Snags the first filter from the first filter chain from the first listener.
-  envoy::api::v2::listener::Filter* getFilterFromListener();
+  // Finds the filter named 'name' from the first filter chain from the first listener.
+  envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;

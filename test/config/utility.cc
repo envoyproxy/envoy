@@ -198,8 +198,8 @@ void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
     cluster->mutable_per_connection_buffer_limit_bytes()->set_value(upstream_buffer_limit);
   }
 
-  auto filter = getFilterFromListener();
-  if (filter->name() == "envoy.http_connection_manager") {
+  auto filter = getFilterFromListener("envoy.http_connection_manager");
+  if (filter) {
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
     loadHttpConnectionManager(hcm_config);
     if (hcm_config.codec_type() ==
@@ -308,7 +308,7 @@ void ConfigHelper::renameListener(const std::string& name) {
   }
 }
 
-envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener() {
+envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener(const std::string& name) {
   RELEASE_ASSERT(!finalized_);
   if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
     return nullptr;
@@ -318,16 +318,18 @@ envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener() {
     return nullptr;
   }
   auto* filter_chain = listener->mutable_filter_chains(0);
-  if (filter_chain->filters_size() == 0) {
-    return nullptr;
+  for (ssize_t i = 0; i < filter_chain->filters_size(); i++) {
+    if (filter_chain->mutable_filters(i)->name() == name) {
+      return filter_chain->mutable_filters(i);
+    }
   }
-  return filter_chain->mutable_filters(0);
+  return nullptr;
 }
 
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
-  auto* hcm_filter = getFilterFromListener();
+  auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
     MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm);
     return true;
@@ -338,7 +340,8 @@ bool ConfigHelper::loadHttpConnectionManager(
 void ConfigHelper::storeHttpConnectionManager(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_);
-  auto* hcm_config_struct = getFilterFromListener()->mutable_config();
+  auto* hcm_config_struct =
+      getFilterFromListener("envoy.http_connection_manager")->mutable_config();
 
   MessageUtil::jsonConvert(hcm, *hcm_config_struct);
 }

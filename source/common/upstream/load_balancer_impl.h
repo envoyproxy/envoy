@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <queue>
 #include <set>
 #include <vector>
 
@@ -8,6 +9,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
+
+#include "common/upstream/edf_scheduler.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -70,10 +73,66 @@ protected:
                             const envoy::api::v2::Cluster::CommonLbConfig& common_config);
   ~ZoneAwareLoadBalancerBase();
 
+  // When deciding which hosts to use on an LB decision, we need to know how to index into the
+  // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
+  // RoundRobinLoadBalancer, to index into auxillary data structures specific to the LB for
+  // a given host set selection.
+  struct HostsSource {
+    enum class SourceType {
+      // All hosts in the host set.
+      AllHosts,
+      // All healthy hosts in the host set.
+      HealthyHosts,
+      // Healthy hosts for locality @ locality_index.
+      LocalityHealthyHosts,
+    };
+
+    HostsSource() {}
+
+    HostsSource(uint32_t priority, SourceType source_type)
+        : priority_(priority), source_type_(source_type) {
+      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts);
+    }
+
+    HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
+        : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
+      ASSERT(source_type == SourceType::LocalityHealthyHosts);
+    }
+
+    // Priority in PrioritySet.
+    uint32_t priority_{};
+
+    // How to index into HostSet for a given priority.
+    SourceType source_type_{};
+
+    // Locality index into HostsPerLocality for SourceType::LocalityHealthyHosts.
+    uint32_t locality_index_{};
+
+    bool operator==(const HostsSource& other) const {
+      return priority_ == other.priority_ && source_type_ == other.source_type_ &&
+             locality_index_ == other.locality_index_;
+    }
+  };
+
+  struct HostsSourceHash {
+    size_t operator()(const HostsSource& hs) const {
+      // This is only used for std::unordered_map keys, so we don't need a deterministic hash.
+      size_t hash = std::hash<uint32_t>()(hs.priority_);
+      hash = 37 * hash + std::hash<size_t>()(static_cast<std::size_t>(hs.source_type_));
+      hash = 37 * hash + std::hash<uint32_t>()(hs.locality_index_);
+      return hash;
+    }
+  };
+
   /**
-   * Pick the host list to use, doing zone aware routing when the hosts are sufficiently healthy.
+   * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    */
-  const HostVector& hostsToUse();
+  HostsSource hostSourceToUse();
+
+  /**
+   * Index into priority_set via hosts source descriptor.
+   */
+  const HostVector& hostSourceToHosts(HostsSource hosts_source);
 
 private:
   enum class LocalityRoutingState {
@@ -101,7 +160,7 @@ private:
    * Try to select upstream hosts from the same locality.
    * @param host_set the last host set returned by chooseHostSet()
    */
-  const HostVector& tryChooseLocalLocalityHosts(const HostSet& host_set);
+  uint32_t tryChooseLocalLocalityHosts(const HostSet& host_set);
 
   /**
    * @return (number of hosts in a given locality)/(total number of hosts) in ret param.
@@ -138,21 +197,39 @@ private:
 
 /**
  * Implementation of LoadBalancer that performs RR selection across the hosts in the cluster.
+ * This scheduler respects host weighting and utilizes an EdfScheduler to achieve O(log n)
+ * pick and insertion time complexity, O(n) memory use. The key insight is that if we schedule with
+ * 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
+ * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
+ * where m is the weight range. We also explicitly check for the unweighted special case and use a
+ * simple index to acheive O(1) scheduling in that case.
+ * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
+ * support large ranges of weights or arbitrary precision floating weights, we could construct an
+ * explicit schedule, since m will be a small constant factor in O(m * n).
  */
 class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
   RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                          ClusterStats& stats, Runtime::Loader& runtime,
                          Runtime::RandomGenerator& random,
-                         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                  common_config) {}
+                         const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 private:
-  size_t rr_index_{};
+  void refresh(uint32_t priority);
+
+  struct Scheduler {
+    // EdfScheduler for weighted RR.
+    EdfScheduler<const Host> edf_;
+    // Simple clock hand for when we do unweighted.
+    size_t rr_index_{};
+    bool weighted_{};
+  };
+
+  // Scheduler for each valid HostsSource.
+  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
 };
 
 /**

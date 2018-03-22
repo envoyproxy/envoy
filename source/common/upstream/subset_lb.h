@@ -112,13 +112,13 @@ private:
 
   void updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                             const HostVector& hosts_removed);
-  void processSubsets(const HostVector& hosts_added, const HostVector& hosts_removed,
-                      std::function<void(LbSubsetEntryPtr)> update_cb,
-                      std::function<void(LbSubsetEntryPtr, HostPredicate, bool)> new_cb);
+  void processSubsets(
+      const HostVector& hosts_added, const HostVector& hosts_removed,
+      std::function<void(LbSubsetEntryPtr)> update_cb,
+      std::function<void(LbSubsetEntryPtr, HostPredicate, const SubsetMetadata&, bool)> cb);
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
-  bool hostMatchesDefaultSubset(const Host& host);
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 
   LbSubsetEntryPtr
@@ -129,6 +129,7 @@ private:
   void forEachSubset(LbSubsetMap& subsets, std::function<void(LbSubsetEntryPtr)> cb);
 
   SubsetMetadata extractSubsetMetadata(const std::set<std::string>& subset_keys, const Host& host);
+  std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
@@ -138,7 +139,7 @@ private:
   Runtime::RandomGenerator& random_;
 
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
-  const ProtobufWkt::Struct default_subset_;
+  const SubsetMetadata default_subset_metadata_;
   const std::vector<std::set<std::string>> subset_keys_;
 
   const PrioritySet& original_priority_set_;
@@ -148,6 +149,8 @@ private:
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;
+
+  friend class SubsetLoadBalancerDescribeMetadataTester;
 };
 
 } // namespace Upstream
