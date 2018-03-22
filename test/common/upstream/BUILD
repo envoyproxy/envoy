@@ -52,6 +52,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "edf_scheduler_test",
+    srcs = ["edf_scheduler_test.cc"],
+    deps = ["//source/common/upstream:edf_scheduler_lib"],
+)
+
+envoy_cc_test(
     name = "eds_test",
     srcs = ["eds_test.cc"],
     deps = [

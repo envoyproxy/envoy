@@ -534,11 +534,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_removed, bool depend_on_hc) {
   uint64_t max_host_weight = 1;
 
-  // Go through and see if the list we have is different from what we just got. If it is, we
-  // make a new host list and raise a change notification. This uses an N^2 search given that
-  // this does not happen very often and the list sizes should be small. We also check for
-  // duplicates here. It's possible for DNS to return the same address multiple times, and a bad
-  // SDS implementation could do the same thing.
+  // Go through and see if the list we have is different from what we just got. If it is, we make a
+  // new host list and raise a change notification. This uses an N^2 search given that this does not
+  // happen very often and the list sizes should be small (see
+  // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
+  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
+  // do the same thing.
   std::unordered_set<std::string> host_addresses;
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
