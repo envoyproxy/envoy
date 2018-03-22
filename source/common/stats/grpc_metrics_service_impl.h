@@ -15,10 +15,8 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/stats/stats_impl.h"
 
-extern "C" {
-#include <circllhist.h>
-}
 namespace Envoy {
 namespace Stats {
 namespace Metrics {
@@ -111,7 +109,7 @@ private:
 /**
  * Per thread implementation of a Metric Service flusher.
  */
-class MetricsServiceSink : public Sink {
+class MetricsServiceSink : public BaseSink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
@@ -147,34 +145,13 @@ public:
   }
 
   void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    // TODO : Need to figure out how to map existing histogram to Proto Model
-    if ((hist.name().compare(std::string("cluster.time.upstream_rq_time"))) == 0) {
-      std::cout<<"inserting to histogram"<<"\n";
-      hist_insert(time_upstream_rq_time,value,1);
-      double mean = hist_approx_mean(time_upstream_rq_time);
-      double sum = hist_approx_sum(time_upstream_rq_time);
-      //(int) hist_approx_quantile(const histogram_t *, double *q_in, int nq, double *q_out);
-      std::cout<<"Mean is :"<<mean<<"\n";
-      std::cout<<"Sum is :"<<sum;
-      double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
-      double out[8];
-      double *arrptr = arr;
-      double *outptr = out;
-      hist_approx_quantile(time_upstream_rq_time, arrptr, 8, outptr);
-       for (int i = 0; i < 8; ++i)
-    {
-        std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
-
-    }
-
-    }
+    std::cout<<"Metrics Sink onHistogramComplete"<<"\n";
+    BaseSink::onHistogramComplete(hist,value);
   }
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::service::metrics::v2::StreamMetricsMessage message_;
-  histogram_t* time_upstream_rq_time;
-
 };
 
 } // namespace Metrics

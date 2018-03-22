@@ -22,7 +22,9 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-
+extern "C" {
+#include <circllhist.h>
+}
 namespace Envoy {
 namespace Stats {
 
@@ -471,6 +473,42 @@ private:
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
   IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
+};
+
+/**
+ * BaseSink implementation for all Sinks. This mainly  .
+ */
+class BaseSink : public Sink {
+public:
+void onHistogramComplete(const Histogram& hist, uint64_t value) override {
+    // TODO : Need to figure out how to map existing histogram to Proto Model
+    std::cout<<"BaseSink::onHistogramComplete==>"<<hist.name()<<"\n";
+    const auto histogram_value = histograms_.emplace(std::make_pair(hist.name(), hist_alloc()));
+    histogram_t* histogram_ptr = histogram_value.first->second;
+    hist_insert(histogram_ptr,value,1);
+    if (histogram_value.second) {
+      std::cout<<"histogram map size ==> "<<histograms_.size()<<"\n";
+    }
+    double mean = hist_approx_mean(histogram_ptr);
+    double sum = hist_approx_sum(histogram_ptr);
+    std::cout<<"Mean is :"<<mean<<"\n";
+    std::cout<<"Sum is :"<<sum<<"\n";
+    double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
+    double out[8];
+    double *arrptr = arr;
+    double *outptr = out;
+    hist_approx_quantile(histogram_ptr, arrptr, 8, outptr);
+    for (int i = 0; i < 8; ++i) {
+      std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
+    }
+}
+
+void flushHistograms() override {
+  std::cout<<"BaseSink::flushHistogram()"<<"\n";
+}
+
+  private:
+  std::map<std::string, histogram_t*> histograms_;
 };
 
 } // namespace Stats

@@ -11,6 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -37,7 +38,7 @@ private:
 /**
  * Implementation of Sink that writes to a UDP statsd address.
  */
-class UdpStatsdSink : public Sink {
+class UdpStatsdSink : public BaseSink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag);
@@ -72,7 +73,7 @@ private:
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
  */
-class TcpStatsdSink : public Sink {
+class TcpStatsdSink : public BaseSink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,

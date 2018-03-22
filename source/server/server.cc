@@ -122,6 +122,7 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
   }
 
   for (const auto& sink : sinks) {
+    sink->flushHistograms();
     sink->endFlush();
   }
 }

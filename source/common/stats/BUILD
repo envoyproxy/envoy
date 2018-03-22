@@ -25,6 +25,9 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
+    external_deps = [
+        "libcircllhist",
+    ],
 )
 
 envoy_cc_library(
@@ -42,16 +45,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
-    ],
+        "//source/common/stats:stats_lib",
+    ]
 )
 
 envoy_cc_library(
     name = "metrics_service_grpc_lib",
     srcs = ["grpc_metrics_service_impl.cc"],
     hdrs = ["grpc_metrics_service_impl.h"],
-    external_deps = [
-        "libcircllhist",
-    ],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/local_info:local_info_interface",
