@@ -45,7 +45,6 @@ public:
       std::shared_ptr<C> ret{edf_entry.entry_};
       ASSERT(edf_entry.deadline_ >= current_time_);
       current_time_ = edf_entry.deadline_;
-      order_offset_ = 0;
       queue_.pop();
       EDF_TRACE("Picked {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
       return ret;
@@ -59,38 +58,36 @@ public:
    */
   void add(uint64_t weight, std::shared_ptr<C> entry) {
     ASSERT(weight > 0);
-    const double deadline = current_time_ + order_offset_ + 1.0 / weight;
+    const double deadline = current_time_ + 1.0 / weight;
     EDF_TRACE("Insertion {} in queue with deadline {} and weight {}.",
               static_cast<const void*>(entry.get()), deadline, weight);
-    queue_.push({deadline, entry});
-    // Increment offset to ensure we get deterministic ordering. We need this bias to be small
-    // enough to avoid conflicting with other entries in the queue.
-    // TODO(htuch): this is a pretty unreliable use of floating point, probably better
-    // to switch to integer weights. Using std::numeric_limits<double>::epsilon() show that this
-    // doesn't work at the smallest precision in edf_scheduler_test.
-    order_offset_ += 0.0000000001;
+    queue_.push({deadline, order_offset_++, entry});
     ASSERT(queue_.top().deadline_ >= current_time_);
   }
 
 private:
   struct EdfEntry {
     double deadline_;
+    // Tie breaker for entries with the same deadline. This is used to provide FIFO behavior.
+    uint64_t order_offset_;
     // We only hold a weak pointer, since we don't support a remove operator. This allows entries to
     // be lazily unloaded from the queue.
     std::weak_ptr<C> entry_;
 
     // Flip < direction to make this a min queue.
-    bool operator<(const EdfEntry& other) const { return deadline_ > other.deadline_; }
+    bool operator<(const EdfEntry& other) const {
+      return deadline_ > other.deadline_ ||
+             (deadline_ == other.deadline_ && order_offset_ > other.order_offset_);
+    }
   };
 
   // Current time in EDF scheduler.
   // TOOD(htuch): Is it worth the small extra complexity to use integer time for performance
-  // reasons? Also, there might be some inaccuracy around the use of epsilon with double that could
-  // be avoided with integer time.
+  // reasons?
   double current_time_{};
   // Offset used during addition to break ties when entries have the same weight but should reflect
   // FIFO insertion order in picks.
-  double order_offset_{};
+  uint64_t order_offset_{};
   // Min priority queue for EDF.
   std::priority_queue<EdfEntry> queue_;
 };
