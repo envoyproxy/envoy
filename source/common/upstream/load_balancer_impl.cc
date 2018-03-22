@@ -412,7 +412,7 @@ RoundRobinLoadBalancer::RoundRobinLoadBalancer(
   // been added/removed, etc. but this is quite a bit more complicated and will require some
   // additional addMemberUpdateCb parameters to track efficiently. The other downside of a full
   // recompute is that time complexity is O(n * log n), so we will need to do better at delta
-  // tracking to scale.
+  // tracking to scale (see https://github.com/envoyproxy/envoy/issues/2874).
   priority_set.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
