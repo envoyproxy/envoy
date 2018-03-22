@@ -13,52 +13,55 @@
 namespace Envoy {
 namespace JwtAuthn {
 
-// Class to parse and a hold JSON Web Key Set.
-// It also holds the failure reason if parse failed.
-//
-// Usage example:
-//   std::unique_ptr<Jwks> keys = Jwks::CreateFrom(jwks_string);
-//   if(keys->GetStatus() == Status::OK) { ... }
-//
+/**
+ *  Class to parse and a hold JSON Web Key Set.
+ *
+ *  Usage example:
+ *  std::unique_ptr<Jwks> keys = Jwks::CreateFrom(jwks_string);
+ *  if (keys->getStatus() == Status::Ok) { ... }
+ */
 class Jwks : public WithStatus {
 public:
   // Format of public key.
   enum Type { PEM, JWKS };
 
-  // Create from string.
-  static std::unique_ptr<Jwks> CreateFrom(const std::string& pkey, Type type);
+  // Create from string
+  static std::unique_ptr<Jwks> createFrom(const std::string& pkey, Type type);
 
   // Struct for JSON Web Key
-  struct Jwk {
-    bssl::UniquePtr<EVP_PKEY> evp_pkey;
-    bssl::UniquePtr<EC_KEY> ec_key;
-    std::string kid;
-    std::string kty;
-    std::string alg;
-    bool alg_specified = false;
-    bool kid_specified = false;
-    bool pem_format = false;
+  struct Pubkey {
+    bssl::UniquePtr<EVP_PKEY> evp_pkey_;
+    bssl::UniquePtr<EC_KEY> ec_key_;
+    std::string kid_;
+    std::string kty_;
+    std::string alg_;
+    bool alg_specified_ = false;
+    bool kid_specified_ = false;
+    bool pem_format_ = false;
   };
+  typedef std::unique_ptr<Pubkey> PubkeyPtr;
 
   // Access to list of Jwks
-  const std::vector<std::unique_ptr<Jwk>>& keys() const { return keys_; }
+  const std::vector<PubkeyPtr>& keys() const { return keys_; }
 
 private:
   // Create Pem
-  void CreateFromPemCore(const std::string& pkey_pem);
+  void createFromPemCore(const std::string& pkey_pem);
   // Create Jwks
-  void CreateFromJwksCore(const std::string& pkey_jwks);
+  void createFromJwksCore(const std::string& pkey_jwks);
 
   // Extracts the public key from a jwk key (jkey) and sets it to keys_;
-  void ExtractJwk(Json::ObjectSharedPtr jwk_json);
+  void extractJwk(Json::ObjectSharedPtr jwk_json);
   // Create RSA Jwk
-  void ExtractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json);
+  void extractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json);
   // Create EC Jwk
-  void ExtractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json);
+  void extractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json);
 
   // List of Jwks
-  std::vector<std::unique_ptr<Jwk>> keys_;
+  std::vector<PubkeyPtr> keys_;
 };
+
+typedef std::unique_ptr<Jwks> JwksPtr;
 
 } // namespace JwtAuthn
 } // namespace Envoy

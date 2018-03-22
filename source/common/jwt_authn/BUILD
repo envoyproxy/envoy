@@ -24,10 +24,12 @@ envoy_cc_library(
         "utils.h",
         "verifier.h",
     ],
+    external_deps = [
+        "rapidjson",
+        "ssl",
+    ],
     repository = "@envoy",
     deps = [
-        "//external:rapidjson",
-        "//external:ssl",
         "//source/exe:envoy_common_lib",
     ],
 )

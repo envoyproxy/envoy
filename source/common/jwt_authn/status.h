@@ -5,99 +5,113 @@
 namespace Envoy {
 namespace JwtAuthn {
 
-// Defines the Jwt verification error status.
+/**
+ * Define the Jwt verification error status.
+ */
 enum class Status {
-  OK = 0,
+  Ok = 0,
 
-  // JWT token is required.
-  JWT_MISSED = 1,
+  // Jwt errors:
 
-  // Token expired.
-  JWT_EXPIRED = 2,
+  // Jwt missing.
+  JwtMissed = 1,
 
-  // Given JWT is not in the form of Header.Payload.Signature
-  JWT_BAD_FORMAT = 3,
+  // Jwt expired.
+  JwtExpired = 2,
 
-  // Header is an invalid Base64url input or an invalid JSON.
-  JWT_HEADER_PARSE_ERROR = 4,
+  // JWT is not in the form of Header.Payload.Signature
+  JwtBadFormat = 3,
 
-  // Header does not have "alg".
-  JWT_HEADER_NO_ALG = 5,
+  // Jwt header is an invalid Base64url input or an invalid JSON.
+  JwtHeaderParseError = 4,
+
+  // Jwt header does not have "alg".
+  JwtHeaderNoAlg = 5,
 
   // "alg" in the header is not a string.
-  JWT_HEADER_BAD_ALG = 6,
-
-  // Signature is an invalid Base64url input.
-  JWT_SIGNATURE_PARSE_ERROR = 7,
-
-  // Signature Verification failed (= Failed in DigestVerifyFinal())
-  JWT_INVALID_SIGNATURE = 8,
-
-  // Signature is valid but payload is an invalid Base64url input or an invalid
-  // JSON.
-  JWT_PAYLOAD_PARSE_ERROR = 9,
-
-  // "kid" in the JWT header is not a string.
-  JWT_HEADER_BAD_KID = 10,
-
-  // Issuer is not configured.
-  JWT_UNKNOWN_ISSUER = 11,
-
-  // JWK is an invalid JSON.
-  JWK_PARSE_ERROR = 12,
-
-  // JWK does not have "keys".
-  JWK_NO_KEYS = 13,
-
-  // "keys" in JWK is not an array.
-  JWK_BAD_KEYS = 14,
-
-  // There are no valid public key in given JWKs.
-  JWK_NO_VALID_PUBKEY = 15,
-
-  // There is no key the kid and the alg of which match those of the given JWT.
-  KID_ALG_UNMATCH = 16,
+  JwtHeaderBadAlg = 6,
 
   // Value of "alg" in the header is invalid.
-  ALG_NOT_IMPLEMENTED = 17,
+  JwtHeaderNotImplementedAlg = 7,
 
-  // Given PEM formatted public key is an invalid Base64 input.
-  PEM_PUBKEY_BAD_BASE64 = 18,
+  // "kid" in the header is not a string.
+  JwtHeaderBadKid = 8,
 
-  // A parse error on PEM formatted public key happened.
-  PEM_PUBKEY_PARSE_ERROR = 19,
+  // Jwt payload is an invalid Base64url input or an invalid JSON.
+  JwtPayloadParseError = 9,
 
-  // "n" or "e" field of a JWK has a parse error or is missing.
-  JWK_RSA_PUBKEY_PARSE_ERROR = 20,
+  // Jwt signature is an invalid Base64url input.
+  JwtSignatureParseError = 10,
 
-  // Failed to create a EC_KEY object.
-  FAILED_CREATE_EC_KEY = 21,
-
-  // "x" or "y" field of a JWK has a parse error or is missing.
-  JWK_EC_PUBKEY_PARSE_ERROR = 22,
+  // Issuer is not configured.
+  JwtUnknownIssuer = 11,
 
   // Audience is not allowed.
-  AUDIENCE_NOT_ALLOWED = 23,
+  JwtAudienceNotAllowed = 12,
+
+  // Jwt verification fails.
+  JwtVerificationFail = 13,
+
+  // Jwks errors
+
+  // Jwks is an invalid JSON.
+  JwksParseError = 14,
+
+  // Jwks does not have "keys".
+  JwksNoKeys = 15,
+
+  // "keys" in Jwks is not an array.
+  JwksBadKeys = 16,
+
+  // Jwks doesn't have any valid public key.
+  JwksNoValidKeys = 17,
+
+  // Jwks doesn't have key to match kid or alg from Jwt.
+  JwksKidAlgMismatch = 18,
+
+  // Jwks PEM public key is an invalid Base64.
+  JwksPemBadBase64 = 19,
+
+  // Jwks PEM public key parse error.
+  JwksPemParseError = 19,
+
+  // "n" or "e" field of a Jwk RSA is missing or has a parse error.
+  JwksRsaParseError = 20,
+
+  // Failed to create a EC_KEY object.
+  JwksEcCreateKeyFail = 21,
+
+  // "x" or "y" field of a Jwk EC is missing or has a parse error.
+  JwksEcParseError = 22,
 
   // Failed to fetch public key
-  FAILED_FETCH_PUBKEY = 24,
+  JwksFetchFail = 23,
 };
 
-// Convert status to string.
-std::string StatusToString(Status status);
+/**
+ * Convert enum status to string.
+ * @param status is the enum status.
+ * @return the string status.
+ */
+std::string getStatusString(Status status);
 
-// Base class to keep the status that represents "OK" or the first failure.
+/**
+ * Base class to keep the status that represents "OK" or the first failure.
+ */
 class WithStatus {
 public:
-  WithStatus() : status_(Status::OK) {}
+  WithStatus() : status_(Status::Ok) {}
 
-  // Get the current status.
-  Status GetStatus() const { return status_; }
+  /**
+   * Get the current status.
+   * @return the enum status.
+   */
+  Status getStatus() const { return status_; }
 
 protected:
-  void UpdateStatus(Status status) {
+  void updateStatus(Status status) {
     // Only keep the first failure
-    if (status_ == Status::OK) {
+    if (status_ == Status::Ok) {
       status_ = status;
     }
   }

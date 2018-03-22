@@ -1,44 +1,46 @@
 #pragma once
 
-#include "envoy/json/json_object.h"
-
 #include "common/jwt_authn/status.h"
+
+#include <string>
+#include <vector>
 
 namespace Envoy {
 namespace JwtAuthn {
 
-// struct to hold a JWT data.
+/**
+ * struct to hold a JWT data.
+ */
 struct Jwt {
-  // JSON object of the header
-  Json::ObjectSharedPtr header_json;
   // header string
-  std::string header_str;
+  std::string header_str_;
   // header base64_url encoded
-  std::string header_str_base64url;
+  std::string header_str_base64url_;
 
-  // SON object of the payload
-  Json::ObjectSharedPtr payload_json;
   // payload string
-  std::string payload_str;
+  std::string payload_str_;
   // payload base64_url encoded
-  std::string payload_str_base64url;
+  std::string payload_str_base64url_;
   // signature string
-  std::string signature;
+  std::string signature_;
   // alg
-  std::string alg;
+  std::string alg_;
   // kid
-  std::string kid;
+  std::string kid_;
   // iss
-  std::string iss;
+  std::string iss_;
   // audiences
-  std::vector<std::string> aud;
+  std::vector<std::string> audiences_;
   // sub
-  std::string sub;
+  std::string sub_;
   // expiration
-  int64_t exp = 0;
+  int64_t exp_ = 0;
 
-  // Parse from string
-  Status ParseFromString(const std::string& jwt);
+  /**
+   * Parse Jwt from string text
+   * @return the status.
+   */
+  Status parseFromString(const std::string& jwt);
 };
 
 } // namespace JwtAuthn

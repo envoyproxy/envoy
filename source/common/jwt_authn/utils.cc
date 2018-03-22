@@ -31,7 +31,7 @@ bool IsNotBase64UrlChar(int8_t c) {
 
 } // namespace
 
-std::string Base64UrlDecode(std::string input) {
+std::string decodeBase64Url(std::string input) {
   // allow at most 2 padding letters at the end of the input, only if input
   // length is divisible by 4
   int len = input.length();
