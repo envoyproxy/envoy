@@ -433,6 +433,8 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
     scheduler_[source].weighted_ = weighted;
     if (weighted) {
       // Populate scheduler with host list.
+      // TODO(htuch): We should add the ability to randomly offset into the host list to
+      // desynchronize the schedule across Envoys in large fleets.
       for (const auto& host : hosts) {
         // We use a fixed weight here. While the weight may change without
         // notification, this will only be stale until this host is next picked,
@@ -467,6 +469,7 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
     auto host = scheduler.edf_.pick();
     // We should always succeed if weighted, since when we compute the scheduler
     // in refresh() above, any empty host vector will be treated as unweighted.
+    // We do not expire any hosts from the host list without rebuilding the scheduler.
     ASSERT(host != nullptr);
     scheduler.edf_.add(host->weight(), host);
     return host;
