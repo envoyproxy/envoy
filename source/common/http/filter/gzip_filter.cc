@@ -189,7 +189,7 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
     // if neither identity nor gzip codings are present, we return the wildcard.
     return is_wildcard;
   }
-
+  // if no accept-encoding header is present, return false.
   return false;
 }
 
