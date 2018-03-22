@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-ARG diversion=1.2.1
+ARG dumbinit_version=1.2.1
 ENV loglevel=info
 
 RUN apt-get update \
@@ -12,8 +12,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 
-RUN wget https://github.com/Yelp/dumb-init/releases/download/v${diversion}/dumb-init_${diversion}_amd64.deb \
-    && dpkg -i dumb-init_${diversion}_amd64.deb
+RUN wget https://github.com/Yelp/dumb-init/releases/download/v${dumbinit_version}/dumb-init_${dumbinit_version}_amd64.deb \
+    && dpkg -i dumb-init_${dumbinit_version}_amd64.deb
 
 RUN mkdir -p /etc/envoy
 
