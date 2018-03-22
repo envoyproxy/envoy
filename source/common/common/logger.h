@@ -57,6 +57,21 @@ public:
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) const { logger_->set_level(level); }
 
+  /* This is simple mapping between Logger severity levels and spdlog severity levels.
+   * The only reason for this mapping is to go around the fact that spdlog defines level as err
+   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
+   * fine spdlog::info corresponds to LOGGER.info method.
+   */
+  typedef enum {
+    trace = spdlog::level::trace,
+    debug = spdlog::level::debug,
+    info = spdlog::level::info,
+    warn = spdlog::level::warn,
+    error = spdlog::level::err,
+    critical = spdlog::level::critical,
+    off = spdlog::level::off
+  } levels;
+
 private:
   Logger(const std::string& name);
 
@@ -176,18 +191,27 @@ protected:
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
+// Compare levels before invoking logger
+#define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
+  do {                                                                                             \
+    if (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level()) {  \
+      LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
+    }                                                                                              \
+  } while (0)
+
 #ifdef NVLOG
 #define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...)
 #define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...)
 #else
-#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, trace, ##__VA_ARGS__)
+#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, debug, ##__VA_ARGS__)
 #endif
 
-#define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_error_TO_LOGGER(LOGGER, ...) LOGGER.error(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, info, ##__VA_ARGS__)
+#define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, warn, ##__VA_ARGS__)
+#define ENVOY_LOG_error_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, error, ##__VA_ARGS__)
+#define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...)                                                  \
+  ENVOY_LOG_COMP_AND_LOG(LOGGER, critical, ##__VA_ARGS__)
 
 /**
  * Convenience macro to log to a user-specified logger.

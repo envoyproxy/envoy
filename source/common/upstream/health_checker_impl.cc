@@ -56,8 +56,6 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   }
 }
 
-const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
-
 HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
@@ -70,6 +68,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -103,7 +102,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval() const {
   if (cluster_.info()->stats().upstream_cx_total_.used()) {
     base_time_ms = interval_.count();
   } else {
-    base_time_ms = NO_TRAFFIC_INTERVAL.count();
+    base_time_ms = no_traffic_interval_.count();
   }
 
   if (interval_jitter_.count() > 0) {
@@ -405,7 +404,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
-                                   data.host_description_);
+                                   data.host_description_, dispatcher_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -902,8 +901,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_);
+  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
+                                                 std::move(data.connection_),
+                                                 data.host_description_, dispatcher_);
 }
 
 } // namespace Upstream

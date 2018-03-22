@@ -23,6 +23,40 @@ namespace Envoy {
 namespace Upstream {
 
 /**
+ * ClusterUpdateCallbacks provide a way to exposes Cluster lifecycle events in the
+ * ClusterManager.
+ */
+class ClusterUpdateCallbacks {
+public:
+  virtual ~ClusterUpdateCallbacks() {}
+
+  /**
+   * onClusterAddOrUpdate is called when a new cluster is added or an existing cluster
+   * is updated in the ClusterManager.
+   * @param cluster is the ThreadLocalCluster that represents the updated
+   * cluster.
+   */
+  virtual void onClusterAddOrUpdate(ThreadLocalCluster& cluster) PURE;
+
+  /**
+   * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
+   * @param cluster_name is the name of the removed cluster.
+   */
+  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+};
+
+/**
+ * ClusterUpdateCallbacksHandle is a RAII wrapper for a ClusterUpdateCallbacks. Deleting
+ * the ClusterUpdateCallbacksHandle will remove the callbacks from ClusterManager in O(1).
+ */
+class ClusterUpdateCallbacksHandle {
+public:
+  virtual ~ClusterUpdateCallbacksHandle() {}
+};
+
+typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  */
@@ -147,6 +181,19 @@ public:
    * @return std::string the local cluster name, or "" if no local cluster was configured.
    */
   virtual const std::string& localClusterName() const PURE;
+
+  /**
+   * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
+   * The callbacks will be registered in a thread local slot and the callbacks will be executed
+   * on the thread that registered them.
+   * To be executed on all threads, Callbacks need to be registered on all threads.
+   *
+   * @param callbacks are the ClusterUpdateCallbacks to add or remove to the cluster manager.
+   * @return ClusterUpdateCallbacksHandlePtr a RAII that needs to be deleted to
+   * unregister the callback.
+   */
+  virtual ClusterUpdateCallbacksHandlePtr
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

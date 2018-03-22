@@ -113,5 +113,9 @@ MockCdsApi::MockCdsApi() {
 
 MockCdsApi::~MockCdsApi() {}
 
+MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
+
+MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
+
 } // namespace Upstream
 } // namespace Envoy

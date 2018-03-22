@@ -42,6 +42,7 @@ public:
   // Upstream::ClusterInfo
   MOCK_CONST_METHOD0(addedViaApi, bool());
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
@@ -78,6 +79,12 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
+};
+
+class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo();
 };
 
 } // namespace Upstream

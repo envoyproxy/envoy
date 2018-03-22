@@ -419,9 +419,12 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
               ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
             }
 
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
-                new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
-                                                                thread_aware_lb_factory));
+            auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+                cluster_manager, new_cluster, thread_aware_lb_factory);
+            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+            for (auto& cb : cluster_manager.update_callbacks_) {
+              cb->onClusterAddOrUpdate(*thread_local_cluster);
+            }
           });
 }
 
@@ -442,6 +445,9 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
       cluster_manager.thread_local_clusters_.erase(cluster_name);
+      for (auto& cb : cluster_manager.update_callbacks_) {
+        cb->onClusterRemoval(cluster_name);
+      }
     });
   }
 
@@ -601,6 +607,23 @@ const std::string ClusterManagerImpl::versionInfo() const {
     return cds_api_->versionInfo();
   }
   return "static";
+}
+
+ClusterUpdateCallbacksHandlePtr
+ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
+}
+
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::ClusterUpdateCallbacksHandleImpl(
+    ClusterUpdateCallbacks& cb, std::list<ClusterUpdateCallbacks*>& ll)
+    : list(ll) {
+  entry = ll.emplace(ll.begin(), &cb);
+}
+
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::~ClusterUpdateCallbacksHandleImpl() {
+  ASSERT(std::find(list.begin(), list.end(), *entry) != list.end());
+  list.erase(entry);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
