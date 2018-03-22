@@ -8,15 +8,14 @@ namespace {
 
 TEST(JwksParseTest, GoodPem) {
   // Public key PEM
-  const std::string PublicKeyPEM =
-      "MIIBCgKCAQEAtw7MNxUTxmzWROCD5BqJxmzT7xqc9KsnAjbXCoqEEHDx4WBlfcwk"
-      "XHt9e/2+Uwi3Arz3FOMNKwGGlbr7clBY3utsjUs8BTF0kO/poAmSTdSuGeh2mSbc"
-      "VHvmQ7X/kichWwx5Qj0Xj4REU3Gixu1gQIr3GATPAIULo5lj/ebOGAa+l0wIG80N"
-      "zz1pBtTIUx68xs5ZGe7cIJ7E8n4pMX10eeuh36h+aossePeuHulYmjr4N0/1jG7a"
-      "+hHYL6nqwOR3ej0VqCTLS0OloC0LuCpLV7CnSpwbp2Qg/c+MDzQ0TH8g8drIzR5h"
-      "Fe9a3NlNRMXgUU5RqbLnR9zfXr7b9oEszQIDAQAB";
+  const std::string jwks_text = "MIIBCgKCAQEAtw7MNxUTxmzWROCD5BqJxmzT7xqc9KsnAjbXCoqEEHDx4WBlfcwk"
+                                "XHt9e/2+Uwi3Arz3FOMNKwGGlbr7clBY3utsjUs8BTF0kO/poAmSTdSuGeh2mSbc"
+                                "VHvmQ7X/kichWwx5Qj0Xj4REU3Gixu1gQIr3GATPAIULo5lj/ebOGAa+l0wIG80N"
+                                "zz1pBtTIUx68xs5ZGe7cIJ7E8n4pMX10eeuh36h+aossePeuHulYmjr4N0/1jG7a"
+                                "+hHYL6nqwOR3ej0VqCTLS0OloC0LuCpLV7CnSpwbp2Qg/c+MDzQ0TH8g8drIzR5h"
+                                "Fe9a3NlNRMXgUU5RqbLnR9zfXr7b9oEszQIDAQAB";
 
-  auto jwks = Jwks::createFrom(PublicKeyPEM, Jwks::PEM);
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::PEM);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 1);
   EXPECT_TRUE(jwks->keys()[0]->pem_format_);
@@ -34,7 +33,7 @@ TEST(JwksParseTest, BadPem) {
 }
 
 TEST(JwksParseTest, GoodJwks) {
-  const std::string PublicKeyRSA =
+  const std::string jwks_text =
       "{\"keys\": [{\"kty\": \"RSA\",\"alg\": \"RS256\",\"use\": "
       "\"sig\",\"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\",\"n\": "
       "\"0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_"
@@ -55,7 +54,7 @@ TEST(JwksParseTest, GoodJwks) {
       "ZDtLd1i24STUw39KH0pcSdfFbL2NtEZdNeam1DDdk0iUtJSPZliUHJBI_pj8M-2Mn_"
       "oA8jBuI8YKwBqYkZCN1I95Q\",\"e\": \"AQAB\"}]}";
 
-  auto jwks = Jwks::createFrom(PublicKeyRSA, Jwks::JWKS);
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 2);
 
@@ -74,25 +73,25 @@ TEST(JwksParseTest, GoodJwks) {
 
 TEST(JwksParseTest, GoodEC) {
   // Public key JwkEC
-  const std::string PublicKeyJwkEC = "{\"keys\": ["
-                                     "{"
-                                     "\"kty\": \"EC\","
-                                     "\"crv\": \"P-256\","
-                                     "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                     "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                     "\"alg\": \"ES256\","
-                                     "\"kid\": \"abc\""
-                                     "},"
-                                     "{"
-                                     "\"kty\": \"EC\","
-                                     "\"crv\": \"P-256\","
-                                     "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                     "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                     "\"alg\": \"ES256\","
-                                     "\"kid\": \"xyz\""
-                                     "}"
-                                     "]}";
-  auto jwks = Jwks::createFrom(PublicKeyJwkEC, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"EC\","
+                                "\"crv\": \"P-256\","
+                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                "\"alg\": \"ES256\","
+                                "\"kid\": \"abc\""
+                                "},"
+                                "{"
+                                "\"kty\": \"EC\","
+                                "\"crv\": \"P-256\","
+                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                "\"alg\": \"ES256\","
+                                "\"kid\": \"xyz\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 2);
 
@@ -128,89 +127,89 @@ TEST(JwksParseTest, JwksWrongKeys) {
 
 TEST(JwksParseTest, JwksInvalidKty) {
   // Invalid kty field
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"XYZ\","
-                               "\"crv\": \"P-256\","
-                               "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                               "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                               "\"alg\": \"ES256\","
-                               "\"kid\": \"abc\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"XYZ\","
+                                "\"crv\": \"P-256\","
+                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                "\"alg\": \"ES256\","
+                                "\"kid\": \"abc\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty1) {
   // kty doesn't match with alg
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"RSA\","
-                               "\"alg\": \"ES256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"RSA\","
+                                "\"alg\": \"ES256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty2) {
   // kty doesn't match with alg
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"EC\","
-                               "\"alg\": \"RS256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"EC\","
+                                "\"alg\": \"RS256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECNoXY) {
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"EC\","
-                               "\"alg\": \"ES256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"EC\","
+                                "\"alg\": \"ES256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksRSANoNE) {
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"RSA\","
-                               "\"alg\": \"RS256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"RSA\","
+                                "\"alg\": \"RS256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECWrongXY) {
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"EC\","
-                               "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111\","
-                               "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111\","
-                               "\"alg\": \"ES256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"EC\","
+                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111\","
+                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111\","
+                                "\"alg\": \"ES256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksEcParseError);
 }
 
 TEST(JwksParseTest, JwksRSAWrongNE) {
-  const std::string JwksText = "{\"keys\": ["
-                               "{"
-                               "\"kty\": \"RSA\","
-                               "\"n\": \"EB54wykhS7YJFD6RYJNnwbW\","
-                               "\"e\": \"92bCBTvMFQ8lKbS2MbgjT3YfmY\","
-                               "\"alg\": \"RS256\""
-                               "}"
-                               "]}";
-  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  const std::string jwks_text = "{\"keys\": ["
+                                "{"
+                                "\"kty\": \"RSA\","
+                                "\"n\": \"EB54wykhS7YJFD6RYJNnwbW\","
+                                "\"e\": \"92bCBTvMFQ8lKbS2MbgjT3YfmY\","
+                                "\"alg\": \"RS256\""
+                                "}"
+                                "]}";
+  auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksRsaParseError);
 }
 
