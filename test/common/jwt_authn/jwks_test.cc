@@ -8,7 +8,7 @@ namespace {
 
 TEST(JwksParseTest, GoodPem) {
   // Public key PEM
-  const std::string kPublicKeyPEM =
+  const std::string PublicKeyPEM =
       "MIIBCgKCAQEAtw7MNxUTxmzWROCD5BqJxmzT7xqc9KsnAjbXCoqEEHDx4WBlfcwk"
       "XHt9e/2+Uwi3Arz3FOMNKwGGlbr7clBY3utsjUs8BTF0kO/poAmSTdSuGeh2mSbc"
       "VHvmQ7X/kichWwx5Qj0Xj4REU3Gixu1gQIr3GATPAIULo5lj/ebOGAa+l0wIG80N"
@@ -16,25 +16,25 @@ TEST(JwksParseTest, GoodPem) {
       "+hHYL6nqwOR3ej0VqCTLS0OloC0LuCpLV7CnSpwbp2Qg/c+MDzQ0TH8g8drIzR5h"
       "Fe9a3NlNRMXgUU5RqbLnR9zfXr7b9oEszQIDAQAB";
 
-  auto jwks = Jwks::CreateFrom(kPublicKeyPEM, Jwks::PEM);
-  EXPECT_EQ(jwks->GetStatus(), Status::OK);
+  auto jwks = Jwks::createFrom(PublicKeyPEM, Jwks::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 1);
-  EXPECT_TRUE(jwks->keys()[0]->pem_format);
+  EXPECT_TRUE(jwks->keys()[0]->pem_format_);
 }
 
 TEST(JwksParseTest, EmptyPem) {
-  auto jwks = Jwks::CreateFrom("", Jwks::PEM);
-  EXPECT_EQ(jwks->GetStatus(), Status::PEM_PUBKEY_BAD_BASE64);
+  auto jwks = Jwks::createFrom("", Jwks::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksPemBadBase64);
 }
 
 TEST(JwksParseTest, BadPem) {
   // U2lnbmF0dXJl is Base64 of "Signature"
-  auto jwks = Jwks::CreateFrom("U2lnbmF0dXJl", Jwks::PEM);
-  EXPECT_EQ(jwks->GetStatus(), Status::PEM_PUBKEY_PARSE_ERROR);
+  auto jwks = Jwks::createFrom("U2lnbmF0dXJl", Jwks::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksPemParseError);
 }
 
 TEST(JwksParseTest, GoodJwks) {
-  const std::string kPublicKeyRSA =
+  const std::string PublicKeyRSA =
       "{\"keys\": [{\"kty\": \"RSA\",\"alg\": \"RS256\",\"use\": "
       "\"sig\",\"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\",\"n\": "
       "\"0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_"
@@ -55,163 +55,163 @@ TEST(JwksParseTest, GoodJwks) {
       "ZDtLd1i24STUw39KH0pcSdfFbL2NtEZdNeam1DDdk0iUtJSPZliUHJBI_pj8M-2Mn_"
       "oA8jBuI8YKwBqYkZCN1I95Q\",\"e\": \"AQAB\"}]}";
 
-  auto jwks = Jwks::CreateFrom(kPublicKeyRSA, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::OK);
+  auto jwks = Jwks::createFrom(PublicKeyRSA, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 2);
 
-  EXPECT_EQ(jwks->keys()[0]->alg, "RS256");
-  EXPECT_EQ(jwks->keys()[0]->kid, "62a93512c9ee4c7f8067b5a216dade2763d32a47");
-  EXPECT_TRUE(jwks->keys()[0]->alg_specified);
-  EXPECT_TRUE(jwks->keys()[0]->kid_specified);
-  EXPECT_FALSE(jwks->keys()[0]->pem_format);
+  EXPECT_EQ(jwks->keys()[0]->alg_, "RS256");
+  EXPECT_EQ(jwks->keys()[0]->kid_, "62a93512c9ee4c7f8067b5a216dade2763d32a47");
+  EXPECT_TRUE(jwks->keys()[0]->alg_specified_);
+  EXPECT_TRUE(jwks->keys()[0]->kid_specified_);
+  EXPECT_FALSE(jwks->keys()[0]->pem_format_);
 
-  EXPECT_EQ(jwks->keys()[1]->alg, "RS256");
-  EXPECT_EQ(jwks->keys()[1]->kid, "b3319a147514df7ee5e4bcdee51350cc890cc89e");
-  EXPECT_TRUE(jwks->keys()[1]->alg_specified);
-  EXPECT_TRUE(jwks->keys()[1]->kid_specified);
-  EXPECT_FALSE(jwks->keys()[1]->pem_format);
+  EXPECT_EQ(jwks->keys()[1]->alg_, "RS256");
+  EXPECT_EQ(jwks->keys()[1]->kid_, "b3319a147514df7ee5e4bcdee51350cc890cc89e");
+  EXPECT_TRUE(jwks->keys()[1]->alg_specified_);
+  EXPECT_TRUE(jwks->keys()[1]->kid_specified_);
+  EXPECT_FALSE(jwks->keys()[1]->pem_format_);
 }
 
 TEST(JwksParseTest, GoodEC) {
   // Public key JwkEC
-  const std::string kPublicKeyJwkEC = "{\"keys\": ["
-                                      "{"
-                                      "\"kty\": \"EC\","
-                                      "\"crv\": \"P-256\","
-                                      "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                      "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                      "\"alg\": \"ES256\","
-                                      "\"kid\": \"abc\""
-                                      "},"
-                                      "{"
-                                      "\"kty\": \"EC\","
-                                      "\"crv\": \"P-256\","
-                                      "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                      "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                      "\"alg\": \"ES256\","
-                                      "\"kid\": \"xyz\""
-                                      "}"
-                                      "]}";
-  auto jwks = Jwks::CreateFrom(kPublicKeyJwkEC, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::OK);
+  const std::string PublicKeyJwkEC = "{\"keys\": ["
+                                     "{"
+                                     "\"kty\": \"EC\","
+                                     "\"crv\": \"P-256\","
+                                     "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                     "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                     "\"alg\": \"ES256\","
+                                     "\"kid\": \"abc\""
+                                     "},"
+                                     "{"
+                                     "\"kty\": \"EC\","
+                                     "\"crv\": \"P-256\","
+                                     "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                     "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                     "\"alg\": \"ES256\","
+                                     "\"kid\": \"xyz\""
+                                     "}"
+                                     "]}";
+  auto jwks = Jwks::createFrom(PublicKeyJwkEC, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 2);
 
-  EXPECT_EQ(jwks->keys()[0]->alg, "ES256");
-  EXPECT_EQ(jwks->keys()[0]->kid, "abc");
-  EXPECT_EQ(jwks->keys()[0]->kty, "EC");
-  EXPECT_TRUE(jwks->keys()[0]->alg_specified);
-  EXPECT_TRUE(jwks->keys()[0]->kid_specified);
-  EXPECT_FALSE(jwks->keys()[0]->pem_format);
+  EXPECT_EQ(jwks->keys()[0]->alg_, "ES256");
+  EXPECT_EQ(jwks->keys()[0]->kid_, "abc");
+  EXPECT_EQ(jwks->keys()[0]->kty_, "EC");
+  EXPECT_TRUE(jwks->keys()[0]->alg_specified_);
+  EXPECT_TRUE(jwks->keys()[0]->kid_specified_);
+  EXPECT_FALSE(jwks->keys()[0]->pem_format_);
 
-  EXPECT_EQ(jwks->keys()[1]->alg, "ES256");
-  EXPECT_EQ(jwks->keys()[1]->kid, "xyz");
-  EXPECT_EQ(jwks->keys()[1]->kty, "EC");
-  EXPECT_TRUE(jwks->keys()[1]->alg_specified);
-  EXPECT_TRUE(jwks->keys()[1]->kid_specified);
-  EXPECT_FALSE(jwks->keys()[1]->pem_format);
+  EXPECT_EQ(jwks->keys()[1]->alg_, "ES256");
+  EXPECT_EQ(jwks->keys()[1]->kid_, "xyz");
+  EXPECT_EQ(jwks->keys()[1]->kty_, "EC");
+  EXPECT_TRUE(jwks->keys()[1]->alg_specified_);
+  EXPECT_TRUE(jwks->keys()[1]->kid_specified_);
+  EXPECT_FALSE(jwks->keys()[1]->pem_format_);
 }
 
 TEST(JwksParseTest, EmptyJwks) {
-  auto jwks = Jwks::CreateFrom("", Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_PARSE_ERROR);
+  auto jwks = Jwks::createFrom("", Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksParseError);
 }
 
 TEST(JwksParseTest, JwksNoKeys) {
-  auto jwks = Jwks::CreateFrom("{}", Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_KEYS);
+  auto jwks = Jwks::createFrom("{}", Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoKeys);
 }
 
 TEST(JwksParseTest, JwksWrongKeys) {
-  auto jwks = Jwks::CreateFrom("{\"keys\": 123}", Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_BAD_KEYS);
+  auto jwks = Jwks::createFrom("{\"keys\": 123}", Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksBadKeys);
 }
 
 TEST(JwksParseTest, JwksInvalidKty) {
   // Invalid kty field
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"XYZ\","
-                            "\"crv\": \"P-256\","
-                            "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                            "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                            "\"alg\": \"ES256\","
-                            "\"kid\": \"abc\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_VALID_PUBKEY);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"XYZ\","
+                               "\"crv\": \"P-256\","
+                               "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                               "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                               "\"alg\": \"ES256\","
+                               "\"kid\": \"abc\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty1) {
   // kty doesn't match with alg
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"RSA\","
-                            "\"alg\": \"ES256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_VALID_PUBKEY);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"RSA\","
+                               "\"alg\": \"ES256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty2) {
   // kty doesn't match with alg
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"EC\","
-                            "\"alg\": \"RS256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_VALID_PUBKEY);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"EC\","
+                               "\"alg\": \"RS256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECNoXY) {
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"EC\","
-                            "\"alg\": \"ES256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_VALID_PUBKEY);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"EC\","
+                               "\"alg\": \"ES256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksRSANoNE) {
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"RSA\","
-                            "\"alg\": \"RS256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_NO_VALID_PUBKEY);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"RSA\","
+                               "\"alg\": \"RS256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECWrongXY) {
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"EC\","
-                            "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111\","
-                            "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111\","
-                            "\"alg\": \"ES256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_EC_PUBKEY_PARSE_ERROR);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"EC\","
+                               "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111\","
+                               "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111\","
+                               "\"alg\": \"ES256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksEcParseError);
 }
 
 TEST(JwksParseTest, JwksRSAWrongNE) {
-  const std::string kJwks = "{\"keys\": ["
-                            "{"
-                            "\"kty\": \"RSA\","
-                            "\"n\": \"EB54wykhS7YJFD6RYJNnwbW\","
-                            "\"e\": \"92bCBTvMFQ8lKbS2MbgjT3YfmY\","
-                            "\"alg\": \"RS256\""
-                            "}"
-                            "]}";
-  auto jwks = Jwks::CreateFrom(kJwks, Jwks::JWKS);
-  EXPECT_EQ(jwks->GetStatus(), Status::JWK_RSA_PUBKEY_PARSE_ERROR);
+  const std::string JwksText = "{\"keys\": ["
+                               "{"
+                               "\"kty\": \"RSA\","
+                               "\"n\": \"EB54wykhS7YJFD6RYJNnwbW\","
+                               "\"e\": \"92bCBTvMFQ8lKbS2MbgjT3YfmY\","
+                               "\"alg\": \"RS256\""
+                               "}"
+                               "]}";
+  auto jwks = Jwks::createFrom(JwksText, Jwks::JWKS);
+  EXPECT_EQ(jwks->getStatus(), Status::JwksRsaParseError);
 }
 
 } // namespace

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "common/jwt_authn/status.h"
-
 #include <string>
 #include <vector>
+
+#include "common/jwt_authn/status.h"
 
 namespace Envoy {
 namespace JwtAuthn {

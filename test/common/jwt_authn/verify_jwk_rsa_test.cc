@@ -37,7 +37,7 @@ namespace {
 
 // The following public key jwk and token are taken from
 // https://github.com/cloudendpoints/esp/blob/master/src/api_manager/auth/lib/auth_jwt_validator_test.cc
-const std::string kPublicKeyRSA =
+const std::string PublicKeyRSA =
     "{\"keys\": [{\"kty\": \"RSA\",\"alg\": \"RS256\",\"use\": "
     "\"sig\",\"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\",\"n\": "
     "\"0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_"
@@ -92,7 +92,7 @@ const std::string kPublicKeyRSA =
 // Header:  {"alg":"RS256","typ":"JWT"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-const std::string kJwtNoKid =
+const std::string JwtTextNoKid =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
     "ImV4cCI6MTUwMTI4MTA1OH0.XYPg6VPrq-H1Kl-kgmAfGFomVpnmdZLIAo0g6dhJb2Be_"
@@ -107,7 +107,7 @@ const std::string kJwtNoKid =
 // Header:  {"alg":"RS256","typ":"JWT"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","aud":"example_service","exp":2001001001}
-const std::string kJwtNoKidLongExp =
+const std::string JwtTextNoKidLongExp =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
     "ImF1ZCI6ImV4YW1wbGVfc2VydmljZSIsImV4cCI6MjAwMTAwMTAwMX0."
@@ -124,7 +124,7 @@ const std::string kJwtNoKidLongExp =
 // {"alg":"RS256","typ":"JWT","kid":"b3319a147514df7ee5e4bcdee51350cc890cc89e"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-const std::string kJwtWithCorrectKid =
+const std::string JwtTextWithCorrectKid =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImIzMzE5YTE0NzUxNGRmN2VlNWU0"
     "YmNkZWU1MTM1MGNjODkwY2M4OWUifQ."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
@@ -141,7 +141,7 @@ const std::string kJwtWithCorrectKid =
 // {"alg":"RS256","typ":"JWT","kid":"62a93512c9ee4c7f8067b5a216dade2763d32a47"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-const std::string kJwtWithIncorrectKid =
+const std::string JwtTextWithIncorrectKid =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjYyYTkzNTEyYzllZTRjN2Y4MDY3"
     "YjVhMjE2ZGFkZTI3NjNkMzJhNDcifQ."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
@@ -157,7 +157,7 @@ const std::string kJwtWithIncorrectKid =
 // Header:  {"alg":"RS256","typ":"JWT","kid":"blahblahblah"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-const std::string kJwtWithNonExistKid =
+const std::string JwtTextWithNonExistKid =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImJsYWhibGFoYmxhaCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
     "ImV4cCI6MTUwMTI4MTA1OH0.digk0Fr_IdcWgJNVyeVDw2dC1cQG6LsHwg5pIN93L4_"
@@ -170,8 +170,8 @@ const std::string kJwtWithNonExistKid =
 class VerifyJwkRsaTest : public testing::Test {
 protected:
   void SetUp() {
-    jwks_ = Jwks::CreateFrom(kPublicKeyRSA, Jwks::Type::JWKS);
-    EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+    jwks_ = Jwks::createFrom(PublicKeyRSA, Jwks::Type::JWKS);
+    EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }
 
   std::unique_ptr<Jwks> jwks_;
@@ -179,62 +179,62 @@ protected:
 
 TEST_F(VerifyJwkRsaTest, NoKidOK) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtNoKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextNoKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkRsaTest, NoKidLongExpOK) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtNoKidLongExp), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextNoKidLongExp), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkRsaTest, CorrectKidOK) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtWithCorrectKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextWithCorrectKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkRsaTest, NonExistKidFail) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtWithNonExistKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::KID_ALG_UNMATCH);
+  EXPECT_EQ(jwt.parseFromString(JwtTextWithNonExistKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::JwksKidAlgMismatch);
 }
 
 TEST_F(VerifyJwkRsaTest, OkPublicKeyNotAlg) {
   // Remove "alg" claim from public key.
   std::string alg_claim = "\"alg\": \"RS256\",";
-  std::string pubkey_no_alg = kPublicKeyRSA;
+  std::string pubkey_no_alg = PublicKeyRSA;
   std::size_t alg_pos = pubkey_no_alg.find(alg_claim);
   while (alg_pos != std::string::npos) {
     pubkey_no_alg.erase(alg_pos, alg_claim.length());
     alg_pos = pubkey_no_alg.find(alg_claim);
   }
 
-  jwks_ = Jwks::CreateFrom(pubkey_no_alg, Jwks::Type::JWKS);
-  EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+  jwks_ = Jwks::createFrom(pubkey_no_alg, Jwks::Type::JWKS);
+  EXPECT_EQ(jwks_->getStatus(), Status::Ok);
 
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtNoKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextNoKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkRsaTest, OkPublicKeyNotKid) {
   // Remove "kid" claim from public key.
   std::string kid_claim1 = ",\"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\"";
   std::string kid_claim2 = ",\"kid\": \"b3319a147514df7ee5e4bcdee51350cc890cc89e\"";
-  std::string pubkey_no_kid = kPublicKeyRSA;
+  std::string pubkey_no_kid = PublicKeyRSA;
   std::size_t kid_pos = pubkey_no_kid.find(kid_claim1);
   pubkey_no_kid.erase(kid_pos, kid_claim1.length());
   kid_pos = pubkey_no_kid.find(kid_claim2);
   pubkey_no_kid.erase(kid_pos, kid_claim2.length());
 
-  jwks_ = Jwks::CreateFrom(pubkey_no_kid, Jwks::Type::JWKS);
-  EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+  jwks_ = Jwks::createFrom(pubkey_no_kid, Jwks::Type::JWKS);
+  EXPECT_EQ(jwks_->getStatus(), Status::Ok);
 
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtNoKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextNoKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 } // namespace

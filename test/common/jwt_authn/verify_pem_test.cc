@@ -10,7 +10,7 @@ namespace {
 // Header:  {"alg":"RS256","typ":"JWT"}
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
-const std::string kJwtPem =
+const std::string JwtPem =
     "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
     "ImV4cCI6MTUwMTI4MTA1OH0.FxT92eaBr9thDpeWaQh0YFhblVggn86DBpnTa_"
@@ -20,21 +20,21 @@ const std::string kJwtPem =
     "N09hdvlCtAF87Fu1qqfwEQ93A-J7m08bZJoyIPcNmTcYGHwfMR4-lcI5cC_93C_"
     "5BGE1FHPLOHpNghLuM6-rhOtgwZc9ywupn_bBK3QzuAoDnYwpqQhgQL_CdUD_bSHcmWFkw";
 
-const std::string kPublicKeyPem = "MIIBCgKCAQEAtw7MNxUTxmzWROCD5BqJxmzT7xqc9KsnAjbXCoqEEHDx4WBlfcwk"
-                                  "XHt9e/2+Uwi3Arz3FOMNKwGGlbr7clBY3utsjUs8BTF0kO/poAmSTdSuGeh2mSbc"
-                                  "VHvmQ7X/kichWwx5Qj0Xj4REU3Gixu1gQIr3GATPAIULo5lj/ebOGAa+l0wIG80N"
-                                  "zz1pBtTIUx68xs5ZGe7cIJ7E8n4pMX10eeuh36h+aossePeuHulYmjr4N0/1jG7a"
-                                  "+hHYL6nqwOR3ej0VqCTLS0OloC0LuCpLV7CnSpwbp2Qg/c+MDzQ0TH8g8drIzR5h"
-                                  "Fe9a3NlNRMXgUU5RqbLnR9zfXr7b9oEszQIDAQAB";
+const std::string PublicKeyPem = "MIIBCgKCAQEAtw7MNxUTxmzWROCD5BqJxmzT7xqc9KsnAjbXCoqEEHDx4WBlfcwk"
+                                 "XHt9e/2+Uwi3Arz3FOMNKwGGlbr7clBY3utsjUs8BTF0kO/poAmSTdSuGeh2mSbc"
+                                 "VHvmQ7X/kichWwx5Qj0Xj4REU3Gixu1gQIr3GATPAIULo5lj/ebOGAa+l0wIG80N"
+                                 "zz1pBtTIUx68xs5ZGe7cIJ7E8n4pMX10eeuh36h+aossePeuHulYmjr4N0/1jG7a"
+                                 "+hHYL6nqwOR3ej0VqCTLS0OloC0LuCpLV7CnSpwbp2Qg/c+MDzQ0TH8g8drIzR5h"
+                                 "Fe9a3NlNRMXgUU5RqbLnR9zfXr7b9oEszQIDAQAB";
 
 TEST(VerifyPemTest, OKPem) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtPem), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtPem), Status::Ok);
 
-  auto jwks = Jwks::CreateFrom(kPublicKeyPem, Jwks::Type::PEM);
-  EXPECT_EQ(jwks->GetStatus(), Status::OK);
+  auto jwks = Jwks::createFrom(PublicKeyPem, Jwks::Type::PEM);
+  EXPECT_EQ(jwks->getStatus(), Status::Ok);
 
-  EXPECT_EQ(VerifyJwt(jwt, *jwks), Status::OK);
+  EXPECT_EQ(verifyJwt(jwt, *jwks), Status::Ok);
 }
 
 } // namespace

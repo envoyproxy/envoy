@@ -28,36 +28,36 @@ namespace {
 // "7CF5bCDTXlrwI5n3ZsIFO8wVDyUptLYxuCNPdh+Zijoec8QTa2wCpZQnDw=="
 // "-----END PUBLIC KEY-----"
 
-const std::string kPublicKeyJwkEC = "{\"keys\": ["
-                                    "{"
-                                    "\"kty\": \"EC\","
-                                    "\"crv\": \"P-256\","
-                                    "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                    "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                    "\"alg\": \"ES256\","
-                                    "\"kid\": \"abc\""
-                                    "},"
-                                    "{"
-                                    "\"kty\": \"EC\","
-                                    "\"crv\": \"P-256\","
-                                    "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                    "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                    "\"alg\": \"ES256\","
-                                    "\"kid\": \"xyz\""
-                                    "}"
-                                    "]}";
+const std::string PublicKeyJwkEC = "{\"keys\": ["
+                                   "{"
+                                   "\"kty\": \"EC\","
+                                   "\"crv\": \"P-256\","
+                                   "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                   "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                   "\"alg\": \"ES256\","
+                                   "\"kid\": \"abc\""
+                                   "},"
+                                   "{"
+                                   "\"kty\": \"EC\","
+                                   "\"crv\": \"P-256\","
+                                   "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
+                                   "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
+                                   "\"alg\": \"ES256\","
+                                   "\"kid\": \"xyz\""
+                                   "}"
+                                   "]}";
 
 // "{"kid":"abc"}"
-const std::string kTokenEC = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9.eyJpc3MiOiI2Mj"
-                             "g2NDU3NDE4ODEtbm9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvc"
-                             "GVyLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4ODEtbm9hYml1"
-                             "MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3V"
-                             "udC5jb20iLCJhdWQiOiJodHRwOi8vbXlzZXJ2aWNlLmNvbS9teWFwaSJ9.T2KAwChqg"
-                             "o2ZSXyLh3IcMBQNSeRZRe5Z-MUDl-s-F99XGoyutqA6lq8bKZ6vmjZAlpVG8AGRZW9J"
-                             "Gp9lq3cbEw";
+const std::string JwtTextEC = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9.eyJpc3MiOiI2Mj"
+                              "g2NDU3NDE4ODEtbm9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvc"
+                              "GVyLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4ODEtbm9hYml1"
+                              "MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3V"
+                              "udC5jb20iLCJhdWQiOiJodHRwOi8vbXlzZXJ2aWNlLmNvbS9teWFwaSJ9.T2KAwChqg"
+                              "o2ZSXyLh3IcMBQNSeRZRe5Z-MUDl-s-F99XGoyutqA6lq8bKZ6vmjZAlpVG8AGRZW9J"
+                              "Gp9lq3cbEw";
 
 // "{"kid":"abcdef"}"
-const std::string kJwtWithNonExistKidEC =
+const std::string JwtTextWithNonExistKidEC =
     "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiY2RlZiJ9.eyJpc3MiOi"
     "I2Mjg2NDU3NDE4ODEtbm9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZ"
     "GV2ZWxvcGVyLmdzZXJ2aWNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4"
@@ -66,7 +66,7 @@ const std::string kJwtWithNonExistKidEC =
     "9teWFwaSJ9.rWSoOV5j7HxHc4yVgZEZYUSgY7AUarG3HxdfPON1mw6II_pNUsc8"
     "_sVf7Yv2-jeVhmf8BtR99wnOwEDhVYrVpQ";
 
-const std::string kTokenECNoKid =
+const std::string JwtTextECNoKid =
     "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI2Mjg2NDU3NDE4ODEtbm"
     "9hYml1MjNmNWE4bThvdmQ4dWN2Njk4bGo3OHZ2MGxAZGV2ZWxvcGVyLmdzZXJ2a"
     "WNlYWNjb3VudC5jb20iLCJzdWIiOiI2Mjg2NDU3NDE4ODEtbm9hYml1MjNmNWE4"
@@ -78,8 +78,8 @@ const std::string kTokenECNoKid =
 class VerifyJwkECTest : public testing::Test {
 protected:
   void SetUp() {
-    jwks_ = Jwks::CreateFrom(kPublicKeyJwkEC, Jwks::Type::JWKS);
-    EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+    jwks_ = Jwks::createFrom(PublicKeyJwkEC, Jwks::Type::JWKS);
+    EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }
 
   std::unique_ptr<Jwks> jwks_;
@@ -87,56 +87,56 @@ protected:
 
 TEST_F(VerifyJwkECTest, KidOK) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kTokenEC), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkECTest, NoKidOK) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kTokenECNoKid), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextECNoKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkECTest, NonExistKidFail) {
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kJwtWithNonExistKidEC), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::KID_ALG_UNMATCH);
+  EXPECT_EQ(jwt.parseFromString(JwtTextWithNonExistKidEC), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::JwksKidAlgMismatch);
 }
 
 TEST_F(VerifyJwkECTest, PubkeyNoAlgOK) {
   // Remove "alg" claim from public key.
   std::string alg_claim = "\"alg\": \"ES256\",";
-  std::string pubkey_no_alg = kPublicKeyJwkEC;
+  std::string pubkey_no_alg = PublicKeyJwkEC;
   std::size_t alg_pos = pubkey_no_alg.find(alg_claim);
   while (alg_pos != std::string::npos) {
     pubkey_no_alg.erase(alg_pos, alg_claim.length());
     alg_pos = pubkey_no_alg.find(alg_claim);
   }
 
-  jwks_ = Jwks::CreateFrom(pubkey_no_alg, Jwks::Type::JWKS);
-  EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+  jwks_ = Jwks::createFrom(pubkey_no_alg, Jwks::Type::JWKS);
+  EXPECT_EQ(jwks_->getStatus(), Status::Ok);
 
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kTokenEC), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 TEST_F(VerifyJwkECTest, PubkeyNoKidOK) {
   // Remove "kid" claim from public key.
   std::string kid_claim1 = ",\"kid\": \"abc\"";
   std::string kid_claim2 = ",\"kid\": \"xyz\"";
-  std::string pubkey_no_kid = kPublicKeyJwkEC;
+  std::string pubkey_no_kid = PublicKeyJwkEC;
   std::size_t kid_pos = pubkey_no_kid.find(kid_claim1);
   pubkey_no_kid.erase(kid_pos, kid_claim1.length());
   kid_pos = pubkey_no_kid.find(kid_claim2);
   pubkey_no_kid.erase(kid_pos, kid_claim2.length());
 
-  jwks_ = Jwks::CreateFrom(pubkey_no_kid, Jwks::Type::JWKS);
-  EXPECT_EQ(jwks_->GetStatus(), Status::OK);
+  jwks_ = Jwks::createFrom(pubkey_no_kid, Jwks::Type::JWKS);
+  EXPECT_EQ(jwks_->getStatus(), Status::Ok);
 
   Jwt jwt;
-  EXPECT_EQ(jwt.ParseFromString(kTokenEC), Status::OK);
-  EXPECT_EQ(VerifyJwt(jwt, *jwks_), Status::OK);
+  EXPECT_EQ(jwt.parseFromString(JwtTextEC), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_), Status::Ok);
 }
 
 } // namespace
