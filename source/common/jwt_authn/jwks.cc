@@ -86,9 +86,6 @@ private:
 
   bssl::UniquePtr<RSA> createRsaFromJwk(const std::string& n, const std::string& e) {
     bssl::UniquePtr<RSA> rsa(RSA_new());
-    // It crash if RSA object couldn't be created.
-    ASSERT(rsa);
-
     rsa->n = createBigNumFromBase64UrlString(n).release();
     rsa->e = createBigNumFromBase64UrlString(e).release();
     if (!rsa->n || !rsa->e) {
@@ -155,7 +152,7 @@ void Jwks::createFromJwksCore(const std::string& pkey_jwks) {
     try {
       extractJwk(jwk_json);
     } catch (Json::Exception& e) {
-      continue;
+      ENVOY_LOG(debug, "Wrong Jwks key format: {}, error: {}", jwk_json->asJsonString(), e.what());
     }
   }
 
@@ -201,6 +198,7 @@ void Jwks::extractJwkFromJwkRSA(Json::ObjectSharedPtr jwk_json) {
     e_str = jwk_json->getString("e");
   } catch (Json::Exception& e) {
     // Do not extract public key if jwk_json has bad format.
+    ENVOY_LOG(debug, "Wrong Jwks key format: {}, error: {}", jwk_json->asJsonString(), e.what());
     return;
   }
 
@@ -234,6 +232,7 @@ void Jwks::extractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json) {
     y_str = jwk_json->getString("y");
   } catch (Json::Exception& e) {
     // Do not extract public key if jwk_json has bad format.
+    ENVOY_LOG(debug, "Wrong Jwks key format: {}, error: {}", jwk_json->asJsonString(), e.what());
     return;
   }
 

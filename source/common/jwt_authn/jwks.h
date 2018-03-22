@@ -5,6 +5,7 @@
 
 #include "envoy/json/json_object.h"
 
+#include "common/common/logger.h"
 #include "common/jwt_authn/status.h"
 
 #include "openssl/ec.h"
@@ -20,7 +21,7 @@ namespace JwtAuthn {
  *    JwksPtr keys = Jwks::createFrom(jwks_string, type);
  *    if (keys->getStatus() == Status::Ok) { ... }
  */
-class Jwks : public WithStatus {
+class Jwks : public WithStatus, public Logger::Loggable<Logger::Id::filter> {
 public:
   // Format of public key.
   enum Type { PEM, JWKS };
