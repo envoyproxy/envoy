@@ -213,19 +213,29 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
   }
 }
 
-void ConnPoolImpl::processIdleClient(ActiveClient& client) {
-  client.stream_wrapper_.reset();
-  if (pending_requests_.empty()) {
-    // There is nothing to service so just move the connection into the ready list.
-    ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
-    client.moveBetweenLists(busy_clients_, ready_clients_);
-  } else {
+void ConnPoolImpl::onUpstreamReady() {
+  upstream_ready_posted_ = false;
+  while (!pending_requests_.empty() && !ready_clients_.empty()) {
+    ActiveClient& client = *ready_clients_.front();
+    ENVOY_CONN_LOG(debug, "attaching to next request", *client.codec_client_);
     // There is work to do so bind a request to the client and move it to the busy list. Pending
     // requests are pushed onto the front, so pull from the back.
-    ENVOY_CONN_LOG(debug, "attaching to next request", *client.codec_client_);
     attachRequestToClient(client, pending_requests_.back()->decoder_,
                           pending_requests_.back()->callbacks_);
     pending_requests_.pop_back();
+    client.moveBetweenLists(ready_clients_, busy_clients_);
+  }
+}
+
+void ConnPoolImpl::processIdleClient(ActiveClient& client) {
+  client.stream_wrapper_.reset();
+  // There is nothing to service so just move the connection into the ready list.
+  ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
+  client.moveBetweenLists(busy_clients_, ready_clients_);
+
+  if (!pending_requests_.empty() && !upstream_ready_posted_) {
+    upstream_ready_posted_ = true;
+    dispatcher_.post([this]() { onUpstreamReady(); });
   }
 
   checkForDrained();

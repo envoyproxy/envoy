@@ -123,6 +123,7 @@ protected:
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
+  void onUpstreamReady();
   void processIdleClient(ActiveClient& client);
 
   Stats::TimespanPtr conn_connect_ms_;
@@ -134,6 +135,7 @@ protected:
   std::list<DrainedCb> drained_callbacks_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  bool upstream_ready_posted_{false};
 };
 
 /**
