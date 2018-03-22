@@ -891,10 +891,6 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     grpc_status_message = fmt::format("{}", grpc_status);
   }
 
-  // The following can be compiled out when defining NVLOG.
-  // TODO(mattklein123): Refactor this to make this less ugly.
-  UNREFERENCED_PARAMETER(service_status);
-  UNREFERENCED_PARAMETER(grpc_status_message);
   ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
                  grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
 }

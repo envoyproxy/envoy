@@ -290,16 +290,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
                                               callbacks_->streamId());
 
-#ifndef NVLOG
-  headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
-                         *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
-                         header.key().c_str(), header.value().c_str());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      callbacks_);
-#endif
+  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
+                           *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
+                           header.key().c_str(), header.value().c_str());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        callbacks_);
+  }
 
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
