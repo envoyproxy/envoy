@@ -16,8 +16,9 @@
 
 #include "common/buffer/buffer_impl.h"
 
+extern "C" {
 #include <circllhist.h>
-
+}
 namespace Envoy {
 namespace Stats {
 namespace Metrics {
@@ -147,10 +148,25 @@ public:
 
   void onHistogramComplete(const Histogram& hist, uint64_t value) override {
     // TODO : Need to figure out how to map existing histogram to Proto Model
-    std::cout<<"Histogram name"<<hist.name()<<"\n";
-    std::cout<<"Histogram value"<<value<<"\n";
-    if (hist.name().compare("cluster.time.upstream_rq_time") == 0) {
+    if ((hist.name().compare(std::string("cluster.time.upstream_rq_time"))) == 0) {
+      std::cout<<"inserting to histogram"<<"\n";
       hist_insert(time_upstream_rq_time,value,1);
+      double mean = hist_approx_mean(time_upstream_rq_time);
+      double sum = hist_approx_sum(time_upstream_rq_time);
+      //(int) hist_approx_quantile(const histogram_t *, double *q_in, int nq, double *q_out);
+      std::cout<<"Mean is :"<<mean<<"\n";
+      std::cout<<"Sum is :"<<sum;
+      double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
+      double out[8];
+      double *arrptr = arr;
+      double *outptr = out;
+      hist_approx_quantile(time_upstream_rq_time, arrptr, 8, outptr);
+       for (int i = 0; i < 8; ++i)
+    {
+        std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
+
+    }
+
     }
   }
 
