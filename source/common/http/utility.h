@@ -39,7 +39,7 @@ public:
    * @param url supplies the url to parse.
    * @return QueryParams the parsed parameters, if any.
    */
-  static QueryParams parseQueryString(const std::string& url);
+  static QueryParams parseQueryString(absl::string_view url);
 
   /**
    * Finds the start of the query string in a path

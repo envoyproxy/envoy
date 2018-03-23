@@ -25,6 +25,8 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -41,7 +43,7 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
@@ -136,37 +138,37 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerAdminHome(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                               Buffer::Instance& response);
-  Http::Code handlerCerts(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerCerts(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
-  Http::Code handlerClusters(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response);
-  Http::Code handlerCpuProfiler(const std::string& path_and_query,
-                                Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(const std::string& path_and_query,
+  Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                                Buffer::Instance& response);
+  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(const std::string& path_and_query,
+  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHelp(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerHelp(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(const std::string& path_and_query,
+  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::HeaderMap& response_headers,
                                       Buffer::Instance& response);
-  Http::Code handlerListenerInfo(const std::string& path_and_query,
+  Http::Code handlerListenerInfo(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerLogging(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
+  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerResetCounters(const std::string& path_and_query,
+  Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response);
-  Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
-  Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 
   class AdminListener : public Network::ListenerConfig {
