@@ -3,14 +3,16 @@
 #include "common/common/utility.h"
 #include "common/http/utility.h"
 
-
 using envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
 namespace JwtAuthn {
 namespace {
 
-// The autorization bearer prefix.
+// The authorization header name.
+const std::string AuthorizationHeader = "authorization";
+
+// The authorization bearer prefix.
 const std::string BearerPrefix = "Bearer ";
 
 // The query parameter name to get JWT token.
@@ -18,59 +20,58 @@ const std::string ParamAccessToken = "access_token";
 
 } // namespace
 
-extractor::extractor(const JwtAuthentication& config) {
+Extractor::Extractor(const JwtAuthentication& config) {
   for (const auto& rule : config.rules()) {
     bool use_default = true;
     if (rule.from_headers_size() > 0) {
       use_default = false;
       for (const auto& header : rule.from_headers()) {
-        auto& issuers = header_maps_[LowerCaseString(header.name())];
-        issuers.insert(rule.issuer());
+        config_header(rule.issuer(), header.name(), header.value_prefix());
       }
     }
-    if (jwt.jwt_params_size() > 0) {
+    if (rule.from_params_size() > 0) {
       use_default = false;
-      for (const std::string& param : jwt.jwt_params()) {
-        auto& issuers = param_maps_[param];
-        issuers.insert(jwt.issuer());
+      for (const std::string& param : rule.from_params()) {
+        config_param(rule.issuer(), param);
       }
     }
 
-    // If not specified, use default
+    // If not specified, use default locations.
     if (use_default) {
-      authorization_issuers_.insert(jwt.issuer());
-
-      auto& param_issuers = param_maps_[kParamAccessToken];
-      param_issuers.insert(jwt.issuer());
+      config_header(rule.issuer(), AuthorizationHeader, BearerPrefix);
+      config_param(rule.issuer(), ParamAccessToken);
     }
   }
 }
 
-void extractor::extract(
-    const HeaderMap& headers,
-    std::vector<std::unique_ptr<extractor::Token>>* tokens) const {
-  if (!authorization_issuers_.empty()) {
-    const HeaderEntry* entry = headers.Authorization();
-    if (entry) {
-      // Extract token from header.
-      const HeaderString& value = entry->value();
-      if (StringUtil::startsWith(value.c_str(), kBearerPrefix, true)) {
-        tokens->emplace_back(new Token(value.c_str() + kBearerPrefix.length(),
-                                       authorization_issuers_, true, nullptr));
-        // Only take the first one.
-        return;
-      }
-    }
-  }
+void Extractor::config_header(const std::string& issuer, const std::string& header_name,
+                              const std::string& value_prefix) {
+  auto& map_value = header_maps_[Http::LowerCaseString(header_name)];
+  map_value.value_prefix_ = value_prefix;
+  map_value.specified_issuers_.insert(issuer);
+}
 
+void Extractor::config_param(const std::string& issuer, const std::string& param) {
+  auto& map_value = param_maps_[param];
+  map_value.specified_issuers_.insert(issuer);
+}
+
+void Extractor::extract(const Http::HeaderMap& headers, std::vector<JwtLocationPtr>* tokens) const {
   // Check header first
   for (const auto& header_it : header_maps_) {
-    const HeaderEntry* entry = headers.get(header_it.first);
+    const auto& map_key = header_it.first;
+    const auto& map_value = header_it.second;
+    const Http::HeaderEntry* entry = headers.get(map_key);
     if (entry) {
-      tokens->emplace_back(new Token(std::string(entry->value().c_str(), entry->value().size()),
-                                     header_it.second, false, &header_it.first));
-      // Only take the first one.
-      return;
+      std::string value_str = std::string(entry->value().c_str(), entry->value().size());
+      if (!map_value.value_prefix_.empty()) {
+        if (!StringUtil::startsWith(value_str.c_str(), map_value.value_prefix_, true)) {
+          // prefix doesn't match, skip it.
+          continue;
+        }
+        value_str = value_str.substr(map_value.value_prefix_.size());
+      }
+      tokens->emplace_back(new JwtLocation(value_str, map_value.specified_issuers_, &map_key));
     }
   }
 
@@ -78,14 +79,14 @@ void extractor::extract(
     return;
   }
 
-  const auto& params = Utility::parseQueryString(
+  const auto& current_params = Http::Utility::parseQueryString(
       std::string(headers.Path()->value().c_str(), headers.Path()->value().size()));
   for (const auto& param_it : param_maps_) {
-    const auto& it = params.find(param_it.first);
-    if (it != params.end()) {
-      tokens->emplace_back(new Token(it->second, param_it.second, false, nullptr));
-      // Only take the first one.
-      return;
+    const auto& map_key = param_it.first;
+    const auto& map_value = param_it.second;
+    const auto& it = current_params.find(map_key);
+    if (it != current_params.end()) {
+      tokens->emplace_back(new JwtLocation(it->second, map_value.specified_issuers_, nullptr));
     }
   }
 }
