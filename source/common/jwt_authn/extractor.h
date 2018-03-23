@@ -1,12 +1,12 @@
 #pragma once
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-
-#include "common/common/logger.h"
-
 #include <map>
 #include <set>
 #include <string>
+
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace JwtAuthn {
