@@ -230,6 +230,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                  },
                  [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
                      bool adding_host) {
+                   UNREFERENCED_PARAMETER(kvs);
                    if (adding_host) {
                      ENVOY_LOG(debug, "subset lb: creating load balancer for {}",
                                describeMetadata(kvs));
