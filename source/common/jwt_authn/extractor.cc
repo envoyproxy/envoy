@@ -3,7 +3,7 @@
 #include "common/common/utility.h"
 #include "common/http/utility.h"
 
-using envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
 namespace JwtAuthn {

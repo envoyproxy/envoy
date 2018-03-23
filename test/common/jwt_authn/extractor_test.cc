@@ -1,117 +1,90 @@
-/* Copyright 2018 Istio Authors. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+#include "common/jwt_authn/extractor.h"
 
+#include "common/protobuf/utility.h"
 #include "test/test_common/utility.h"
 
-#include "gtest/gtest.h"
-#include "src/envoy/http/jwt_auth/token_extractor.h"
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::_;
 
 namespace Envoy {
-namespace JwtAuth {
+namespace JwtAuthn {
 namespace {
 
 const char ExampleConfig[] = R"(
-{
-   "rules": [
-      {
-         "issuer": "issuer1",
-         "jwks_uri": "uri1"
-      },
-      {
-         "issuer": "issuer2",
-         "jwks_uri": "uri2",
-         "from_headers": [
-             "token-header"
-         ]
-      },
-      {
-         "issuer": "issuer3",
-         "jwks_uri": "uri3",
-         "jwt_params": [
-             "token_param"
-         ]
-      },
-      {
-         "issuer": "issuer4",
-         "jwks_uri": "uri1",
-         "jwt_headers": [
-             "token-header"
-         ],
-         "jwt_params": [
-             "token_param"
-         ]
-      }
-   ]
-}
+- rules:
+   issuer: issuer1
+- rules:
+   issuer: issuer2
+   from_headers:
+     - name: token-header
+- rules:
+   issuer: issuer3
+   from_params:
+     - token_param
+- rules:
+   issuer: issuer4
+   from_headers:
+     - name: token-header
+   from_params:
+     - token_param
+- rules:
+   issuer: issuer5
+   from_headers:
+     - name: prefix-header
+       value_prefix: prefix
 )";
 
 } //  namespace
 
 class ExtractorTest : public ::testing::Test {
 public:
-  void SetUp() { SetupConfig(kExampleConfig); }
-
-  void SetupConfig(const std::string& json_str) {
-    google::protobuf::util::Status status =
-        ::google::protobuf::util::JsonStringToMessage(json_str, &config_);
-    ASSERT_TRUE(status.ok());
+  void SetUp() {
+    MessageUtil::loadFromYaml(ExampleConfig, config_);
     extractor_.reset(new Extractor(config_));
   }
 
-  Config::AuthFilterConfig config_;
+  JwtAuthentication config_;
   std::unique_ptr<Extractor> extractor_;
 };
 
 TEST_F(ExtractorTest, TestNoToken) {
   auto headers = TestHeaderMapImpl{};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestWrongHeaderToken) {
   auto headers = TestHeaderMapImpl{{"wrong-token-header", "jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestWrongParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?wrong_token=jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   auto headers = TestHeaderMapImpl{{"Authorization", "Bearer jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 1);
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
 
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer1"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer1"));
 
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer2"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer3"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer4"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("unknown_issuer"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer3"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 
   // Test token remove
   tokens[0]->Remove(&headers);
@@ -121,31 +94,33 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
 TEST_F(ExtractorTest, TestDefaultParamLocation) {
   auto headers = TestHeaderMapImpl{{":path", "/path?access_token=jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 1);
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
 
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer1"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer1"));
 
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer2"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer3"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer4"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("unknown_issuer"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer3"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 }
 
 TEST_F(ExtractorTest, TestCustomHeaderToken) {
   auto headers = TestHeaderMapImpl{{"token-header", "jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
 
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer1"));
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer2"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer3"));
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer4"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("unknown_issuer"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer1"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer2"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer3"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer4"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 
   // Test token remove
   tokens[0]->Remove(&headers);
@@ -155,23 +130,27 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 TEST_F(ExtractorTest, TestCustomParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
 
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer1"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("issuer2"));
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer3"));
-  EXPECT_TRUE(tokens[0]->IsIssuerAllowed("issuer4"));
-  EXPECT_FALSE(tokens[0]->IsIssuerAllowed("unknown_issuer"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer1"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer3"));
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer4"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
+  EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 }
 
 TEST_F(ExtractorTest, TestMultipleTokens) {
-  auto headers = TestHeaderMapImpl{{":path", "/path?token_param=param_token"},
-                                   {"token-header", "header_token"}};
+  auto headers = TestHeaderMapImpl{{":path", "/path?token_param=token3&access_token=token4"},
+                                   {"token-header", "token2"},
+                                   {"authorization", "Bearer token1"},
+                                   {"prefix-header", "prefixtoken5"},
+  };
   std::vector<JwtLocationPtr> tokens;
-  extractor_->Extract(headers, &tokens);
+  extractor_->extract(headers, &tokens);
   EXPECT_EQ(tokens.size(), 1);
 
   // Header token first.

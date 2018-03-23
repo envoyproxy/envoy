@@ -78,7 +78,7 @@ typedef std::unique_ptr<JwtLocation> JwtLocationPtr;
  */
 class Extractor : public Logger::Loggable<Logger::Id::filter> {
 public:
-  Extractor(const envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
+  Extractor(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 
   // Return the extracted JWT tokens.
   void extract(const Http::HeaderMap& headers, std::vector<JwtLocationPtr>* tokens) const;
