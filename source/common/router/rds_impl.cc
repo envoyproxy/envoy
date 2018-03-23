@@ -229,13 +229,13 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2::RouteConfigDump>();
   auto* const dynamic_configs = config_dump->mutable_dynamic_route_configs();
   for (const auto& provider : getRdsRouteConfigProviders()) {
-    *(dynamic_configs->Add()) = provider->configAsProto();
+    dynamic_configs->Add()->MergeFrom(provider->configAsProto());
   }
   auto* const static_configs = config_dump->mutable_static_route_configs();
   for (const auto& provider : getStaticRouteConfigProviders()) {
-    *(static_configs->Add()) = provider->configAsProto();
+    static_configs->Add()->MergeFrom(provider->configAsProto());
   }
-  return config_dump;
+  return ProtobufTypes::MessagePtr{std::move(config_dump)};
 }
 
 } // namespace Router

@@ -283,8 +283,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
   envoy::admin::v2::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
-    ProtobufTypes::MessagePtr message;
-    message = key_callback_pair.second();
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message);
     Protobuf::Any any_message;
     any_message.PackFrom(*message);
