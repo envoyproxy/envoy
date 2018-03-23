@@ -47,29 +47,25 @@ public:
 
 TEST_F(ExtractorTest, TestNoToken) {
   auto headers = TestHeaderMapImpl{};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestWrongHeaderToken) {
   auto headers = TestHeaderMapImpl{{"wrong-token-header", "jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestWrongParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?wrong_token=jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   auto headers = TestHeaderMapImpl{{"Authorization", "Bearer jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
@@ -82,14 +78,13 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 
   // Test token remove
-  tokens[0]->remove(&headers);
+  tokens[0]->removeJwt(headers);
   EXPECT_FALSE(headers.Authorization());
 }
 
 TEST_F(ExtractorTest, TestDefaultParamLocation) {
   auto headers = TestHeaderMapImpl{{":path", "/path?access_token=jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
@@ -104,8 +99,7 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
 
 TEST_F(ExtractorTest, TestCustomHeaderToken) {
   auto headers = TestHeaderMapImpl{{"token-header", "jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
@@ -118,21 +112,19 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 
   // Test token remove
-  tokens[0]->remove(&headers);
+  tokens[0]->removeJwt(headers);
   EXPECT_FALSE(headers.get(Http::LowerCaseString("token-header")));
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {
   auto headers = TestHeaderMapImpl{{"prefix-header", "jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
   auto headers = TestHeaderMapImpl{{"prefix-header", "prefixjwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
@@ -145,14 +137,13 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 
   // Test token remove
-  tokens[0]->remove(&headers);
+  tokens[0]->removeJwt(headers);
   EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
 }
 
 TEST_F(ExtractorTest, TestCustomParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
@@ -172,8 +163,7 @@ TEST_F(ExtractorTest, TestMultipleTokens) {
       {"authorization", "Bearer token1"},
       {"prefix-header", "prefixtoken5"},
   };
-  std::vector<JwtLocationPtr> tokens;
-  extractor_->extract(headers, &tokens);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 5);
 
   EXPECT_EQ(tokens[0]->token(), "token1"); // from authorization

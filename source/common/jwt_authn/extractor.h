@@ -12,38 +12,24 @@ namespace Envoy {
 namespace JwtAuthn {
 
 /**
- * Store extracted JWT string and its location where it is extracted from.
- * It has a list of issuers specified the location. Only JWT from one of these issuers are allowed
+ * JwtLocation stores following info
+ * *  extracted JWT string,
+ * *  the location where the JWT is extracted from,
+ * *  list of issuers specified the location. The issuer of extracted JWT must match one of these
+ * issuers.
  */
 class JwtLocation {
 public:
-  JwtLocation(const std::string& token, const std::set<std::string>& issuers,
-              const Http::LowerCaseString* header_name)
-      : token_(token), specified_issuers_(issuers), header_name_(header_name) {}
+  virtual ~JwtLocation() {}
 
   // Get the token string
-  const std::string& token() const { return token_; }
+  virtual const std::string& token() const PURE;
 
-  // Check if the issuer has specified the location.
-  bool isIssuerSpecified(const std::string& issuer) const {
-    return specified_issuers_.find(issuer) != specified_issuers_.end();
-  }
+  // Check if an issuer has specified the location.
+  virtual bool isIssuerSpecified(const std::string& issuer) const PURE;
 
   // Remove the token from the headers
-  void remove(Http::HeaderMap* headers) {
-    // TODO(qiwzhang): to remove token from query parameter.
-    if (header_name_ != nullptr) {
-      headers->remove(*header_name_);
-    }
-  }
-
-private:
-  // Extracted token.
-  std::string token_;
-  // Stored issuers specified the location.
-  const std::set<std::string>& specified_issuers_;
-  // Not nullptr if Jwt is extracted from the header.
-  const Http::LowerCaseString* header_name_;
+  virtual void removeJwt(Http::HeaderMap& headers) const PURE;
 };
 
 typedef std::unique_ptr<JwtLocation> JwtLocationPtr;
@@ -56,32 +42,33 @@ typedef std::unique_ptr<JwtLocation> JwtLocationPtr;
  * * If an issuer doesn't specify any locations, following default locations are used:
  *      header:  Authorization: Bear <token>
  *      query parameter: ?access_token=<token>
- * * A JWT must be extracted from its configurated locations. For example, a JWT is extracted
- *   from header A, but the specified location from its issuer is header B. This JWT will be
+ * * A JWT must be extracted from its configurated locations. For example, if a JWT is extracted
+ *   from header A, but its specified location in the config is header B. This JWT should be
  * discarded.
  *
- * Usage:
+ * Usage example:
  *
  *  Extractor extractor(config);
- *
- *  std::vector<JwtLocationPtr> tokens;
- *  extractor.extract(headers, &tokens);
- *
- *  for (const auto& token : tokens) {
+ *  auto tokens = extractor.extract(headers);
+ *  for (token : tokens) {
  *     Jwt jwt;
- *     if (jwt.parseFromString(token.token()) != Status::Ok) // parse fails, drop it.
+ *     if (jwt.parseFromString(token->token()) != Status::Ok) // parse fails, drop it.
  *
- *     if (!token.isIssuerSpecified(jwt.iss())) // from unspecified location, drop it
+ *     if (!token->isIssuerSpecified(jwt.iss())) // from unspecified location, drop it
  *
- *     if (remove_token) token.remove(headers); // remove token from headers
+ *     if (need_to_remove) token->removeJwt(headers); // remove the JWT from headers
  *  }
  */
 class Extractor : public Logger::Loggable<Logger::Id::filter> {
 public:
   Extractor(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 
-  // Return the extracted JWT tokens.
-  void extract(const Http::HeaderMap& headers, std::vector<JwtLocationPtr>* tokens) const;
+  /**
+   * Extract all JWT tokens from the headers
+   * @param headers is the HTTP request headers.
+   * @return list of extracted Jwt location info.
+   */
+  std::vector<JwtLocationPtr> extract(const Http::HeaderMap& headers) const;
 
 private:
   // config a header
