@@ -37,11 +37,11 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
       table_build_entries[i].next_++;
       table_index++;
       if (table_index == table_size_) {
-#ifndef NVLOG
-        for (uint64_t i = 0; i < table_.size(); i++) {
-          ENVOY_LOG(trace, "maglev: i={} host={}", i, table_[i]->address()->asString());
+        if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+          for (uint64_t i = 0; i < table_.size(); i++) {
+            ENVOY_LOG(trace, "maglev: i={} host={}", i, table_[i]->address()->asString());
+          }
         }
-#endif
         return;
       }
     }

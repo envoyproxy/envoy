@@ -86,16 +86,29 @@ TEST(Logger, logAsStatement) {
   EXPECT_THAT(j, testing::Eq(1));
 }
 
-#ifdef NVLOG
-TEST(Logger, doNotExpandTraceAndDebug) {
-  uint32_t i = 1;
+TEST(Logger, checkLoggerLevel) {
+  class logTestClass : public Logger::Loggable<Logger::Id::misc> {
+  public:
+    void setLevel(const spdlog::level::level_enum level) { ENVOY_LOGGER().set_level(level); }
+    uint32_t executeAtTraceLevel() {
+      if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+        //  Logger's level was at least trace
+        return 1;
+      } else {
+        // Logger's level was higher than trace
+        return 2;
+      };
+    }
+  };
 
-  // The following two macros should be expanded to no-op if NVLOG compile flag is defined.
-  ENVOY_LOG_TO_LOGGER(nonExistingLogger, trace, "test message 5 '{}'", i++);
-  EXPECT_THAT(i, testing::Eq(1));
+  logTestClass testObj;
 
-  ENVOY_LOG_TO_LOGGER(nonExistingLogger, debug, "test message 6 '{}'", i++);
-  EXPECT_THAT(i, testing::Eq(1));
+  // Set Loggers severity low
+  testObj.setLevel(spdlog::level::trace);
+  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(1));
+
+  testObj.setLevel(spdlog::level::info);
+  EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
 }
-#endif /* NVLOG */
+
 } // namespace Envoy

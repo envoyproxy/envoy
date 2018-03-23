@@ -240,12 +240,7 @@ bazel test -c dbg --config=clang-tsan //test/...
 
 ## Log Verbosity
 
-By default, log verbosity is controlled at runtime in all builds. However, it may be desirable to
-remove log statements of lower importance during compilation to enhance performance. To remove
-`trace` and `debug` log statements during compilation define `NVLOG`:
-```
-bazel build --copt=-DNVLOG //source/exe:envoy-static
-```
+Log verbosity is controlled at runtime in all builds. 
 
 ## Disabling optional features
 
