@@ -20,6 +20,12 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
+ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+                           Upstream::ResourcePriority priority,
+                           const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options),
+      upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })) {}
+
 ConnPoolImpl::~ConnPoolImpl() {
   while (!ready_clients_.empty()) {
     ready_clients_.front()->codec_client_->close();
@@ -214,7 +220,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 }
 
 void ConnPoolImpl::onUpstreamReady() {
-  upstream_ready_posted_ = false;
+  upstream_ready_enabled_ = false;
   while (!pending_requests_.empty() && !ready_clients_.empty()) {
     ActiveClient& client = *ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next request", *client.codec_client_);
@@ -233,9 +239,9 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client) {
   ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
   client.moveBetweenLists(busy_clients_, ready_clients_);
 
-  if (!pending_requests_.empty() && !upstream_ready_posted_) {
-    upstream_ready_posted_ = true;
-    dispatcher_.post([this]() { onUpstreamReady(); });
+  if (!pending_requests_.empty() && !upstream_ready_enabled_) {
+    upstream_ready_enabled_ = true;
+    upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
   }
 
   checkForDrained();

@@ -42,10 +42,15 @@ namespace Http1 {
 class ConnPoolImplForTest : public ConnPoolImpl {
 public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
-                      Upstream::ClusterInfoConstSharedPtr cluster)
+                      Upstream::ClusterInfoConstSharedPtr cluster,
+                      NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr),
-        mock_dispatcher_(dispatcher) {}
+        mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {
+    ON_CALL(*mock_upstream_ready_timer_, enableTimer(std::chrono::milliseconds(0)))
+        .WillByDefault(Invoke(
+            [&](const std::chrono::milliseconds&) { mock_upstream_ready_timer_->callback_(); }));
+  }
 
   ~ConnPoolImplForTest() {
     EXPECT_EQ(0U, ready_clients_.size());
@@ -99,6 +104,7 @@ public:
   }
 
   Event::MockDispatcher& mock_dispatcher_;
+  NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;
 };
 
@@ -107,7 +113,9 @@ public:
  */
 class Http1ConnPoolImplTest : public testing::Test {
 public:
-  Http1ConnPoolImplTest() : conn_pool_(dispatcher_, cluster_) {}
+  Http1ConnPoolImplTest()
+      : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
+        conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0.
@@ -118,6 +126,7 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Event::MockTimer>* upstream_ready_timer_;
   ConnPoolImplForTest conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
