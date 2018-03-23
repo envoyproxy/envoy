@@ -533,7 +533,7 @@ public:
 
   std::list<HistogramStatistics> flushHistograms() override {
     // TODO: Merge with optimized locking
-    std::unique_lock<std::mutex> lock(lock_);
+    std::lock_guard<std::mutex> guard(lock_);
     tls_->runOnAllThreads([this]() {
       ThreadLocalHistograms& tls_histograms = tls_->getTyped<ThreadLocalHistograms>();
       for (auto const& histogram : tls_histograms.histograms_) {
