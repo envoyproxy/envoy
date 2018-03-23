@@ -52,8 +52,8 @@ brew install bazel
 brew install automake
 ```
 
-Envoy compiles and passes tests with the version of clang installed by XCode 8.3.3:
-Apple LLVM version 8.1.0 (clang-802.0.42).
+Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
+Apple LLVM version 9.1.0 (clang-902.0.30).
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
