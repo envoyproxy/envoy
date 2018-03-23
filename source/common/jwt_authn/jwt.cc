@@ -2,9 +2,9 @@
 
 #include <algorithm>
 
+#include "common/common/base64.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
-#include "common/jwt_authn/utils.h"
 
 namespace Envoy {
 namespace JwtAuthn {
@@ -21,7 +21,7 @@ Status Jwt::parseFromString(const std::string& jwt) {
 
   // Parse header json
   header_str_base64url_ = std::string(jwt_split[0].begin(), jwt_split[0].end());
-  header_str_ = decodeBase64Url(header_str_base64url_);
+  header_str_ = Base64Url::decode(header_str_base64url_);
   Json::ObjectSharedPtr header_json;
   try {
     header_json = Json::Factory::loadFromString(header_str_);
@@ -52,7 +52,7 @@ Status Jwt::parseFromString(const std::string& jwt) {
 
   // Parse payload json
   payload_str_base64url_ = std::string(jwt_split[1].begin(), jwt_split[1].end());
-  payload_str_ = decodeBase64Url(payload_str_base64url_);
+  payload_str_ = Base64Url::decode(payload_str_base64url_);
   Json::ObjectSharedPtr payload_json;
   try {
     payload_json = Json::Factory::loadFromString(payload_str_);
@@ -79,7 +79,7 @@ Status Jwt::parseFromString(const std::string& jwt) {
   }
 
   // Set up signature
-  signature_ = decodeBase64Url(std::string(jwt_split[2].begin(), jwt_split[2].end()));
+  signature_ = Base64Url::decode(std::string(jwt_split[2].begin(), jwt_split[2].end()));
   if (signature_ == "") {
     // Signature is a bad Base64url input.
     return Status::JwtSignatureParseError;

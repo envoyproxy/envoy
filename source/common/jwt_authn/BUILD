@@ -14,7 +14,6 @@ envoy_cc_library(
         "jwks.cc",
         "jwt.cc",
         "status.cc",
-        "utils.cc",
         "verifier.cc",
     ],
     hdrs = [

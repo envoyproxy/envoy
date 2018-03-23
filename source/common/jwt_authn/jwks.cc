@@ -77,7 +77,7 @@ private:
   }
 
   bssl::UniquePtr<BIGNUM> createBigNumFromBase64UrlString(const std::string& s) {
-    std::string s_decoded = decodeBase64Url(s);
+    std::string s_decoded = Base64Url::decode(s);
     if (s_decoded == "") {
       return nullptr;
     }
