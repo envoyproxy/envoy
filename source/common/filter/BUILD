@@ -9,19 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "echo_lib",
-    srcs = ["echo.cc"],
-    hdrs = ["echo.h"],
-    deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],

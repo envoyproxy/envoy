@@ -3,6 +3,7 @@
 #include "test/server/utility.h"
 
 namespace Envoy {
+namespace {
 
 std::string echo_config;
 
@@ -59,6 +60,8 @@ TEST_P(EchoIntegrationTest, Hello) {
   EXPECT_EQ("hello", response);
 }
 
+// TODO(mattklein123): This test does not belong here in an extension integration test. Move it
+//                     somewhere else.
 TEST_P(EchoIntegrationTest, AddRemoveListener) {
   const std::string json = TestEnvironment::substitute(R"EOF(
   {
@@ -122,4 +125,5 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   connection2.run();
 }
 
+} // namespace
 } // namespace Envoy

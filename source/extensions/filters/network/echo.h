@@ -5,7 +5,9 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
+namespace Extensions {
 namespace Filter {
+namespace NetworkFilter {
 
 /**
  * Implementation of a basic echo filter.
@@ -23,5 +25,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
+} // namespace NetworkFilter
 } // namespace Filter
+} // namespace Extensions
 } // namespace Envoy
