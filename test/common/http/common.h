@@ -24,15 +24,14 @@ public:
         destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
-
   ~CodecClientForTest() {
     if (destroy_cb_) {
       destroy_cb_(this);
     }
   }
-
   void raiseGoAway() { onGoAway(); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+
   DestroyCb destroy_cb_;
 };
 

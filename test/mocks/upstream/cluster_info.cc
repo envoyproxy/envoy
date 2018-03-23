@@ -23,7 +23,6 @@ MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
 MockLoadBalancerSubsetInfo::~MockLoadBalancerSubsetInfo() {}
 
 MockIdleTimeEnabledClusterInfo::MockIdleTimeEnabledClusterInfo() {
-
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(std::chrono::milliseconds(1000)));
 }
 
@@ -34,7 +33,6 @@ MockClusterInfo::MockClusterInfo()
       transport_socket_factory_(new Network::RawBufferSocketFactory),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1)) {
-
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
