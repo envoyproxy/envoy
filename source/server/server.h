@@ -85,7 +85,7 @@ public:
    * @param sinks supplies the list of sinks.
    * @param store supplies the store to flush.
    */
-  static void flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+  static std::list<Stats::HistogramStatistics> flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
                                             Stats::Store& store);
 
   /**
@@ -161,6 +161,7 @@ public:
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
+  std::list<Stats::HistogramStatistics> histogramStats() override { return histogram_stats_; }
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
@@ -179,6 +180,7 @@ private:
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
+  std::list<Stats::HistogramStatistics> histogram_stats_; 
   std::unique_ptr<ServerStats> server_stats_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;

@@ -164,6 +164,11 @@ public:
    */
   virtual Stats::Store& stats() PURE;
 
+ /**
+   * @return the histogram statistics.
+   */
+  virtual std::list<Stats::HistogramStatistics> histogramStats() PURE;
+
   /**
    * @return the server-wide http tracer.
    */

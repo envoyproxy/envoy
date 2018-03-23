@@ -148,9 +148,10 @@ public:
     BaseSink::onHistogramComplete(hist,value);
   }
 
-  void flushHistograms() override {
-    BaseSink::flushHistograms();
+  std::list<HistogramStatistics> flushHistograms() override {
+    std::list<HistogramStatistics> all_histograms = BaseSink::flushHistograms();
     // TODO : Need to figure out how to map existing histogram to Proto Model
+    return all_histograms;
   }
 
 private:

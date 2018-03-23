@@ -476,65 +476,96 @@ private:
   IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
 };
 
+  /**
+   * Structure to hold statistical data of histogram. 
+   */
+  struct HistogramStatistics {
+    public:
+    HistogramStatistics(const std::string name, histogram_t* histogram_ptr) :name_(name) {
+       double arr[9] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+       double out[9];
+       double *arrptr = arr;
+       double *outptr = out;
+       hist_approx_quantile(histogram_ptr, arrptr, 9, outptr);
+       p0_ = out[0];
+       p25_ = out[1];
+       p50_ = out[2];
+       p75_ = out[3];
+       p90_ = out[4];
+       p95_ = out[5];
+       p99_ = out[6];
+       p999_ = out[7];
+       p100_ = out[8];
+    }
+    
+    std::string name() const {
+       return name_;
+     }
+
+    std::string summary() const {
+        return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
+        p0_,p25_,p50_,p75_,p90_,p95_,p99_,p999_,p100_);
+     }
+
+    private:
+    const std::string name_;
+    double p0_;
+    double p25_;
+    double p50_;
+    double p75_;
+    double p90_;
+    double p95_;
+    double p99_;
+    double p999_;
+    double p100_;
+  };
+
 /**
  * BaseSink implementation for all Sinks. This mainly  .
  */
 class BaseSink : public Sink {
 public:
 void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    std::cout<<"BaseSink::onHistogramComplete==>"<<hist.name()<<"\n";
     const auto histogram_value = tls_->getTyped<ThreadLocalHistograms>().histograms_.emplace(std::make_pair(hist.name(), hist_alloc()));
     histogram_t* histogram_ptr = histogram_value.first->second;
     hist_insert(histogram_ptr,value,1);
-    if (histogram_value.second) {
-      std::cout<<"histogram map size ==> "<<tls_->getTyped<ThreadLocalHistograms>().histograms_.size()<<"\n";
-    }
-    double mean = hist_approx_mean(histogram_ptr);
-    double sum = hist_approx_sum(histogram_ptr);
-    std::cout<<"Mean is :"<<mean<<"\n";
-    std::cout<<"Sum is :"<<sum<<"\n";
-    double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
-    double out[8];
-    double *arrptr = arr;
-    double *outptr = out;
-    hist_approx_quantile(histogram_ptr, arrptr, 8, outptr);
-    for (int i = 0; i < 8; ++i) {
-      std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
-    }
 }
 
-void flushHistograms() override {
-  std::cout<<"BaseSink::flushHistogram()"<<"\n";
-  //TODO: Merge with locking
+std::list<HistogramStatistics> flushHistograms() override {
+  //TODO: Merge with optimized locking
+  std::unique_lock<std::mutex> lock(lock_);
   tls_->runOnAllThreads([this]() {
     ThreadLocalHistograms& tls_histograms = tls_->getTyped<ThreadLocalHistograms>();
     for (auto const& histogram : tls_histograms.histograms_) {
-       const auto histogram_value = merged_histograms_.emplace(std::make_pair(histogram.first, hist_alloc()));
-       // TODO: look at using std::array
-       histogram_t *hist_array[1];
-       hist_array[0] = histogram.second;
-       // std::array<histogram_t,1> hist_array = {histogram.second};
-       hist_accumulate(histogram_value.first->second, hist_array, 1);
-       hist_clear(histogram.second);
+       std::map<std::string, histogram_t*>::iterator iter = merged_histograms_.find(histogram.first);
+       // TODO: Optimize this if condition
+       if (iter != merged_histograms_.end()){
+          // TODO: look at using std::array
+          histogram_t *merged_histogram = hist_alloc();
+          histogram_t *hist_array[2];
+          hist_array[0] = histogram.second;
+          hist_array[1] = iter->second;
+          // std::array<histogram_t,1> hist_array = {histogram.second};
+          hist_accumulate(merged_histogram, hist_array, 2);
+          hist_clear(histogram.second);
+          hist_clear(iter->second);
+          merged_histograms_[histogram.first]=merged_histogram;
+       } else {
+          histogram_t *merged_histogram = hist_alloc();
+          histogram_t *hist_array[1];
+          hist_array[0] = histogram.second;
+          // std::array<histogram_t,1> hist_array = {histogram.second};
+          hist_accumulate(merged_histogram, hist_array, 1);
+          hist_clear(histogram.second);
+          merged_histograms_[histogram.first]=merged_histogram;
+       }
     }
   });
-  std::cout<<"Merged Histograms..."<<"\n";
+  std::list<HistogramStatistics> all_histograms;
   for (auto const& histogram : merged_histograms_) {
-     std::cout<<"BaseSink::Merged Histogram name==>"<<histogram.first<<"\n";
-     histogram_t* histogram_ptr = histogram.second;
-     double mean = hist_approx_mean(histogram_ptr);
-     double sum = hist_approx_sum(histogram_ptr);
-     std::cout<<"Mean is :"<<mean<<"\n";
-     std::cout<<"Sum is :"<<sum<<"\n";
-     double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
-     double out[8];
-     double *arrptr = arr;
-     double *outptr = out;
-     hist_approx_quantile(histogram_ptr, arrptr, 8, outptr);
-     for (int i = 0; i < 8; ++i) {
-       std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
-     }
+     all_histograms.emplace_back(histogram.first,histogram.second);
   }
+  return all_histograms;
 }
 
   protected:
@@ -548,6 +579,7 @@ void flushHistograms() override {
   std::map<std::string, histogram_t*> merged_histograms_;
 
   private:
+  std::mutex lock_;
   struct ThreadLocalHistograms : public ThreadLocal::ThreadLocalObject {
     std::map<std::string, histogram_t*> histograms_;
   };

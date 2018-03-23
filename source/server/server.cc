@@ -98,7 +98,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
+std::list<Stats::HistogramStatistics> InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
                                                  Stats::Store& store) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
@@ -120,11 +120,12 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
       }
     }
   }
-
+  std::list<Stats::HistogramStatistics> histogram_stats;
   for (const auto& sink : sinks) {
-    sink->flushHistograms();
+    histogram_stats = sink->flushHistograms();
     sink->endFlush();
   }
+  return histogram_stats;
 }
 
 void InstanceImpl::flushStats() {
@@ -140,7 +141,7 @@ void InstanceImpl::flushStats() {
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
-  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
+  histogram_stats_ = InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 

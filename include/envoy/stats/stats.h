@@ -23,6 +23,8 @@ class Instance;
 
 namespace Stats {
 
+struct HistogramStatistics;
+
 /**
  * General representation of a tag.
  */
@@ -197,7 +199,7 @@ public:
   /**
    * Flush all Histograms. This will be called before endFlush().
    */
-  virtual void flushHistograms() PURE;
+  virtual std::list<HistogramStatistics> flushHistograms() PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of
