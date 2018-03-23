@@ -482,13 +482,12 @@ private:
 class BaseSink : public Sink {
 public:
 void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    // TODO : Need to figure out how to map existing histogram to Proto Model
     std::cout<<"BaseSink::onHistogramComplete==>"<<hist.name()<<"\n";
-    const auto histogram_value = histograms_.emplace(std::make_pair(hist.name(), hist_alloc()));
+    const auto histogram_value = tls_->getTyped<ThreadLocalHistograms>().histograms_.emplace(std::make_pair(hist.name(), hist_alloc()));
     histogram_t* histogram_ptr = histogram_value.first->second;
     hist_insert(histogram_ptr,value,1);
     if (histogram_value.second) {
-      std::cout<<"histogram map size ==> "<<histograms_.size()<<"\n";
+      std::cout<<"histogram map size ==> "<<tls_->getTyped<ThreadLocalHistograms>().histograms_.size()<<"\n";
     }
     double mean = hist_approx_mean(histogram_ptr);
     double sum = hist_approx_sum(histogram_ptr);
@@ -506,16 +505,52 @@ void onHistogramComplete(const Histogram& hist, uint64_t value) override {
 
 void flushHistograms() override {
   std::cout<<"BaseSink::flushHistogram()"<<"\n";
+  //TODO: Merge with locking
+  tls_->runOnAllThreads([this]() {
+    ThreadLocalHistograms& tls_histograms = tls_->getTyped<ThreadLocalHistograms>();
+    for (auto const& histogram : tls_histograms.histograms_) {
+       const auto histogram_value = merged_histograms_.emplace(std::make_pair(histogram.first, hist_alloc()));
+       // TODO: look at using std::array
+       histogram_t *hist_array[1];
+       hist_array[0] = histogram.second;
+       // std::array<histogram_t,1> hist_array = {histogram.second};
+       hist_accumulate(histogram_value.first->second, hist_array, 1);
+       hist_clear(histogram.second);
+    }
+  });
+  std::cout<<"Merged Histograms..."<<"\n";
+  for (auto const& histogram : merged_histograms_) {
+     std::cout<<"BaseSink::Merged Histogram name==>"<<histogram.first<<"\n";
+     histogram_t* histogram_ptr = histogram.second;
+     double mean = hist_approx_mean(histogram_ptr);
+     double sum = hist_approx_sum(histogram_ptr);
+     std::cout<<"Mean is :"<<mean<<"\n";
+     std::cout<<"Sum is :"<<sum<<"\n";
+     double arr[8] = {0, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 1};
+     double out[8];
+     double *arrptr = arr;
+     double *outptr = out;
+     hist_approx_quantile(histogram_ptr, arrptr, 8, outptr);
+     for (int i = 0; i < 8; ++i) {
+       std::cout<<"P"<<arr[i]<<"="<<out[i]<<"\n";
+     }
+  }
 }
 
   protected:
-  BaseSink(ThreadLocal::SlotPtr tls):tls_(std::move(tls)){}
+  BaseSink(ThreadLocal::SlotPtr tls):tls_(std::move(tls)){
+     tls_->set([this](Event::Dispatcher& ) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalHistograms>();
+  });
+  }
 
   ThreadLocal::SlotPtr tls_;
+  std::map<std::string, histogram_t*> merged_histograms_;
 
   private:
-  std::map<std::string, histogram_t*> histograms_;
-  std::map<std::string, histogram_t*> merged_histograms_;
+  struct ThreadLocalHistograms : public ThreadLocal::ThreadLocalObject {
+    std::map<std::string, histogram_t*> histograms_;
+  };
 };
 
 } // namespace Stats

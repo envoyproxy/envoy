@@ -145,8 +145,12 @@ public:
   }
 
   void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    std::cout<<"Metrics Sink onHistogramComplete"<<"\n";
     BaseSink::onHistogramComplete(hist,value);
+  }
+
+  void flushHistograms() override {
+    BaseSink::flushHistograms();
+    // TODO : Need to figure out how to map existing histogram to Proto Model
   }
 
 private:
