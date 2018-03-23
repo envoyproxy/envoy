@@ -972,12 +972,12 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
   // Response 2.
+  fake_upstream_connection_->waitForDisconnect();
   fake_upstream_connection_.reset();
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024, true);
   response2->waitForEndStream();
-
   codec_client2->close();
 
   EXPECT_TRUE(upstream_request_->complete());
