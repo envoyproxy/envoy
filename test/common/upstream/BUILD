@@ -52,6 +52,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "edf_scheduler_test",
+    srcs = ["edf_scheduler_test.cc"],
+    deps = ["//source/common/upstream:edf_scheduler_lib"],
+)
+
+envoy_cc_test(
     name = "eds_test",
     srcs = ["eds_test.cc"],
     deps = [
@@ -288,11 +294,14 @@ envoy_cc_test(
     srcs = ["subset_lb_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:logger_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:subset_lb_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],

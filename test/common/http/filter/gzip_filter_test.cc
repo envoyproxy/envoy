@@ -193,7 +193,7 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   }
   {
     TestHeaderMapImpl headers = {};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
     TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
