@@ -143,6 +143,7 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
 }
 
+#if 0
 TEST_F(ExtractorTest, TestMultipleTokens) {
   auto headers = TestHeaderMapImpl{{":path", "/path?token_param=token3&access_token=token4"},
                                    {"token-header", "token2"},
@@ -156,7 +157,7 @@ TEST_F(ExtractorTest, TestMultipleTokens) {
   // Header token first.
   EXPECT_EQ(tokens[0]->token(), "header_token");
 }
-
+#endif
 } // namespace JwtAuth
 } // namespace Http
 } // namespace Envoy
