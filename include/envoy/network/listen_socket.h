@@ -49,10 +49,9 @@ public:
     virtual bool setOption(Socket& socket, SocketState state) const PURE;
 
     /**
-     * @param vector of bits that can be used to separate connections based on the options. Should
-     *        return zero if connections with different options can be pooled together. This is
-     *        limited to 32 bits to allow these bits to be efficiently combined into a larger hash
-     *        key used in connection pool lookups.
+     * @param vector of bytes to which the option should append hash key data that will be used
+     *        to separate connections based on the option. Any data already in the key vector must
+     *        not be modified.
      */
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
