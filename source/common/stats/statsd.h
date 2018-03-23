@@ -45,7 +45,7 @@ public:
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag)
-      : tls_(tls.allocateSlot()), use_tag_(use_tag) {
+      : BaseSink(tls.allocateSlot()), use_tag_(use_tag) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -65,7 +65,6 @@ private:
   const std::string getName(const Metric& metric);
   const std::string buildTagStr(const std::vector<Tag>& tags);
 
-  ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
 };
@@ -136,7 +135,6 @@ private:
   static char STAT_PREFIX[];
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  ThreadLocal::SlotPtr tls_;
   Upstream::ClusterManager& cluster_manager_;
   Stats::Counter& cx_overflow_stat_;
 };

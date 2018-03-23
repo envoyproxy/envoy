@@ -15,6 +15,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
@@ -507,8 +508,14 @@ void flushHistograms() override {
   std::cout<<"BaseSink::flushHistogram()"<<"\n";
 }
 
+  protected:
+  BaseSink(ThreadLocal::SlotPtr tls):tls_(std::move(tls)){}
+
+  ThreadLocal::SlotPtr tls_;
+
   private:
   std::map<std::string, histogram_t*> histograms_;
+  std::map<std::string, histogram_t*> merged_histograms_;
 };
 
 } // namespace Stats

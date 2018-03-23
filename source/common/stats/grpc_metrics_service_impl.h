@@ -112,7 +112,7 @@ private:
 class MetricsServiceSink : public BaseSink {
 public:
   // MetricsService::Sink
-  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
+  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,ThreadLocal::SlotAllocator& tls);
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
