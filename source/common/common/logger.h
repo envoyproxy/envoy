@@ -207,6 +207,9 @@ protected:
 
 /**
  * Convenience macro to log to a user-specified logger.
+ * Maps directly to ENVOY_LOG_COMP_AND_LOG - it could contain macro logic itself, without
+ * redirection, but left in case various implementations are required in the future (based on log
+ * level for example).
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__)
 

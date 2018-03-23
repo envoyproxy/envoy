@@ -95,7 +95,7 @@ TEST(Logger, checkLoggerLevel) {
         //  Logger's level was at least trace
         return 1;
       } else {
-        // Logger's evel was higher than trace
+        // Logger's level was higher than trace
         return 2;
       };
     }
