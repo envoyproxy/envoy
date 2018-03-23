@@ -112,7 +112,8 @@ private:
 class MetricsServiceSink : public BaseSink {
 public:
   // MetricsService::Sink
-  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,ThreadLocal::SlotAllocator& tls);
+  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
+                     ThreadLocal::SlotAllocator& tls);
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
@@ -145,7 +146,7 @@ public:
   }
 
   void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    BaseSink::onHistogramComplete(hist,value);
+    BaseSink::onHistogramComplete(hist, value);
   }
 
   std::list<HistogramStatistics> flushHistograms() override {

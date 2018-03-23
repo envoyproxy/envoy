@@ -29,8 +29,8 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
                                                                                  server.stats()),
           server.threadLocal(), server.localInfo());
 
-  return Stats::SinkPtr(
-      std::make_unique<Stats::Metrics::MetricsServiceSink>(grpc_metrics_streamer,server.threadLocal()));
+  return Stats::SinkPtr(std::make_unique<Stats::Metrics::MetricsServiceSink>(grpc_metrics_streamer,
+                                                                             server.threadLocal()));
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {

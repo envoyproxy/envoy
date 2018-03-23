@@ -85,7 +85,7 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED; }
   Stats::Store& stats() override { return stats_store_; }
-  std::list<Stats::HistogramStatistics> histogramStats() override { return histogram_stats_; }
+  std::list<Stats::HistogramStatistics>& histogramStats() override { return histogram_stats_; }
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
