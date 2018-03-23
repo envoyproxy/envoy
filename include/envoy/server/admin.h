@@ -41,8 +41,8 @@ public:
    * @param response supplies the buffer to fill in with the response body.
    * @return Http::Code the response code.
    */
-  typedef std::function<Http::Code(absl::string_view url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response)>
+  typedef std::function<Http::Code(absl::string_view path_and_query,
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response)>
       HandlerCb;
 
   /**
