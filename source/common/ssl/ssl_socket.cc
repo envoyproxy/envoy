@@ -1,3 +1,4 @@
+#include <openssl/x509v3.h>
 #include "common/ssl/ssl_socket.h"
 
 #include "common/common/assert.h"
@@ -225,6 +226,14 @@ std::string SslSocket::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
+std::vector<std::string> SslSocket::dnsSansLocalCertificate() {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return {};
+  }
+  return getDnsSansFromCertificate(cert);
+}
+
 const std::string& SslSocket::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
@@ -273,6 +282,14 @@ std::string SslSocket::uriSanPeerCertificate() {
   return getUriSanFromCertificate(cert.get());
 }
 
+std::vector<std::string> SslSocket::dnsSansPeerCertificate() {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return {};
+  }
+  return getDnsSansFromCertificate(cert.get());
+}
+
 std::string SslSocket::getUriSanFromCertificate(X509* cert) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
@@ -288,6 +305,32 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
     }
   }
   return "";
+}
+
+std::vector<std::string> getDnsSansFromCertificate(X509* cert) {
+  STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
+          X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
+
+  if (altnames == nullptr) {
+    return {};
+  }
+
+  std::vector<std::string> dns_sans = {};
+  int n = sk_GENERAL_NAME_num(altnames);
+  for (int i = 0; n > 0 && i < n; i++) {
+    GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, i);
+    switch (altname->type) {
+      case GEN_DNS:
+        dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.dNSName)));
+        break;
+      default:
+        // Default to empty;
+        break;
+    }
+  }
+
+  sk_GENERAL_NAME_pop_free(altnames, GENERAL_NAME_free);
+  return dns_sans;
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {

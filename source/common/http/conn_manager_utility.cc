@@ -223,11 +223,19 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         // The "SAN" key still exists even if the SAN is empty.
         client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
         break;
-      case Http::ClientCertDetailsType::Cert:
+      case Http::ClientCertDetailsType::Cert: {
         const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
         if (!peer_cert.empty()) {
           client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
-        }
+        }}
+        break;
+      case Http::ClientCertDetailsType::DNS: {
+        const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        if (!dns_sans.empty()) {
+          for (const std::string &dns : dns_sans) {
+            client_cert_details.push_back("DNS=" + dns);
+          }
+        }}
         break;
       }
     }

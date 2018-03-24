@@ -171,6 +171,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (set_current_client_cert_details.cert()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
   }
+  if (set_current_client_cert_details.dns()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
+  }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
     user_agent_ = context_.localInfo().clusterName();
