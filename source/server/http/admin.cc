@@ -278,7 +278,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
                                          Buffer::Instance& response) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(std::string(url));
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
     response.add("?enable=<y|n>\n");
