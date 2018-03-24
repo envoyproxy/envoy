@@ -3,25 +3,17 @@
 #include "common/common/utility.h"
 #include "common/http/utility.h"
 
+using ::Envoy::Http::LowerCaseString;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
 namespace JwtAuthn {
 namespace {
 
-// The authorization header name.
-const std::string AuthorizationHeader = "authorization";
-
-// The authorization bearer prefix.
-const std::string BearerPrefix = "Bearer ";
-
-// The query parameter name to get JWT token.
-const std::string ParamAccessToken = "access_token";
-
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
 public:
-  JwtLocationBase(const std::string& token, const std::set<std::string>& issuers)
+  JwtLocationBase(const std::string& token, const std::unordered_set<std::string>& issuers)
       : token_(token), specified_issuers_(issuers) {}
 
   // Get the token string
@@ -36,27 +28,27 @@ private:
   // Extracted token.
   std::string token_;
   // Stored issuers specified the location.
-  const std::set<std::string>& specified_issuers_;
+  const std::unordered_set<std::string>& specified_issuers_;
 };
 
 // The JwtLocation for header extraction.
 class JwtHeaderLocation : public JwtLocationBase {
 public:
-  JwtHeaderLocation(const std::string& token, const std::set<std::string>& issuers,
-                    const Http::LowerCaseString& header)
+  JwtHeaderLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
+                    const LowerCaseString& header)
       : JwtLocationBase(token, issuers), header_(header) {}
 
   void removeJwt(Http::HeaderMap& headers) const override { headers.remove(header_); }
 
 private:
   // the header name the JWT is extracted from.
-  const Http::LowerCaseString& header_;
+  const LowerCaseString& header_;
 };
 
 // The JwtLocation for param extraction.
 class JwtParamLocation : public JwtLocationBase {
 public:
-  JwtParamLocation(const std::string& token, const std::set<std::string>& issuers,
+  JwtParamLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
                    const std::string& param)
       : JwtLocationBase(token, issuers), param_(param) {}
 
@@ -73,36 +65,32 @@ private:
 
 Extractor::Extractor(const JwtAuthentication& config) {
   for (const auto& rule : config.rules()) {
-    bool use_default = true;
-    if (rule.from_headers_size() > 0) {
-      use_default = false;
-      for (const auto& header : rule.from_headers()) {
-        config_header(rule.issuer(), header.name(), header.value_prefix());
-      }
+    for (const auto& header : rule.from_headers()) {
+      addHeaderConfig(rule.issuer(), LowerCaseString(header.name()), header.value_prefix());
     }
-    if (rule.from_params_size() > 0) {
-      use_default = false;
-      for (const std::string& param : rule.from_params()) {
-        config_param(rule.issuer(), param);
-      }
+    for (const std::string& param : rule.from_params()) {
+      addParamConfig(rule.issuer(), param);
     }
 
     // If not specified, use default locations.
-    if (use_default) {
-      config_header(rule.issuer(), AuthorizationHeader, BearerPrefix);
-      config_param(rule.issuer(), ParamAccessToken);
+    if (rule.from_headers().empty() && rule.from_params().empty()) {
+      addHeaderConfig(rule.issuer(), Http::Headers::get().Authorization,
+                      Http::Headers::get().JwtValues.BearerPrefix);
+      addParamConfig(rule.issuer(), Http::Headers::get().JwtValues.AccessTokenParam);
     }
   }
 }
 
-void Extractor::config_header(const std::string& issuer, const std::string& header_name,
-                              const std::string& value_prefix) {
-  auto& map_value = header_maps_[Http::LowerCaseString(header_name)];
+void Extractor::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
+                                const std::string& value_prefix) {
+  std::string key = header_name.get() + value_prefix;
+  auto it = header_maps_.empace
+  map_value.header_ = header_name;
   map_value.value_prefix_ = value_prefix;
   map_value.specified_issuers_.insert(issuer);
 }
 
-void Extractor::config_param(const std::string& issuer, const std::string& param) {
+void Extractor::addParamConfig(const std::string& issuer, const std::string& param) {
   auto& map_value = param_maps_[param];
   map_value.specified_issuers_.insert(issuer);
 }
@@ -111,9 +99,8 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
   std::vector<JwtLocationPtr> tokens;
   // Check header first
   for (const auto& header_it : header_maps_) {
-    const auto& map_key = header_it.first;
     const auto& map_value = header_it.second;
-    const Http::HeaderEntry* entry = headers.get(map_key);
+    const Http::HeaderEntry* entry = headers.get(map_value.header_);
     if (entry) {
       std::string value_str = std::string(entry->value().c_str(), entry->value().size());
       if (!map_value.value_prefix_.empty()) {
@@ -123,7 +110,8 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
         }
         value_str = value_str.substr(map_value.value_prefix_.size());
       }
-      tokens.emplace_back(new JwtHeaderLocation(value_str, map_value.specified_issuers_, map_key));
+      tokens.emplace_back(
+          new JwtHeaderLocation(value_str, map_value.specified_issuers_, map_value.header_));
     }
   }
 
