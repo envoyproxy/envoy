@@ -14,7 +14,7 @@ envoy_cc_test(
         "echo_integration_test.cc",
     ],
     deps = [
-        "//source/extensions/filters/network:echo_lib",
+        "//source/extensions/filters/network/echo:echo_lib",
         "//test/integration:integration_lib",
         "//test/server:utility_lib",
     ],

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/echo.h"
+#include "extensions/filters/network/echo/echo.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
@@ -10,10 +10,10 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Filter {
 namespace NetworkFilter {
+namespace Echo {
 
-Network::FilterStatus Echo::onData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus Instance::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "echo: got {} bytes", read_callbacks_->connection(), data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
@@ -29,7 +29,7 @@ public:
   Server::Configuration::NetworkFilterFactoryCb
   createFilterFactory(const Json::Object&, Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<Echo>());
+      filter_manager.addReadFilter(std::make_shared<Instance>());
     };
   }
 
@@ -37,7 +37,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<Echo>());
+      filter_manager.addReadFilter(std::make_shared<Instance>());
     };
   }
 
@@ -55,7 +55,7 @@ static Registry::RegisterFactory<EchoConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 
+} // namespace Echo
 } // namespace NetworkFilter
-} // namespace Filter
 } // namespace Extensions
 } // namespace Envoy

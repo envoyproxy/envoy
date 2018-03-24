@@ -4,6 +4,6 @@
 # selection options such as maturity.
 def envoy_all_extensions(repository = ""):
   return [
-    repository + "//source/extensions/filters/network:echo_lib",
+    repository + "//source/extensions/filters/network/echo:echo_lib",
   ]
 

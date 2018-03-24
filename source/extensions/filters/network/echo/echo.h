@@ -6,13 +6,13 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Filter {
 namespace NetworkFilter {
+namespace Echo {
 
 /**
  * Implementation of a basic echo filter.
  */
-class Echo : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class Instance : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -25,7 +25,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
+} // namespace Echo
 } // namespace NetworkFilter
-} // namespace Filter
 } // namespace Extensions
 } // namespace Envoy
