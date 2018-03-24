@@ -227,16 +227,16 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
         if (!peer_cert.empty()) {
           client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
-        }}
-        break;
+        }
+      } break;
       case Http::ClientCertDetailsType::DNS: {
         const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
-          for (const std::string &dns : dns_sans) {
+          for (const std::string& dns : dns_sans) {
             client_cert_details.push_back("DNS=" + dns);
           }
-        }}
-        break;
+        }
+      } break;
       }
     }
   }

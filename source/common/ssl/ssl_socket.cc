@@ -1,5 +1,6 @@
-#include <openssl/x509v3.h>
 #include "common/ssl/ssl_socket.h"
+
+#include <openssl/x509v3.h>
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -309,7 +310,7 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
 
 std::vector<std::string> getDnsSansFromCertificate(X509* cert) {
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
-          X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
+      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
 
   if (altnames == nullptr) {
     return {};
@@ -320,12 +321,12 @@ std::vector<std::string> getDnsSansFromCertificate(X509* cert) {
   for (int i = 0; n > 0 && i < n; i++) {
     GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, i);
     switch (altname->type) {
-      case GEN_DNS:
-        dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.dNSName)));
-        break;
-      default:
-        // Default to empty;
-        break;
+    case GEN_DNS:
+      dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.dNSName)));
+      break;
+    default:
+      // Default to empty;
+      break;
     }
   }
 
