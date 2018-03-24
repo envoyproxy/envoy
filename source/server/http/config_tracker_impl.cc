@@ -20,6 +20,7 @@ ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
   if (const auto map_strong = map_weak_.lock()) {
     size_t erased = map_strong->erase(key_);
     ASSERT(erased == 1);
+    UNREFERENCED_PARAMETER(erased);
   }
 }
 
