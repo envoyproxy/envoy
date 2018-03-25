@@ -571,7 +571,7 @@ public:
 
 protected:
   BaseSink(ThreadLocal::SlotPtr tls) : tls_(std::move(tls)) {
-    tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalHistograms>();
     });
   }
