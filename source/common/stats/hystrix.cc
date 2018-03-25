@@ -5,10 +5,10 @@
 #include <iostream>
 #include <sstream>
 
-#include "absl/strings/str_cat.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Stats {
@@ -20,8 +20,11 @@ const uint64_t Hystrix::PING_INTERVAL_IN_MS;
 // Add new value to rolling window, in place of oldest one.
 void Hystrix::pushNewValue(const std::string& key, uint64_t value) {
   // Create vector if do not exist.
-  rolling_stats_map_[key].resize(num_of_buckets_);
-  rolling_stats_map_[key][current_index_] = value;
+  if (rolling_stats_map_.find(key) == rolling_stats_map_.end()) {
+    rolling_stats_map_[key].resize(num_of_buckets_, value);
+  } else {
+    rolling_stats_map_[key][current_index_] = value;
+  }
 }
 
 uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_view stats) {
@@ -42,52 +45,70 @@ uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_v
   }
 }
 
-void Hystrix::updateRollingWindowMap(Stats::Store& stats, absl::string_view cluster_name) {
-  std::string prefix;
-  prefix = absl::StrCat("cluster.", cluster_name, ".");
+void Hystrix::CreateCounterNameLookupForCluster(const std::string& cluster_name) {
+  // Building lookup name map for all specific cluster values.
+  // Every call to the updateRollingWindowMap function should get the appropriate name from the map.
+  std::string cluster_name_with_prefix = absl::StrCat("cluster.", cluster_name, ".");
+  counter_name_lookup[cluster_name]["upstream_rq_timeout"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_timeout");
+  counter_name_lookup[cluster_name]["upstream_rq_per_try_timeout"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_per_try_timeout");
+  counter_name_lookup[cluster_name]["timeouts"] =
+      absl::StrCat(cluster_name_with_prefix, "timeouts");
+  counter_name_lookup[cluster_name]["upstream_rq_5xx"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_5xx");
+  counter_name_lookup[cluster_name]["retry.upstream_rq_5xx"] =
+      absl::StrCat(cluster_name_with_prefix, "retry.upstream_rq_5xx");
+  counter_name_lookup[cluster_name]["upstream_rq_4xx"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_4xx");
+  counter_name_lookup[cluster_name]["retry.upstream_rq_4xx"] =
+      absl::StrCat(cluster_name_with_prefix, "retry.upstream_rq_4xx");
+  counter_name_lookup[cluster_name]["errors"] = absl::StrCat(cluster_name_with_prefix, "errors");
+  counter_name_lookup[cluster_name]["upstream_rq_2xx"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_2xx");
+  counter_name_lookup[cluster_name]["success"] = absl::StrCat(cluster_name_with_prefix, "success");
+  counter_name_lookup[cluster_name]["upstream_rq_pending_overflow"] =
+      absl::StrCat(cluster_name_with_prefix, "upstream_rq_pending_overflow");
+  counter_name_lookup[cluster_name]["rejected"] =
+      absl::StrCat(cluster_name_with_prefix, "rejected");
+  counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
+}
+
+void Hystrix::updateRollingWindowMap(Stats::Store& stats, const std::string& cluster_name) {
+  if (counter_name_lookup.find(cluster_name) == counter_name_lookup.end()) {
+    CreateCounterNameLookupForCluster(cluster_name);
+  }
 
   // Combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1).
-  std::string upstream_rq_timeout_key = absl::StrCat(prefix, "upstream_rq_timeout");
-  std::string upstream_rq_per_try_timeout_key = absl::StrCat(prefix, "upstream_rq_per_try_timeout");
-  uint64_t timeouts = stats.counter(upstream_rq_timeout_key).value() +
-                      stats.counter(upstream_rq_per_try_timeout_key).value();
-
-  std::string timeouts_key = absl::StrCat(prefix, "timeouts");
-  pushNewValue(timeouts_key,timeouts);
-
+  uint64_t timeouts =
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_timeout"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_per_try_timeout"]).value();
+  pushNewValue(counter_name_lookup[cluster_name]["timeouts"], timeouts);
   // Combining errors+retry errors - retries are counted as separate requests
   // (alternative: each request including the retries counted as 1)
-  // since timeouts are 504 (or 408), deduce them from here.
-  // Timeout retries were not counted here anyway.
-  std::string upstream_rq_5xx_key = absl::StrCat(prefix, "upstream_rq_5xx");
-  std::string retry_upstream_rq_5xx_key = absl::StrCat(prefix, "retry.upstream_rq_5xx");
-  std::string upstream_rq_4xx_key = absl::StrCat(prefix, "upstream_rq_4xx");
-  std::string retry_upstream_rq_4xx_key = absl::StrCat(prefix, "retry.upstream_rq_4xx");
-  uint64_t errors = stats.counter(upstream_rq_5xx_key).value() +
-                    stats.counter(retry_upstream_rq_5xx_key).value() +
-                    stats.counter(upstream_rq_4xx_key).value() +
-                    stats.counter(retry_upstream_rq_4xx_key).value() -
-                    stats.counter(upstream_rq_timeout_key).value();
+  // since timeouts error code are 504 (or 408), envoy reduce them from here ("-" sign).
+  // Timeout retries were not counted here anyway and therefore they are not reduced.
+  uint64_t errors =
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_5xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["retry.upstream_rq_5xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_4xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["retry.upstream_rq_4xx"]).value() -
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_timeout"]).value();
 
-  std::string errors_key = absl::StrCat(prefix, "errors");
-  pushNewValue(errors_key,errors);
+  pushNewValue(counter_name_lookup[cluster_name]["errors"], errors);
 
-  std::string upstream_rq_2xx_key = absl::StrCat(prefix, "upstream_rq_2xx");
-  uint64_t success = stats.counter(upstream_rq_2xx_key).value();
-  std::string success_key = absl::StrCat(prefix,"success");
-  pushNewValue(success_key,success);
+  uint64_t success = stats.counter(counter_name_lookup[cluster_name]["upstream_rq_2xx"]).value();
+  pushNewValue(counter_name_lookup[cluster_name]["success"], success);
 
-  std::string upstream_rq_pending_overflow_key = absl::StrCat(prefix, "upstream_rq_pending_overflow");
-  uint64_t rejected = stats.counter(upstream_rq_pending_overflow_key).value();
-  std::string rejected_key = absl::StrCat(prefix, "rejected");
-  pushNewValue(rejected_key, rejected);
+  uint64_t rejected =
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_pending_overflow"]).value();
+  pushNewValue(counter_name_lookup[cluster_name]["rejected"], rejected);
 
   // Should not take from upstream_rq_total since it is updated before its components,
   // leading to wrong results such as error percentage higher than 100%.
   uint64_t total = errors + timeouts + success + rejected;
-  std::string total_key = absl::StrCat(prefix, "total");
-  pushNewValue(total_key, total);
+  pushNewValue(counter_name_lookup[cluster_name]["total"], total);
 
   // TODO (@trabetti) : why does it fail compilation?
   // ENVOY_LOG(trace, "{}", printRollingWindow());
@@ -95,7 +116,8 @@ void Hystrix::updateRollingWindowMap(Stats::Store& stats, absl::string_view clus
 
 void Hystrix::resetRollingWindow() { rolling_stats_map_.clear(); }
 
-void Hystrix::addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info) {
+void Hystrix::addStringToStream(absl::string_view key, absl::string_view value,
+                                std::stringstream& info) {
   std::string quoted_value;
   quoted_value = absl::StrCat("\"", value, "\"");
   addInfoToStream(key, quoted_value, info);
@@ -105,12 +127,13 @@ void Hystrix::addIntToStream(absl::string_view key, uint64_t value, std::strings
   addInfoToStream(key, std::to_string(value), info);
 }
 
-void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info) {
+void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value,
+                              std::stringstream& info) {
   if (!info.str().empty()) {
     info << ", ";
   }
   std::string added_info;
-  added_info = absl::StrCat("\"", key,"\": ", value);
+  added_info = absl::StrCat("\"", key, "\": ", value);
   info << added_info;
 }
 
@@ -220,8 +243,8 @@ void Hystrix::getClusterStats(std::stringstream& ss, absl::string_view cluster_n
 absl::string_view Hystrix::printRollingWindow() const {
   std::stringstream out_str;
 
-  for (auto stats_map_itr = rolling_stats_map_.begin();
-		  stats_map_itr != rolling_stats_map_.end(); ++stats_map_itr) {
+  for (auto stats_map_itr = rolling_stats_map_.begin(); stats_map_itr != rolling_stats_map_.end();
+       ++stats_map_itr) {
     out_str << stats_map_itr->first << " | ";
     RollingStats rolling_stats = stats_map_itr->second;
     for (auto specific_stat_vec_itr = rolling_stats.begin();
