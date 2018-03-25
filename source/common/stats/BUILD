@@ -12,6 +12,9 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
+    external_deps = [
+        "libcircllhist",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
@@ -25,9 +28,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
-    ],
-    external_deps = [
-        "libcircllhist",
     ],
 )
 
