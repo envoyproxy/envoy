@@ -58,7 +58,19 @@ MockHotRestart::~MockHotRestart() {}
 
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
-  ON_CALL(*this, createListenSocket(_, _)).WillByDefault(Return(socket_));
+  ON_CALL(*this, createListenSocket(_, _, _))
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                bool) -> Network::SocketSharedPtr {
+        if (options) {
+          for (const auto& option : *options) {
+            if (!option->setOption(*socket_, Network::Socket::SocketState::PreBind)) {
+              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+            }
+          }
+        }
+        return socket_;
+      }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() {}
 

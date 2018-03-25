@@ -620,7 +620,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
                      Stats::ScopePtr&& listener_scope)
     : server_(server), profile_path_(profile_path),
-      socket_(new Network::TcpListenSocket(address, true)),
+      socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),

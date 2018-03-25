@@ -114,6 +114,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
