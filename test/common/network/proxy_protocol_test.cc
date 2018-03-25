@@ -39,7 +39,7 @@ class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), true),
+      : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy") {
     connection_handler_->addListener(*this);
@@ -321,7 +321,7 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersi
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : socket_(Network::Test::getAnyAddress(GetParam()), true),
+      : socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),

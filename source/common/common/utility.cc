@@ -215,8 +215,8 @@ std::string StringUtil::join(const std::vector<std::string>& source, const std::
   return ret.substr(0, ret.length() - delimiter.length());
 }
 
-std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
-  return source.substr(start, end - start);
+std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
+  return std::string(source.data() + start, end - start);
 }
 
 std::string StringUtil::escape(const std::string& source) {

@@ -259,8 +259,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   span->injectContext(request_headers_);
 
   // Check B3 sampled flag is set to not sample
-  EXPECT_TRUE(ZipkinCoreConstants::get().NOT_SAMPLED.compare(
-                  request_headers_.XB3Sampled()->value().getString()) == 0);
+  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
@@ -281,8 +281,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
   span->injectContext(request_headers_);
 
   // Check B3 sampled flag is set to not sample
-  EXPECT_TRUE(ZipkinCoreConstants::get().NOT_SAMPLED.compare(
-                  request_headers_.XB3Sampled()->value().getString()) == 0);
+  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
@@ -303,8 +303,8 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
   span->injectContext(request_headers_);
 
   // Check B3 sampled flag is set to sample
-  EXPECT_TRUE(ZipkinCoreConstants::get().SAMPLED.compare(
-                  request_headers_.XB3Sampled()->value().getString()) == 0);
+  EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
