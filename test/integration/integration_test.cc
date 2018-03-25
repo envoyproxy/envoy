@@ -135,6 +135,14 @@ TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit()
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
 
+// Tests idle timeout behaviour with single request and validates that idle timer kicks in
+// after given timeout.
+TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
+
+// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
+// after both the requests are done.
+TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
+
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a 500.
 TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
@@ -174,7 +182,13 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) { testInvalidCharacterInFir
 
 TEST_P(IntegrationTest, InvalidVersion) { testInvalidVersion(); }
 
-TEST_P(IntegrationTest, Http10Request) { testHttp10Request(); }
+TEST_P(IntegrationTest, Http10Disabled) { testHttp10Disabled(); }
+
+TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
+
+TEST_P(IntegrationTest, Http10Enabled) { testHttp10Enabled(); }
+
+TEST_P(IntegrationTest, Http10WithHostandKeepAlive) { testHttp10WithHostAndKeepAlive(); }
 
 TEST_P(IntegrationTest, NoHost) { testNoHost(); }
 

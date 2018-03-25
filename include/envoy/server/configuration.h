@@ -7,10 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -134,9 +135,9 @@ public:
   virtual Admin& admin() PURE;
 
   /**
-   * @return Optional<std::string> the path to look for flag files.
+   * @return absl::optional<std::string> the path to look for flag files.
    */
-  virtual Optional<std::string> flagsPath() PURE;
+  virtual absl::optional<std::string> flagsPath() PURE;
 
   /**
    * @return Runtime* the local disk runtime configuration or nullptr if there is no configuration.

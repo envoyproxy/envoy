@@ -183,9 +183,9 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
     message->headers().insertContentLength().value(body_size);
   }
 
-  Optional<std::chrono::milliseconds> timeout;
+  absl::optional<std::chrono::milliseconds> timeout;
   if (timeout_ms > 0) {
-    timeout.value(std::chrono::milliseconds(timeout_ms));
+    timeout = std::chrono::milliseconds(timeout_ms);
   }
 
   http_request_ = filter_.clusterManager().httpAsyncClientForCluster(cluster).send(
@@ -355,6 +355,17 @@ int StreamHandleWrapper::luaTrailers(lua_State* state) {
   }
 }
 
+int StreamHandleWrapper::luaMetadata(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Envoy::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()),
+                            true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
   const char* message = luaL_checkstring(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
@@ -395,6 +406,8 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
   lua_state_.registerType<Envoy::Lua::BufferWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapWrapper>();
+  lua_state_.registerType<Envoy::Lua::MetadataMapIterator>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
@@ -481,17 +494,23 @@ void Filter::scriptError(const Envoy::Lua::LuaException& e) {
 void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
   switch (level) {
   case spdlog::level::trace:
-    return ENVOY_LOG(trace, "script log: {}", message);
+    ENVOY_LOG(trace, "script log: {}", message);
+    return;
   case spdlog::level::debug:
-    return ENVOY_LOG(debug, "script log: {}", message);
+    ENVOY_LOG(debug, "script log: {}", message);
+    return;
   case spdlog::level::info:
-    return ENVOY_LOG(info, "script log: {}", message);
+    ENVOY_LOG(info, "script log: {}", message);
+    return;
   case spdlog::level::warn:
-    return ENVOY_LOG(warn, "script log: {}", message);
+    ENVOY_LOG(warn, "script log: {}", message);
+    return;
   case spdlog::level::err:
-    return ENVOY_LOG(error, "script log: {}", message);
+    ENVOY_LOG(error, "script log: {}", message);
+    return;
   case spdlog::level::critical:
-    return ENVOY_LOG(critical, "script log: {}", message);
+    ENVOY_LOG(critical, "script log: {}", message);
+    return;
   case spdlog::level::off:
     NOT_IMPLEMENTED;
   }

@@ -10,7 +10,6 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/callback.h"
-#include "envoy/common/optional.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -19,6 +18,8 @@
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -282,6 +283,7 @@ public:
   COUNTER  (upstream_cx_http2_total)                                                               \
   COUNTER  (upstream_cx_connect_fail)                                                              \
   COUNTER  (upstream_cx_connect_timeout)                                                           \
+  COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
   COUNTER  (upstream_cx_overflow)                                                                  \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
@@ -383,6 +385,11 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
+   * @return the idle timeout for upstream connection pool connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
@@ -417,7 +424,8 @@ public:
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const PURE;
+  virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
+  lbRingHashConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

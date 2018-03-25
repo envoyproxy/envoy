@@ -36,8 +36,8 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
+    external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:optional",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",

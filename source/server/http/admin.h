@@ -25,6 +25,8 @@
 
 #include "server/config/network/http_connection_manager.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -41,7 +43,7 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
@@ -68,7 +70,7 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
-  const Optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override {
     return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
@@ -84,10 +86,11 @@ public:
     return set_current_client_cert_details_;
   }
   const Network::Address::Instance& localAddress() override;
-  const Optional<std::string>& userAgent() override { return user_agent_; }
+  const absl::optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
+  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
 private:
   /**
@@ -135,37 +138,37 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerAdminHome(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                               Buffer::Instance& response);
-  Http::Code handlerCerts(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerCerts(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
-  Http::Code handlerClusters(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response);
-  Http::Code handlerCpuProfiler(const std::string& path_and_query,
-                                Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(const std::string& path_and_query,
+  Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                                Buffer::Instance& response);
+  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(const std::string& path_and_query,
+  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHelp(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerHelp(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(const std::string& path_and_query,
+  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::HeaderMap& response_headers,
                                       Buffer::Instance& response);
-  Http::Code handlerListenerInfo(const std::string& path_and_query,
+  Http::Code handlerListenerInfo(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerLogging(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
+  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerResetCounters(const std::string& path_and_query,
+  Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response);
-  Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
-  Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 
   class AdminListener : public Network::ListenerConfig {
@@ -202,11 +205,12 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
-  Optional<std::chrono::milliseconds> idle_timeout_;
-  Optional<std::string> user_agent_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   AdminListener listener_;
+  Http::Http1Settings http1_settings_;
 };
 
 /**
@@ -249,10 +253,11 @@ public:
   /**
    * Extracts counters and gauges and relevant tags, appending them to
    * the response buffer after sanitizing the metric / label names.
+   * @return uint64_t total number of metric types inserted in response.
    */
-  static void statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                const std::list<Stats::GaugeSharedPtr>& gauges,
-                                Buffer::Instance& response);
+  static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                    const std::list<Stats::GaugeSharedPtr>& gauges,
+                                    Buffer::Instance& response);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.

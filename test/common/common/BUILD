@@ -10,13 +10,6 @@ load(
 
 envoy_package()
 
-envoy_cc_fuzz_test(
-    name = "base64_fuzz_test",
-    srcs = ["base64_fuzz_test.cc"],
-    corpus = "base64_corpus",
-    deps = ["//source/common/common:base64_lib"],
-)
-
 envoy_cc_test(
     name = "base64_test",
     srcs = ["base64_test.cc"],
@@ -24,6 +17,13 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
     ],
+)
+
+envoy_cc_fuzz_test(
+    name = "base64_fuzz_test",
+    srcs = ["base64_fuzz_test.cc"],
+    corpus = "base64_corpus",
+    deps = ["//source/common/common:base64_lib"],
 )
 
 envoy_cc_test(
@@ -51,12 +51,6 @@ envoy_cc_test(
     name = "hex_test",
     srcs = ["hex_test.cc"],
     deps = ["//source/common/common:hex_lib"],
-)
-
-envoy_cc_test(
-    name = "optional_test",
-    srcs = ["optional_test.cc"],
-    deps = ["//include/envoy/common:optional"],
 )
 
 envoy_cc_test(

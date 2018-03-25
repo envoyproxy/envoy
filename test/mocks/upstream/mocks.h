@@ -142,7 +142,7 @@ public:
   }
 
   // Upstream::ClusterManager
-  MOCK_METHOD1(addOrUpdatePrimaryCluster, bool(const envoy::api::v2::Cluster& cluster));
+  MOCK_METHOD1(addOrUpdateCluster, bool(const envoy::api::v2::Cluster& cluster));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
@@ -154,13 +154,15 @@ public:
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
-  MOCK_METHOD1(removePrimaryCluster, bool(const std::string& cluster));
+  MOCK_METHOD1(removeCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
+  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
+               std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -198,6 +200,15 @@ public:
   MOCK_CONST_METHOD0(versionInfo, const std::string());
 
   std::function<void()> initialized_callback_;
+};
+
+class MockClusterUpdateCallbacks : public ClusterUpdateCallbacks {
+public:
+  MockClusterUpdateCallbacks();
+  ~MockClusterUpdateCallbacks();
+
+  MOCK_METHOD1(onClusterAddOrUpdate, void(ThreadLocalCluster& cluster));
+  MOCK_METHOD1(onClusterRemoval, void(const std::string& cluster_name));
 };
 
 } // namespace Upstream

@@ -795,7 +795,14 @@ const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "name" : {"type" : "string"},
       "value" : {"type" : "string"},
-      "regex" : {"type" : "boolean"}
+      "regex" : {"type" : "boolean"},
+      "range_match" : {
+        "type" : "object",
+        "properties" : {
+          "start" : {"type" : "integer"},
+          "end" : {"type" : "integer"}
+        }
+      }
     },
     "required" : ["name"],
     "additionalProperties" : false

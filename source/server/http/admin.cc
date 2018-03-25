@@ -38,6 +38,7 @@
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/str_replace.h"
+#include "absl/strings/string_view.h"
 
 // TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
 #include "rapidjson/document.h"
@@ -218,7 +219,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
                                       Buffer::Instance& response) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
@@ -275,7 +276,7 @@ Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
                                          Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
@@ -299,27 +300,27 @@ Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
                                              Buffer::Instance& response) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::HeaderMap&,
                                                Buffer::Instance& response) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
                                      Buffer::Instance& response) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
@@ -345,7 +346,7 @@ Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
   return rc;
 }
 
-Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
@@ -355,7 +356,7 @@ Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
                                         Buffer::Instance& response) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
@@ -366,7 +367,7 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
@@ -427,22 +428,31 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
-void PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                                 const std::list<Stats::GaugeSharedPtr>& gauges,
-                                                 Buffer::Instance& response) {
+uint64_t
+PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
+                                            const std::list<Stats::GaugeSharedPtr>& gauges,
+                                            Buffer::Instance& response) {
+  std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
     const std::string tags = formattedTags(counter->tags());
     const std::string metric_name = metricName(counter->tagExtractedName());
-    response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} counter\n", metric_name));
+    }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, counter->value()));
   }
 
   for (const auto& gauge : gauges) {
     const std::string tags = formattedTags(gauge->tags());
     const std::string metric_name = metricName(gauge->tagExtractedName());
-    response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
   }
+  return metric_type_tracker.size();
 }
 
 std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
@@ -468,14 +478,14 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   return strbuf.GetString();
 }
 
-Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
                                           Buffer::Instance& response) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
                                           Buffer::Instance& response) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
@@ -487,7 +497,7 @@ Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& r
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
+Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&,
                                    Buffer::Instance& response) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
@@ -506,7 +516,7 @@ Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
@@ -559,7 +569,7 @@ std::string AdminImpl::runtimeAsJson(
     entry_obj.AddMember("name", {entry.first.c_str(), allocator}, allocator);
 
     Value entry_value;
-    if (entry.second.uint_value_.valid()) {
+    if (entry.second.uint_value_) {
       entry_value.SetUint64(entry.second.uint_value_.value());
     } else {
       entry_value.SetString(entry.second.string_value_.c_str(), allocator);
@@ -576,7 +586,7 @@ std::string AdminImpl::runtimeAsJson(
 }
 
 void AdminFilter::onComplete() {
-  std::string path = request_headers_->Path()->value().c_str();
+  absl::string_view path = request_headers_->Path()->value().getStringView();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
@@ -611,7 +621,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
                      Stats::ScopePtr&& listener_scope)
     : server_(server), profile_path_(profile_path),
-      socket_(new Network::TcpListenSocket(address, true)),
+      socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
                                                                        server_.stats())),
@@ -677,7 +687,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
   callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
 }
 
-Http::Code AdminImpl::runCallback(const std::string& path_and_query,
+Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
@@ -713,12 +723,11 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   }
   // Note: it's generally faster to sort a vector with std::vector than to construct a std::map.
   std::sort(sorted_handlers.begin(), sorted_handlers.end(),
-            [&](const UrlHandler* h1, const UrlHandler* h2) { return h1->prefix_ < h2->prefix_; });
+            [](const UrlHandler* h1, const UrlHandler* h2) { return h1->prefix_ < h2->prefix_; });
   return sorted_handlers;
 }
 
-Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
-                                  Buffer::Instance& response) {
+Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::Instance& response) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -728,7 +737,7 @@ Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& response_headers,
+Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance& response) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);

@@ -5,8 +5,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Runtime {
@@ -51,7 +52,7 @@ public:
     /**
      * The possibly parsed integer value from the runtime data.
      */
-    Optional<uint64_t> uint_value_;
+    absl::optional<uint64_t> uint_value_;
   };
 
   /**

@@ -283,9 +283,11 @@ TEST_P(AdsIntegrationTest, Basic) {
   // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("cluster_1"), buildCluster("cluster_2")}, "2");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
   sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment("cluster_1"), buildClusterLoadAssignment("cluster_2")}, "2");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                       {"cluster_2", "cluster_1"}));
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}));

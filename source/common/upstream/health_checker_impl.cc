@@ -56,8 +56,6 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   }
 }
 
-const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
-
 HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
@@ -70,6 +68,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -103,7 +102,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval() const {
   if (cluster_.info()->stats().upstream_cx_total_.used()) {
     base_time_ms = interval_.count();
   } else {
-    base_time_ms = NO_TRAFFIC_INTERVAL.count();
+    base_time_ms = no_traffic_interval_.count();
   }
 
   if (interval_jitter_.count() > 0) {
@@ -284,7 +283,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
   if (!config.http_health_check().service_name().empty()) {
-    service_name_.value(config.http_health_check().service_name());
+    service_name_ = config.http_health_check().service_name();
   }
 }
 
@@ -361,7 +360,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
     return false;
   }
 
-  if (parent_.service_name_.valid() &&
+  if (parent_.service_name_ &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
     parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
@@ -405,7 +404,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
-                                   data.host_description_);
+                                   data.host_description_, dispatcher_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -646,7 +645,7 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
-    service_name_.value(config.grpc_health_check().service_name());
+    service_name_ = config.grpc_health_check().service_name();
   }
 }
 
@@ -670,7 +669,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     // grpc-status be used if available.
     if (end_stream) {
       const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
-      if (grpc_status.valid()) {
+      if (grpc_status) {
         onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
         return;
       }
@@ -687,7 +686,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
     // This is how, for instance, grpc-go signals about missing service - HTTP/2 200 OK with
     // 'unimplemented' gRPC status.
     const auto grpc_status = Grpc::Common::getGrpcStatus(*headers);
-    if (grpc_status.valid()) {
+    if (grpc_status) {
       onRpcComplete(grpc_status.value(), Grpc::Common::getGrpcMessage(*headers), true);
       return;
     }
@@ -733,9 +732,9 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeTrailers(
     Http::HeaderMapPtr&& trailers) {
   auto maybe_grpc_status = Grpc::Common::getGrpcStatus(*trailers);
   auto grpc_status =
-      maybe_grpc_status.valid() ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
+      maybe_grpc_status ? maybe_grpc_status.value() : Grpc::Status::GrpcStatus::Internal;
   const std::string grpc_message =
-      maybe_grpc_status.valid() ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
+      maybe_grpc_status ? Grpc::Common::getGrpcMessage(*trailers) : "invalid gRPC status";
   onRpcComplete(grpc_status, grpc_message, true);
 }
 
@@ -771,7 +770,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->encodeHeaders(headers_message->headers(), false);
 
   grpc::health::v1::HealthCheckRequest request;
-  if (parent_.service_name_.valid()) {
+  if (parent_.service_name_) {
     request.set_service(parent_.service_name_.value());
   }
 
@@ -892,18 +891,15 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     grpc_status_message = fmt::format("{}", grpc_status);
   }
 
-  // The following can be compiled out when defining NVLOG.
-  // TODO(mattklein123): Refactor this to make this less ugly.
-  UNREFERENCED_PARAMETER(service_status);
-  UNREFERENCED_PARAMETER(grpc_status_message);
   ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
                  grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
 }
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_);
+  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
+                                                 std::move(data.connection_),
+                                                 data.host_description_, dispatcher_);
 }
 
 } // namespace Upstream

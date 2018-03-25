@@ -21,7 +21,7 @@ namespace Envoy {
 namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const Optional<std::chrono::milliseconds>& timeout)
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.auth.v2.Authorization.Check")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
@@ -105,7 +105,9 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
 
 std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entry) {
   if (entry) {
-    return entry->value().getString();
+    // TODO(jmarantz): plumb absl::string_view further here; there's no need
+    // to allocate a temp string in the local uses.
+    return std::string(entry->value().getStringView());
   }
   return "";
 }
@@ -135,7 +137,7 @@ void CheckRequestUtils::setHttpRequest(
   httpreq.set_size(sdfc->requestInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->requestInfo().protocol().valid()) {
+  if (sdfc->requestInfo().protocol()) {
     httpreq.set_protocol(
         Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
   }
@@ -148,7 +150,8 @@ void CheckRequestUtils::setHttpRequest(
             mutable_headers = static_cast<
                 Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*>(
                 ctx);
-        (*mutable_headers)[e.key().getString()] = e.value().getString();
+        (*mutable_headers)[std::string(e.key().getStringView())] =
+            std::string(e.value().getStringView());
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
       mutable_headers);

@@ -85,6 +85,7 @@ envoy_cc_test_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 

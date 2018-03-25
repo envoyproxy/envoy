@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "envoy/common/optional.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
@@ -23,6 +22,8 @@
 #include "server/http/admin.h"
 #include "server/listener_manager_impl.h"
 #include "server/server.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -72,7 +73,7 @@ public:
   ListenerManager& listenerManager() override { return listener_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) override {
+  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
     return config_->rateLimitClientFactory().create(timeout);
   }
   Runtime::Loader& runtime() override { return *runtime_loader_; }
@@ -100,6 +101,7 @@ public:
     return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
+                                              const Network::Socket::OptionsSharedPtr&,
                                               bool) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.

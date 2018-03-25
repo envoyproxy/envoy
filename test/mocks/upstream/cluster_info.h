@@ -42,6 +42,7 @@ public:
   // Upstream::ClusterInfo
   MOCK_CONST_METHOD0(addedViaApi, bool());
   MOCK_CONST_METHOD0(connectTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
@@ -49,7 +50,7 @@ public:
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
-                     const Optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+                     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -76,8 +77,14 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
-  Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
+};
+
+class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockIdleTimeEnabledClusterInfo();
+  ~MockIdleTimeEnabledClusterInfo();
 };
 
 } // namespace Upstream

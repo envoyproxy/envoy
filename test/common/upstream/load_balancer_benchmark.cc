@@ -33,7 +33,7 @@ public:
 class RingHashTester : public BaseTester {
 public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
-    config_.value(envoy::api::v2::Cluster::RingHashLbConfig());
+    config_ = (envoy::api::v2::Cluster::RingHashLbConfig());
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
     ring_hash_lb_.reset(new RingHashLoadBalancer{priority_set_, stats_, runtime_, random_, config_,
                                                  common_config_});
@@ -43,7 +43,7 @@ public:
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
-  Optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
+  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> config_;
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
 };
@@ -92,11 +92,11 @@ BENCHMARK(BM_MaglevLoadBalancerBuildTable)
 class TestLoadBalancerContext : public LoadBalancerContext {
 public:
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return hash_key_; }
+  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
 
-  Optional<uint64_t> hash_key_;
+  absl::optional<uint64_t> hash_key_;
 };
 
 void computeHitStats(benchmark::State& state,
@@ -139,7 +139,7 @@ void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
     // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
     //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(hashInt(i));
+      context.hash_key_ = (hashInt(i));
       hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
     }
 
@@ -201,7 +201,7 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(hashInt(i));
+      context.hash_key_ = (hashInt(i));
       hosts.push_back(lb->chooseHost(&context));
     }
 
@@ -210,7 +210,7 @@ void BM_RingHashLoadBalancerHostLoss(benchmark::State& state) {
     lb = tester2.ring_hash_lb_->factory()->create();
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_.value(hashInt(i));
+      context.hash_key_ = (hashInt(i));
       hosts2.push_back(lb->chooseHost(&context));
     }
 

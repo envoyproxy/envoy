@@ -18,8 +18,8 @@ namespace RequestInfo {
 namespace {
 
 std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
-                                       Optional<std::chrono::nanoseconds> timing) {
-  EXPECT_TRUE(timing.valid());
+                                       absl::optional<std::chrono::nanoseconds> timing) {
+  EXPECT_TRUE(timing);
   EXPECT_LE(last, timing.value());
   return timing.value();
 }
@@ -34,36 +34,36 @@ TEST(RequestInfoImplTest, TimingTest) {
   EXPECT_LE(pre_start, start) << "Start time was lower than expected";
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
-  EXPECT_FALSE(info.lastDownstreamRxByteReceived().valid());
+  EXPECT_FALSE(info.lastDownstreamRxByteReceived());
   info.onLastDownstreamRxByteReceived();
   std::chrono::nanoseconds dur =
       checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstUpstreamTxByteSent().valid());
+  EXPECT_FALSE(info.firstUpstreamTxByteSent());
   info.onFirstUpstreamTxByteSent();
   dur = checkDuration(dur, info.firstUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastUpstreamTxByteSent().valid());
+  EXPECT_FALSE(info.lastUpstreamTxByteSent());
   info.onLastUpstreamTxByteSent();
   dur = checkDuration(dur, info.lastUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.firstUpstreamRxByteReceived().valid());
+  EXPECT_FALSE(info.firstUpstreamRxByteReceived());
   info.onFirstUpstreamRxByteReceived();
   dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.lastUpstreamRxByteReceived().valid());
+  EXPECT_FALSE(info.lastUpstreamRxByteReceived());
   info.onLastUpstreamRxByteReceived();
   dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstDownstreamTxByteSent().valid());
+  EXPECT_FALSE(info.firstDownstreamTxByteSent());
   info.onFirstDownstreamTxByteSent();
   dur = checkDuration(dur, info.firstDownstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastDownstreamTxByteSent().valid());
+  EXPECT_FALSE(info.lastDownstreamTxByteSent());
   info.onLastDownstreamTxByteSent();
   dur = checkDuration(dur, info.lastDownstreamTxByteSent());
 
-  EXPECT_FALSE(info.requestComplete().valid());
+  EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
   dur = checkDuration(dur, info.requestComplete());
 }
@@ -113,9 +113,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, request_info.protocol().value());
 
-    EXPECT_FALSE(request_info.responseCode().valid());
+    EXPECT_FALSE(request_info.responseCode());
     request_info.response_code_ = 200;
-    ASSERT_TRUE(request_info.responseCode().valid());
+    ASSERT_TRUE(request_info.responseCode());
     EXPECT_EQ(200, request_info.responseCode().value());
 
     EXPECT_EQ(nullptr, request_info.upstreamHost());

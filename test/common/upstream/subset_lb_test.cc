@@ -6,25 +6,46 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/common/optional.h"
 
+#include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/upstream/subset_lb.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/access_log/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace Upstream {
+
+class SubsetLoadBalancerDescribeMetadataTester {
+public:
+  SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
+
+  typedef std::vector<std::pair<std::string, ProtobufWkt::Value>> MetadataVector;
+
+  void test(std::string expected, const MetadataVector& metadata) {
+    SubsetLoadBalancer::SubsetMetadata subset_metadata(metadata);
+    EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
+  }
+
+private:
+  std::shared_ptr<SubsetLoadBalancer> lb_;
+};
+
 namespace SubsetLoadBalancerTest {
 
 class TestMetadataMatchCriterion : public Router::MetadataMatchCriterion {
@@ -69,7 +90,7 @@ public:
             new TestMetadataMatchCriteria(std::map<std::string, std::string>(metadata_matches))) {}
 
   // Upstream::LoadBalancerContext
-  Optional<uint64_t> computeHashKey() override { return {}; }
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
     return matches_.get();
@@ -191,7 +212,7 @@ public:
     return default_subset;
   }
 
-  void modifyHosts(HostVector add, HostVector remove, Optional<uint32_t> add_in_locality = {},
+  void modifyHosts(HostVector add, HostVector remove, absl::optional<uint32_t> add_in_locality = {},
                    uint32_t priority = 0) {
     MockHostSet& host_set = *priority_set_.getMockHostSet(priority);
     for (const auto& host : remove) {
@@ -220,7 +241,7 @@ public:
       host_set.hosts_.emplace_back(host);
       host_set.healthy_hosts_ = host_set.hosts_;
 
-      if (add_in_locality.valid()) {
+      if (add_in_locality) {
         std::vector<HostVector> locality_hosts_copy = host_set.hosts_per_locality_->get();
         locality_hosts_copy[add_in_locality.value()].emplace_back(host);
         host_set.hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
@@ -358,6 +379,7 @@ TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
   HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
   modifyHosts({added_host}, {host_set_.hosts_.back()});
 
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
 }
 
@@ -572,6 +594,41 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
 }
 
+TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"hardware"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  init({
+      {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+      {"tcp://127.0.0.1:81", {{"version", "1.0"}}},
+      {"tcp://127.0.0.1:82", {{"version", "1.1"}}},
+      {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+  });
+
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_11({{"version", "1.1"}});
+
+  // All hosts are healthy.
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+
+  host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  host_set_.hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  host_set_.healthy_hosts_ = {host_set_.hosts_[1], host_set_.hosts_[3]};
+  host_set_.runCallbacks({}, {});
+
+  // Unhealthy hosts are excluded.
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+}
+
 TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
@@ -776,7 +833,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
@@ -819,10 +876,10 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_[0]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({makeHost("tcp://127.0.0.1:9000", {{"version", "1.0"}})}, {local_hosts_->at(0)},
                    0);
@@ -832,7 +889,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
@@ -886,7 +943,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
@@ -940,10 +997,10 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "default"}})}, {host_set_.hosts_[1]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)},
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}})}, 0);
@@ -953,7 +1010,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
@@ -1006,7 +1063,7 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
@@ -1059,10 +1116,10 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8001", {{"version", "1.1"}})}, {host_set_.hosts_[1]},
-              Optional<uint32_t>(0));
+              absl::optional<uint32_t>(0));
 
   modifyLocalHosts({local_hosts_->at(1)}, {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}})},
                    0);
@@ -1072,7 +1129,26 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+}
+
+TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+  init();
+
+  ProtobufWkt::Value str_value;
+  str_value.set_string_value("abc");
+
+  ProtobufWkt::Value num_value;
+  num_value.set_number_value(100);
+
+  auto tester = SubsetLoadBalancerDescribeMetadataTester(lb_);
+  tester.test("version=\"abc\"", {{"version", str_value}});
+  tester.test("number=100", {{"number", num_value}});
+  tester.test("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
+  tester.test("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
+  tester.test("<no metadata>", {});
 }
 
 INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,
