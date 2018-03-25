@@ -6,11 +6,11 @@
 #include "test/mocks/thread_local/mocks.h"
 
 using namespace std::chrono_literals;
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Stats {
@@ -99,7 +99,7 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
   NiceMock<ThreadLocal::MockInstance> tls_;
 
-  MetricsServiceSink sink(streamer_,tls_);
+  MetricsServiceSink sink(streamer_, tls_);
 
   sink.beginFlush();
 
@@ -119,7 +119,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
   NiceMock<ThreadLocal::MockInstance> tls_;
 
-  MetricsServiceSink sink(streamer_,tls_);
+  MetricsServiceSink sink(streamer_, tls_);
 
   sink.beginFlush();
 

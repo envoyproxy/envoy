@@ -535,7 +535,7 @@ public:
     // TODO: Merge with optimized locking
     std::lock_guard<std::mutex> guard(lock_);
     tls_->runOnAllThreads([this]() {
-      ThreadLocalHistograms& tls_histograms = tls_->getTyped<ThreadLocalHistograms>();
+      ThreadLocalHistograms& tls_histograms = this->tls_->getTyped<ThreadLocalHistograms>();
       for (auto const& histogram : tls_histograms.histograms_) {
         std::map<std::string, histogram_t*>::iterator iter =
             merged_histograms_.find(histogram.first);
