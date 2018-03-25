@@ -166,6 +166,8 @@ private:
                                Buffer::Instance& response);
   Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
+  Http::Code handlerPrometheusStats(const std::string& path_and_query,
+                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 

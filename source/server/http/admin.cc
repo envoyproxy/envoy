@@ -366,6 +366,13 @@ Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerPrometheusStats(const std::string&, Http::HeaderMap&,
+                                             Buffer::Instance& response) {
+  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
+                                              response);
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
@@ -394,8 +401,7 @@ Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& resp
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(),
-                                                  server_.stats().gauges(), response);
+      return handlerPrometheusStats(url, response_headers, response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -648,6 +654,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
+          {"/stats/prometheus", "print server stats in prometheus format",
+           MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
