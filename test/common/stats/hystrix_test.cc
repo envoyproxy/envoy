@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Stats {
 
-// copied from CodeUtilityTest in codes_test.cc
+// Copied from CodeUtilityTest in codes_test.cc.
 class HystrixUtilityTest : public testing::Test {
 public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
@@ -52,8 +52,8 @@ absl::string_view getStreamField(absl::string_view dataMessage, absl::string_vie
   return actual;
 }
 
-// this part is useful for testing updateRollingWindowMap()
-// by using addResponse() to
+// This part is useful for testing updateRollingWindowMap()
+// by using addResponse().
 TEST_F(HystrixUtilityTest, CreateDataMessage) {
   Stats::Hystrix hystrix;
   std::stringstream ss;
@@ -61,7 +61,7 @@ TEST_F(HystrixUtilityTest, CreateDataMessage) {
   uint64_t expected_queue_size = 12;
   uint64_t expectedReportingHosts = 16;
 
-  // insert data to rolling window
+  // Insert data to rolling window.
   for (uint64_t i = 0; i < 14; i++) {
     hystrix.incCounter();
     addResponse(201, false, false);
@@ -74,7 +74,7 @@ TEST_F(HystrixUtilityTest, CreateDataMessage) {
   hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
   std::string dataMessage = ss.str();
 
-  // check stream format and data
+  // Check stream format and data.
   EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "66");
   EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "20");
   EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "30");
@@ -96,7 +96,7 @@ TEST(Hystrix, CreateDataMessage) {
   EXPECT_EQ(hystrix.GetRollingWindowIntervalInMs(), 1000);
   EXPECT_EQ(hystrix.GetPingIntervalInMs(), 3000);
 
-  // insert data to rolling window
+  // Insert data to rolling window.
   for (uint64_t i = 0; i < 15; i++) {
     hystrix.incCounter();
     hystrix.pushNewValue("cluster.clusterName.timeouts", (i + 1) * 3);
@@ -108,7 +108,7 @@ TEST(Hystrix, CreateDataMessage) {
   hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
   std::string dataMessage = ss.str();
 
-  // check stream format and data
+  // Check stream format and data.
   EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "80");
   EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "170");
   EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "350");
@@ -119,7 +119,7 @@ TEST(Hystrix, CreateDataMessage) {
             std::to_string(expected_queue_size));
   EXPECT_EQ(getStreamField(dataMessage, "reportingHosts"), std::to_string(expectedReportingHosts));
 
-  // check reset of window
+  // Check reset of window.
   ss.str("");
   hystrix.resetRollingWindow();
   hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);

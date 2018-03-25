@@ -17,22 +17,19 @@ const uint64_t Hystrix::DEFAULT_NUM_OF_BUCKETS;
 const uint64_t Hystrix::ROLLING_WINDOW_IN_MS;
 const uint64_t Hystrix::PING_INTERVAL_IN_MS;
 
-// add new value to rolling window, in place of oldest one
-void Hystrix::pushNewValue(std::string key, uint64_t value) {
-  // create vector if do not exist
-  if (rolling_stats_map_.find(key) == rolling_stats_map_.end()) {
-    rolling_stats_map_[key].resize(num_of_buckets_, value);
-  } else {
-    rolling_stats_map_[key][current_index_] = value;
-  }
+// Add new value to rolling window, in place of oldest one.
+void Hystrix::pushNewValue(const std::string& key, uint64_t value) {
+  // Create vector if do not exist.
+  rolling_stats_map_[key].resize(num_of_buckets_);
+  rolling_stats_map_[key][current_index_] = value;
 }
 
 uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_view stats) {
   std::string key;
-  key = absl::StrCat("cluster.",cluster_name,".",stats);
+  key = absl::StrCat("cluster.", cluster_name, ".", stats);
   if (rolling_stats_map_.find(key) != rolling_stats_map_.end()) {
-    // if the counter was reset, the result is negative
-    // better return 0, will be back to normal once one rolling window passes
+    // If the counter was reset, the result is negative
+    // better return 0, will be back to normal once one rolling window passes.
     if (rolling_stats_map_[key][current_index_] <
         rolling_stats_map_[key][(current_index_ + 1) % num_of_buckets_]) {
       return 0;
@@ -47,49 +44,49 @@ uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_v
 
 void Hystrix::updateRollingWindowMap(Stats::Store& stats, absl::string_view cluster_name) {
   std::string prefix;
-  prefix = absl::StrCat("cluster.",cluster_name,".");
+  prefix = absl::StrCat("cluster.", cluster_name, ".");
 
-  // combining timeouts+retries - retries are counted  as separate requests
-  // (alternative: each request including the retries counted as 1)
-  std::string upstream_rq_timeout_key = absl::StrCat(prefix,"upstream_rq_timeout");
-  std::string upstream_rq_per_try_timeout_key = absl::StrCat(prefix,"upstream_rq_per_try_timeout");
+  // Combining timeouts+retries - retries are counted  as separate requests
+  // (alternative: each request including the retries counted as 1).
+  std::string upstream_rq_timeout_key = absl::StrCat(prefix, "upstream_rq_timeout");
+  std::string upstream_rq_per_try_timeout_key = absl::StrCat(prefix, "upstream_rq_per_try_timeout");
   uint64_t timeouts = stats.counter(upstream_rq_timeout_key).value() +
                       stats.counter(upstream_rq_per_try_timeout_key).value();
 
-  std::string timeouts_key = absl::StrCat(prefix,"timeouts");
+  std::string timeouts_key = absl::StrCat(prefix, "timeouts");
   pushNewValue(timeouts_key,timeouts);
 
-  // combining errors+retry errors - retries are counted as separate requests
+  // Combining errors+retry errors - retries are counted as separate requests
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here.
-  // timeout retries were not counted here anyway.
-  std::string upstream_rq_5xx_key = absl::StrCat(prefix,"upstream_rq_5xx");
-  std::string retry_upstream_rq_5xx_key = absl::StrCat(prefix,"retry.upstream_rq_5xx");
-  std::string upstream_rq_4xx_key = absl::StrCat(prefix,"upstream_rq_4xx");
-  std::string retry_upstream_rq_4xx_key = absl::StrCat(prefix,"retry.upstream_rq_4xx");
+  // Timeout retries were not counted here anyway.
+  std::string upstream_rq_5xx_key = absl::StrCat(prefix, "upstream_rq_5xx");
+  std::string retry_upstream_rq_5xx_key = absl::StrCat(prefix, "retry.upstream_rq_5xx");
+  std::string upstream_rq_4xx_key = absl::StrCat(prefix, "upstream_rq_4xx");
+  std::string retry_upstream_rq_4xx_key = absl::StrCat(prefix, "retry.upstream_rq_4xx");
   uint64_t errors = stats.counter(upstream_rq_5xx_key).value() +
                     stats.counter(retry_upstream_rq_5xx_key).value() +
                     stats.counter(upstream_rq_4xx_key).value() +
                     stats.counter(retry_upstream_rq_4xx_key).value() -
                     stats.counter(upstream_rq_timeout_key).value();
 
-  std::string errors_key = absl::StrCat(prefix,"errors");
+  std::string errors_key = absl::StrCat(prefix, "errors");
   pushNewValue(errors_key,errors);
 
-  std::string upstream_rq_2xx_key = absl::StrCat(prefix,"upstream_rq_2xx");
+  std::string upstream_rq_2xx_key = absl::StrCat(prefix, "upstream_rq_2xx");
   uint64_t success = stats.counter(upstream_rq_2xx_key).value();
   std::string success_key = absl::StrCat(prefix,"success");
   pushNewValue(success_key,success);
 
-  std::string upstream_rq_pending_overflow_key = absl::StrCat(prefix,"upstream_rq_pending_overflow");
+  std::string upstream_rq_pending_overflow_key = absl::StrCat(prefix, "upstream_rq_pending_overflow");
   uint64_t rejected = stats.counter(upstream_rq_pending_overflow_key).value();
-  std::string rejected_key = absl::StrCat(prefix,"rejected");
+  std::string rejected_key = absl::StrCat(prefix, "rejected");
   pushNewValue(rejected_key, rejected);
 
-  // should not take from upstream_rq_total since it is updated before its components,
-  // leading to wrong results such as error percentage higher than 100%
+  // Should not take from upstream_rq_total since it is updated before its components,
+  // leading to wrong results such as error percentage higher than 100%.
   uint64_t total = errors + timeouts + success + rejected;
-  std::string total_key = absl::StrCat(prefix,"total");
+  std::string total_key = absl::StrCat(prefix, "total");
   pushNewValue(total_key, total);
 
   // TODO (@trabetti) : why does it fail compilation?
@@ -113,7 +110,7 @@ void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value, st
     info << ", ";
   }
   std::string added_info;
-  added_info = absl::StrCat("\"",key,"\": ",value);
+  added_info = absl::StrCat("\"", key,"\": ", value);
   info << added_info;
 }
 
@@ -152,9 +149,9 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, absl::string_view cluster
   // so we count upstream_rq_pending_overflow and present it as rejected
   addIntToStream("rollingCountSemaphoreRejected", rejected, cluster_info);
 
-  // Hystrix's short circuit is not similar to Envoy's since it is trrigered by 503 responses
+  // Hystrix's short circuit is not similar to Envoy's since it is triggered by 503 responses
   // there is no parallel counter in Envoy since as a result of errors (outlier detection)
-  // requests are not rejected, but rather the node is removed from load balancer healthy pool
+  // requests are not rejected, but rather the node is removed from load balancer healthy pool.
   addIntToStream("rollingCountShortCircuited", 0, cluster_info);
   addIntToStream("rollingCountSuccess", getRollingValue(cluster_name, "success"), cluster_info);
   addIntToStream("rollingCountThreadPoolRejected", 0, cluster_info);
@@ -163,8 +160,8 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, absl::string_view cluster
   addIntToStream("currentConcurrentExecutionCount", 0, cluster_info);
   addIntToStream("latencyExecute_mean", 0, cluster_info);
 
-  // latency information can be  taken rom hystogram, which is only available to sinks
-  // we should consider make this a sink so we can get this information
+  // Latency information can be taken from histogram, which is only available to sinks
+  // we should consider make this a sink so we can get this information.
   addInfoToStream(
       "latencyExecute",
       "{\"0\":0,\"25\":0,\"50\":0,\"75\":0,\"90\":0,\"95\":0,\"99\":0,\"99.5\":0,\"100\":0}",
@@ -220,15 +217,16 @@ void Hystrix::getClusterStats(std::stringstream& ss, absl::string_view cluster_n
   addHystrixThreadPool(ss, cluster_name, max_concurrent_requests, reporting_hosts);
 }
 
-absl::string_view Hystrix::printRollingWindow() {
+absl::string_view Hystrix::printRollingWindow() const {
   std::stringstream out_str;
 
-  for (std::map<std::string, RollingStats>::const_iterator it = rolling_stats_map_.begin();
-       it != rolling_stats_map_.end(); ++it) {
-    out_str << it->first << " | ";
-    RollingStats rolling_stats = it->second;
-    for (uint64_t i = 0; i < rolling_stats.size(); i++) {
-      out_str << rolling_stats[i] << " | ";
+  for (auto stats_map_itr = rolling_stats_map_.begin();
+		  stats_map_itr != rolling_stats_map_.end(); ++stats_map_itr) {
+    out_str << stats_map_itr->first << " | ";
+    RollingStats rolling_stats = stats_map_itr->second;
+    for (auto specific_stat_vec_itr = rolling_stats.begin();
+         specific_stat_vec_itr != rolling_stats.end(); ++specific_stat_vec_itr) {
+      out_str << *specific_stat_vec_itr << " | ";
     }
     out_str << std::endl;
   }
@@ -249,7 +247,7 @@ void HystrixHandlerInfoImpl::Destroy() {
 void HystrixHandler::HandleEventStream(HystrixHandlerInfoImpl* hystrix_handler_info,
                                        Server::Instance& server) {
   Server::Instance* serverPtr = &server;
-  // start streaming
+  // Start streaming.
   hystrix_handler_info->data_timer_ = hystrix_handler_info->callbacks_->dispatcher().createTimer(
       [hystrix_handler_info, serverPtr]() -> void {
         HystrixHandler::prepareAndSendHystrixStream(hystrix_handler_info, serverPtr);
@@ -257,7 +255,7 @@ void HystrixHandler::HandleEventStream(HystrixHandlerInfoImpl* hystrix_handler_i
   hystrix_handler_info->data_timer_->enableTimer(
       std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
 
-  // start keep alive ping
+  // Start keep alive ping.
   hystrix_handler_info->ping_timer_ =
       hystrix_handler_info->callbacks_->dispatcher().createTimer([hystrix_handler_info]() -> void {
         HystrixHandler::sendKeepAlivePing(hystrix_handler_info);
@@ -296,7 +294,7 @@ void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix
   data.add(ss.str());
   hystrix_handler_info->callbacks_->encodeData(data, false);
 
-  // restart timer
+  // Restart timer.
   hystrix_handler_info->data_timer_->enableTimer(
       std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
 }
@@ -306,7 +304,7 @@ void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_i
   data.add(":\n\n");
   hystrix_handler_info->callbacks_->encodeData(data, false);
 
-  // restart timer
+  // Restart timer.
   hystrix_handler_info->ping_timer_->enableTimer(
       std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
 }
