@@ -84,9 +84,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   if (request_headers.XB3Sampled()) {
     // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
     // zipkin tracers may still use that value, although should be 0 or 1.
-    sampled =
-        request_headers.XB3Sampled()->value().getString() == ZipkinCoreConstants::get().SAMPLED ||
-        request_headers.XB3Sampled()->value().getString() == "true";
+    absl::string_view xb3_sampled = request_headers.XB3Sampled()->value().getStringView();
+    sampled = xb3_sampled == ZipkinCoreConstants::get().SAMPLED || xb3_sampled == "true";
   }
 
   if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
@@ -30,36 +31,40 @@ public:
    */
   virtual void close() PURE;
 
+  enum class SocketState { PreBind, PostBind };
+
   /**
    * Visitor class for setting socket options.
    */
-  class Options {
+  class Option {
   public:
-    virtual ~Options() {}
+    virtual ~Option() {}
 
     /**
      * @param socket the socket on which to apply options.
+     * @param state the current state of the socket. Significant for options that can only be
+     *        set for some particular state of the socket.
      * @return true if succeeded, false otherwise.
      */
-    virtual bool setOptions(Socket& socket) const PURE;
+    virtual bool setOption(Socket& socket, SocketState state) const PURE;
 
     /**
-     * @return bits that can be used to separate connections based on the options. Should return
-     *         zero if connections with different options can be pooled together. This is limited
-     *         to 32 bits to allow these bits to be efficiently combined into a larger hash key
-     *         used in connection pool lookups.
+     * @param vector of bytes to which the option should append hash key data that will be used
+     *        to separate connections based on the option. Any data already in the key vector must
+     *        not be modified.
      */
-    virtual uint32_t hashKey() const PURE;
+    virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
-  typedef std::shared_ptr<Options> OptionsSharedPtr;
+  typedef std::unique_ptr<Option> OptionPtr;
+  typedef std::shared_ptr<std::vector<OptionPtr>> OptionsSharedPtr;
 
   /**
-   * Set the socket options for later retrieval with options().
+   * Add a socket option visitor for later retrieval with options().
    */
-  virtual void setOptions(const OptionsSharedPtr&) PURE;
+  virtual void addOption(OptionPtr&&) PURE;
 
   /**
-   * @return the socket options stored earlier with setOptions(), if any.
+   * @return the socket options stored earlier with addOption() calls, if any.
    */
   virtual const OptionsSharedPtr& options() const PURE;
 };

@@ -24,7 +24,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
 
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -85,8 +86,9 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
 TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), true);
-  Network::TcpListenSocket socketDst(alt_address_, false);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  Network::TcpListenSocket socketDst(alt_address_, nullptr, false);
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -122,7 +124,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
 TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), true);
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_), nullptr, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
@@ -161,7 +163,12 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), true);
+  auto option = std::make_unique<MockSocketOption>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
+  EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
+  options->emplace_back(std::move(option));
+
+  Network::TcpListenSocket socket(Network::Test::getAnyAddress(version_, true), options, true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
 

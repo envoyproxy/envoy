@@ -332,7 +332,7 @@ protected:
   Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Stats::IsolatedStoreImpl stats_store_;
-  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), true};
+  Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};

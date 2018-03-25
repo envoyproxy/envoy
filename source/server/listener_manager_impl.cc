@@ -74,6 +74,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 
 Network::SocketSharedPtr
 ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                                 const Network::Socket::OptionsSharedPtr& options,
                                                  bool bind_to_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
@@ -94,9 +95,9 @@ ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConst
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(fd, address);
+    return std::make_shared<Network::TcpListenSocket>(fd, address, options);
   }
-  return std::make_shared<Network::TcpListenSocket>(address, bind_to_port);
+  return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
 }
 
 DrainManagerPtr
@@ -275,14 +276,17 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   socket_ = socket;
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
-    bool ok = listen_socket_options_->setOptions(*socket_);
-    const std::string message =
-        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-    if (!ok) {
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    } else {
-      ENVOY_LOG(debug, "{}", message);
+    // 'pre_bind = false' as bind() is never done after this.
+    for (const auto& option : *listen_socket_options_) {
+      bool ok = option->setOption(*socket_, Network::Socket::SocketState::PostBind);
+      const std::string message =
+          fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+      if (!ok) {
+        ENVOY_LOG(warn, "{}", message);
+        throw EnvoyException(message);
+      } else {
+        ENVOY_LOG(debug, "{}", message);
+      }
     }
   }
 }
@@ -394,10 +398,11 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
       draining_listener_socket = existing_draining_listener->listener_->getSocket();
     }
 
-    new_listener->setSocket(
-        draining_listener_socket
-            ? draining_listener_socket
-            : factory_.createListenSocket(new_listener->address(), new_listener->bindToPort()));
+    new_listener->setSocket(draining_listener_socket
+                                ? draining_listener_socket
+                                : factory_.createListenSocket(new_listener->address(),
+                                                              new_listener->listenSocketOptions(),
+                                                              new_listener->bindToPort()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
