@@ -84,6 +84,7 @@ public:
   MOCK_METHOD2(flushGauge, void(const Gauge& gauge, uint64_t value));
   MOCK_METHOD0(endFlush, void());
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
+  MOCK_METHOD0(flushHistograms, std::list<HistogramStatistics>());
 };
 
 class MockStore : public Store {

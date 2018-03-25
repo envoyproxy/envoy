@@ -31,6 +31,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   EXPECT_CALL(*sink, beginFlush());
   EXPECT_CALL(*sink, flushCounter(Property(&Stats::Metric::name, "hello"), 1));
   EXPECT_CALL(*sink, flushGauge(Property(&Stats::Metric::name, "world"), 5));
+  EXPECT_CALL(*sink, flushHistograms());
   EXPECT_CALL(*sink, endFlush());
 
   std::list<Stats::SinkPtr> sinks;
@@ -103,7 +104,6 @@ protected:
         options_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_, thread_local_));
-
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
 

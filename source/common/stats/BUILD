@@ -47,7 +47,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/stats:stats_lib",
-    ]
+    ],
 )
 
 envoy_cc_library(

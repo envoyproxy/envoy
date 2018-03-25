@@ -97,8 +97,9 @@ class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 
-  MetricsServiceSink sink(streamer_);
+  MetricsServiceSink sink(streamer_,tls_);
 
   sink.beginFlush();
 
@@ -116,8 +117,9 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
 
-  MetricsServiceSink sink(streamer_);
+  MetricsServiceSink sink(streamer_,tls_);
 
   sink.beginFlush();
 
