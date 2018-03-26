@@ -22,17 +22,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "echo_lib",
-    srcs = ["echo.cc"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:echo_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http_connection_manager_lib",
     srcs = ["http_connection_manager.cc"],
     hdrs = ["http_connection_manager.h"],

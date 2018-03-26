@@ -8,6 +8,10 @@ load(
     "envoy_sh_test",
     "envoy_select_hot_restart",
 )
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+)
 
 envoy_package()
 
@@ -51,6 +55,8 @@ envoy_cc_test(
     ],
 )
 
+# TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
+# This will go away when we delete v1 configuration.
 envoy_cc_test(
     name = "legacy_json_integration_test",
     srcs = ["legacy_json_integration_test.cc"],
@@ -74,7 +80,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + envoy_all_extensions(),
 )
 
 envoy_sh_test(
@@ -295,7 +301,6 @@ envoy_cc_test_library(
         "//source/server/config/http:router_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:client_ssl_auth_lib",
-        "//source/server/config/network:echo_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:ratelimit_lib",
@@ -344,6 +349,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
     ],
 )

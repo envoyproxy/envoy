@@ -5,12 +5,14 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
-namespace Filter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Echo {
 
 /**
  * Implementation of a basic echo filter.
  */
-class Echo : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class EchoFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -23,5 +25,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-} // namespace Filter
+} // namespace Echo
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
