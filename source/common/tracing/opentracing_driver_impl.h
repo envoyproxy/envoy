@@ -7,8 +7,8 @@
 #include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
-#include "opentracing/tracer.h"
 #include "opentracing/ext/tags.h"
+#include "opentracing/tracer.h"
 
 namespace Envoy {
 namespace Tracing {
