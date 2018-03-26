@@ -114,9 +114,8 @@ public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
                      ThreadLocal::SlotAllocator& tls);
-  ~MetricsServiceSink() {
-    std::cout<<"Metrics Service Destructor"<<"\n";
-  }
+  ~MetricsServiceSink() {}
+  
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
   void flushCounter(const Counter& counter, uint64_t) override {
