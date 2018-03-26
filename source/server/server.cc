@@ -141,7 +141,7 @@ void InstanceImpl::flushStats() {
   server_stats_->total_connections_.set(numConnections() + info.num_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
-  if (!terminated_ && !shutdown_) {
+  if (!terminated_) {
     histogram_stats_ =
         InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
