@@ -2,8 +2,9 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/json/json_loader.h"
-#include "common/mongo/bson_impl.h"
-#include "common/mongo/codec_impl.h"
+
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -15,7 +16,9 @@ using testing::NiceMock;
 using testing::Pointee;
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 class TestDecoderCallbacks : public DecoderCallbacks {
 public:
@@ -332,5 +335,7 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
 }
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -17,24 +17,14 @@ envoy_cc_test(
         "//source/common/dynamo:dynamo_filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/client_ssl_auth:config",
+        "//source/extensions/filters/network/mongo_proxy:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/server/config/access_log:file_access_log_lib",
         "//source/server/config/network:ext_authz_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:redis_proxy_lib",
         "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "mongo_proxy_test",
-    srcs = ["mongo_proxy_test.cc"],
-    deps = [
-        "//source/server/config/network:mongo_proxy_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

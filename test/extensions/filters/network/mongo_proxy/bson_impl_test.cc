@@ -1,13 +1,17 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/mongo/bson_impl.h"
+
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include "test/test_common/printers.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 namespace Bson {
 
 TEST(BsonImplTest, BadCast) {
@@ -60,4 +64,7 @@ TEST(BufferHelperTest, InvalidSize) {
 }
 
 } // namespace Bson
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

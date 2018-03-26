@@ -5,13 +5,16 @@
 #include <string>
 #include <vector>
 
-#include "envoy/mongo/bson.h"
+#include "extensions/filters/network/mongo_proxy/bson.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
+
 /**
  * General implementation of https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/
  */
-namespace Mongo {
 
 /**
  * Base class for all mongo messages.
@@ -185,5 +188,7 @@ public:
   virtual void encodeReply(const ReplyMessage& message) PURE;
 };
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

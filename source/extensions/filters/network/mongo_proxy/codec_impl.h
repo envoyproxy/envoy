@@ -5,12 +5,14 @@
 #include <string>
 #include <vector>
 
-#include "envoy/mongo/codec.h"
-
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mongo_proxy/codec.h"
+
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 class MessageImpl : public virtual Message {
 public:
@@ -215,5 +217,7 @@ private:
   Buffer::Instance& output_;
 };
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

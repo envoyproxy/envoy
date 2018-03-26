@@ -1,4 +1,4 @@
-#include "common/mongo/utility.h"
+#include "extensions/filters/network/mongo_proxy/utility.h"
 
 #include <string>
 
@@ -7,7 +7,9 @@
 #include "common/json/json_loader.h"
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 QueryMessageInfo::QueryMessageInfo(const QueryMessage& query)
     : request_id_{query.requestId()}, max_time_{0} {
@@ -136,5 +138,7 @@ void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
   }
 }
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

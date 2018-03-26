@@ -2,10 +2,12 @@
 
 #include <string>
 
-#include "envoy/mongo/codec.h"
+#include "extensions/filters/network/mongo_proxy/codec.h"
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 /**
  * Parses a query into information that can be used for stat gathering.
@@ -68,5 +70,7 @@ private:
   std::string command_;
 };
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

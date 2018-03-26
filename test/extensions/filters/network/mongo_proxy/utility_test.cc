@@ -1,13 +1,15 @@
 #include <string>
 
-#include "common/mongo/bson_impl.h"
-#include "common/mongo/codec_impl.h"
-#include "common/mongo/utility.h"
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 TEST(QueryMessageInfoTest, FindCommand) {
   std::string json = R"EOF(
@@ -189,5 +191,7 @@ TEST(QueryMessageInfoTest, Command) {
   }
 }
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

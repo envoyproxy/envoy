@@ -1,4 +1,4 @@
-#include "common/mongo/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include <cstdint>
 #include <list>
@@ -11,10 +11,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/mongo/bson_impl.h"
+
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 std::string
 MessageImpl::documentListToString(const std::list<Bson::DocumentSharedPtr>& documents) const {
@@ -392,5 +395,7 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
   }
 }
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

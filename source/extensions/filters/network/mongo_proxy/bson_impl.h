@@ -6,11 +6,15 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
-#include "envoy/mongo/bson.h"
 
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mongo_proxy/bson.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 namespace Bson {
 
 /**
@@ -262,4 +266,7 @@ private:
 };
 
 } // namespace Bson
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -9,11 +9,14 @@
 #include "envoy/common/pure.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
+namespace Bson {
+
 /**
  * Implementation of http://bsonspec.org/spec.html
  */
-namespace Bson {
-
 class Document;
 typedef std::shared_ptr<Document> DocumentSharedPtr;
 
@@ -115,4 +118,7 @@ public:
 };
 
 } // namespace Bson
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
