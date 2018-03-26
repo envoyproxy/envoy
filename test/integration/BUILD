@@ -340,6 +340,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "echo_integration_test",
+    srcs = [
+        "echo_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration:echo_server.json",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/network/echo:config",
+        "//test/server:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     deps = [
