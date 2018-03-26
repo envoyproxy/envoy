@@ -4,12 +4,15 @@
 
 #include "common/config/filter_json.h"
 #include "common/filesystem/filesystem_impl.h"
-#include "common/filter/auth/client_ssl.h"
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 
+#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "extensions/filters/network/client_ssl_auth/config.h"
+
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -29,9 +32,9 @@ using testing::WithArg;
 using testing::_;
 
 namespace Envoy {
-namespace Filter {
-namespace Auth {
-namespace ClientSsl {
+namespace Extensions {
+namespace NetworkFilters {
+namespace ClientSslAuth {
 
 TEST(ClientSslAuthAllowedPrincipalsTest, EmptyString) {
   AllowedPrincipals principals;
@@ -78,14 +81,15 @@ public:
     Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
     EXPECT_CALL(cm_, get("vpn"));
     setupRequest();
-    config_ = Config::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
+    config_ =
+        ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_);
 
     createAuthFilter();
   }
 
   void createAuthFilter() {
     filter_callbacks_.connection_.callbacks_.clear();
-    instance_.reset(new Instance(config_));
+    instance_.reset(new ClientSslAuthFilter(config_));
     instance_->initializeReadFilterCallbacks(filter_callbacks_);
 
     // NOP currently.
@@ -108,9 +112,9 @@ public:
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
   Http::MockAsyncClientRequest request_;
-  ConfigSharedPtr config_;
+  ClientSslAuthConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  std::unique_ptr<Instance> instance_;
+  std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
   Ssl::MockConnection ssl_;
@@ -130,8 +134,9 @@ TEST_F(ClientSslAuthFilterTest, NoCluster) {
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
   Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
   EXPECT_CALL(cm_, get("bad_cluster")).WillOnce(Return(nullptr));
-  EXPECT_THROW(Config::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
-               EnvoyException);
+  EXPECT_THROW(
+      ClientSslAuthConfig::create(proto_config, tls_, cm_, dispatcher_, stats_store_, random_),
+      EnvoyException);
 }
 
 TEST_F(ClientSslAuthFilterTest, NoSsl) {
@@ -172,8 +177,9 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-  message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
-      TestEnvironment::runfilesPath("test/common/filter/auth/test_data/vpn_response_1.json"))));
+  message->body().reset(
+      new Buffer::OwnedImpl(Filesystem::fileReadToEnd(TestEnvironment::runfilesPath(
+          "test/extensions/filters/network/client_ssl_auth/test_data/vpn_response_1.json"))));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(1U, stats_store_.gauge("auth.clientssl.vpn.total_principals").value());
 
@@ -262,7 +268,80 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }
 
-} // namespace ClientSsl
-} // namespace Auth
-} // namespace Filter
+class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_CASE_P(IpList, IpWhiteListConfigTest,
+                        ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",
+                                          R"EOF(["2001:abcd::/64"])EOF"));
+
+TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectJson) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ClientSslAuthConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectProto) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ClientSslAuthConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "auth_api_cluster" : "fake_cluster",
+    "ip_white_list":)EOF" + GetParam() +
+                            R"EOF(
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ClientSslAuthConfigFactory factory;
+  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config =
+      *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
+          factory.createEmptyConfigProto().get());
+
+  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+} // namespace ClientSslAuth
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

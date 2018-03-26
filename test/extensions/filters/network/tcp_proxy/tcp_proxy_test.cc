@@ -4,10 +4,12 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
-#include "common/filter/tcp_proxy.h"
 #include "common/network/address_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/filters/network/tcp_proxy/config.h"
+#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -30,7 +32,9 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Filter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace TcpProxy {
 
 namespace {
 TcpProxyConfig constructTcpProxyConfigFromJson(const Json::Object& json,
@@ -340,16 +344,16 @@ public:
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<TcpProxy> filter_;
+  std::unique_ptr<TcpProxyFilter> filter_;
 };
 
 TEST_F(TcpProxyNoConfigTest, Initialization) {
-  filter_.reset(new TcpProxy(nullptr, factory_context_.cluster_manager_));
+  filter_.reset(new TcpProxyFilter(nullptr, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 }
 
 TEST_F(TcpProxyNoConfigTest, ReadDisableDownstream) {
-  filter_.reset(new TcpProxy(nullptr, factory_context_.cluster_manager_));
+  filter_.reset(new TcpProxyFilter(nullptr, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_->readDisableDownstream(true);
@@ -436,7 +440,7 @@ public:
           .WillRepeatedly(Return(Upstream::MockHost::MockCreateConnectionData()));
     }
 
-    filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+    filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
     EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -465,7 +469,7 @@ public:
   std::vector<Upstream::MockHost::MockCreateConnectionData> conn_infos_;
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::vector<NiceMock<Event::MockTimer>*> connect_timers_;
-  std::unique_ptr<TcpProxy> filter_;
+  std::unique_ptr<TcpProxyFilter> filter_;
   std::string access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
@@ -739,7 +743,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
 
   const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
 
@@ -752,7 +756,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -781,7 +785,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
       new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1028,7 +1032,7 @@ public:
   void setup() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_.reset(new TcpProxy(config_, factory_context_.cluster_manager_));
+    filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
@@ -1036,7 +1040,7 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<TcpProxy> filter_;
+  std::unique_ptr<TcpProxyFilter> filter_;
 };
 
 TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
@@ -1074,5 +1078,77 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
-} // namespace Filter
+class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
+
+INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
+                        ::testing::Values(R"EOF("destination_ip_list": [
+                                                  "192.168.1.1/32",
+                                                  "192.168.1.0/24"
+                                                ],
+                                                "source_ip_list": [
+                                                  "192.168.0.0/16",
+                                                  "192.0.0.0/8",
+                                                  "127.0.0.0/8"
+                                                ],)EOF",
+                                          R"EOF("destination_ip_list": [
+                                                  "2001:abcd::/64",
+                                                  "2002:ffff::/32"
+                                                ],
+                                                "source_ip_list": [
+                                                  "ffee::/128",
+                                                  "2001::abcd/64",
+                                                  "1234::5678/128"
+                                                ],)EOF"));
+
+TEST_P(RouteIpListConfigTest, TcpProxy) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "route_config": {
+      "routes": [
+        {)EOF" + GetParam() +
+                            R"EOF("destination_ports": "1-1024,2048-4096,12345",
+          "cluster": "fake_cluster"
+        },
+        {
+          "source_ports": "23457,23459",
+          "cluster": "fake_cluster2"
+        }
+      ]
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TcpProxyConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+
+  factory.createFilterFactory(*json_config, context);
+}
+
+// Test that a minimal TcpProxy v2 config works.
+TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TcpProxyConfigFactory factory;
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+      *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_stat_prefix("prefix");
+  config.set_cluster("cluster");
+
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+} // namespace TcpProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

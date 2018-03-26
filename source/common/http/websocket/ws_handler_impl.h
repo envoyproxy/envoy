@@ -9,7 +9,9 @@
 #include "envoy/router/router.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/filter/tcp_proxy.h"
+// TODO(mattklein123): Common code reaching into extensions is not right. Sort this out when the
+// HTTP connection manager is moved.
+#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Http {
@@ -23,7 +25,7 @@ namespace WebSocket {
  * All data will be proxied back and forth between the two connections, without any
  * knowledge of the underlying WebSocket protocol.
  */
-class WsHandlerImpl : public Envoy::Filter::TcpProxy {
+class WsHandlerImpl : public Extensions::NetworkFilters::TcpProxy::TcpProxyFilter {
 public:
   WsHandlerImpl(HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
                 const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
@@ -36,7 +38,7 @@ public:
   }
 
 protected:
-  // Filter::TcpProxy
+  // Extensions::NetworkFilters::TcpProxy::TcpProxyFilter
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
   void onInitFailure(UpstreamFailureReason failure_reason) override;
   void onConnectionSuccess() override;

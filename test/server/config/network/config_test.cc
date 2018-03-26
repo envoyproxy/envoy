@@ -9,13 +9,14 @@
 #include "common/protobuf/utility.h"
 
 #include "server/config/access_log/file_access_log.h"
-#include "server/config/network/client_ssl_auth.h"
 #include "server/config/network/ext_authz.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
-#include "server/config/network/tcp_proxy.h"
+
+#include "extensions/filters/network/client_ssl_auth/config.h"
+#include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -36,7 +37,7 @@ namespace Configuration {
 TEST(NetworkFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
-  ClientSslAuthConfigFactory client_ssl_auth_factory;
+  Extensions::NetworkFilters::ClientSslAuth::ClientSslAuthConfigFactory client_ssl_auth_factory;
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth client_ssl_auth_proto;
   HttpConnectionManagerFilterConfigFactory hcm_factory;
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_proto;
@@ -46,7 +47,7 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   envoy::config::filter::network::rate_limit::v2::RateLimit rate_limit_proto;
   RedisProxyFilterConfigFactory redis_factory;
   envoy::config::filter::network::redis_proxy::v2::RedisProxy redis_proto;
-  TcpProxyConfigFactory tcp_proxy_factory;
+  Extensions::NetworkFilters::TcpProxy::TcpProxyConfigFactory tcp_proxy_factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_proto;
   ExtAuthzConfigFactory ext_authz_factory;
   envoy::config::filter::network::ext_authz::v2::ExtAuthz ext_authz_proto;
@@ -133,128 +134,6 @@ TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
 
   Config::FilterJson::translateRedisProxy(*json_config, proto_config);
 
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
-class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
-
-INSTANTIATE_TEST_CASE_P(IpList, RouteIpListConfigTest,
-                        ::testing::Values(R"EOF("destination_ip_list": [
-                                                  "192.168.1.1/32",
-                                                  "192.168.1.0/24"
-                                                ],
-                                                "source_ip_list": [
-                                                  "192.168.0.0/16",
-                                                  "192.0.0.0/8",
-                                                  "127.0.0.0/8"
-                                                ],)EOF",
-                                          R"EOF("destination_ip_list": [
-                                                  "2001:abcd::/64",
-                                                  "2002:ffff::/32"
-                                                ],
-                                                "source_ip_list": [
-                                                  "ffee::/128",
-                                                  "2001::abcd/64",
-                                                  "1234::5678/128"
-                                                ],)EOF"));
-
-TEST_P(RouteIpListConfigTest, TcpProxy) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "route_config": {
-      "routes": [
-        {)EOF" + GetParam() +
-                            R"EOF("destination_ports": "1-1024,2048-4096,12345",
-          "cluster": "fake_cluster"
-        },
-        {
-          "source_ports": "23457,23459",
-          "cluster": "fake_cluster2"
-        }
-      ]
-    }
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  TcpProxyConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-
-  factory.createFilterFactory(*json_config, context);
-}
-
-class IpWhiteListConfigTest : public ::testing::TestWithParam<std::string> {};
-
-INSTANTIATE_TEST_CASE_P(IpList, IpWhiteListConfigTest,
-                        ::testing::Values(R"EOF(["192.168.3.0/24"])EOF",
-                                          R"EOF(["2001:abcd::/64"])EOF"));
-
-TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list":)EOF" + GetParam() +
-                            R"EOF(
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  ClientSslAuthConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
-TEST_P(IpWhiteListConfigTest, ClientSslAuthCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list":)EOF" + GetParam() +
-                            R"EOF(
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
-  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
-  NiceMock<MockFactoryContext> context;
-  ClientSslAuthConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
-TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "auth_api_cluster" : "fake_cluster",
-    "ip_white_list":)EOF" + GetParam() +
-                            R"EOF(
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  ClientSslAuthConfigFactory factory;
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config =
-      *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
-          factory.createEmptyConfigProto().get());
-
-  Envoy::Config::FilterJson::translateClientSslAuthFilter(*json_config, proto_config);
   NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -495,7 +374,9 @@ TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
   EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ClientSslAuthConfigFactory, NamedNetworkFilterConfigFactory>()),
+      (Registry::RegisterFactory<
+          Extensions::NetworkFilters::ClientSslAuth::ClientSslAuthConfigFactory,
+          NamedNetworkFilterConfigFactory>()),
       EnvoyException,
       fmt::format("Double registration for name: '{}'",
                   Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
@@ -521,22 +402,6 @@ TEST(AccessLogConfigTest, FileAccessLogTest) {
       factory->createAccessLogInstance(*message, std::move(filter), context);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<AccessLog::FileAccessLog*>(instance.get()));
-}
-
-// Test that a minimal TcpProxy v2 config works.
-TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
-  NiceMock<MockFactoryContext> context;
-  TcpProxyConfigFactory factory;
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
-      *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
-          factory.createEmptyConfigProto().get());
-  config.set_stat_prefix("prefix");
-  config.set_cluster("cluster");
-
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
 }
 
 TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {

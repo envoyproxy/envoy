@@ -18,9 +18,9 @@
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Auth {
-namespace ClientSsl {
+namespace Extensions {
+namespace NetworkFilters {
+namespace ClientSslAuth {
 
 /**
  * All client SSL auth stats. @see stats_macros.h
@@ -64,17 +64,17 @@ private:
 
 typedef std::shared_ptr<AllowedPrincipals> AllowedPrincipalsSharedPtr;
 
-class Config;
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+class ClientSslAuthConfig;
+typedef std::shared_ptr<ClientSslAuthConfig> ClientSslAuthConfigSharedPtr;
 
 /**
  * Global configuration for client SSL authentication. The config contacts a JSON API to fetch the
  * list of allowed principals, caches it, then makes auth decisions on it and any associated IP
  * white list.
  */
-class Config : public Http::RestApiFetcher {
+class ClientSslAuthConfig : public Http::RestApiFetcher {
 public:
-  static ConfigSharedPtr
+  static ClientSslAuthConfigSharedPtr
   create(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
          Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
@@ -84,9 +84,10 @@ public:
   GlobalStats& stats() { return stats_; }
 
 private:
-  Config(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
-         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random);
+  ClientSslAuthConfig(
+      const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+      ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+      Stats::Scope& scope, Runtime::RandomGenerator& random);
 
   static GlobalStats generateStats(Stats::Scope& scope, const std::string& prefix);
 
@@ -104,9 +105,9 @@ private:
 /**
  * A client SSL auth filter instance. One per connection.
  */
-class Instance : public Network::ReadFilter, public Network::ConnectionCallbacks {
+class ClientSslAuthFilter : public Network::ReadFilter, public Network::ConnectionCallbacks {
 public:
-  Instance(ConfigSharedPtr config) : config_(config) {}
+  ClientSslAuthFilter(ClientSslAuthConfigSharedPtr config) : config_(config) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -122,11 +123,11 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
-  ConfigSharedPtr config_;
+  ClientSslAuthConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
 } // ClientSsl
-} // namespace Auth
-} // namespace Filter
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "common/filter/auth/client_ssl.h"
+#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include <chrono>
 #include <cstdint>
@@ -15,13 +15,14 @@
 #include "common/network/utility.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Auth {
-namespace ClientSsl {
+namespace Extensions {
+namespace NetworkFilters {
+namespace ClientSslAuth {
 
-Config::Config(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
-               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::RandomGenerator& random)
+ClientSslAuthConfig::ClientSslAuthConfig(
+    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+    Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(
           cm, config.auth_api_cluster(), dispatcher, random,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
@@ -38,26 +39,28 @@ Config::Config(const envoy::config::filter::network::client_ssl_auth::v2::Client
       [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 }
 
-ConfigSharedPtr
-Config::create(const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
-               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope,
-               Runtime::RandomGenerator& random) {
-  ConfigSharedPtr new_config(new Config(config, tls, cm, dispatcher, scope, random));
+ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
+    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
+    Stats::Scope& scope, Runtime::RandomGenerator& random) {
+  ClientSslAuthConfigSharedPtr new_config(
+      new ClientSslAuthConfig(config, tls, cm, dispatcher, scope, random));
   new_config->initialize();
   return new_config;
 }
 
-const AllowedPrincipals& Config::allowedPrincipals() { return tls_->getTyped<AllowedPrincipals>(); }
+const AllowedPrincipals& ClientSslAuthConfig::allowedPrincipals() {
+  return tls_->getTyped<AllowedPrincipals>();
+}
 
-GlobalStats Config::generateStats(Stats::Scope& scope, const std::string& prefix) {
+GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::string& prefix) {
   std::string final_prefix = fmt::format("auth.clientssl.{}.", prefix);
   GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                               POOL_GAUGE_PREFIX(scope, final_prefix))};
   return stats;
 }
 
-void Config::parseResponse(const Http::Message& message) {
+void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
   Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
   for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
@@ -72,20 +75,20 @@ void Config::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void Config::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
+void ClientSslAuthConfig::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
 
 static const std::string Path = "/v1/certs/list/approved";
 
-void Config::createRequest(Http::Message& request) {
+void ClientSslAuthConfig::createRequest(Http::Message& request) {
   request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(Path);
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&, bool) {
+Network::FilterStatus ClientSslAuthFilter::onData(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus Instance::onNewConnection() {
+Network::FilterStatus ClientSslAuthFilter::onNewConnection() {
   // If this is not an SSL connection, do no further checking. High layers should redirect, etc.
   // if SSL is required.
   if (!read_callbacks_->connection().ssl()) {
@@ -97,7 +100,7 @@ Network::FilterStatus Instance::onNewConnection() {
   }
 }
 
-void Instance::onEvent(Network::ConnectionEvent event) {
+void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
   if (event != Network::ConnectionEvent::Connected) {
     return;
   }
@@ -120,7 +123,7 @@ void Instance::onEvent(Network::ConnectionEvent event) {
   read_callbacks_->continueReading();
 }
 
-} // namespace ClientSsl
-} // namespace Auth
-} // namespace Filter
+} // namespace ClientSslAuth
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
