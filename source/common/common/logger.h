@@ -191,32 +191,27 @@ protected:
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
+
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
+
 // Compare levels before invoking logger
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
-    if (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level()) {  \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
     }                                                                                              \
   } while (0)
 
-#ifdef NVLOG
-#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...)
-#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...)
-#else
-#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, trace, ##__VA_ARGS__)
-#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, debug, ##__VA_ARGS__)
-#endif
-
-#define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, info, ##__VA_ARGS__)
-#define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, warn, ##__VA_ARGS__)
-#define ENVOY_LOG_error_TO_LOGGER(LOGGER, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, error, ##__VA_ARGS__)
-#define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...)                                                  \
-  ENVOY_LOG_COMP_AND_LOG(LOGGER, critical, ##__VA_ARGS__)
+#define ENVOY_LOG_CHECK_LEVEL(LEVEL) ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)
 
 /**
  * Convenience macro to log to a user-specified logger.
+ * Maps directly to ENVOY_LOG_COMP_AND_LOG - it could contain macro logic itself, without
+ * redirection, but left in case various implementations are required in the future (based on log
+ * level for example).
  */
-#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
+#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to get logger.

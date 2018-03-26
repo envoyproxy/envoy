@@ -160,9 +160,7 @@ private:
 
   static ListenerStats generateStats(Stats::Scope& scope);
 
-#ifndef NVLOG
   spdlog::logger& logger_;
-#endif
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::atomic<uint64_t> num_connections_{};

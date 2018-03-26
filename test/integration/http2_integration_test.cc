@@ -274,18 +274,18 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
 
   // Respond to request 1
   upstream_request1->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request1->encodeData(request2_bytes, true);
+  upstream_request1->encodeData(request1_bytes, true);
   response1->waitForEndStream();
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
   EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
-  EXPECT_EQ(request2_bytes, response1->body().size());
+  EXPECT_EQ(request1_bytes, response1->body().size());
 
   // Do not send any requests and validate idle timeout kicks in after both the requests are done.
   fake_upstream_connection1->waitForDisconnect();
   fake_upstream_connection2->waitForDisconnect();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 2);
 }
 
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
