@@ -593,6 +593,12 @@ protected:
 private:
   std::mutex lock_;
   struct ThreadLocalHistograms : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalHistograms(){};
+    ~ThreadLocalHistograms() {
+      for (auto const& histogram : histograms_) {
+        hist_free(histogram.second);
+      }
+    }
     std::unordered_map<std::string, histogram_t*> histograms_;
   };
 };
