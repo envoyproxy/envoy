@@ -156,7 +156,7 @@ public:
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
   MOCK_METHOD1(removeCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
-  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(bindConfig, const envoy::api::v2::core::BindConfig&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
@@ -167,7 +167,7 @@ public:
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  Network::Address::InstanceConstSharedPtr source_address_;
+  envoy::api::v2::core::BindConfig bind_config_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
