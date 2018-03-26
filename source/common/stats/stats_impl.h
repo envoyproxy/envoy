@@ -525,7 +525,7 @@ private:
 class BaseSink : public Sink {
 public:
   void onHistogramComplete(const Histogram& hist, uint64_t value) override {
-    ThreadLocalHistograms tls_histograms = tls_->getTyped<ThreadLocalHistograms>();
+    ThreadLocalHistograms tls_histograms = hist_tls_->getTyped<ThreadLocalHistograms>();
     auto tls_hist_iterator = tls_histograms.histograms_.find(hist.name());
     if (tls_hist_iterator != tls_histograms.histograms_.end()) {
       hist_insert(tls_hist_iterator->second, value, 1);
@@ -539,8 +539,8 @@ public:
   std::list<HistogramStatistics> flushHistograms() override {
     // TODO: Merge with optimized locking
     std::lock_guard<std::mutex> guard(lock_);
-    tls_->runOnAllThreads([this]() {
-      ThreadLocalHistograms& tls_histograms = this->tls_->getTyped<ThreadLocalHistograms>();
+    hist_tls_->runOnAllThreads([this]() {
+      ThreadLocalHistograms& tls_histograms = this->hist_tls_->getTyped<ThreadLocalHistograms>();
       for (auto const& histogram : tls_histograms.histograms_) {
         std::unordered_map<std::string, histogram_t*>::iterator iter =
             merged_histograms_.find(histogram.first);
@@ -575,8 +575,8 @@ public:
   }
 
 protected:
-  BaseSink(ThreadLocal::SlotPtr tls) : tls_(std::move(tls)) {
-    tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  BaseSink(ThreadLocal::SlotPtr tls) : hist_tls_(std::move(tls)) {
+    hist_tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalHistograms>();
     });
   }
@@ -587,10 +587,10 @@ protected:
     }
   }
 
-  ThreadLocal::SlotPtr tls_;
   std::unordered_map<std::string, histogram_t*> merged_histograms_;
 
 private:
+  ThreadLocal::SlotPtr hist_tls_;
   std::mutex lock_;
   struct ThreadLocalHistograms : public ThreadLocal::ThreadLocalObject {
     ThreadLocalHistograms(){};

@@ -204,7 +204,6 @@ private:
   InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
-  bool hot_restarted_;
 };
 
 } // namespace Server

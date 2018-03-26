@@ -141,7 +141,7 @@ void InstanceImpl::flushStats() {
   server_stats_->total_connections_.set(numConnections() + info.num_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
-  if (!terminated_ && !hot_restarted_) {
+  if (!terminated_ && !shutdown_) {
     histogram_stats_ =
         InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
@@ -407,7 +407,6 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
-  hot_restarted_ = true;
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->mutable_socket().close();
