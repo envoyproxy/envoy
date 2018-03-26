@@ -21,11 +21,11 @@ private:
 
   class EntryOwnerImpl : public ConfigTracker::EntryOwner {
   public:
-    EntryOwnerImpl(std::weak_ptr<CbsMap> map_weak, std::string key);
+    EntryOwnerImpl(const std::shared_ptr<CbsMap>& map, const std::string& key);
     ~EntryOwnerImpl();
 
   private:
-    std::weak_ptr<CbsMap> map_weak_;
+    std::shared_ptr<CbsMap> map_;
     std::string key_;
   };
 };

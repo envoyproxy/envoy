@@ -12,16 +12,14 @@ ConfigTracker::EntryOwnerPtr ConfigTrackerImpl::add(const std::string& key, Cb c
 
 const ConfigTracker::CbsMap& ConfigTrackerImpl::getCallbacksMap() const { return *map_; }
 
-ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(std::weak_ptr<ConfigTracker::CbsMap> map_weak,
-                                                  std::string key)
-    : map_weak_(std::move(map_weak)), key_(std::move(key)) {}
+ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(const std::shared_ptr<ConfigTracker::CbsMap>& map,
+                                                  const std::string& key)
+    : map_(map), key_(key) {}
 
 ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
-  if (const auto map_strong = map_weak_.lock()) {
-    size_t erased = map_strong->erase(key_);
-    ASSERT(erased == 1);
-    UNREFERENCED_PARAMETER(erased);
-  }
+  size_t erased = map_->erase(key_);
+  ASSERT(erased == 1);
+  UNREFERENCED_PARAMETER(erased);
 }
 
 } // namespace Server
