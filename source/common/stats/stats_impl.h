@@ -532,7 +532,7 @@ public:
     } else {
       histogram_t* histogram_ptr = hist_alloc();
       hist_insert(histogram_ptr, value, 1);
-      tls_histograms.histograms_.emplace(std::make_pair(hist.name(), histogram_ptr))
+      tls_histograms.histograms_.emplace(std::make_pair(hist.name(), histogram_ptr));
     }
   }
 
@@ -542,7 +542,7 @@ public:
     tls_->runOnAllThreads([this]() {
       ThreadLocalHistograms& tls_histograms = this->tls_->getTyped<ThreadLocalHistograms>();
       for (auto const& histogram : tls_histograms.histograms_) {
-        std::map<std::string, histogram_t*>::iterator iter =
+        std::unordered_map<std::string, histogram_t*>::iterator iter =
             merged_histograms_.find(histogram.first);
         // TODO: Optimize this if condition
         if (iter != merged_histograms_.end()) {
