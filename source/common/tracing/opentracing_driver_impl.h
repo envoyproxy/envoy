@@ -8,16 +8,10 @@
 #include "common/singleton/const_singleton.h"
 
 #include "opentracing/tracer.h"
+#include "opentracing/ext/tags.h"
 
 namespace Envoy {
 namespace Tracing {
-
-class OpenTracingTagValues {
-public:
-  const std::string SAMPLING_PRIORITY = "sampling.priority";
-};
-
-typedef ConstSingleton<OpenTracingTagValues> OpenTracingTags;
 
 #define OPENTRACING_TRACER_STATS(COUNTER)                                                          \
   COUNTER(span_context_extraction_error)                                                           \

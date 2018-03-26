@@ -174,7 +174,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
   opentracing::ChildOf(parent_span_ctx.get()).Apply(options);
   opentracing::StartTimestamp(start_time).Apply(options);
   if (!tracing_decision.traced) {
-    opentracing::SetTag(OpenTracingTags::get().SAMPLING_PRIORITY, 0).Apply(options);
+    opentracing::SetTag(opentracing::ext::sampling_priority, 0).Apply(options);
   }
   active_span = tracer.StartSpanWithOptions(operation_name, options);
   RELEASE_ASSERT(active_span != nullptr);

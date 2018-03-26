@@ -98,7 +98,7 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalse) {
   first_span->finishSpan();
 
   const std::unordered_map<std::string, opentracing::Value> expected_tags = {
-      {OpenTracingTags::get().SAMPLING_PRIORITY, 0}};
+      {opentracing::ext::sampling_priority, 0}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
