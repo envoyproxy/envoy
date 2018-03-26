@@ -168,6 +168,8 @@ private:
                                Buffer::Instance& response);
   Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response);
+  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
+                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
 
