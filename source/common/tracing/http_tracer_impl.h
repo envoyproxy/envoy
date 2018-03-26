@@ -131,7 +131,7 @@ class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config&, Http::HeaderMap&, const RequestInfo::RequestInfo&,
-                    const Tracing::Decision&) override {
+                    const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -143,7 +143,7 @@ public:
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                     const RequestInfo::RequestInfo& request_info,
-                    const Tracing::Decision& tracing_decision) override;
+                    const Tracing::Decision tracing_decision) override;
 
 private:
   DriverPtr driver_;

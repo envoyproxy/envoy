@@ -169,7 +169,7 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
                                   const RequestInfo::RequestInfo& request_info,
-                                  const Tracing::Decision& tracing_decision) {
+                                  const Tracing::Decision tracing_decision) {
   std::string span_name = HttpTracerUtility::toString(config.operationName());
 
   if (config.operationName() == OperationName::Egress) {

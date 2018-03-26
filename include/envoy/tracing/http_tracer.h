@@ -13,17 +13,28 @@ namespace Tracing {
 
 enum class OperationName { Ingress, Egress };
 
+/**
+ * The reasons why trace sampling may or may not be performed.
+ */
 enum class Reason {
+  // Not sampled based on supplied request id.
   NotTraceableRequestId,
+  // Not sampled due to being a health check.
   HealthCheck,
+  // Sampling enabled.
   Sampling,
+  // Sampling forced by the service.
   ServiceForced,
+  // Sampling forced by the client.
   ClientForced,
 };
 
+/**
+ * The decision regarding whether traces should be sampled, and the reason for it.
+ */
 struct Decision {
   Reason reason;
-  bool is_tracing;
+  bool traced;
 };
 
 /**
@@ -102,7 +113,7 @@ public:
    */
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const std::string& operation_name, SystemTime start_time,
-                            const Tracing::Decision& tracing_decision) PURE;
+                            const Tracing::Decision tracing_decision) PURE;
 };
 
 typedef std::unique_ptr<Driver> DriverPtr;
@@ -117,7 +128,7 @@ public:
 
   virtual SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
                             const RequestInfo::RequestInfo& request_info,
-                            const Tracing::Decision& tracing_decision) PURE;
+                            const Tracing::Decision tracing_decision) PURE;
 };
 
 typedef std::unique_ptr<HttpTracer> HttpTracerPtr;

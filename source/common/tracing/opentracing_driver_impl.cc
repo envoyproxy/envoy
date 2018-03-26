@@ -129,10 +129,10 @@ OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
 
 SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
                                      const std::string& operation_name, SystemTime start_time,
-                                     const Tracing::Decision& tracing_decision) {
+                                     const Tracing::Decision tracing_decision) {
   // If tracing decision is no, and sampling decision is not communicated via tags, then
   // return a null span to indicate that tracing is not being performed.
-  if (!tracing_decision.is_tracing && !useTagForSamplingDecision()) {
+  if (!tracing_decision.traced && !useTagForSamplingDecision()) {
     return nullptr;
   }
   const PropagationMode propagation_mode = this->propagationMode();
@@ -173,7 +173,7 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
   opentracing::StartSpanOptions options;
   opentracing::ChildOf(parent_span_ctx.get()).Apply(options);
   opentracing::StartTimestamp(start_time).Apply(options);
-  if (!tracing_decision.is_tracing) {
+  if (!tracing_decision.traced) {
     opentracing::SetTag(OpenTracingTags::get().SAMPLING_PRIORITY, 0).Apply(options);
   }
   active_span = tracer.StartSpanWithOptions(operation_name, options);

@@ -185,7 +185,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, forced_header);
     EXPECT_EQ(Reason::ServiceForced, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // Sample traced.
@@ -194,7 +194,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, sampled_header);
     EXPECT_EQ(Reason::Sampling, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // HC request.
@@ -204,7 +204,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, traceable_header_hc);
     EXPECT_EQ(Reason::HealthCheck, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 
   // Client traced.
@@ -213,7 +213,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, client_header);
     EXPECT_EQ(Reason::ClientForced, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // No request id.
@@ -222,7 +222,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(request_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 
   // Broken request id.
@@ -231,7 +231,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(request_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 }
 

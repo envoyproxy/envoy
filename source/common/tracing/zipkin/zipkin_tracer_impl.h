@@ -100,7 +100,7 @@ public:
    */
   Tracing::SpanPtr startSpan(const Tracing::Config&, Http::HeaderMap& request_headers,
                              const std::string&, SystemTime start_time,
-                             const Tracing::Decision& tracing_decision) override;
+                             const Tracing::Decision tracing_decision) override;
 
   // Getters to return the ZipkinDriver's key members.
   Upstream::ClusterManager& clusterManager() { return cm_; }
