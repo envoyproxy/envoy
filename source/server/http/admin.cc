@@ -395,8 +395,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(),
-                                                  server_.stats().gauges(), response);
+      return handlerPrometheusStats(url, response_headers, response);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -404,6 +403,13 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     }
   }
   return rc;
+}
+
+Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
+                                             Buffer::Instance& response) {
+  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
+                                              response);
+  return Http::Code::OK;
 }
 
 std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
@@ -649,6 +655,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
+          {"/stats/prometheus", "print server stats in prometheus format",
+           MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
