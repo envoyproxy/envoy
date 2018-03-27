@@ -85,6 +85,15 @@ public:
   Runtime::RandomGeneratorImpl random_;
 };
 
+void test_merge() {
+  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  Server::TestOptionsImpl options("google_com_proxy.v2.yaml", overlay,
+                                  Network::Address::IpVersion::v6);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
+}
+
 uint32_t run(const std::string& directory) {
   // Change working directory, otherwise we won't be able to read files using relative paths.
   char cwd[PATH_MAX];
@@ -104,6 +113,9 @@ uint32_t run(const std::string& directory) {
       num_tested++;
     }
   }
+
+  test_merge();
+
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0);
   return num_tested;

@@ -155,13 +155,14 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
                                   Options& options) {
   try {
     if (!options.configPath().empty()) {
-      MessageUtil::loadFromFileAndValidate(options.configPath(), bootstrap);
+      MessageUtil::loadFromFile(options.configPath(), bootstrap);
     }
     if (!options.configYaml().empty()) {
-      auto bootstrap_override = envoy::config::bootstrap::v2::Bootstrap();
-      MessageUtil::loadFromYamlAndValidate(options.configYaml(), bootstrap_override);
+      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
       bootstrap.MergeFrom(bootstrap_override);
     }
+    MessageUtil::validate(bootstrap);
     return BootstrapVersion::V2;
   } catch (const EnvoyException& e) {
     if (options.v2ConfigOnly()) {
@@ -169,6 +170,9 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
     }
     // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
     ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+  }
+  if (!options.configYaml().empty()) {
+    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
   }
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
   Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
