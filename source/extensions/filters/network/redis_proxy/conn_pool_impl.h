@@ -9,17 +9,20 @@
 #include <vector>
 
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/redis/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/redis/codec_impl.h"
+
+#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace ConnPool {
 
 // TODO(mattklein123): Circuit breaking
@@ -176,5 +179,7 @@ private:
 };
 
 } // namespace ConnPool
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

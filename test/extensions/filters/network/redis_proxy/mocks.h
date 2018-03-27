@@ -4,18 +4,25 @@
 #include <list>
 #include <string>
 
-#include "envoy/redis/command_splitter.h"
-#include "envoy/redis/conn_pool.h"
-
-#include "common/redis/codec_impl.h"
+#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/redis_proxy/command_splitter.h"
+#include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
+/**
+ * Pretty print const RespValue& value
+ */
+
+void PrintTo(const RespValue& value, std::ostream* os);
+void PrintTo(const RespValuePtr& value, std::ostream* os);
 bool operator==(const RespValue& lhs, const RespValue& rhs);
 
 class MockEncoder : public Encoder {
@@ -132,5 +139,7 @@ public:
 };
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

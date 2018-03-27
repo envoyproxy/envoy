@@ -4,8 +4,6 @@
 
 #include "common/common/assert.h"
 
-#include "test/test_common/printers.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -13,7 +11,13 @@ using testing::Invoke;
 using testing::_;
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
+
+void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
+
+void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
 
 bool operator==(const RespValue& lhs, const RespValue& rhs) {
   if (lhs.type() != rhs.type()) {
@@ -98,5 +102,7 @@ MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -6,10 +6,11 @@
 #include "common/common/macros.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 struct SupportedCommands {
-
   /**
    * @return commands which hash to a single server
    */
@@ -59,5 +60,7 @@ struct SupportedCommands {
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
 };
 
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

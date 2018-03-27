@@ -1,4 +1,4 @@
-#include "common/redis/conn_pool_impl.h"
+#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -8,7 +8,9 @@
 #include "common/common/assert.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace ConnPool {
 
 ConfigImpl::ConfigImpl(
@@ -267,5 +269,7 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
 }
 
 } // namespace ConnPool
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

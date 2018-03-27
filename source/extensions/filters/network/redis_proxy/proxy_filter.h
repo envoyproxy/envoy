@@ -8,14 +8,17 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
-#include "envoy/redis/codec.h"
-#include "envoy/redis/command_splitter.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/network/redis_proxy/codec.h"
+#include "extensions/filters/network/redis_proxy/command_splitter.h"
+
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 /**
  * All redis proxy stats. @see stats_macros.h
@@ -111,6 +114,7 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
 };
-
-} // Redis
+}
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

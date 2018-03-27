@@ -11,11 +11,11 @@
 #include "server/config/access_log/file_access_log.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/config/network/ratelimit.h"
-#include "server/config/network/redis_proxy.h"
 
 #include "extensions/filters/network/client_ssl_auth/config.h"
 #include "extensions/filters/network/ext_authz/config.h"
 #include "extensions/filters/network/mongo_proxy/config.h"
+#include "extensions/filters/network/redis_proxy/config.h"
 #include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/grpc/mocks.h"
@@ -45,7 +45,7 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy mongo_proto;
   RateLimitConfigFactory rate_limit_factory;
   envoy::config::filter::network::rate_limit::v2::RateLimit rate_limit_proto;
-  RedisProxyFilterConfigFactory redis_factory;
+  Extensions::NetworkFilters::RedisProxy::RedisProxyFilterConfigFactory redis_factory;
   envoy::config::filter::network::redis_proxy::v2::RedisProxy redis_proto;
   Extensions::NetworkFilters::TcpProxy::TcpProxyConfigFactory tcp_proxy_factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_proto;
@@ -70,74 +70,6 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
                    envoy::config::filter::accesslog::v2::FileAccessLog(), nullptr, context),
                ProtoValidationException);
-}
-
-TEST(NetworkFilterConfigTest, RedisProxyCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RedisProxyFilterConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
-TEST(NetworkFilterConfigTest, RedisProxyCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config{};
-  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
-  NiceMock<MockFactoryContext> context;
-  RedisProxyFilterConfigFactory factory;
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-}
-
-TEST(NetworkFilterConfigTest, RedisProxyEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "cluster_name": "fake_cluster",
-    "stat_prefix": "foo",
-    "conn_pool": {
-      "op_timeout_ms": 20
-    }
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RedisProxyFilterConfigFactory factory;
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
-      *dynamic_cast<envoy::config::filter::network::redis_proxy::v2::RedisProxy*>(
-          factory.createEmptyConfigProto().get());
-
-  Config::FilterJson::translateRedisProxy(*json_config, proto_config);
-
-  NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
 }
 
 TEST(NetworkFilterConfigTest, RatelimitCorrectJson) {

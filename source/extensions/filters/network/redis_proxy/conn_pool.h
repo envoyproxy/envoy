@@ -4,11 +4,14 @@
 #include <memory>
 #include <string>
 
-#include "envoy/redis/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "extensions/filters/network/redis_proxy/codec.h"
+
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace ConnPool {
 
 /**
@@ -134,5 +137,7 @@ public:
 typedef std::unique_ptr<Instance> InstancePtr;
 
 } // namespace ConnPool
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
