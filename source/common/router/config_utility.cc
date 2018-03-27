@@ -22,6 +22,8 @@ namespace Router {
 //   b.regex_match: Match will succeed if header value matches the value specified here.
 //   c.range_match: Match will succeed if header value lies within the range specified
 //     here, using half open interval semantics [start,end).
+// For a regex match the configured regex string is stored on the 'value_' member to aid
+// in debugging.
 ConfigUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
     : name_(config.name()) {
   switch (config.header_match_specifier_case()) {
@@ -31,7 +33,8 @@ ConfigUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     break;
   case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_pattern_ = RegexUtil::parseRegex(config.regex_match());
+    value_ = config.regex_match();
+    regex_pattern_ = RegexUtil::parseRegex(value_);
     break;
   case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
@@ -41,12 +44,12 @@ ConfigUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
   case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
+    value_ = config.value();
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
       header_match_type_ = HeaderMatchType::Regex;
-      regex_pattern_ = RegexUtil::parseRegex(config.value());
+      regex_pattern_ = RegexUtil::parseRegex(value_);
     } else {
       header_match_type_ = HeaderMatchType::Value;
-      value_ = config.value();
     }
     break;
   }
