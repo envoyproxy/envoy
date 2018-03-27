@@ -165,7 +165,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) override;
-  void UnregisterHystrixSink() override;
+  void unregisterHystrixSink() override;
 
 private:
   void flushStats();

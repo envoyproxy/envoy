@@ -154,7 +154,7 @@ void InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* cal
   }
 }
 
-void InstanceImpl::UnregisterHystrixSink() {
+void InstanceImpl::unregisterHystrixSink() {
   for (const auto& sink : config_->statsSinks()) {
     // TODO: is there a better way to find the hystrix sink?
     Stats::HystrixNameSpace::HystrixSink* hystrix_sink =

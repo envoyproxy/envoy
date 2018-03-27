@@ -182,7 +182,7 @@ public:
 
   virtual void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
 
-  virtual void UnregisterHystrixSink() PURE;
+  virtual void unregisterHystrixSink() PURE;
 };
 
 } // namespace Server

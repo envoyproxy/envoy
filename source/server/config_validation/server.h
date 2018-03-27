@@ -88,7 +88,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   void registerToHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
-  void UnregisterHystrixSink() override { NOT_IMPLEMENTED; }
+  void unregisterHystrixSink() override { NOT_IMPLEMENTED; }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(

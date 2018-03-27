@@ -100,7 +100,7 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
 
-  void UregisterHystrixConnection() { server_.UnregisterHystrixSink(); }
+  void unregisterHystrixConnection() { server_.unregisterHystrixSink(); }
 
 private:
   /**
@@ -239,7 +239,7 @@ public:
   AdminFilter(AdminImpl& parent);
 
   // Http::StreamFilterBase
-  void onDestroy() override { parent_.UregisterHystrixConnection(); }
+  void onDestroy() override { parent_.unregisterHystrixConnection(); }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& response_headers,
