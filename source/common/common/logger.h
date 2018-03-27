@@ -153,6 +153,12 @@ public:
    */
   bool hasLock() const { return stderr_sink_->hasLock(); }
 
+  // Constructs a new DelegatingLogSink, sets up the default sink to stderr,
+  // and returns a shared_ptr to it. A shared_ptr is required for sinks used
+  // in spdlog::logger; it would not otherwise be required in Envoy. This method
+  // must own the construction process because StderrSinkDelegate needs access to
+  // the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+  // available after construction.
   static DelegatingLogSinkPtr init();
 
 private:
@@ -187,10 +193,21 @@ public:
     return sink;
   }
 
+  /*
+   * Initialize the logging system with the specified lock and log level.
+   */
+  static void initialize(uint64_t log_level, Thread::BasicLockable& lock) {
+    // TODO(jmarantz): I think it would be more robust to push a separate lockable
+    // SinkDelegate onto the stack for the lifetime of the lock, so we don't crash
+    // if we try to log anything after the context owning the lock is destroyed.
+    getSink()->setLock(lock);
+    setLogLevel(log_level);
+  }
+
   /**
    * Initialize the logging system from server options.
    */
-  static void initialize(uint64_t log_level, Thread::BasicLockable& lock);
+  static void setLogLevel(uint64_t log_level);
 
   /**
    * @return const std::vector<Logger>& the installed loggers.

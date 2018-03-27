@@ -1,6 +1,6 @@
 #include "common/common/logger.h"
 
-#include <cassert>
+#include <cassert> // use direct system-assert to avoid cyclic dependency.
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -84,8 +84,7 @@ std::vector<Logger>& Registry::allLoggers() {
 
 spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }
 
-void Registry::initialize(uint64_t log_level, Thread::BasicLockable& lock) {
-  getSink()->setLock(lock);
+void Registry::setLogLevel(uint64_t log_level) {
   for (Logger& logger : allLoggers()) {
     logger.logger_->set_level(static_cast<spdlog::level::level_enum>(log_level));
   }

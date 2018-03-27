@@ -85,7 +85,7 @@ public:
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
-    Logger::Registry::initialize(Logger::Logger::warn, lock_);
+    Logger::Registry::setLogLevel(Logger::Logger::warn);
   }
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
