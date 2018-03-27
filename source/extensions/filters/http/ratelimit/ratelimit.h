@@ -16,8 +16,9 @@
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {
-namespace Http {
-namespace RateLimit {
+namespace Extensions {
+namespace HttpFilters {
+namespace RateLimitFilter {
 
 /**
  * Type of requests the filter should apply to.
@@ -72,40 +73,41 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public StreamDecoderFilter, public Envoy::RateLimit::RequestCallbacks {
+class Filter : public Http::StreamDecoderFilter, public RateLimit::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Envoy::RateLimit::ClientPtr&& client)
+  Filter(FilterConfigSharedPtr config, RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
-  void complete(Envoy::RateLimit::LimitStatus status) override;
+  void complete(RateLimit::LimitStatus status) override;
 
 private:
-  void initiateCall(const HeaderMap& headers);
+  void initiateCall(const Http::HeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                    std::vector<RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
-                                    const HeaderMap& headers) const;
+                                    const Http::HeaderMap& headers) const;
 
   enum class State { NotStarted, Calling, Complete, Responded };
 
   FilterConfigSharedPtr config_;
-  Envoy::RateLimit::ClientPtr client_;
-  StreamDecoderFilterCallbacks* callbacks_{};
+  RateLimit::ClientPtr client_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
 };
 
-} // namespace RateLimit
-} // namespace Http
+} // namespace RateLimitFilter
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

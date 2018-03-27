@@ -13,8 +13,9 @@
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
-namespace RateLimit {
-namespace TcpFilter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RateLimitFilter {
 
 /**
  * All tcp rate limit stats. @see stats_macros.h
@@ -44,7 +45,7 @@ public:
   Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
          Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
-  const std::vector<Descriptor>& descriptors() { return descriptors_; }
+  const std::vector<RateLimit::Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
 
@@ -52,7 +53,7 @@ private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
 
   std::string domain_;
-  std::vector<Descriptor> descriptors_;
+  std::vector<RateLimit::Descriptor> descriptors_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
 };
@@ -65,11 +66,11 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * connection will be closed without any further filters being called. Otherwise all buffered
  * data will be released to further filters.
  */
-class Instance : public Network::ReadFilter,
-                 public Network::ConnectionCallbacks,
-                 public RequestCallbacks {
+class Filter : public Network::ReadFilter,
+               public Network::ConnectionCallbacks,
+               public RateLimit::RequestCallbacks {
 public:
-  Instance(ConfigSharedPtr config, ClientPtr&& client)
+  Filter(ConfigSharedPtr config, RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Network::ReadFilter
@@ -86,18 +87,18 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // RateLimit::RequestCallbacks
-  void complete(LimitStatus status) override;
+  void complete(RateLimit::LimitStatus status) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };
 
   ConfigSharedPtr config_;
-  ClientPtr client_;
+  RateLimit::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_limit_{};
 };
-
-} // TcpFilter
-} // namespace RateLimit
+}
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
