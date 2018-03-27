@@ -2,6 +2,9 @@
 
 #include "envoy/common/time.h"
 
+#include "common/common/logger.h"
+
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -44,4 +47,14 @@ public:
 
   MOCK_METHOD0(currentTime, MonotonicTime());
 };
+
+class MockLogSink : public Logger::SinkDelegate {
+public:
+  MockLogSink() : Logger::SinkDelegate(Logger::Registry::getSink()) {}
+  virtual ~MockLogSink(){};
+
+  MOCK_METHOD1(log, void(absl::string_view msg));
+  MOCK_METHOD0(flush, void());
+};
+
 } // namespace Envoy

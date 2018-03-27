@@ -1,5 +1,6 @@
 #include "common/common/logger.h"
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -23,39 +24,62 @@ Logger::Logger(const std::string& name) {
   logger_->flush_on(spdlog::level::critical);
 }
 
-void LockingStderrOrFileSink::logToStdErr() { log_file_.reset(); }
+SinkDelegate::SinkDelegate(DelegatingLogSinkPtr log_sink)
+    : previous_delegate_(log_sink->delegate()), log_sink_(log_sink) {
+  log_sink->setDelegate(this);
+}
 
-void LockingStderrOrFileSink::logToFile(const std::string& log_path,
-                                        AccessLog::AccessLogManager& log_manager) {
-  log_file_ = log_manager.createAccessLog(log_path);
+SinkDelegate::~SinkDelegate() {
+  assert(log_sink_->delegate() == this); // Ensures stacked allocation of delegates.
+  log_sink_->setDelegate(previous_delegate_);
+}
+
+FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
+                                   AccessLog::AccessLogManager& log_manager,
+                                   DelegatingLogSinkPtr log_sink)
+    : SinkDelegate(log_sink), log_file_(log_manager.createAccessLog(log_path)) {}
+
+void FileSinkDelegate::log(absl::string_view msg) {
+  // Logfiles have internal locking to ensure serial, non-interleaved
+  // writes, so no additional locking needed here.
+  //
+  // TODO(jmarantz): filesystem file write should take string_view. Adding that requires
+  // finding a way to make that work for mocked filesystem writes.
+  log_file_->write(std::string(msg));
+}
+
+void FileSinkDelegate::flush() {
+  // Logfiles have internal locking to ensure serial, non-interleaved
+  // writes, so no additional locking needed here.
+  log_file_->flush();
+}
+
+StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkPtr log_sink) : SinkDelegate(log_sink) {}
+
+void StderrSinkDelegate::log(absl::string_view msg) {
+  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+  std::cerr << msg;
+}
+
+void StderrSinkDelegate::flush() {
+  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+  std::cerr << std::flush;
+}
+
+void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
+  sink_->log(msg.formatted.str());
+}
+
+DelegatingLogSinkPtr DelegatingLogSink::init() {
+  DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
+  delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
+  return delegating_sink;
 }
 
 std::vector<Logger>& Registry::allLoggers() {
   static std::vector<Logger>* all_loggers =
       new std::vector<Logger>({ALL_LOGGER_IDS(GENERATE_LOGGER)});
   return *all_loggers;
-}
-
-void LockingStderrOrFileSink::log(const spdlog::details::log_msg& msg) {
-  if (log_file_) {
-    // Logfiles have internal locking to ensure serial, non-interleaved
-    // writes, so no additional locking needed here.
-    log_file_->write(msg.formatted.str());
-  } else {
-    Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
-    std::cerr << msg.formatted.str();
-  }
-}
-
-void LockingStderrOrFileSink::flush() {
-  if (log_file_) {
-    // Logfiles have internal locking to ensure serial, non-interleaved
-    // writes, so no additional locking needed here.
-    log_file_->flush();
-  } else {
-    Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
-    std::cerr << std::flush;
-  }
 }
 
 spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }
