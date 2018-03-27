@@ -81,6 +81,16 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(connection_.remote_address_->ip()->addressAsString(),
             headers.get_(Headers::get().ForwardedFor));
+
+  // Enable IPv4MappedIpv6 addresses and ensure address is mapped.
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(
+                  "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6", _))
+      .WillOnce(Return(true));
+  TestHeaderMapImpl headersMappingEnabled;
+  EXPECT_EQ((MutateRequestRet{"[::ffff:12.12.12.12]:0", false}),
+            callMutateRequestHeaders(headersMappingEnabled, Protocol::Http2));
+  EXPECT_EQ("::ffff:12.12.12.12", headersMappingEnabled.get_(Headers::get().ForwardedFor));
 }
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
@@ -89,11 +99,22 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
   Network::Address::Ipv4Instance local_address("10.3.2.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
-  TestHeaderMapImpl headers;
 
+  TestHeaderMapImpl headers;
   EXPECT_EQ((MutateRequestRet{"127.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(local_address.ip()->addressAsString(), headers.get_(Headers::get().ForwardedFor));
+
+  // Enable IPv4MappedIpv6 addresses and ensure same result.
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(
+                  "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6", _))
+      .WillOnce(Return(true));
+  TestHeaderMapImpl headersMappingEnabled;
+  EXPECT_EQ((MutateRequestRet{"127.0.0.1:0", true}),
+            callMutateRequestHeaders(headersMappingEnabled, Protocol::Http2));
+  EXPECT_EQ(local_address.ip()->addressAsString(),
+            headersMappingEnabled.get_(Headers::get().ForwardedFor));
 }
 
 // Verify that we trust Nth address from XFF when using remote address with xff_num_trusted_hops.
@@ -105,6 +126,16 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "198.51.100.1");
+
+  // Enable IPv4MappedIpv6 addresses. Since the value was pulled from XFF, it should be untouched.
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(
+                  "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6", _))
+      .WillOnce(Return(true));
+  TestHeaderMapImpl headersMappingEnabled{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false}),
+            callMutateRequestHeaders(headersMappingEnabled, Protocol::Http2));
+  EXPECT_EQ(headersMappingEnabled.EnvoyExternalAddress()->value(), "198.51.100.1");
 }
 
 // Verify that xff_num_trusted_hops works when not using remote address.
@@ -116,6 +147,16 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+
+  // Enable IPv4MappedIpv6 addresses. Since the value was pulled from XFF it should be untouched.
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(
+                  "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6", _))
+      .WillOnce(Return(true));
+  TestHeaderMapImpl headersMappingEnabled{{"x-forwarded-for", "198.51.100.2, 198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
+            callMutateRequestHeaders(headersMappingEnabled, Protocol::Http2));
+  EXPECT_EQ(headersMappingEnabled.EnvoyExternalAddress(), nullptr);
 }
 
 // Verify that we don't set user agent when it is already set.
@@ -186,6 +227,10 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillByDefault(Return(true));
+  EXPECT_CALL(runtime_.snapshot_,
+              featureEnabled(
+                  "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6", _))
+      .Times(testing::AnyNumber());
 
   {
     TestHeaderMapImpl headers{{"x-envoy-downstream-service-cluster", "foo"},

@@ -156,6 +156,16 @@ void Utility::throwWithMalformedIp(const std::string& ip_address) {
   throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
 }
 
+Address::InstanceConstSharedPtr
+Utility::mapIPv4toIPv6(const Address::InstanceConstSharedPtr& address) {
+  if (address->ip()->version() == Address::IpVersion::v4) {
+    return std::make_shared<Address::Ipv6Instance>("::ffff:" + address->ip()->addressAsString(),
+                                                   address->ip()->port());
+  } else {
+    return address;
+  }
+}
+
 // TODO(hennna): Currently getLocalAddress does not support choosing between
 // multiple interfaces and addresses not returned by getifaddrs. In additon,
 // the default is to return a loopback address of type version. This function may
@@ -208,7 +218,8 @@ bool Utility::isInternalAddress(const Address::Instance& address) {
   }
 
   if (address.ip()->version() == Address::IpVersion::v4) {
-    // Handle the RFC1918 space for IPV4. Also count loopback as internal.
+    // Handle the RFC1918 space for IPv4, i.e. 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. Also count
+    // loopback as internal.
     const uint32_t address4 = address.ip()->ipv4()->address();
     const uint8_t* address4_bytes = reinterpret_cast<const uint8_t*>(&address4);
     if ((address4_bytes[0] == 10) || (address4_bytes[0] == 192 && address4_bytes[1] == 168) ||

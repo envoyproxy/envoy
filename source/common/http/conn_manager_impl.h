@@ -290,7 +290,8 @@ public:
   virtual bool proxy100Continue() const PURE;
 
   /**
-   * @return should the HttpConnectionManager representIpv4RemoteAddressAsIpv4MappedIpv6 TODO(FIX FIX)
+   * @return should IPv4 addresses be represented in IPv4 mapped IPv6 format when appended to
+   *         XFF and for logging
    */
   virtual bool representIpv4RemoteAddressAsIpv4MappedIpv6() const PURE;
 };
