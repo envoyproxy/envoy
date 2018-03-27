@@ -52,9 +52,13 @@ public:
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
   const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, "static"); }
+  const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+    return route_config_proto_;
+  }
 
 private:
   ConfigConstSharedPtr config_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
 };
 
 /**
@@ -77,11 +81,11 @@ struct RdsStats {
 class RouteConfigProviderManagerImpl;
 
 /**
- * Implementation of RdsRouteConfigProvider that fetches the route configuration dynamically using
+ * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the RDS API.
  */
 class RdsRouteConfigProviderImpl
-    : public RdsRouteConfigProvider,
+    : public RouteConfigProvider,
       public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
@@ -96,13 +100,9 @@ public:
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
-
-  // Router::RdsRouteConfigProvider
-  std::string configAsJson() const override {
-    return MessageUtil::getJsonStringFromMessage(route_config_proto_, true);
+  const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+    return route_config_proto_;
   }
-  const std::string& routeConfigName() const override { return route_config_name_; }
-  const std::string& configSource() const override { return config_source_; }
   const std::string versionInfo() const override { return subscription_->versionInfo(); }
 
   // Config::SubscriptionCallbacks
@@ -148,55 +148,44 @@ private:
   friend class RouteConfigProviderManagerImpl;
 };
 
-class RouteConfigProviderManagerImpl : public ServerRouteConfigProviderManager,
+class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
                                  ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
-  ~RouteConfigProviderManagerImpl();
 
-  // ServerRouteConfigProviderManager
-  std::vector<RdsRouteConfigProviderSharedPtr> rdsRouteConfigProviders() override;
   // RouteConfigProviderManager
-  RouteConfigProviderSharedPtr getRouteConfigProvider(
+  std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
+  std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() override;
+
+  RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
+  RouteConfigProviderSharedPtr
+  getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
+                               Runtime::Loader& runtime, Upstream::ClusterManager& cm) override;
+
 private:
-  /**
-   * The handler used in the Admin /routes endpoint. This handler is used to
-   * populate the response Buffer::Instance with information about the currently
-   * loaded dynamic HTTP Route Tables.
-   * @param path_and_query supplies the url path and query-params sent to the Admin endpoint.
-   * @param response_headers enables setting of http headers (eg content-type, cache-control) in
-   * the handler.
-   * @param response supplies the buffer to fill with information.
-   * @return Http::Code OK if the endpoint can parse and operate on the url, NotFound otherwise.
-   */
-  Http::Code handlerRoutes(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                           Buffer::Instance& response);
+  ProtobufTypes::MessagePtr dumpRouteConfigs();
 
-  /**
-   * Helper function used by handlerRoutes. The function loops through the providers
-   * and adds them to the response.
-   * @param response supplies the buffer to fill with information.
-   * @param providers supplies the vector of providers to add to the response.
-   * @return Http::Code OK.
-   */
-  Http::Code handlerRoutesLoop(Buffer::Instance& response,
-                               const std::vector<RdsRouteConfigProviderSharedPtr> providers);
-
+  // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
+  // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
+  // Then the lifetime management stuff is centralized and opaque. Plus the copypasta
+  // in getRdsRouteConfigProviders()/getStaticRouteConfigProviders() goes away.
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
+  std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
   Runtime::Loader& runtime_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
   const LocalInfo::LocalInfo& local_info_;
   ThreadLocal::SlotAllocator& tls_;
   Server::Admin& admin_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigProviderImpl;
 };
