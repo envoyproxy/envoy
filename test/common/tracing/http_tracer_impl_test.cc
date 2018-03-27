@@ -185,7 +185,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, forced_header);
     EXPECT_EQ(Reason::ServiceForced, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // Sample traced.
@@ -194,7 +194,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, sampled_header);
     EXPECT_EQ(Reason::Sampling, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // HC request.
@@ -204,7 +204,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, traceable_header_hc);
     EXPECT_EQ(Reason::HealthCheck, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 
   // Client traced.
@@ -213,7 +213,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 
     Decision result = HttpTracerUtility::isTracing(request_info, client_header);
     EXPECT_EQ(Reason::ClientForced, result.reason);
-    EXPECT_TRUE(result.is_tracing);
+    EXPECT_TRUE(result.traced);
   }
 
   // No request id.
@@ -222,7 +222,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(request_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 
   // Broken request id.
@@ -231,7 +231,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
     EXPECT_CALL(request_info, healthCheck()).WillOnce(Return(false));
     Decision result = HttpTracerUtility::isTracing(request_info, headers);
     EXPECT_EQ(Reason::NotTraceableRequestId, result.reason);
-    EXPECT_FALSE(result.is_tracing);
+    EXPECT_FALSE(result.traced);
   }
 }
 
@@ -411,7 +411,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_headers;
 
-  SpanPtr span_ptr = null_tracer.startSpan(config, request_headers, request_info);
+  SpanPtr span_ptr =
+      null_tracer.startSpan(config, request_headers, request_info, {Reason::Sampling, true});
   EXPECT_TRUE(dynamic_cast<NullSpan*>(span_ptr.get()) != nullptr);
 
   span_ptr->setOperation("foo");
@@ -441,9 +442,9 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNullSpan) {
   EXPECT_CALL(config_, operationName()).Times(2);
   EXPECT_CALL(request_info_, startTime());
   const std::string operation_name = "ingress";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
+  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_, _))
       .WillOnce(Return(nullptr));
-  tracer_->startSpan(config_, request_headers_, request_info_);
+  tracer_->startSpan(config_, request_headers_, request_info_, {Reason::Sampling, true});
 }
 
 TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
@@ -453,12 +454,12 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
 
   NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
   const std::string operation_name = "egress test";
-  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_))
+  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, request_info_.start_time_, _))
       .WillOnce(Return(span));
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, setTag(Tracing::Tags::get().NODE_ID, "node_name"));
 
-  tracer_->startSpan(config_, request_headers_, request_info_);
+  tracer_->startSpan(config_, request_headers_, request_info_, {Reason::Sampling, true});
 }
 
 } // namespace Tracing

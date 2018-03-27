@@ -33,7 +33,11 @@ MockOptions::MockOptions(const std::string& config_path)
 }
 MockOptions::~MockOptions() {}
 
-MockAdmin::MockAdmin() {}
+MockAdmin::MockAdmin() {
+  ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker));
+  ON_CALL(config_tracker, addReturnsRaw(_, _))
+      .WillByDefault(ReturnNew<Server::MockConfigTracker::MockEntryOwner>());
+}
 MockAdmin::~MockAdmin() {}
 
 MockDrainManager::MockDrainManager() {

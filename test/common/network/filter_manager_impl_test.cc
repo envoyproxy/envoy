@@ -4,10 +4,11 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/filter/ratelimit.h"
-#include "common/filter/tcp_proxy.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -185,10 +186,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
   tcp_proxy.set_cluster("fake_cluster");
-  Envoy::Filter::TcpProxyConfigSharedPtr tcp_proxy_config(
-      new Envoy::Filter::TcpProxyConfig(tcp_proxy, factory_context));
-  manager.addReadFilter(ReadFilterSharedPtr{
-      new Envoy::Filter::TcpProxy(tcp_proxy_config, factory_context.cluster_manager_)});
+  Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr tcp_proxy_config(
+      new Extensions::NetworkFilters::TcpProxy::TcpProxyConfig(tcp_proxy, factory_context));
+  manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyFilter>(
+      tcp_proxy_config, factory_context.cluster_manager_));
 
   RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
