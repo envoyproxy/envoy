@@ -470,7 +470,7 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::vector<NiceMock<Event::MockTimer>*> connect_timers_;
   std::unique_ptr<TcpProxyFilter> filter_;
-  std::string access_log_data_;
+  Filesystem::StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
@@ -711,14 +711,14 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
                     .value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ("UF", access_log_data_);
 }
 
 TEST_F(TcpProxyTest, NoHost) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UH");
+  EXPECT_EQ("UH", access_log_data_);
 }
 
 TEST_F(TcpProxyTest, WithMetadataMatch) {
@@ -776,7 +776,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
                     .value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ("UF", access_log_data_);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
@@ -796,7 +796,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
                     .value());
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UO");
+  EXPECT_EQ("UO", access_log_data_);
 }
 
 // Tests that the idle timer closes both connections, and gets updated when either
@@ -862,14 +862,14 @@ TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
+  EXPECT_EQ("127.0.0.1:80 fake_cluster", access_log_data_);
 }
 
 // Test that access log field %UPSTREAM_LOCAL_ADDRESS% is correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
+  EXPECT_EQ("2.2.2.2:50000", access_log_data_);
 }
 
 // Test that access log fields %DOWNSTREAM_ADDRESS% and %DOWNSTREAM_LOCAL_ADDRESS% are correctly
@@ -881,7 +881,7 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
   setup(1, accessLogConfig("%DOWNSTREAM_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
+  EXPECT_EQ("1.1.1.1 1.1.1.2:20000", access_log_data_);
 }
 
 // Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are

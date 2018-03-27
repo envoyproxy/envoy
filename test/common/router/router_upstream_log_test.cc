@@ -80,7 +80,8 @@ public:
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
-          .WillByDefault(Invoke([&](const std::string& data) { output_.push_back(data); }));
+          .WillByDefault(
+              Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
 
       envoy::config::filter::accesslog::v2::AccessLog* current_upstream_log =
           router_proto.add_upstream_log();
