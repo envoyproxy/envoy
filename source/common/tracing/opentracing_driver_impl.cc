@@ -171,10 +171,11 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
     }
   }
   opentracing::StartSpanOptions options;
-  opentracing::ChildOf(parent_span_ctx.get()).Apply(options);
-  opentracing::StartTimestamp(start_time).Apply(options);
+  options.references.emplace_back(opentracing::SpanReferenceType::ChildOfRef,
+                                  parent_span_ctx.get());
+  options.start_system_timestamp = start_time;
   if (!tracing_decision.traced) {
-    opentracing::SetTag(opentracing::ext::sampling_priority, 0).Apply(options);
+    options.tags.emplace_back(opentracing::ext::sampling_priority, 0);
   }
   active_span = tracer.StartSpanWithOptions(operation_name, options);
   RELEASE_ASSERT(active_span != nullptr);
