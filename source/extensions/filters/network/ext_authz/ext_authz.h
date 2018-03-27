@@ -67,13 +67,13 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * connection will be closed without any further filters being called. Otherwise all buffered
  * data will be released to further filters.
  */
-class Instance : public Network::ReadFilter,
-                 public Network::ConnectionCallbacks,
-                 public Filters::Common::ExtAuthz::RequestCallbacks {
+class Filter : public Network::ReadFilter,
+               public Network::ConnectionCallbacks,
+               public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Instance(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
+  Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Instance() {}
+  ~Filter() {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

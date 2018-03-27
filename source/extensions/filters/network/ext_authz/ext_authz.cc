@@ -17,7 +17,7 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void Instance::callCheck() {
+void Filter::callCheck() {
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_);
 
   status_ = Status::Calling;
@@ -29,7 +29,7 @@ void Instance::callCheck() {
   calling_check_ = false;
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&, bool /* end_stream */) {
+Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
     // sufficient information to fillout the checkRequest_.
@@ -39,12 +39,12 @@ Network::FilterStatus Instance::onData(Buffer::Instance&, bool /* end_stream */)
                                     : Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus Instance::onNewConnection() {
+Network::FilterStatus Filter::onNewConnection() {
   // Wait till onData() happens.
   return Network::FilterStatus::Continue;
 }
 
-void Instance::onEvent(Network::ConnectionEvent event) {
+void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     if (status_ == Status::Calling) {
@@ -56,7 +56,7 @@ void Instance::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Instance::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
+void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

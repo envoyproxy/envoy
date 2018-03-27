@@ -54,7 +54,7 @@ public:
     MessageUtil::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
     client_ = new Filters::Common::ExtAuthz::MockClient();
-    filter_.reset(new Instance(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
+    filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
@@ -72,7 +72,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::MockClient* client_;
-  std::unique_ptr<Instance> filter_;
+  std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
