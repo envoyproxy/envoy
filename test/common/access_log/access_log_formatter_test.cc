@@ -54,6 +54,14 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
+    RequestInfoFormatter start_time_format("START_TIME", "%Y/%m/%d");
+    SystemTime time;
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTimeWithFormat(time, "%Y/%m/%d"),
+              start_time_format.format(header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
     EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));

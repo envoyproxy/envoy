@@ -116,7 +116,7 @@ public:
  */
 class RequestInfoFormatter : public Formatter {
 public:
-  RequestInfoFormatter(const std::string& field_name);
+  RequestInfoFormatter(const std::string& field_name, const std::string& arguments = "");
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,

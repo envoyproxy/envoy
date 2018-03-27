@@ -49,6 +49,7 @@ private:
 class AccessLogDateTimeFormatter {
 public:
   static std::string fromTime(const SystemTime& time);
+  static std::string fromTimeWithFormat(const SystemTime& time, const std::string& format);
 };
 
 /**

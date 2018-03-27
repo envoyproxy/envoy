@@ -87,7 +87,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     max_length = length_value;
   }
 
-  std::string header_name = token.substr(start, end_request - start);
+  const std::string header_name = token.substr(start, end_request - start);
   size_t separator = header_name.find('?');
 
   if (separator == std::string::npos) {
@@ -110,13 +110,23 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         current_token = "";
       }
 
-      size_t command_end_position = format.find('%', pos + 1);
+      pos += 1;
+      size_t command_end_position;
+
+      // special consideration is made for START_TIME to escape date format strings which likely
+      // contain '%'
+      if (format.find("START_TIME(", pos) == pos) {
+        command_end_position = format.find(")%", pos) + 1;
+      } else {
+        command_end_position = format.find('%', pos);
+      }
+
       if (command_end_position == std::string::npos) {
         throw EnvoyException(fmt::format(
             "Incorrect configuration: {}. Expected end of operation '%', around position {}",
             format, pos));
       }
-      std::string token = format.substr(pos + 1, command_end_position - (pos + 1));
+      const std::string token = format.substr(pos, command_end_position - pos);
 
       if (token.find("REQ(") == 0) {
         std::string main_header, alternative_header;
@@ -136,10 +146,13 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         formatters.emplace_back(
             FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
+      } else if (token.find("START_TIME(") == 0) {
+        const size_t start = 11;
+        const std::string args = token.substr(start, command_end_position - (pos + start + 1));
+        formatters.emplace_back(FormatterPtr(new RequestInfoFormatter("START_TIME", args)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
       }
-
       pos = command_end_position;
     } else {
       current_token += format[pos];
@@ -153,10 +166,11 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   return formatters;
 }
 
-RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
+RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name,
+                                           const std::string& arguments) {
   if (field_name == "START_TIME") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
+    field_extractor_ = [arguments](const RequestInfo::RequestInfo& request_info) {
+      return AccessLogDateTimeFormatter::fromTimeWithFormat(request_info.startTime(), arguments);
     };
   } else if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
