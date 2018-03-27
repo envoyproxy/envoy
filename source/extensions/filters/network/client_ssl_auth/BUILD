@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "client_ssl_lib",
-    srcs = ["client_ssl.cc"],
-    hdrs = ["client_ssl.h"],
+    name = "client_ssl_auth",
+    srcs = ["client_ssl_auth.cc"],
+    hdrs = ["client_ssl_auth.h"],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -30,5 +30,18 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":client_ssl_auth",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
     ],
 )

@@ -25,7 +25,9 @@
 #include "common/router/config_impl.h"
 
 namespace Envoy {
-namespace Filter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace TcpProxy {
 
 /**
  * All tcp proxy stats. @see stats_macros.h
@@ -138,12 +140,12 @@ typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
  * connection using the defined load balancing proxy for the configured cluster. All data will
  * be proxied back and forth between the two connections.
  */
-class TcpProxy : public Network::ReadFilter,
-                 Upstream::LoadBalancerContext,
-                 protected Logger::Loggable<Logger::Id::filter> {
+class TcpProxyFilter : public Network::ReadFilter,
+                       Upstream::LoadBalancerContext,
+                       protected Logger::Loggable<Logger::Id::filter> {
 public:
-  TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
-  ~TcpProxy();
+  TcpProxyFilter(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
+  ~TcpProxyFilter();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -171,7 +173,7 @@ public:
 
   struct UpstreamCallbacks : public Network::ConnectionCallbacks,
                              public Network::ReadFilterBaseImpl {
-    UpstreamCallbacks(TcpProxy* parent) : parent_(parent) {}
+    UpstreamCallbacks(TcpProxyFilter* parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -192,7 +194,7 @@ public:
     // Parent starts out as non-NULL. If the downstream connection is closed while
     // the upstream connection still has buffered data to flush, drainer_ becomes
     // non-NULL and parent_ is set to NULL.
-    TcpProxy* parent_{};
+    TcpProxyFilter* parent_{};
     TcpProxyDrainer* drainer_{};
 
     bool on_high_watermark_called_{false};
@@ -200,14 +202,14 @@ public:
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
-    DownstreamCallbacks(TcpProxy& parent) : parent_(parent) {}
+    DownstreamCallbacks(TcpProxyFilter& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
-    TcpProxy& parent_;
+    TcpProxyFilter& parent_;
     bool on_high_watermark_called_{false};
   };
 
@@ -262,7 +264,7 @@ class TcpProxyDrainer : public Event::DeferredDeletable {
 public:
   TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
                   const TcpProxyConfig::SharedConfigSharedPtr& config,
-                  const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+                  const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
                   Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
                   const Upstream::HostDescriptionConstSharedPtr& upstream_host,
                   Stats::TimespanPtr&& connected_timespan);
@@ -275,7 +277,7 @@ public:
 
 private:
   TcpProxyUpstreamDrainManager& parent_;
-  std::shared_ptr<TcpProxy::UpstreamCallbacks> callbacks_;
+  std::shared_ptr<TcpProxyFilter::UpstreamCallbacks> callbacks_;
   Network::ClientConnectionPtr upstream_connection_;
   Event::TimerPtr timer_;
   Stats::TimespanPtr connected_timespan_;
@@ -290,7 +292,7 @@ public:
   ~TcpProxyUpstreamDrainManager();
   void add(const TcpProxyConfig::SharedConfigSharedPtr& config,
            Network::ClientConnectionPtr&& upstream_connection,
-           const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
+           const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
            Event::TimerPtr&& idle_timer,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host,
            Stats::TimespanPtr&& connected_timespan);
@@ -304,4 +306,6 @@ private:
 };
 
 } // Filter
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

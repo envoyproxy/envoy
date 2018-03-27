@@ -1,4 +1,4 @@
-#include "common/filter/tcp_proxy.h"
+#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include <cstdint>
 #include <string>
@@ -18,7 +18,9 @@
 #include "common/config/well_known_names.h"
 
 namespace Envoy {
-namespace Filter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace TcpProxy {
 
 TcpProxyConfig::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -123,11 +125,12 @@ TcpProxyUpstreamDrainManager& TcpProxyConfig::drainManager() {
 }
 
 // TODO(ggreenway): refactor this and websocket code so that config_ is always non-null.
-TcpProxy::TcpProxy(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
+TcpProxyFilter::TcpProxyFilter(TcpProxyConfigSharedPtr config,
+                               Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
       upstream_callbacks_(new UpstreamCallbacks(this)) {}
 
-TcpProxy::~TcpProxy() {
+TcpProxyFilter::~TcpProxyFilter() {
   request_info_.onRequestComplete();
 
   if (config_ != nullptr) {
@@ -156,11 +159,11 @@ void finalizeConnectionStats(const Upstream::HostDescription& host,
 }
 } // namespace
 
-void TcpProxy::finalizeUpstreamConnectionStats() {
+void TcpProxyFilter::finalizeUpstreamConnectionStats() {
   finalizeConnectionStats(*read_callbacks_->upstreamHost(), *connected_timespan_);
 }
 
-void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void TcpProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
@@ -185,7 +188,7 @@ void TcpProxy::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callb
        config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
 }
 
-void TcpProxy::readDisableUpstream(bool disable) {
+void TcpProxyFilter::readDisableUpstream(bool disable) {
   if (upstream_connection_ == nullptr ||
       upstream_connection_->state() != Network::Connection::State::Open) {
     // Because we flush write downstream, we can have a case where upstream has already disconnected
@@ -208,7 +211,7 @@ void TcpProxy::readDisableUpstream(bool disable) {
   }
 }
 
-void TcpProxy::readDisableDownstream(bool disable) {
+void TcpProxyFilter::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
   // The WsHandlerImpl class uses TCP Proxy code with a null config.
   if (!config_) {
@@ -222,21 +225,21 @@ void TcpProxy::readDisableDownstream(bool disable) {
   }
 }
 
-void TcpProxy::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
+void TcpProxyFilter::DownstreamCallbacks::onAboveWriteBufferHighWatermark() {
   ASSERT(!on_high_watermark_called_);
   on_high_watermark_called_ = true;
   // If downstream has too much data buffered, stop reading on the upstream connection.
   parent_.readDisableUpstream(true);
 }
 
-void TcpProxy::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
+void TcpProxyFilter::DownstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
   // The downstream buffer has been drained. Resume reading from upstream.
   parent_.readDisableUpstream(false);
 }
 
-void TcpProxy::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
+void TcpProxyFilter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
   if (drainer_ == nullptr) {
     parent_->onUpstreamEvent(event);
   } else {
@@ -244,7 +247,7 @@ void TcpProxy::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+void TcpProxyFilter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
   ASSERT(!on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
@@ -254,7 +257,7 @@ void TcpProxy::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
   }
 }
 
-void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+void TcpProxyFilter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   ASSERT(on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
@@ -264,7 +267,8 @@ void TcpProxy::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   }
 }
 
-Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus TcpProxyFilter::UpstreamCallbacks::onData(Buffer::Instance& data,
+                                                                bool end_stream) {
   if (parent_) {
     parent_->onUpstreamData(data, end_stream);
   } else {
@@ -273,7 +277,7 @@ Network::FilterStatus TcpProxy::UpstreamCallbacks::onData(Buffer::Instance& data
   return Network::FilterStatus::StopIteration;
 }
 
-void TcpProxy::UpstreamCallbacks::onBytesSent() {
+void TcpProxyFilter::UpstreamCallbacks::onBytesSent() {
   if (drainer_ == nullptr) {
     parent_->resetIdleTimer();
   } else {
@@ -281,7 +285,7 @@ void TcpProxy::UpstreamCallbacks::onBytesSent() {
   }
 }
 
-void TcpProxy::UpstreamCallbacks::onIdleTimeout() {
+void TcpProxyFilter::UpstreamCallbacks::onIdleTimeout() {
   if (drainer_ == nullptr) {
     parent_->onIdleTimeout();
   } else {
@@ -289,13 +293,13 @@ void TcpProxy::UpstreamCallbacks::onIdleTimeout() {
   }
 }
 
-void TcpProxy::UpstreamCallbacks::drain(TcpProxyDrainer& drainer) {
+void TcpProxyFilter::UpstreamCallbacks::drain(TcpProxyDrainer& drainer) {
   ASSERT(drainer_ == nullptr); // This should only get set once.
   drainer_ = &drainer;
   parent_ = nullptr;
 }
 
-Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
+Network::FilterStatus TcpProxyFilter::initializeUpstreamConnection() {
   ASSERT(upstream_connection_ == nullptr);
 
   const std::string& cluster_name = getUpstreamCluster();
@@ -374,7 +378,7 @@ Network::FilterStatus TcpProxy::initializeUpstreamConnection() {
   return Network::FilterStatus::Continue;
 }
 
-void TcpProxy::onConnectTimeout() {
+void TcpProxyFilter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
@@ -385,7 +389,7 @@ void TcpProxy::onConnectTimeout() {
   upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus TcpProxyFilter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
   request_info_.bytes_received_ += data.length();
@@ -395,7 +399,7 @@ Network::FilterStatus TcpProxy::onData(Buffer::Instance& data, bool end_stream) 
   return Network::FilterStatus::StopIteration;
 }
 
-void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
+void TcpProxyFilter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (upstream_connection_) {
     if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
@@ -419,7 +423,7 @@ void TcpProxy::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+void TcpProxyFilter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
   request_info_.bytes_sent_ += data.length();
@@ -428,7 +432,7 @@ void TcpProxy::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
-void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
+void TcpProxyFilter::onUpstreamEvent(Network::ConnectionEvent event) {
   bool connecting = false;
 
   // The timer must be cleared before, not after, processing the event because
@@ -495,21 +499,21 @@ void TcpProxy::onUpstreamEvent(Network::ConnectionEvent event) {
   }
 }
 
-void TcpProxy::onIdleTimeout() {
+void TcpProxyFilter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-void TcpProxy::resetIdleTimer() {
+void TcpProxyFilter::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(config_->idleTimeout());
     idle_timer_->enableTimer(config_->idleTimeout().value());
   }
 }
 
-void TcpProxy::disableIdleTimer() {
+void TcpProxyFilter::disableIdleTimer() {
   if (idle_timer_ != nullptr) {
     idle_timer_->disableTimer();
     idle_timer_.reset();
@@ -534,8 +538,8 @@ TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
 void TcpProxyUpstreamDrainManager::add(
     const TcpProxyConfig::SharedConfigSharedPtr& config,
     Network::ClientConnectionPtr&& upstream_connection,
-    const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks, Event::TimerPtr&& idle_timer,
-    const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+    const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
+    Event::TimerPtr&& idle_timer, const Upstream::HostDescriptionConstSharedPtr& upstream_host,
     Stats::TimespanPtr&& connected_timespan) {
   TcpProxyDrainerPtr drainer(
       new TcpProxyDrainer(*this, config, callbacks, std::move(upstream_connection),
@@ -554,13 +558,12 @@ void TcpProxyUpstreamDrainManager::remove(TcpProxyDrainer& drainer, Event::Dispa
   drainers_.erase(it);
 }
 
-TcpProxyDrainer::TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
-                                 const TcpProxyConfig::SharedConfigSharedPtr& config,
-                                 const std::shared_ptr<TcpProxy::UpstreamCallbacks>& callbacks,
-                                 Network::ClientConnectionPtr&& connection,
-                                 Event::TimerPtr&& idle_timer,
-                                 const Upstream::HostDescriptionConstSharedPtr& upstream_host,
-                                 Stats::TimespanPtr&& connected_timespan)
+TcpProxyDrainer::TcpProxyDrainer(
+    TcpProxyUpstreamDrainManager& parent, const TcpProxyConfig::SharedConfigSharedPtr& config,
+    const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
+    Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
+    const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+    Stats::TimespanPtr&& connected_timespan)
     : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
       timer_(std::move(idle_timer)), connected_timespan_(std::move(connected_timespan)),
       upstream_host_(upstream_host), config_(config) {
@@ -606,5 +609,7 @@ void TcpProxyDrainer::cancelDrain() {
   upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-} // namespace Filter
+} // namespace TcpProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
