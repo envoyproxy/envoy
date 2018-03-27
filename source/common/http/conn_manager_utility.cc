@@ -133,7 +133,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   }
 
   // Edge request is the request from external clients to front Envoy.
-  // Request from front Envoy to the ex service will be treated as not edge request.
+  // Request from front Envoy to the internal service will be treated as not edge request.
   const bool edge_request = !internal_request && config.useRemoteAddress();
 
   // If internal request, set header and do other internal only modifications.
