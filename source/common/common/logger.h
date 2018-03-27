@@ -72,6 +72,8 @@ public:
     off = spdlog::level::off
   } levels;
 
+  static std::string default_log_format;
+
 private:
   Logger(const std::string& name);
 
@@ -145,7 +147,8 @@ public:
   /**
    * Initialize the logging system from server options.
    */
-  static void initialize(uint64_t log_level, Thread::BasicLockable& lock);
+  static void initialize(uint64_t log_level, const std::string& log_format,
+                         Thread::BasicLockable& lock);
 
   /**
    * @return const std::vector<Logger>& the installed loggers.
