@@ -67,6 +67,7 @@ public:
   MOCK_METHOD0(hotRestartDisabled, bool());
 
   std::string config_path_;
+  std::string config_yaml_;
   bool v2_config_only_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
