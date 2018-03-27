@@ -202,7 +202,7 @@ private:
   InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
-  std::unique_ptr<Logger::FileSink> file_logger_;
+  std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
 };
 
 } // Server

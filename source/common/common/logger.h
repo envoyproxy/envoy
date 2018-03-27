@@ -86,7 +86,7 @@ typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
 
 /**
  * Captures a logging sink that can be delegated to for a bounded amount of time.
- * On destruction, logging is reverted to its previous state.  SinkDelegates must
+ * On destruction, logging is reverted to its previous state. SinkDelegates must
  * be allocated/freed as a stack.
  */
 class SinkDelegate {

@@ -56,8 +56,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     if (!options.logPath().empty()) {
       try {
-        file_logger_ = std::make_unique<Logger::FileSink>(options.logPath(), access_log_manager_,
-                                                          Logger::Registry::getSink());
+        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+            options.logPath(), access_log_manager_, Logger::Registry::getSink());
       } catch (const EnvoyException& e) {
         throw EnvoyException(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
