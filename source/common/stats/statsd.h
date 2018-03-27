@@ -45,7 +45,7 @@ public:
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag)
-      : BaseSink(tls.allocateSlot(),false), tls_(tls.allocateSlot()), use_tag_(use_tag) {
+      : BaseSink(tls.allocateSlot(), false), tls_(tls.allocateSlot()), use_tag_(use_tag) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
