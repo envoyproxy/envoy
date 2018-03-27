@@ -33,7 +33,6 @@ namespace Server {
 class HandlerInfo {
 public:
   virtual ~HandlerInfo(){};
-  virtual void Destroy() PURE;
 };
 
 typedef std::unique_ptr<HandlerInfo> HandlerInfoPtr;

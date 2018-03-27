@@ -37,7 +37,6 @@ class HandlerInfoImpl : public HandlerInfo {
 public:
   HandlerInfoImpl(){};
   virtual ~HandlerInfoImpl(){};
-  virtual void Destroy(){};
 };
 
 /**
@@ -100,6 +99,8 @@ public:
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
+
+  void UregisterHystrixConnection() { server_.UnregisterHystrixSink(); }
 
 private:
   /**
@@ -238,7 +239,7 @@ public:
   AdminFilter(AdminImpl& parent);
 
   // Http::StreamFilterBase
-  void onDestroy() override { handler_info_->Destroy(); }
+  void onDestroy() override { parent_.UregisterHystrixConnection(); }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& response_headers,

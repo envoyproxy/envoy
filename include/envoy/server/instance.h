@@ -179,6 +179,10 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  virtual void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
+
+  virtual void UnregisterHystrixSink() PURE;
 };
 
 } // namespace Server

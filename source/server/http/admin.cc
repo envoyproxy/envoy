@@ -592,7 +592,8 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
 
   Stats::HystrixHandlerInfoImpl& hystrix_handler_info =
       dynamic_cast<Stats::HystrixHandlerInfoImpl&>(handler_info);
-  Stats::HystrixHandler::HandleEventStream(&hystrix_handler_info, server_);
+
+  server_.registerToHystrixSink(hystrix_handler_info.callbacks_);
 
   ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
             hystrix_handler_info.callbacks_->connection()->localAddress()->asString());

@@ -51,3 +51,16 @@ envoy_cc_library(
         "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "hystrix_lib",
+    srcs = ["hystrix.cc"],
+    hdrs = ["hystrix.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//source/common/config:well_known_names",
+        "//source/common/stats:hystrix_lib",
+        "//source/server:configuration_lib",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)

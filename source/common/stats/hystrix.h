@@ -49,13 +49,17 @@ public:
    */
   static uint64_t GetPingIntervalInMs() { return PING_INTERVAL_IN_MS; }
 
-  void updateRollingWindowMap(Stats::Store& stats, std::string cluster_name);
+  void updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
+                              std::string cluster_name);
 
   /**
    * clear map
    */
   void resetRollingWindow();
 
+  /**
+   * return string represnting current state of the map. for DEBUG.
+   */
   std::string printRollingWindow();
 
 private:
@@ -109,54 +113,45 @@ typedef std::unique_ptr<Hystrix> HystrixPtr;
  */
 class HystrixHandlerInfoImpl : public Server::HandlerInfo {
 public:
-  HystrixHandlerInfoImpl(Http::StreamDecoderFilterCallbacks* callbacks)
-      : stats_(new Stats::Hystrix()), data_timer_(nullptr), ping_timer_(nullptr),
-        callbacks_(callbacks) {}
+  HystrixHandlerInfoImpl(Http::StreamDecoderFilterCallbacks* callbacks) : callbacks_(callbacks) {}
   virtual ~HystrixHandlerInfoImpl(){};
-  virtual void Destroy();
 
-  /**
-   * HystrixHandlerInfoImpl includes statistics for hystrix API, timers for build (and send) data
-   * and keep alive messages and the handler's callback
-   */
-  Stats::HystrixPtr stats_;
-  Event::TimerPtr data_timer_;
-  Event::TimerPtr ping_timer_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 
-/**
- * Convert statistics from envoy format to hystrix format and prepare them and writes them to the
- * appropriate socket
- */
-class HystrixHandler {
+namespace HystrixNameSpace {
+
+class HystrixSink : public Sink {
 public:
-  static void HandleEventStream(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                Server::Instance& server);
+  HystrixSink(Server::Instance& server);
+  void beginFlush();
+  void flushCounter(const Counter& counter, uint64_t delta);
+  void flushGauge(const Gauge&, uint64_t){};
+  void endFlush();
+  void onHistogramComplete(const Histogram& histogram, uint64_t value) {
+    std::cout << "histogram complete: " << histogram.name() << ", value: " << std::to_string(value)
+              << std::endl;
+  };
+
   /**
-   * Update counter and set values of upstream_rq statistics
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   * @param server contains envoy statistics
+   * register a new connection
    */
-  static void updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                         Server::Instance* server);
+  void registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_);
   /**
-   * Builds a buffer of envoy statistics which will be sent to hystrix dashboard according to
-   * hystrix API
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   * @param server contains envoy statistics*
+   * remove registered connection
    */
-  static void prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                          Server::Instance* server);
-  /**
-   * Sends a keep alive (ping) message to hystrix dashboard
-   * @param hystrix_handler_info is the data which is received in the hystrix handler from the admin
-   * filter (callback, timers, statistics)
-   */
-  static void sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info);
+  void unregisterConnection();
+
+private:
+  Stats::HystrixPtr stats_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Server::Instance* server_;
+  std::map<std::string, uint64_t> current_stat_values_;
 };
+
+typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
+
+} // namespace HystrixNameSpace
 
 } // namespace Stats
 } // namespace Envoy

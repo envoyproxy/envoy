@@ -164,6 +164,9 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
+  void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) override;
+  void UnregisterHystrixSink() override;
+
 private:
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,

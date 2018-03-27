@@ -124,6 +124,12 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(sink_object, factory);
 
+    //    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>("envoy.hystrix");
+    //    ProtobufTypes::MessagePtr message =
+    //        Config::Utility::translateToFactoryConfig(sink_object, factory);
+
+    //   std::cout << "sink_object.name() = " << sink_object.name() << std::endl;
+
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }
 }

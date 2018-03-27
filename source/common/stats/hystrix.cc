@@ -42,13 +42,14 @@ uint64_t Hystrix::getRollingValue(std::string cluster_name, std::string stats) {
   }
 }
 
-void Hystrix::updateRollingWindowMap(Stats::Store& stats, std::string cluster_name) {
+void Hystrix::updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
+                                     std::string cluster_name) {
   std::string prefix = "cluster." + cluster_name + ".";
 
   // combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1)
-  uint64_t timeouts = stats.counter(prefix + "upstream_rq_timeout").value() +
-                      stats.counter(prefix + "upstream_rq_per_try_timeout").value();
+  uint64_t timeouts = current_stat_values[prefix + "upstream_rq_timeout"] +
+                      current_stat_values[prefix + "upstream_rq_per_try_timeout"];
 
   pushNewValue(prefix + "timeouts", timeouts);
 
@@ -56,24 +57,26 @@ void Hystrix::updateRollingWindowMap(Stats::Store& stats, std::string cluster_na
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here.
   // timeout retries were not counted here anyway.
-  uint64_t errors = stats.counter(prefix + "upstream_rq_5xx").value() +
-                    stats.counter(prefix + "retry.upstream_rq_5xx").value() +
-                    stats.counter(prefix + "upstream_rq_4xx").value() +
-                    stats.counter(prefix + "retry.upstream_rq_4xx").value() -
-                    stats.counter(prefix + "upstream_rq_timeout").value();
+  uint64_t errors = current_stat_values[prefix + "upstream_rq_5xx"] +
+                    current_stat_values[prefix + "retry.upstream_rq_5xx"] +
+                    current_stat_values[prefix + "upstream_rq_4xx"] +
+                    current_stat_values[prefix + "retry.upstream_rq_4xx"] -
+                    current_stat_values[prefix + "upstream_rq_timeout"];
 
   pushNewValue(prefix + "errors", errors);
 
-  uint64_t success = stats.counter(prefix + "upstream_rq_2xx").value();
+  uint64_t success = current_stat_values[prefix + "upstream_rq_2xx"];
   pushNewValue(prefix + "success", success);
 
-  uint64_t rejected = stats.counter(prefix + "upstream_rq_pending_overflow").value();
+  uint64_t rejected = current_stat_values[prefix + "upstream_rq_pending_overflow"];
   pushNewValue(prefix + "rejected", rejected);
 
   // should not take from upstream_rq_total since it is updated before its components,
   // leading to wrong results such as error percentage higher than 100%
   uint64_t total = errors + timeouts + success + rejected;
   pushNewValue(prefix + "total", total);
+
+  std::cout << printRollingWindow() << std::endl;
 
   // TODO (@trabetti) : why does it fail compilation?
   // ENVOY_LOG(trace, "{}", printRollingWindow());
@@ -214,81 +217,64 @@ std::string Hystrix::printRollingWindow() {
   return out_str.str();
 }
 
-void HystrixHandlerInfoImpl::Destroy() {
-  if (data_timer_) {
-    data_timer_->disableTimer();
-    data_timer_.reset();
+namespace HystrixNameSpace {
+HystrixSink::HystrixSink(Server::Instance& server)
+    : stats_(new Stats::Hystrix()), server_(&server){};
+
+void HystrixSink::beginFlush() { current_stat_values_.clear(); }
+
+void HystrixSink::flushCounter(const Counter& counter, uint64_t delta) {
+  if (callbacks_ == nullptr) {
+    std::cout << "callback is null" << std::endl;
+    return;
   }
-  if (ping_timer_) {
-    ping_timer_->disableTimer();
-    ping_timer_.reset();
-  }
-}
-
-void HystrixHandler::HandleEventStream(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                       Server::Instance& server) {
-  Server::Instance* serverPtr = &server;
-  // start streaming
-  hystrix_handler_info->data_timer_ = hystrix_handler_info->callbacks_->dispatcher().createTimer(
-      [hystrix_handler_info, serverPtr]() -> void {
-        HystrixHandler::prepareAndSendHystrixStream(hystrix_handler_info, serverPtr);
-      });
-  hystrix_handler_info->data_timer_->enableTimer(
-      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
-
-  // start keep alive ping
-  hystrix_handler_info->ping_timer_ =
-      hystrix_handler_info->callbacks_->dispatcher().createTimer([hystrix_handler_info]() -> void {
-        HystrixHandler::sendKeepAlivePing(hystrix_handler_info);
-      });
-
-  hystrix_handler_info->ping_timer_->enableTimer(
-      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
-}
-
-void HystrixHandler::updateHystrixRollingWindow(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                                Server::Instance* server) {
-  hystrix_handler_info->stats_->incCounter();
-  for (auto& cluster : server->clusterManager().clusters()) {
-    hystrix_handler_info->stats_->updateRollingWindowMap(server->stats(),
-                                                         cluster.second.get().info()->name());
+  std::cout << "callback is not null. flushing counter: " << counter.name()
+            << ", delta: " << std::to_string(delta) << std::endl;
+  if (counter.name().find("upstream_rq_") != std::string::npos) {
+    current_stat_values_[counter.name()] = counter.value();
   }
 }
-
-void HystrixHandler::prepareAndSendHystrixStream(HystrixHandlerInfoImpl* hystrix_handler_info,
-                                                 Server::Instance* server) {
-  updateHystrixRollingWindow(hystrix_handler_info, server);
+// void HystrixSink::flushGauge(const Gauge& gauge, uint64_t value);
+void HystrixSink::endFlush() {
+  if (callbacks_ == nullptr)
+    return;
+  stats_->incCounter();
+  for (auto& cluster : server_->clusterManager().clusters()) {
+    stats_->updateRollingWindowMap(current_stat_values_, cluster.second.get().info()->name());
+  }
   std::stringstream ss;
-  for (auto& cluster : server->clusterManager().clusters()) {
-    hystrix_handler_info->stats_->getClusterStats(
+  for (auto& cluster : server_->clusterManager().clusters()) {
+    stats_->getClusterStats(
         ss, cluster.second.get().info()->name(),
         cluster.second.get()
             .info()
             ->resourceManager(Upstream::ResourcePriority::Default)
             .pendingRequests()
             .max(),
-        server->stats()
+        server_->stats()
             .gauge("cluster." + cluster.second.get().info()->name() + ".membership_total")
             .value());
   }
   Buffer::OwnedImpl data;
   data.add(ss.str());
-  hystrix_handler_info->callbacks_->encodeData(data, false);
+  // std::cout << "endflush : " << ss.str() << std::endl;
+  callbacks_->encodeData(data, false);
 
-  // restart timer
-  hystrix_handler_info->data_timer_->enableTimer(
-      std::chrono::milliseconds(Stats::Hystrix::GetRollingWindowIntervalInMs()));
+  // send keep alive ping
+  Buffer::OwnedImpl ping_data;
+  ping_data.add(":\n\n");
+  callbacks_->encodeData(ping_data, false);
 }
 
-void HystrixHandler::sendKeepAlivePing(HystrixHandlerInfoImpl* hystrix_handler_info) {
-  Buffer::OwnedImpl data;
-  data.add(":\n\n");
-  hystrix_handler_info->callbacks_->encodeData(data, false);
-
-  // restart timer
-  hystrix_handler_info->ping_timer_->enableTimer(
-      std::chrono::milliseconds(Stats::Hystrix::GetPingIntervalInMs()));
+// void HystrixSink::onHistogramComplete(const Histogram& histogram, uint64_t value);
+void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbacks) {
+  callbacks_ = callbacks;
 }
+
+// TODO (@trabetti) is this correct way?
+void HystrixSink::unregisterConnection() { callbacks_ = nullptr; }
+
+} // namespace HystrixNameSpace
 
 } // namespace Stats
 } // namespace Envoy

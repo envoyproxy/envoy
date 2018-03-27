@@ -143,6 +143,30 @@ void InstanceImpl::flushStats() {
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
+void InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) {
+  for (const auto& sink : config_->statsSinks()) {
+    // TODO: is there a better way to find the hystrix sink?
+    Stats::HystrixNameSpace::HystrixSink* hystrix_sink =
+        dynamic_cast<Stats::HystrixNameSpace::HystrixSink*>(sink.get());
+    if (hystrix_sink != nullptr) {
+      hystrix_sink->registerConnection(callbacks);
+    }
+  }
+}
+
+void InstanceImpl::UnregisterHystrixSink() {
+  for (const auto& sink : config_->statsSinks()) {
+    // TODO: is there a better way to find the hystrix sink?
+    Stats::HystrixNameSpace::HystrixSink* hystrix_sink =
+        dynamic_cast<Stats::HystrixNameSpace::HystrixSink*>(sink.get());
+    if (hystrix_sink != nullptr) {
+      // TODO (@trabetti) :  will want to move to a vector of connections,
+      // need a parameter (callback, hope it will work) to identify which connection to remove
+      hystrix_sink->unregisterConnection();
+    }
+  }
+}
+
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
   info.num_connections_ = numConnections();
