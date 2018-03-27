@@ -1,4 +1,4 @@
-#include "common/mongo/bson_impl.h"
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include <cstdint>
 #include <sstream>
@@ -11,6 +11,9 @@
 #include "common/common/utility.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 namespace Bson {
 
 int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
@@ -552,4 +555,7 @@ const Field* DocumentImpl::find(const std::string& name, Field::Type type) const
 }
 
 } // namespace Bson
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

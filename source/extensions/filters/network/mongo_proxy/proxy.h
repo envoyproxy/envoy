@@ -10,7 +10,6 @@
 #include "envoy/common/time.h"
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
 #include "envoy/event/timer.h"
-#include "envoy/mongo/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -20,13 +19,17 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "common/mongo/utility.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/mongo_proxy/codec.h"
+#include "extensions/filters/network/mongo_proxy/utility.h"
+
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 class MongoRuntimeConfigKeys {
 public:
@@ -205,5 +208,7 @@ public:
   DecoderPtr createDecoder(DecoderCallbacks& callbacks) override;
 };
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

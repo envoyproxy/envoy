@@ -1,4 +1,4 @@
-#include "common/mongo/proxy.h"
+#include "extensions/filters/network/mongo_proxy/proxy.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,10 +12,13 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/mongo/codec_impl.h"
+
+#include "extensions/filters/network/mongo_proxy/codec_impl.h"
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 AccessLog::AccessLog(const std::string& file_name,
                      Envoy::AccessLog::AccessLogManager& log_manager) {
@@ -340,5 +343,7 @@ void ProxyFilter::tryInjectDelay() {
   }
 }
 
-} // namespace Mongo
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

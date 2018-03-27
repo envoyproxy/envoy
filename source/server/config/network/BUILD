@@ -37,19 +37,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mongo_proxy_lib",
-    srcs = ["mongo_proxy.cc"],
-    hdrs = ["mongo_proxy.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/mongo:proxy_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],

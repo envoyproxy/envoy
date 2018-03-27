@@ -5,16 +5,19 @@
 
 #include "envoy/config/filter/fault/v2/fault.pb.h"
 
-#include "common/mongo/bson_impl.h"
-#include "common/mongo/codec_impl.h"
-#include "common/mongo/proxy.h"
 #include "common/stats/stats_impl.h"
+
+#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/config.h"
+#include "extensions/filters/network/mongo_proxy/proxy.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -29,7 +32,9 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Mongo {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
@@ -525,5 +530,257 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
   EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 }
 
-} // namespace Mongo
+TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "access_log" : "path/to/access/log"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
+
+  config.set_access_log("path/to/access/log");
+  config.set_stat_prefix("my_stat_prefix");
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config =
+      *dynamic_cast<envoy::config::filter::network::mongo_proxy::v2::MongoProxy*>(
+          factory.createEmptyConfigProto().get());
+  config.set_access_log("path/to/access/log");
+  config.set_stat_prefix("my_stat_prefix");
+
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+void handleInvalidConfiguration(const std::string& json_string) {
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
+}
+
+TEST(MongoFilterConfigTest, InvalidExtraProperty) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "access_log" : "path/to/access/log",
+    "test" : "a"
+  }
+  )EOF";
+
+  handleInvalidConfiguration(json_string);
+}
+
+TEST(MongoFilterConfigTest, EmptyConfig) { handleInvalidConfiguration("{}"); }
+
+TEST(MongoFilterConfigTest, InvalidFaultsEmptyConfig) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "fault" : {}
+  }
+  )EOF";
+
+  handleInvalidConfiguration(json_string);
+}
+
+TEST(MongoFilterConfigTest, InvalidFaultsMissingPercentage) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "fault" : {
+      "fixed_delay": {
+        "duration_ms": 1
+      }
+    }
+  }
+  )EOF";
+
+  handleInvalidConfiguration(json_string);
+}
+
+TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "fault" : {
+      "fixed_delay": {
+        "delay_percent": 1
+      }
+    }
+  }
+  )EOF";
+
+  handleInvalidConfiguration(json_string);
+}
+
+TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "fault" : {
+      "fixed_delay": {
+        "percent": 1,
+        "duration_ms": -1
+      }
+    }
+  }
+  )EOF";
+
+  handleInvalidConfiguration(json_string);
+}
+
+TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": 101,
+          "duration_ms": 1
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
+
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": -1,
+          "duration_ms": 1
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
+}
+
+TEST(MongoFilterConfigTest, InvalidFaultsType) {
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": "df",
+          "duration_ms": 1
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
+
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": 3,
+          "duration_ms": "ab"
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
+
+  {
+    std::string json_string = R"EOF(
+    {
+      "stat_prefix": "my_stat_prefix",
+      "fault" : {
+        "fixed_delay": {
+          "percent": 3,
+          "duration_ms": "0"
+        }
+      }
+    }
+    )EOF";
+
+    handleInvalidConfiguration(json_string);
+  }
+}
+
+TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
+  std::string json_string = R"EOF(
+  {
+    "stat_prefix": "my_stat_prefix",
+    "fault" : {
+      "fixed_delay": {
+        "percent": 1,
+        "duration_ms": 1
+      }
+    }
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactory(*json_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
+  envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
+  config.set_stat_prefix("my_stat_prefix");
+  config.mutable_delay()->set_percent(50);
+  config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
+} // namespace MongoProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

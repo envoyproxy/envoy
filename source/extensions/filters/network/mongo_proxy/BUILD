@@ -9,12 +9,24 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "bson_interface",
+    hdrs = ["bson.h"],
+    deps = ["//include/envoy/buffer:buffer_interface"],
+)
+
+envoy_cc_library(
+    name = "codec_interface",
+    hdrs = ["codec.h"],
+    deps = [":bson_interface"],
+)
+
+envoy_cc_library(
     name = "bson_lib",
     srcs = ["bson_impl.cc"],
     hdrs = ["bson_impl.h"],
     deps = [
+        ":bson_interface",
         "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/mongo:bson_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/common:hex_lib",
@@ -29,8 +41,8 @@ envoy_cc_library(
     hdrs = ["codec_impl.h"],
     deps = [
         ":bson_lib",
+        ":codec_interface",
         "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/mongo:codec_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
     ],
@@ -41,12 +53,12 @@ envoy_cc_library(
     srcs = ["proxy.cc"],
     hdrs = ["proxy.h"],
     deps = [
+        ":codec_interface",
         ":codec_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/mongo:codec_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
@@ -69,7 +81,20 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        "//include/envoy/mongo:codec_interface",
+        ":codec_interface",
         "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":proxy_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
     ],
 )

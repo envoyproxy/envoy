@@ -11,11 +11,11 @@
 #include "server/config/access_log/file_access_log.h"
 #include "server/config/network/ext_authz.h"
 #include "server/config/network/http_connection_manager.h"
-#include "server/config/network/mongo_proxy.h"
 #include "server/config/network/ratelimit.h"
 #include "server/config/network/redis_proxy.h"
 
 #include "extensions/filters/network/client_ssl_auth/config.h"
+#include "extensions/filters/network/mongo_proxy/config.h"
 #include "extensions/filters/network/tcp_proxy/config.h"
 
 #include "test/mocks/grpc/mocks.h"
@@ -41,7 +41,7 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth client_ssl_auth_proto;
   HttpConnectionManagerFilterConfigFactory hcm_factory;
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_proto;
-  MongoProxyFilterConfigFactory mongo_factory;
+  Extensions::NetworkFilters::MongoProxy::MongoProxyFilterConfigFactory mongo_factory;
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy mongo_proto;
   RateLimitConfigFactory rate_limit_factory;
   envoy::config::filter::network::rate_limit::v2::RateLimit rate_limit_proto;

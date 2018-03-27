@@ -67,11 +67,11 @@ envoy_cc_library(
 )
 
 # Non-core HTTP/TCP proxy libraries.
+# TODO(mattklein123): Delete this when extension migration is complete.
 envoy_cc_library(
     name = "extra_protocol_proxies_lib",
     deps = [
         "//source/server/config/http:dynamo_lib",
-        "//source/server/config/network:mongo_proxy_lib",
         "//source/server/config/network:redis_proxy_lib",
     ],
 )
