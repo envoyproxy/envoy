@@ -1,4 +1,4 @@
-#include "common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -15,9 +15,10 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "fmt/format.h"
-
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace ExtAuthz {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
@@ -191,4 +192,7 @@ void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callb
 }
 
 } // namespace ExtAuthz
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
