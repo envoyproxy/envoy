@@ -136,14 +136,14 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
 #endif
 
-TEST_P(AdminInstanceTest, HealthcheckGetMutate) {
+TEST_P(AdminInstanceTest, MutatesWarnWithGet) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   EXPECT_CALL(mock_logger_, log(HasSubstr("admin path \"" + path +
                                           "\" mutates state, method=GET rather than POST")));
-  // TODO(jmarantz): this should fail, but as an interim we will just issue a warning, so
-  // that scripts using curl GET comamnds to mutate state can be fixed.
+  // TODO(jmarantz): this should be made to fail, but as an interim we will just issue a
+  // warning, so that scripts using curl GET comamnds to mutate state can be fixed.
   EXPECT_EQ(Http::Code::OK, getCallback(path, header_map, data));
 }
 
@@ -269,7 +269,7 @@ TEST_P(AdminInstanceTest, ConfigDump) {
  }
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   std::string output = TestUtility::bufferToString(response);
   EXPECT_EQ(expected_json, output);
 }
