@@ -348,8 +348,8 @@ public:
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_.reset(new TestDnsServer(dispatcher_));
-    socket_.reset(
-        new Network::TcpListenSocket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true));
+    socket_.reset(new Network::TcpListenSocket(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true));
     listener_ = dispatcher_.createListener(*socket_, *server_, true, false);
 
     // Point c-ares at the listener with no search domains and TCP-only.

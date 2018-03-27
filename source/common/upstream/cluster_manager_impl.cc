@@ -419,9 +419,12 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
               ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
             }
 
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(
-                new ThreadLocalClusterManagerImpl::ClusterEntry(cluster_manager, new_cluster,
-                                                                thread_aware_lb_factory));
+            auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+                cluster_manager, new_cluster, thread_aware_lb_factory);
+            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+            for (auto& cb : cluster_manager.update_callbacks_) {
+              cb->onClusterAddOrUpdate(*thread_local_cluster);
+            }
           });
 }
 
@@ -442,6 +445,9 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
       ASSERT(cluster_manager.thread_local_clusters_.count(cluster_name) == 1);
       ENVOY_LOG(debug, "removing TLS cluster {}", cluster_name);
       cluster_manager.thread_local_clusters_.erase(cluster_name);
+      for (auto& cb : cluster_manager.update_callbacks_) {
+        cb->onClusterRemoval(cluster_name);
+      }
     });
   }
 
@@ -601,6 +607,23 @@ const std::string ClusterManagerImpl::versionInfo() const {
     return cds_api_->versionInfo();
   }
   return "static";
+}
+
+ClusterUpdateCallbacksHandlePtr
+ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
+  ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
+}
+
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::ClusterUpdateCallbacksHandleImpl(
+    ClusterUpdateCallbacks& cb, std::list<ClusterUpdateCallbacks*>& ll)
+    : list(ll) {
+  entry = ll.emplace(ll.begin(), &cb);
+}
+
+ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::~ClusterUpdateCallbacksHandleImpl() {
+  ASSERT(std::find(list.begin(), list.end(), *entry) != list.end());
+  list.erase(entry);
 }
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl(
@@ -813,28 +836,31 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  absl::optional<uint32_t> hash_key;
+  std::vector<uint8_t> hash_key = {uint8_t(protocol), uint8_t(priority)};
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
   // different options are not pooled together.
+  bool have_options = false;
   if (context && context->downstreamConnection()) {
     const Network::ConnectionSocket::OptionsSharedPtr& options =
         context->downstreamConnection()->socketOptions();
     if (options) {
-      hash_key = options->hashKey();
+      for (const auto& option : *options) {
+        have_options = true;
+        option->hashKey(hash_key);
+      }
     }
   }
 
   ConnPoolsContainer& container = parent_.host_http_conn_pool_map_[host];
-  const auto key = container.key(priority, protocol, hash_key ? hash_key.value() : 0);
-  if (!container.pools_[key]) {
-    container.pools_[key] = parent_.parent_.factory_.allocateConnPool(
+  if (!container.pools_[hash_key]) {
+    container.pools_[hash_key] = parent_.parent_.factory_.allocateConnPool(
         parent_.thread_local_dispatcher_, host, priority, protocol,
-        hash_key ? context->downstreamConnection()->socketOptions() : nullptr);
+        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
   }
 
-  return container.pools_[key].get();
+  return container.pools_[hash_key].get();
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(

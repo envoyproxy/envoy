@@ -307,6 +307,9 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+  const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return idle_timeout_;
+  }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -357,6 +360,7 @@ private:
   const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
@@ -407,6 +411,15 @@ public:
    * documented in setHealthChecker().
    */
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
+
+  /**
+   * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
+   * based on the cluster's type.
+   * @param address supplies the address proto to resolve.
+   * @return Network::Address::InstanceConstSharedPtr the resolved address.
+   */
+  const Network::Address::InstanceConstSharedPtr
+  resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }

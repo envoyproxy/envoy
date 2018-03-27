@@ -105,6 +105,7 @@ public:
   bool representIpv4RemoteAddressAsIpv4MappedIpv6() const override {
     return represent_ipv4_remote_address_as_ipv4_mapped_ipv6_;
   }
+  const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
   static const std::string DEFAULT_SERVER_STRING;
 

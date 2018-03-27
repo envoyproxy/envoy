@@ -184,14 +184,16 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                          {Reason::Sampling, true});
 
   // Currently not possible to access the operation from the span, but this
   // invocation will make sure setting the operation does not cause a crash!
   first_span->setOperation("myOperation");
   first_span->finishSpan();
 
-  SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr second_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                           {Reason::Sampling, true});
   second_span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -241,7 +243,8 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                          {Reason::Sampling, true});
 
   first_span->finishSpan();
 
@@ -282,7 +285,8 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                          {Reason::Sampling, true});
 
   first_span->finishSpan();
 
@@ -312,7 +316,8 @@ TEST_F(LightStepDriverTest, FlushSpansTimer) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans", 5))
       .WillOnce(Return(5));
 
-  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                    {Reason::Sampling, true});
   span->finishSpan();
 
   // Timer should be re-enabled.
@@ -353,7 +358,8 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                    {Reason::Sampling, true});
   span->finishSpan();
 
   Http::MessagePtr msg(new Http::ResponseMessageImpl(
@@ -391,7 +397,8 @@ TEST_F(LightStepDriverTest, CancelRequestOnDestruction) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
 
-  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                    {Reason::Sampling, true});
   span->finishSpan();
 
   EXPECT_CALL(request, cancel());
@@ -409,7 +416,8 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     const std::string invalid_context = "notvalidcontext";
     request_headers_.insertOtSpanContext().value(invalid_context);
     stats_.counter("tracing.opentracing.span_context_extraction_error").reset();
-    driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+    driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                       {Reason::Sampling, true});
     EXPECT_EQ(1U, stats_.counter("tracing.opentracing.span_context_extraction_error").value());
 
     std::string injected_ctx = request_headers_.OtSpanContext()->value().c_str();
@@ -417,7 +425,8 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Supply empty context.
     request_headers_.removeOtSpanContext();
-    SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+    SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                      {Reason::Sampling, true});
 
     EXPECT_EQ(nullptr, request_headers_.OtSpanContext());
     span->injectContext(request_headers_);
@@ -432,8 +441,8 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
     EXPECT_TRUE(tracer.Extract(iss));
 
     // Supply parent context, request_headers has properly populated x-ot-span-context.
-    SpanPtr span_with_parent =
-        driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+    SpanPtr span_with_parent = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                  start_time_, {Reason::Sampling, true});
     request_headers_.removeOtSpanContext();
     span_with_parent->injectContext(request_headers_);
     injected_ctx = request_headers_.OtSpanContext()->value().c_str();
@@ -444,11 +453,12 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 TEST_F(LightStepDriverTest, SpawnChild) {
   setupValidDriver();
 
-  SpanPtr parent = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr parent = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                      {Reason::Sampling, true});
   parent->injectContext(request_headers_);
 
-  SpanPtr childViaHeaders =
-      driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr childViaHeaders = driver_->startSpan(config_, request_headers_, operation_name_,
+                                               start_time_, {Reason::Sampling, true});
   SpanPtr childViaSpawn = parent->spawnChild(config_, operation_name_, start_time_);
 
   Http::TestHeaderMapImpl base1{{":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};

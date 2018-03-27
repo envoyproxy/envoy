@@ -294,6 +294,11 @@ public:
    *         XFF and for logging
    */
   virtual bool representIpv4RemoteAddressAsIpv4MappedIpv6() const PURE;
+
+  /**
+   * @return supplies the http1 settings.
+   */
+  virtual const Http::Http1Settings& http1Settings() const PURE;
 };
 
 /**

@@ -61,6 +61,7 @@ typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
 
 /**
  * Well-known network filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
  */
 class NetworkFilterNameValues {
 public:

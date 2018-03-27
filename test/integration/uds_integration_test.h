@@ -48,12 +48,13 @@ protected:
   const bool abstract_namespace_;
 };
 
-class UdsListenerIntegrationTest : public HttpIntegrationTest,
-                                   public testing::TestWithParam<std::tuple<bool>> {
+class UdsListenerIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
   UdsListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4),
-        abstract_namespace_(std::get<0>(GetParam())) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
+        abstract_namespace_(std::get<1>(GetParam())) {}
 
   void initialize() override;
 

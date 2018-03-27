@@ -161,6 +161,8 @@ public:
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
+  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
+               std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -198,6 +200,15 @@ public:
   MOCK_CONST_METHOD0(versionInfo, const std::string());
 
   std::function<void()> initialized_callback_;
+};
+
+class MockClusterUpdateCallbacks : public ClusterUpdateCallbacks {
+public:
+  MockClusterUpdateCallbacks();
+  ~MockClusterUpdateCallbacks();
+
+  MOCK_METHOD1(onClusterAddOrUpdate, void(ThreadLocalCluster& cluster));
+  MOCK_METHOD1(onClusterRemoval, void(const std::string& cluster_name));
 };
 
 } // namespace Upstream

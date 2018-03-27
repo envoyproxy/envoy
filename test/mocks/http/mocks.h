@@ -63,6 +63,7 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(representIpv4RemoteAddressAsIpv4MappedIpv6, bool());
+  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
 };
 
 class MockConnectionCallbacks : public virtual ConnectionCallbacks {

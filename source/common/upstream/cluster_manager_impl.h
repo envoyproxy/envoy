@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
@@ -191,6 +191,9 @@ public:
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
+  ClusterUpdateCallbacksHandlePtr
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
@@ -199,17 +202,7 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
-
-      uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
-        // One bit needed for priority
-        static_assert(NumResourcePriorities == 2,
-                      "Fix shifts below to match number of bits needed for 'priority'");
-        // Two bits needed for protocol
-        static_assert(Http::NumProtocols <= 4,
-                      "Fix shifts below to match number of bits needed for 'protocol'");
-        return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
-      }
+      typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -260,6 +253,7 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
 
@@ -282,6 +276,16 @@ private:
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  };
+
+  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
+    ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
+                                     std::list<ClusterUpdateCallbacks*>& parent);
+    ~ClusterUpdateCallbacksHandleImpl() override;
+
+  private:
+    std::list<ClusterUpdateCallbacks*>::iterator entry;
+    std::list<ClusterUpdateCallbacks*>& list;
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;

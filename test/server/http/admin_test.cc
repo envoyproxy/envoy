@@ -7,6 +7,7 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/http/admin.h"
 
@@ -134,7 +135,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
 
@@ -162,7 +163,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(
@@ -170,14 +171,14 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
 
@@ -204,6 +205,28 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+}
+
+TEST_P(AdminInstanceTest, ConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto entry = admin_.getConfigTracker().add("foo", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": {
+  "foo": {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bar"
+  }
+ }
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  std::string output = TestUtility::bufferToString(response);
+  EXPECT_EQ(expected_json, output);
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
@@ -291,6 +314,122 @@ TEST(PrometheusStatsFormatter, FormattedTags) {
   std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
+}
+
+TEST(PrometheusStatsFormatter, MetricNameCollison) {
+
+  // Create two counters and two gauges with each pair having the same name,
+  // but having different tag names and values.
+  //`statsAsPrometheus()` should return two implying it found two unique stat names
+
+  Stats::HeapRawStatDataAllocator alloc;
+  std::list<Stats::CounterSharedPtr> counters;
+  std::list<Stats::GaugeSharedPtr> gauges;
+
+  {
+    std::string name = "cluster.test_cluster_1.upstream_cx_total";
+    std::vector<Stats::Tag> cluster_tags;
+    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
+    counters.push_back(c);
+  }
+
+  {
+    std::string name = "cluster.test_cluster_1.upstream_cx_total";
+    std::vector<Stats::Tag> cluster_tags;
+    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
+    counters.push_back(c);
+  }
+
+  {
+    std::vector<Stats::Tag> cluster_tags;
+    std::string name = "cluster.test_cluster_2.upstream_cx_total";
+    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
+    gauges.push_back(g);
+  }
+
+  {
+    std::vector<Stats::Tag> cluster_tags;
+    std::string name = "cluster.test_cluster_2.upstream_cx_total";
+    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
+    gauges.push_back(g);
+  }
+
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
+}
+
+TEST(PrometheusStatsFormatter, UniqueMetricName) {
+
+  // Create two counters and two gauges, all with unique names.
+  // statsAsPrometheus() should return four implying it found
+  // four unique stat names.
+
+  Stats::HeapRawStatDataAllocator alloc;
+  std::list<Stats::CounterSharedPtr> counters;
+  std::list<Stats::GaugeSharedPtr> gauges;
+
+  {
+    std::string name = "cluster.test_cluster_1.upstream_cx_total";
+    std::vector<Stats::Tag> cluster_tags;
+    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
+    counters.push_back(c);
+  }
+
+  {
+    std::string name = "cluster.test_cluster_2.upstream_cx_total";
+    std::vector<Stats::Tag> cluster_tags;
+    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
+                                                                     std::move(cluster_tags));
+    counters.push_back(c);
+  }
+
+  {
+    std::vector<Stats::Tag> cluster_tags;
+    std::string name = "cluster.test_cluster_3.upstream_cx_total";
+    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
+    gauges.push_back(g);
+  }
+
+  {
+    std::vector<Stats::Tag> cluster_tags;
+    std::string name = "cluster.test_cluster_4.upstream_cx_total";
+    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
+    cluster_tags.push_back(tag);
+    Stats::RawStatData* data = alloc.alloc(name);
+    Stats::GaugeSharedPtr g =
+        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
+    gauges.push_back(g);
+  }
+
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
 }
 
 } // namespace Server

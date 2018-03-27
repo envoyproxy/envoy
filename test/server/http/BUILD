@@ -27,6 +27,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "config_tracker_impl_test",
+    srcs = ["config_tracker_impl_test.cc"],
+    deps = [
+        "//source/server/http:config_tracker_lib",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "health_check_test",
     srcs = ["health_check_test.cc"],
     deps = [

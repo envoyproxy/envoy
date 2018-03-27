@@ -21,9 +21,11 @@ envoy_cc_library(
         "//include/envoy/router:router_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
-        "//source/common/filter:tcp_proxy_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
+        # TODO(mattklein123): Common code reaching into extensions is not right. Sort this out
+        # when the HTTP connection manager is moved.
+        "//source/extensions/filters/network/tcp_proxy",
     ],
 )
