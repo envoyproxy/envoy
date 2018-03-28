@@ -6,18 +6,20 @@
 #include <vector>
 
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
-#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/header_map_impl.h"
 
+#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
 namespace ExtAuthz {
 
 /**
@@ -59,30 +61,31 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global
  * ext_authz service before allowing further filter iteration.
  */
-class Filter : public StreamDecoderFilter, public Envoy::ExtAuthz::RequestCallbacks {
+class Filter : public Http::StreamDecoderFilter,
+               public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Filter(FilterConfigSharedPtr config, Envoy::ExtAuthz::ClientPtr&& client)
+  Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
-  void onComplete(Envoy::ExtAuthz::CheckStatus status) override;
+  void onComplete(Filters::Common::ExtAuthz::CheckStatus status) override;
 
 private:
   enum class State { NotStarted, Calling, Complete };
-  void initiateCall(const HeaderMap& headers);
+  void initiateCall(const Http::HeaderMap& headers);
 
   FilterConfigSharedPtr config_;
-  Envoy::ExtAuthz::ClientPtr client_;
-  StreamDecoderFilterCallbacks* callbacks_{};
+  Filters::Common::ExtAuthz::ClientPtr client_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
@@ -90,5 +93,6 @@ private:
 };
 
 } // namespace ExtAuthz
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

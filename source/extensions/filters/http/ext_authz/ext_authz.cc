@@ -1,4 +1,4 @@
-#include "common/http/filter/ext_authz.h"
+#include "extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <string>
 #include <vector>
@@ -7,27 +7,29 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
-#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
+
+#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 
 #include "fmt/format.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
 namespace ExtAuthz {
 
 namespace {
 
 const Http::HeaderMap* getDeniedHeader() {
   static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Code::Forbidden))}};
+      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Forbidden))}};
   return header_map;
 }
 
 } // namespace
 
-void Filter::initiateCall(const HeaderMap& headers) {
+void Filter::initiateCall(const Http::HeaderMap& headers) {
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
     return;
@@ -40,7 +42,8 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
   cluster_ = cluster->info();
 
-  Envoy::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers, check_request_);
+  Filters::Common::ExtAuthz::CheckRequestUtils::createHttpCheck(callbacks_, headers,
+                                                                check_request_);
 
   state_ = State::Calling;
   initiating_call_ = true;
@@ -48,23 +51,23 @@ void Filter::initiateCall(const HeaderMap& headers) {
   initiating_call_ = false;
 }
 
-FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   initiateCall(headers);
-  return state_ == State::Calling ? FilterHeadersStatus::StopIteration
-                                  : FilterHeadersStatus::Continue;
+  return state_ == State::Calling ? Http::FilterHeadersStatus::StopIteration
+                                  : Http::FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
-  return state_ == State::Calling ? FilterDataStatus::StopIterationAndWatermark
-                                  : FilterDataStatus::Continue;
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
+  return state_ == State::Calling ? Http::FilterDataStatus::StopIterationAndWatermark
+                                  : Http::FilterDataStatus::Continue;
 }
 
-FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
-  return state_ == State::Calling ? FilterTrailersStatus::StopIteration
-                                  : FilterTrailersStatus::Continue;
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+  return state_ == State::Calling ? Http::FilterTrailersStatus::StopIteration
+                                  : Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
@@ -75,12 +78,12 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
+void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
   ASSERT(cluster_);
 
   state_ = State::Complete;
 
-  using Envoy::ExtAuthz::CheckStatus;
+  using Filters::Common::ExtAuthz::CheckStatus;
 
   switch (status) {
   case CheckStatus::OK:
@@ -94,7 +97,7 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
-                                             enumToInt(Code::Forbidden),
+                                             enumToInt(Http::Code::Forbidden),
                                              true,
                                              EMPTY_STRING,
                                              EMPTY_STRING,
@@ -109,10 +112,10 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
   // if there is an error contacting the service.
   if (status == CheckStatus::Denied ||
       (status == CheckStatus::Error && !config_->failureModeAllow())) {
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getDeniedHeader())};
+    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getDeniedHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     callbacks_->requestInfo().setResponseFlag(
-        Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService);
+        RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
     // We can get completion inline, so only call continue if that isn't happening.
     if (!initiating_call_) {
@@ -122,5 +125,6 @@ void Filter::onComplete(Envoy::ExtAuthz::CheckStatus status) {
 }
 
 } // namespace ExtAuthz
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
