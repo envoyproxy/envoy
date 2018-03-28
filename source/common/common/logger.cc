@@ -14,11 +14,11 @@ namespace Logger {
 
 #define GENERATE_LOGGER(X) Logger(#X),
 
-std::string Logger::default_log_format = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
 
 Logger::Logger(const std::string& name) {
   logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
-  logger_->set_pattern(default_log_format);
+  logger_->set_pattern(DEFAULT_LOG_FORMAT);
   logger_->set_level(spdlog::level::trace);
 
   // Ensure that critical errors, especially ASSERT/PANIC, get flushed

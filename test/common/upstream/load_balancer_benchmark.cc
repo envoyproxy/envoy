@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
   // fuzz, etc.
   Envoy::Thread::MutexBasicLockable lock;
   Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::default_log_format, lock);
+                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

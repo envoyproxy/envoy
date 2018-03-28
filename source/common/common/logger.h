@@ -72,7 +72,7 @@ public:
     off = spdlog::level::off
   } levels;
 
-  static std::string default_log_format;
+  static const char* DEFAULT_LOG_FORMAT;
 
 private:
   Logger(const std::string& name);

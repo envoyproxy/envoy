@@ -40,11 +40,11 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
       fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
   log_levels_string += "\n[trace] and [debug] are only available on debug builds";
 
-  std::string log_format_string =
+  const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
                   "\nDefault is \"{}\"",
-                  Logger::Logger::default_log_format);
+                  Logger::Logger::DEFAULT_LOG_FORMAT);
 
   TCLAP::CmdLine cmd("envoy", ' ', VersionInfo::version());
   TCLAP::ValueArg<uint32_t> base_id(
@@ -65,7 +65,7 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
-                                          Logger::Logger::default_log_format, "string", cmd);
+                                          Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
                                         cmd);
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
