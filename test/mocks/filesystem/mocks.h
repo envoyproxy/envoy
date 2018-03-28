@@ -24,28 +24,6 @@ public:
   MOCK_METHOD0(flush, void());
 };
 
-// Captures absl::string_view parameters into temp strings, for use
-// with gmock's SaveArg<n>. Providing an absl::string_view compiles,
-// but fails because by the time you examine the saved value, its
-// backing store will go out of scope.
-class StringViewSaver {
-public:
-  void operator=(absl::string_view view) { value_ = std::string(view); }
-  const std::string& value() const { return value_; }
-  operator std::string() const { return value_; }
-
-private:
-  std::string value_;
-};
-
-inline bool operator==(const char* str, const StringViewSaver& saver) {
-  return saver.value() == str;
-}
-
-inline bool operator==(const StringViewSaver& saver, const char* str) {
-  return saver.value() == str;
-}
-
 class MockWatcher : public Watcher {
 public:
   MockWatcher();

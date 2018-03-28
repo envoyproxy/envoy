@@ -762,7 +762,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_source, monotonic_time_source);
 
-  Filesystem::StringViewSaver log1;
+  StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write(absl::string_view(
                          "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
@@ -774,7 +774,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
   Json::Factory::loadFromString(log1);
 
-  Filesystem::StringViewSaver log2;
+  StringViewSaver log2;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write(absl::string_view(
                          "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
@@ -789,7 +789,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   time = (time_source.currentTime() - std::chrono::seconds(30));
   monotonic_time = (monotonic_time_source.currentTime() - std::chrono::seconds(30));
 
-  Filesystem::StringViewSaver log3;
+  StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(-1));
@@ -807,7 +807,7 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
   Json::Factory::loadFromString(log3);
 
-  Filesystem::StringViewSaver log4;
+  StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(*file, write(absl::string_view(
                          "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
