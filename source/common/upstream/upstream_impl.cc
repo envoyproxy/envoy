@@ -36,6 +36,11 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+// Priority levels are considered overprovisioned with this factor. This means that we don't
+// consider a priority level unhealthy until the ratio of healthy hosts multiplied by
+// kOverProvisioningFactor drops below 1.0.
+static constexpr double kOverProvisioningFactor = 1.4;
+
 const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const Network::Address::InstanceConstSharedPtr source_address) {
@@ -99,6 +104,11 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
   // Rebuild the locality scheduler.
+  // TODO(htuch): if the underlying locality index ->
+  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
+  // could just update locality_weight_ without rebuilding. Similar to how host
+  // level WRR works, we would age out the existing entries via picks and lazily
+  // apply the new weights.
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
       !locality_weights_->empty()) {
     locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
@@ -143,7 +153,12 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   }
   const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
-  return weight * std::min(1.0, 1.4 * locality_healthy_ratio);
+  // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
+  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
+  // Eventually the overprovision factor will likely be made configurable.
+  const double effective_locality_health_ratio =
+      std::min(1.0, kOverProvisioningFactor * locality_healthy_ratio);
+  return weight * effective_locality_health_ratio;
 }
 
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
