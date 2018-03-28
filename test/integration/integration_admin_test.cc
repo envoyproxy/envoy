@@ -182,6 +182,26 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(
       response->body(),
       testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats/prometheus", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->body(),
+              testing::HasSubstr(
+                  "envoy_http_downstream_rq_xx{envoy_response_code_class=\"4\",envoy_http_conn_"
+                  "manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("# TYPE envoy_http_downstream_rq_xx counter\n"));
+  EXPECT_THAT(response->body(),
+              testing::HasSubstr(
+                  "envoy_listener_admin_http_downstream_rq_xx{envoy_response_code_class=\"4\","
+                  "envoy_http_conn_manager_prefix=\"admin\"} 2\n"));
+  EXPECT_THAT(response->body(),
+              testing::HasSubstr("# TYPE envoy_cluster_upstream_cx_active gauge\n"));
+  EXPECT_THAT(
+      response->body(),
+      testing::HasSubstr("envoy_cluster_upstream_cx_active{envoy_cluster_name=\"cluster_0\"} 0\n"));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/clusters", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());

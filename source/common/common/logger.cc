@@ -14,9 +14,11 @@ namespace Logger {
 
 #define GENERATE_LOGGER(X) Logger(#X),
 
+const char* Logger::DEFAULT_LOG_FORMAT = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
+
 Logger::Logger(const std::string& name) {
   logger_ = std::make_shared<spdlog::logger>(name, Registry::getSink());
-  logger_->set_pattern("[%Y-%m-%d %T.%e][%t][%l][%n] %v");
+  logger_->set_pattern(DEFAULT_LOG_FORMAT);
   logger_->set_level(spdlog::level::trace);
 
   // Ensure that critical errors, especially ASSERT/PANIC, get flushed
@@ -60,10 +62,12 @@ void LockingStderrOrFileSink::flush() {
 
 spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }
 
-void Registry::initialize(uint64_t log_level, Thread::BasicLockable& lock) {
+void Registry::initialize(uint64_t log_level, const std::string& log_format,
+                          Thread::BasicLockable& lock) {
   getSink()->setLock(lock);
   for (Logger& logger : allLoggers()) {
     logger.logger_->set_level(static_cast<spdlog::level::level_enum>(log_level));
+    logger.logger_->set_pattern(log_format);
   }
 }
 

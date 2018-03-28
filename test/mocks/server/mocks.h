@@ -53,6 +53,7 @@ public:
   MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
   MOCK_METHOD0(logLevel, spdlog::level::level_enum());
+  MOCK_METHOD0(logFormat, const std::string&());
   MOCK_METHOD0(logPath, const std::string&());
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
@@ -75,6 +76,16 @@ public:
   bool hot_restart_disabled_{};
 };
 
+class MockConfigTracker : public ConfigTracker {
+public:
+  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
+  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
+  EntryOwnerPtr add(const std::string& key, Cb callback) override {
+    return EntryOwnerPtr{addReturnsRaw(key, std::move(callback))};
+  }
+  struct MockEntryOwner : public EntryOwner {};
+};
+
 class MockAdmin : public Admin {
 public:
   MockAdmin();
@@ -85,6 +96,9 @@ public:
                                 HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
+  MOCK_METHOD0(getConfigTracker, ConfigTracker&());
+
+  NiceMock<MockConfigTracker> config_tracker;
 };
 
 class MockDrainManager : public DrainManager {

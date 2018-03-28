@@ -74,7 +74,7 @@ bool TraceableRequestFilter::evaluate(const RequestInfo::RequestInfo& info,
                                       const Http::HeaderMap& request_headers) {
   Tracing::Decision decision = Tracing::HttpTracerUtility::isTracing(info, request_headers);
 
-  return decision.is_tracing && decision.reason == Tracing::Reason::ServiceForced;
+  return decision.traced && decision.reason == Tracing::Reason::ServiceForced;
 }
 
 bool StatusCodeFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
