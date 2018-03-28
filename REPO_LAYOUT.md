@@ -8,7 +8,7 @@ are:
 * [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
 * [ci/](ci/): Scripts used both during CI as well as to build Docker containers.
 * [configs/](configs/): Example Envoy configurations.
-* [docs/](docs/): Project level documentation is well as scripts for publishing final docs during
+* [docs/](docs/): Project level documentation as well as scripts for publishing final docs during
   releases.
 * [examples/](examples/): Larger Envoy examples using Docker and Docker Compose.
 * [include/](include/): "Public" interface headers for "core" Envoy. In general,
