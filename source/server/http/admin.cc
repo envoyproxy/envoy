@@ -544,19 +544,50 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
                                      Buffer::Instance& response) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  const auto& entries = server_.runtime().snapshot().getAll();
-  const auto pairs = sortedRuntime(entries);
 
+  const auto& layers = server_.runtime().snapshot().getAllLayers();
   if (params.size() == 0) {
-    for (const auto& entry : pairs) {
-      response.add(fmt::format("{}: {}\n", entry.first, entry.second.string_value_));
+    std::set<std::string> keys;
+    static constexpr absl::string_view key_header = "KEY";
+
+    // Determine the maximum width for each column.
+    std::vector<size_t> column_widths;
+    size_t key_column_width = key_header.size();
+    for (const auto& layer : layers) {
+      column_widths.push_back(layer->name().size());
+      for (const auto& kv : layer->values()) {
+        key_column_width = std::max(key_column_width, kv.first.size());
+        column_widths.back() = std::max(column_widths.back(), kv.second.string_value_.size());
+        keys.insert(kv.first);
+      }
+    }
+
+    static const std::string cell_format = "{:<{}}\t";
+    // Add header row.
+    response.add(fmt::format(cell_format, key_header, key_column_width));
+    for (size_t i = 0; i < layers.size(); i++) {
+      response.add(
+          fmt::format(cell_format, StringUtil::toUpper(layers[i]->name()), column_widths[i]));
+    }
+    response.add("\n");
+
+    // Add a row for each key.
+    for (const auto& key : keys) {
+      response.add(fmt::format(cell_format, key, key_column_width));
+      for (size_t i = 0; i < layers.size(); i++) {
+        const auto& layer_values = layers[i]->values();
+        const auto value_it = layer_values.find(key);
+        const auto& value = value_it != layer_values.end() ? value_it->second.string_value_ : "";
+        response.add(fmt::format(cell_format, value, column_widths[i]));
+      }
+      response.add("\n");
     }
   } else {
     if (params.begin()->first == "format" && params.begin()->second == "json") {
+      // TODO: Reviewers, do we want to proto-ize this now? Or continue manually constructing JSON?
+      // Or skip JSON altogether?
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(runtimeAsJson(pairs));
-      response.add("\n");
     } else {
       response.add("usage: /runtime?format=json\n");
       rc = Http::Code::BadRequest;
@@ -579,20 +610,6 @@ Http::Code AdminImpl::handlerRuntimeModify(const std::string& url, Http::HeaderM
   server_.runtime().mergeValues(overrides);
   response.add("OK\n");
   return Http::Code::OK;
-}
-
-const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
-    const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
-  std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
-                                                                      entries.end());
-
-  std::sort(pairs.begin(), pairs.end(),
-            [](const std::pair<std::string, const Runtime::Snapshot::Entry>& a,
-               const std::pair<std::string, const Runtime::Snapshot::Entry>& b) -> bool {
-              return a.first < b.first;
-            });
-
-  return pairs;
 }
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
@@ -699,6 +716,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true}},
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {

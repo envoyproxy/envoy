@@ -190,56 +190,50 @@ const std::unordered_map<std::string, const Snapshot::Entry>& SnapshotImpl::getA
   return values_;
 }
 
-SnapshotImpl::SnapshotImpl(RandomGenerator& generator,
-                           const std::unordered_map<std::string, std::string>& values)
-    : SnapshotImpl(generator) {
-  mergeValues(values);
+const std::vector<Snapshot::OverrideLayerSharedPtr>& SnapshotImpl::getAllLayers() const {
+  return layers_;
 }
 
-SnapshotImpl::SnapshotImpl(RandomGenerator& generator) : generator_(generator) {}
-
-void SnapshotImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
-  for (const auto& kv : values) {
-    Entry entry{kv.second, absl::nullopt};
-    tryConvertToInteger(entry);
-    values_.erase(kv.first);
-    values_.emplace(kv.first, std::move(entry));
+SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+                           const std::vector<OverrideLayerSharedPtr>& layers)
+    : layers_{layers}, generator_{generator} {
+  for (const auto& layer : layers_) {
+    for (const auto& kv : layer->values()) {
+      values_.erase(kv.first);
+      values_.emplace(kv.first, kv.second);
+    }
   }
+  stats.num_keys_.set(values_.size());
 }
 
-void SnapshotImpl::tryConvertToInteger(Snapshot::Entry& entry) {
+Snapshot::Entry SnapshotImpl::createEntry(const std::string& value) {
+  Entry entry{value, absl::nullopt};
   // As a perf optimization, attempt to convert the entry's string into an integer. If we don't
   // succeed that's fine.
   uint64_t converted;
   if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
     entry.uint_value_ = converted;
   }
+  return entry;
 }
 
-DiskBackedSnapshotImpl::DiskBackedSnapshotImpl(
-    RandomGenerator& generator,
-    const std::unordered_map<std::string, std::string>& additional_overrides,
-    const std::string& root_path, const std::string& override_path, RuntimeStats& stats,
-    Api::OsSysCalls& os_sys_calls)
-    : SnapshotImpl(generator), os_sys_calls_(os_sys_calls) {
-  try {
-    walkDirectory(root_path, "");
-    if (Filesystem::directoryExists(override_path)) {
-      walkDirectory(override_path, "");
-      stats.override_dir_exists_.inc();
-    } else {
-      stats.override_dir_not_exists_.inc();
+void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+  for (const auto& kv : values) {
+    values_.erase(kv.first);
+    if (!kv.second.empty()) {
+      values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
-    mergeValues(additional_overrides);
-  } catch (EnvoyException& e) {
-    stats.load_error_.inc();
-    ENVOY_LOG(debug, "error creating runtime snapshot: {}", e.what());
   }
-
-  stats.num_keys_.set(values_.size());
+  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
 }
 
-void DiskBackedSnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
+DiskLayer::DiskLayer(const std::string& name, const std::string& path,
+                     Api::OsSysCalls& os_sys_calls)
+    : OverrideLayerImpl{name}, os_sys_calls_(os_sys_calls) {
+  walkDirectory(path, "");
+}
+
+void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   Directory current_dir(path);
   while (true) {
@@ -275,7 +269,7 @@ void DiskBackedSnapshotImpl::walkDirectory(const std::string& path, const std::s
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
       ENVOY_LOG(debug, "reading file: {}", full_path);
-      Entry entry;
+      std::string value;
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
@@ -287,51 +281,47 @@ void DiskBackedSnapshotImpl::walkDirectory(const std::string& path, const std::s
         }
         if (line == lines.back()) {
           const absl::string_view trimmed = StringUtil::rtrim(line);
-          entry.string_value_.append(trimmed.data(), trimmed.size());
+          value.append(trimmed.data(), trimmed.size());
         } else {
-          entry.string_value_.append(std::string{line} + "\n");
+          value.append(std::string{line} + "\n");
         }
       }
-      tryConvertToInteger(entry);
-
       // Separate erase/insert calls required due to the value type being constant; this prevents
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
-      values_.insert({full_prefix, entry});
+      values_.insert({full_prefix, SnapshotImpl::createEntry(value)});
     }
   }
 }
 
-LoaderImpl::LoaderImpl(RandomGenerator& generator, ThreadLocal::SlotAllocator& tls)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, tls) {
+LoaderImpl::LoaderImpl(RandomGenerator& generator, Stats::Store& store,
+                       ThreadLocal::SlotAllocator& tls)
+    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls) {
   loadNewSnapshot();
 }
 
 LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
-                       ThreadLocal::SlotAllocator& tls)
-    : generator_(generator), tls_(tls.allocateSlot()) {}
+                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
+    : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()) {
+  adminLayer_ = std::make_shared<AdminLayer>(stats_);
+}
 
 std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
-  return std::make_unique<SnapshotImpl>(generator_, values_);
+  return std::make_unique<SnapshotImpl>(generator_, stats_,
+                                        std::vector<Snapshot::OverrideLayerSharedPtr>{adminLayer_});
 }
 
 void LoaderImpl::loadNewSnapshot() {
   ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
-  tls_->set([ptr_copy = ptr](Event::Dispatcher&)->ThreadLocal::ThreadLocalObjectSharedPtr {
-    return ptr_copy;
+  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&)->ThreadLocal::ThreadLocalObjectSharedPtr {
+    return ptr;
   });
 }
 
 Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
-  for (const auto& kv : values) {
-    values_.erase(kv.first);
-    if (!kv.second.empty()) {
-      values_.insert(kv);
-    }
-  }
-
+  adminLayer_->mergeValues(values);
   loadNewSnapshot();
 }
 
@@ -342,9 +332,9 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
                                            const std::string& override_dir, Stats::Store& store,
                                            RandomGenerator& generator,
                                            Api::OsSysCallsPtr os_sys_calls)
-    : LoaderImpl(DoNotLoadSnapshot{}, generator, tls),
+    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls),
       watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir), stats_(generateStats(store)),
+      override_path_(root_symlink_path + "/" + override_dir),
       os_sys_calls_(std::move(os_sys_calls)) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
                      [this](uint32_t) -> void { loadNewSnapshot(); });
@@ -352,7 +342,7 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
   loadNewSnapshot();
 }
 
-RuntimeStats DiskBackedLoaderImpl::generateStats(Stats::Store& store) {
+RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
   RuntimeStats stats{
       ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
@@ -360,8 +350,21 @@ RuntimeStats DiskBackedLoaderImpl::generateStats(Stats::Store& store) {
 }
 
 std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
-  return std::make_unique<DiskBackedSnapshotImpl>(generator_, values_, root_path_, override_path_,
-                                                  stats_, *os_sys_calls_);
+  std::vector<Snapshot::OverrideLayerSharedPtr> layers;
+  try {
+    layers.push_back(std::make_unique<DiskLayer>("root", root_path_, *os_sys_calls_));
+    if (Filesystem::directoryExists(override_path_)) {
+      layers.push_back(std::make_unique<DiskLayer>("override", override_path_, *os_sys_calls_));
+      stats_.override_dir_exists_.inc();
+    } else {
+      stats_.override_dir_not_exists_.inc();
+    }
+  } catch (EnvoyException& e) {
+    stats_.load_error_.inc();
+    ENVOY_LOG(debug, "error creating runtime snapshot: {}", e.what());
+  }
+  layers.push_back(adminLayer_);
+  return std::make_unique<SnapshotImpl>(generator_, stats_, layers);
 }
 
 } // namespace Runtime

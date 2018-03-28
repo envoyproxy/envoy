@@ -44,7 +44,8 @@ public:
   COUNTER(override_dir_not_exists)                                                                 \
   COUNTER(override_dir_exists)                                                                     \
   COUNTER(load_success)                                                                            \
-  GAUGE  (num_keys)
+  GAUGE  (num_keys)                                                                                \
+  GAUGE  (admin_overrides_active)
 // clang-format on
 
 /**
@@ -55,13 +56,12 @@ struct RuntimeStats {
 };
 
 /**
- * Implementation of Snapshot whose source is the values map provided to its constructor.
- * Used by LoaderImpl.
+ * Implementation of Snapshot whose source the vector of layers passed to the constructor.
  */
 class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
 public:
-  SnapshotImpl(RandomGenerator& generator,
-               const std::unordered_map<std::string, std::string>& values);
+  SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+               const std::vector<OverrideLayerSharedPtr>& layers);
 
   // Runtime::Snapshot
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
@@ -72,29 +72,56 @@ public:
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
   const std::unordered_map<std::string, const Snapshot::Entry>& getAll() const override;
+  const std::vector<OverrideLayerSharedPtr>& getAllLayers() const override;
 
-protected:
-  explicit SnapshotImpl(RandomGenerator& generator);
-
-  static void tryConvertToInteger(Snapshot::Entry& entry);
-  void mergeValues(const std::unordered_map<std::string, std::string>& values);
-
-  std::unordered_map<std::string, const Snapshot::Entry> values_;
+  static Entry createEntry(const std::string& value);
 
 private:
+  const std::vector<OverrideLayerSharedPtr> layers_;
+  std::unordered_map<std::string, const Snapshot::Entry> values_;
   RandomGenerator& generator_;
 };
 
 /**
- * Extension of SnapshotImpl that uses the disk as its primary source of values and SnapshotImpl's
- * in-memory values as overrides. Used by DiskBackedLoaderImpl.
+ * Base implementation of OverrideLayer that by itself provides an empty values map.
  */
-class DiskBackedSnapshotImpl : public SnapshotImpl, Logger::Loggable<Logger::Id::runtime> {
+class OverrideLayerImpl : public Snapshot::OverrideLayer {
 public:
-  DiskBackedSnapshotImpl(RandomGenerator& generator,
-                         const std::unordered_map<std::string, std::string>& additional_overrides,
-                         const std::string& root_path, const std::string& override_path,
-                         RuntimeStats& stats, Api::OsSysCalls& os_sys_calls);
+  explicit OverrideLayerImpl(const std::string& name) : name_{name} {}
+  const std::unordered_map<std::string, Snapshot::Entry>& values() const override {
+    return values_;
+  }
+  const std::string& name() const override { return name_; }
+
+protected:
+  std::unordered_map<std::string, Snapshot::Entry> values_;
+  const std::string name_;
+};
+
+/**
+ * Extension of OverrideLayerImpl that maintains an in-memory set of values. These values can be
+ * modified programmatically via mergeValues(). AdminLayer is so named because it can be access and
+ * manipulated by Envoy's admin interface.
+ */
+class AdminLayer : public OverrideLayerImpl {
+public:
+  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_(stats) {}
+  /**
+   * Merge the provided values into our entry map. An empty value indicates that a key should be
+   * removed from our map.
+   */
+  void mergeValues(const std::unordered_map<std::string, std::string>& values);
+
+private:
+  RuntimeStats& stats_;
+};
+
+/**
+ * Extension of OverrideLayerImpl that loads values from the file system upon construction.
+ */
+class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
+public:
+  DiskLayer(const std::string& name, const std::string& path, Api::OsSysCalls& os_sys_calls);
 
 private:
   struct Directory {
@@ -112,6 +139,7 @@ private:
 
   void walkDirectory(const std::string& path, const std::string& prefix);
 
+  const std::string path_;
   Api::OsSysCalls& os_sys_calls_;
 };
 
@@ -123,7 +151,7 @@ private:
  */
 class LoaderImpl : public Loader {
 public:
-  LoaderImpl(RandomGenerator& generator, ThreadLocal::SlotAllocator& tls);
+  LoaderImpl(RandomGenerator& generator, Stats::Store& stats, ThreadLocal::SlotAllocator& tls);
 
   // Runtime::Loader
   Snapshot& snapshot() override;
@@ -134,7 +162,7 @@ protected:
   // loadSnapshot() themselves to create the initial snapshot, since loadSnapshot calls the virtual
   // function createNewSnapshot() and is therefore unsuitable for use in a superclass constructor.
   struct DoNotLoadSnapshot {};
-  LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
+  LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator, Stats::Store& stats,
              ThreadLocal::SlotAllocator& tls);
 
   // Create a new Snapshot
@@ -142,10 +170,12 @@ protected:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
 
+  std::shared_ptr<AdminLayer> adminLayer_;
   RandomGenerator& generator_;
-  std::unordered_map<std::string, std::string> values_;
+  RuntimeStats stats_;
 
 private:
+  RuntimeStats generateStats(Stats::Store& store);
   ThreadLocal::SlotPtr tls_;
 };
 
@@ -153,7 +183,7 @@ private:
  * Extension of LoaderImpl that watches a symlink for swapping and loads a specified subdirectory
  * from disk. Values added via mergeValues() are secondary to those loaded from disk.
  */
-class DiskBackedLoaderImpl : public LoaderImpl {
+class DiskBackedLoaderImpl : public LoaderImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
   DiskBackedLoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
                        const std::string& root_symlink_path, const std::string& subdir,
@@ -162,12 +192,10 @@ public:
 
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
-  RuntimeStats generateStats(Stats::Store& store);
 
   Filesystem::WatcherPtr watcher_;
   std::string root_path_;
   std::string override_path_;
-  RuntimeStats stats_;
   Api::OsSysCallsPtr os_sys_calls_;
 };
 

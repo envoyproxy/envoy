@@ -294,7 +294,8 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
         config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
         std::move(os_sys_calls))};
   } else {
-    return Runtime::LoaderPtr{new Runtime::LoaderImpl(server.random(), server.threadLocal())};
+    return Runtime::LoaderPtr{
+        new Runtime::LoaderImpl(server.random(), server.stats(), server.threadLocal())};
   }
 }
 

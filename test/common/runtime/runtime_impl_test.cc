@@ -231,7 +231,8 @@ TEST_F(DiskBackedLoaderImplTest, mergeValues) {
 TEST(LoaderImplTest, All) {
   MockRandomGenerator generator;
   NiceMock<ThreadLocal::MockInstance> tls;
-  LoaderImpl loader(generator, tls);
+  Stats::IsolatedStoreImpl store;
+  LoaderImpl loader(generator, store, tls);
   EXPECT_EQ("", loader.snapshot().get("foo"));
   EXPECT_EQ(1UL, loader.snapshot().getInteger("foo", 1));
   EXPECT_CALL(generator, random()).WillOnce(Return(49));

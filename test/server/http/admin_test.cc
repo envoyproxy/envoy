@@ -234,63 +234,48 @@ TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
+  auto layer1 = std::make_shared<NiceMock<Runtime::MockOverrideLayer>>();
+  auto layer2 = std::make_shared<NiceMock<Runtime::MockOverrideLayer>>();
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
+      {"string_key", {"override", {}}}, {"extra_key", {"bar", {}}}};
 
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRef("layer1"));
+  ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
+  ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRef("layer2"));
+  ON_CALL(*layer2, values()).WillByDefault(testing::ReturnRef(entries2));
+
+  std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers{layer1, layer2};
+  EXPECT_CALL(snapshot, getAllLayers()).WillRepeatedly(testing::ReturnRef(layers));
+
+  const std::string expected_table = "KEY       \tLAYER1\tLAYER2  \t\n"
+                                     "extra_key \t      \tbar     \t\n"
+                                     "int_key   \t1     \t        \t\n"
+                                     "other_key \tbar   \t        \t\n"
+                                     "string_key\tfoo   \toverride\t\n";
+
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
   EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
-  EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
+  EXPECT_EQ(expected_table, TestUtility::bufferToString(response));
 }
 
 TEST_P(AdminInstanceTest, RuntimeJSON) {
-  Http::HeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
-  Runtime::MockSnapshot snapshot;
-  Runtime::MockLoader loader;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
-  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime?format=json", header_map, response));
-
-  std::string output = TestUtility::bufferToString(response);
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(output);
-
-  EXPECT_TRUE(json->hasObject("runtime"));
-  std::vector<Json::ObjectSharedPtr> pairs = json->getObjectArray("runtime");
-  EXPECT_EQ(3, pairs.size());
-
-  Json::ObjectSharedPtr pair = pairs[0];
-  EXPECT_EQ("int_key", pair->getString("name", ""));
-  EXPECT_EQ(1, pair->getInteger("value", -1));
-
-  pair = pairs[1];
-  EXPECT_EQ("other_key", pair->getString("name", ""));
-  EXPECT_EQ("bar", pair->getString("value", ""));
-
-  pair = pairs[2];
-  EXPECT_EQ("string_key", pair->getString("name", ""));
-  EXPECT_EQ("foo", pair->getString("value", ""));
+  // TODO Reviewers, see comment in admin.cc about JSON output
 }
 
 TEST_P(AdminInstanceTest, RuntimeBadFormat) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
+  std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers;
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
 
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  EXPECT_CALL(snapshot, getAllLayers()).WillRepeatedly(testing::ReturnRef(layers));
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
@@ -303,12 +288,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
-  Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
   std::unordered_map<std::string, std::string> overrides;
