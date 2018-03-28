@@ -70,6 +70,12 @@ public:
   virtual const std::string& configPath() PURE;
 
   /**
+   * @return const std::string& an inline YAML bootstrap config that merges
+   *                            into the config loaded in configPath().
+   */
+  virtual const std::string& configYaml() PURE;
+
+  /**
    * @return bool whether the config should only be parsed as v2. If false, when a v2 parse fails,
    *              a second attempt to parse the config as v1 will be made.
    */
