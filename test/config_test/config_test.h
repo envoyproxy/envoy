@@ -13,5 +13,10 @@ namespace ConfigTest {
  */
 uint32_t run(const std::string& path);
 
+/**
+ * Test --config-yaml overlay merge.
+ */
+void testMerge();
+
 } // namespace ConfigTest
 } // namespace Envoy
