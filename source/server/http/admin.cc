@@ -597,7 +597,7 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   return rc;
 }
 
-Http::Code AdminImpl::handlerRuntimeModify(const std::string& url, Http::HeaderMap&,
+Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
                                            Buffer::Instance& response) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
