@@ -79,7 +79,6 @@ envoy_cc_test(
         "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/filter:ratelimit_lib",
-        "//source/common/filter:tcp_proxy_lib",
         "//source/common/network:filter_manager_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
@@ -114,6 +113,7 @@ envoy_cc_test(
     deps = [
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
+        "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],

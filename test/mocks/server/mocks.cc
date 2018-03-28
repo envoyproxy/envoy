@@ -33,7 +33,11 @@ MockOptions::MockOptions(const std::string& config_path)
 }
 MockOptions::~MockOptions() {}
 
-MockAdmin::MockAdmin() {}
+MockAdmin::MockAdmin() {
+  ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker));
+  ON_CALL(config_tracker, addReturnsRaw(_, _))
+      .WillByDefault(ReturnNew<Server::MockConfigTracker::MockEntryOwner>());
+}
 MockAdmin::~MockAdmin() {}
 
 MockDrainManager::MockDrainManager() {
@@ -58,7 +62,19 @@ MockHotRestart::~MockHotRestart() {}
 
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
-  ON_CALL(*this, createListenSocket(_, _)).WillByDefault(Return(socket_));
+  ON_CALL(*this, createListenSocket(_, _, _))
+      .WillByDefault(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                bool) -> Network::SocketSharedPtr {
+        if (options) {
+          for (const auto& option : *options) {
+            if (!option->setOption(*socket_, Network::Socket::SocketState::PreBind)) {
+              throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
+            }
+          }
+        }
+        return socket_;
+      }));
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() {}
 

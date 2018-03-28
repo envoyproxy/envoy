@@ -135,7 +135,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
 
@@ -163,7 +163,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(
@@ -171,14 +171,14 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [&](const std::string&, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
 
@@ -205,6 +205,28 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+}
+
+TEST_P(AdminInstanceTest, ConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto entry = admin_.getConfigTracker().add("foo", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": {
+  "foo": {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bar"
+  }
+ }
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  std::string output = TestUtility::bufferToString(response);
+  EXPECT_EQ(expected_json, output);
 }
 
 TEST_P(AdminInstanceTest, Runtime) {

@@ -44,6 +44,7 @@ public:
   // Api::OsSysCalls
   ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
   int open(const std::string& full_path, int flags, int mode) override;
+
   MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD1(close, int(int));
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));

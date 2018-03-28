@@ -75,6 +75,16 @@ public:
   bool hot_restart_disabled_{};
 };
 
+class MockConfigTracker : public ConfigTracker {
+public:
+  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
+  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
+  EntryOwnerPtr add(const std::string& key, Cb callback) override {
+    return EntryOwnerPtr{addReturnsRaw(key, std::move(callback))};
+  }
+  struct MockEntryOwner : public EntryOwner {};
+};
+
 class MockAdmin : public Admin {
 public:
   MockAdmin();
@@ -85,6 +95,9 @@ public:
                                 HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
+  MOCK_METHOD0(getConfigTracker, ConfigTracker&());
+
+  NiceMock<MockConfigTracker> config_tracker;
 };
 
 class MockDrainManager : public DrainManager {
@@ -165,8 +178,9 @@ public:
                std::vector<Configuration::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD2(createListenSocket,
+  MOCK_METHOD3(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        const Network::Socket::OptionsSharedPtr& options,
                                         bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
@@ -368,12 +382,16 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 };
 
-class MockListenerFactoryContext : public MockFactoryContext {
+class MockListenerFactoryContext : public virtual MockFactoryContext,
+                                   public virtual ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
 
-  MOCK_METHOD1(setListenSocketOptions, void(const Network::Socket::OptionsSharedPtr&));
+  void addListenSocketOption(Network::Socket::OptionPtr&& option) override {
+    addListenSocketOption_(option);
+  }
+  MOCK_METHOD1(addListenSocketOption_, void(Network::Socket::OptionPtr&));
 };
 
 } // namespace Configuration

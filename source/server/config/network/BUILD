@@ -9,30 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "client_ssl_auth_lib",
-    srcs = ["client_ssl_auth.cc"],
-    hdrs = ["client_ssl_auth.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/filter/auth:client_ssl_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "echo_lib",
-    srcs = ["echo.cc"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:echo_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "http_connection_manager_lib",
     srcs = ["http_connection_manager.cc"],
     hdrs = ["http_connection_manager.h"],
@@ -57,19 +33,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "mongo_proxy_lib",
-    srcs = ["mongo_proxy.cc"],
-    hdrs = ["mongo_proxy.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/mongo:proxy_lib",
     ],
 )
 
@@ -100,20 +63,6 @@ envoy_cc_library(
         "//source/common/redis:command_splitter_lib",
         "//source/common/redis:conn_pool_lib",
         "//source/common/redis:proxy_filter_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "tcp_proxy_lib",
-    srcs = ["tcp_proxy.cc"],
-    hdrs = ["tcp_proxy.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:tcp_proxy_lib",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
     ],
 )
 

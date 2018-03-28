@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
@@ -202,17 +202,7 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
-
-      uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
-        // One bit needed for priority
-        static_assert(NumResourcePriorities == 2,
-                      "Fix shifts below to match number of bits needed for 'priority'");
-        // Two bits needed for protocol
-        static_assert(Http::NumProtocols <= 4,
-                      "Fix shifts below to match number of bits needed for 'protocol'");
-        return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
-      }
+      typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};

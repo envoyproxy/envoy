@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
+        ":config_tracker_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:listen_socket_interface",
@@ -49,6 +50,18 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/server/config/network:http_connection_manager_lib",
+        "@envoy_api//envoy/admin/v2:config_dump_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_tracker_lib",
+    srcs = ["config_tracker_impl.cc"],
+    hdrs = ["config_tracker_impl.h"],
+    deps = [
+        "//include/envoy/server:config_tracker_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
     ],
 )
 

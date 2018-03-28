@@ -5,7 +5,9 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
+#include "common/singleton/const_singleton.h"
 
+#include "opentracing/ext/tags.h"
 #include "opentracing/tracer.h"
 
 namespace Envoy {
@@ -49,7 +51,8 @@ public:
 
   // Tracer::TracingDriver
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const std::string& operation_name, SystemTime start_time) override;
+                    const std::string& operation_name, SystemTime start_time,
+                    const Tracing::Decision tracing_decision) override;
 
   virtual opentracing::Tracer& tracer() PURE;
 
@@ -63,6 +66,9 @@ public:
   virtual PropagationMode propagationMode() const { return PropagationMode::SingleHeader; }
 
   OpenTracingTracerStats& tracerStats() { return tracer_stats_; }
+
+protected:
+  virtual bool useTagForSamplingDecision() PURE;
 
 private:
   OpenTracingTracerStats tracer_stats_;
