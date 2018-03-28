@@ -104,13 +104,21 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
 
   HostVector hosts_added;
   HostVector hosts_removed;
+  // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
+  // when the locality weight map changes.
+  // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
+  // since this has the knock on effect that we rebuild the load balancers and locality scheduler.
+  // We could make this happen lazily, as we do for host-level weight updates, where as things age
+  // out of the locality scheduler, we discover their new weights. We don't currently have a shared
+  // object for locality weights that we can update here, we should add something like this to
+  // improve performance and scalability of locality weight updates.
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr) ||
       current_locality_weights_map_ != locality_weights_map) {
     current_locality_weights_map_ = locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({}) priority {}", info_->name(),
-              host_set.hosts().size(), host_set.priority());
+    ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
+              info_->name(), host_set.hosts().size(), host_set.priority());
     std::vector<HostVector> per_locality;
 
     // If we are configured for locality weighted LB we populate the locality
