@@ -73,7 +73,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       priority_state.resize(priority + 1);
     }
     if (priority_state[priority].first == nullptr) {
-      priority_state[priority] = {std::make_unique<HostVector>(), {}};
+      priority_state[priority].first.reset(new HostVector());
     }
     if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
       priority_state[priority].second[locality_lb_endpoint.locality()] =
