@@ -260,11 +260,9 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
 std::string AccessLogDateTimeFormatter::fromTimeWithFormat(const SystemTime& time,
                                                            const std::string& format) {
 
-  if (format != "") {
-    time_t in_time_t = std::chrono::system_clock::to_time_t(time);
-    std::stringstream ss;
-    ss << std::put_time(std::localtime(&in_time_t), format.c_str());
-    return ss.str();
+  if (!format.empty()) {
+    DateFormatter formatter(format);
+    return formatter.fromTime(time);
   }
 
   return fromTime(time);
