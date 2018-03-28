@@ -42,6 +42,10 @@ inline bool operator==(const char* str, const StringViewSaver& saver) {
   return saver.value() == str;
 }
 
+inline bool operator==(const StringViewSaver& saver, const char* str) {
+  return saver.value() == str;
+}
+
 class MockWatcher : public Watcher {
 public:
   MockWatcher();
