@@ -105,6 +105,7 @@ MockInstance::MockInstance()
     : ssl_context_manager_(runtime_loader_), singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(*this, histogramStats()).WillByDefault(ReturnRef(histogram_stats_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));

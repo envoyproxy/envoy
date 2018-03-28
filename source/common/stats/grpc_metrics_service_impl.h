@@ -15,6 +15,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -108,10 +109,12 @@ private:
 /**
  * Per thread implementation of a Metric Service flusher.
  */
-class MetricsServiceSink : public Sink {
+class MetricsServiceSink : public BaseSink {
 public:
   // MetricsService::Sink
-  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
+  MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
+                     ThreadLocal::SlotAllocator& tls);
+  ~MetricsServiceSink() {}
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
@@ -143,8 +146,14 @@ public:
     }
   }
 
-  void onHistogramComplete(const Histogram&, uint64_t) override {
+  void onHistogramComplete(const Histogram& hist, uint64_t value) override {
+    BaseSink::onHistogramComplete(hist, value);
+  }
+
+  std::list<HistogramStatistics> flushHistograms() override {
+    std::list<HistogramStatistics> all_histograms = BaseSink::flushHistograms();
     // TODO : Need to figure out how to map existing histogram to Proto Model
+    return all_histograms;
   }
 
 private:

@@ -11,6 +11,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -37,14 +38,14 @@ private:
 /**
  * Implementation of Sink that writes to a UDP statsd address.
  */
-class UdpStatsdSink : public Sink {
+class UdpStatsdSink : public BaseSink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag)
-      : tls_(tls.allocateSlot()), use_tag_(use_tag) {
+      : BaseSink(tls.allocateSlot(), false), tls_(tls.allocateSlot()), use_tag_(use_tag) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -72,7 +73,7 @@ private:
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
  */
-class TcpStatsdSink : public Sink {
+class TcpStatsdSink : public BaseSink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
@@ -92,6 +93,7 @@ public:
   void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 
   void onHistogramComplete(const Histogram& histogram, uint64_t value) override {
+    BaseSink::onHistogramComplete(histogram, value);
     // For statsd histograms are all timers.
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
                                                  std::chrono::milliseconds(value));

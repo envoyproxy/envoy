@@ -38,7 +38,8 @@ void Writer::write(const std::string& message) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag)
-    : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag) {
+    : BaseSink(tls.allocateSlot(), false), tls_(tls.allocateSlot()),
+      server_address_(std::move(address)), use_tag_(use_tag) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
@@ -90,8 +91,8 @@ char TcpStatsdSink::STAT_PREFIX[] = "envoy.";
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
-    : tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
-      cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
+    : BaseSink(tls.allocateSlot(), false), tls_(tls.allocateSlot()),
+      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
