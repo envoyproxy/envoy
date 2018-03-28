@@ -5,15 +5,18 @@
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/filter/ext_authz.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
-#include "test/mocks/ext_authz/mocks.h"
+#include "extensions/filters/network/ext_authz/config.h"
+#include "extensions/filters/network/ext_authz/ext_authz.h"
+
+#include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -30,8 +33,9 @@ using testing::WithArgs;
 using testing::_;
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
 namespace ExtAuthz {
-namespace TcpFilter {
 
 class ExtAuthzFilterTest : public testing::Test {
 public:
@@ -49,8 +53,8 @@ public:
     envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
     MessageUtil::loadFromJson(json, proto_config);
     config_.reset(new Config(proto_config, stats_store_));
-    client_ = new MockClient();
-    filter_.reset(new Instance(config_, ClientPtr{client_}));
+    client_ = new Filters::Common::ExtAuthz::MockClient();
+    filter_.reset(new Filter(config_, Filters::Common::ExtAuthz::ClientPtr{client_}));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     addr_ = std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
@@ -67,11 +71,11 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   ConfigSharedPtr config_;
-  MockClient* client_;
-  std::unique_ptr<Instance> filter_;
+  Filters::Common::ExtAuthz::MockClient* client_;
+  std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   Network::Address::InstanceConstSharedPtr addr_;
-  RequestCallbacks* request_callbacks_{};
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
 };
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
@@ -96,8 +100,10 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
@@ -110,7 +116,7 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   EXPECT_EQ(1U, stats_store_.gauge("ext_authz.name.active").value());
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->onComplete(CheckStatus::OK);
+  request_callbacks_->onComplete(Filters::Common::ExtAuthz::CheckStatus::OK);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -130,8 +136,10 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
@@ -145,7 +153,7 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->onComplete(CheckStatus::Denied);
+  request_callbacks_->onComplete(Filters::Common::ExtAuthz::CheckStatus::Denied);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -162,8 +170,10 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -172,7 +182,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->onComplete(CheckStatus::Error);
+  request_callbacks_->onComplete(Filters::Common::ExtAuthz::CheckStatus::Error);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -191,8 +201,10 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -200,7 +212,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(1);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  request_callbacks_->onComplete(CheckStatus::Error);
+  request_callbacks_->onComplete(Filters::Common::ExtAuthz::CheckStatus::Error);
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
@@ -217,15 +229,17 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->onComplete(CheckStatus::Error);
+  request_callbacks_->onComplete(Filters::Common::ExtAuthz::CheckStatus::Error);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -247,8 +261,10 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](RequestCallbacks& callbacks) -> void { request_callbacks_ = &callbacks; })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -273,8 +289,10 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _))
-      .WillOnce(WithArgs<0>(Invoke(
-          [&](RequestCallbacks& callbacks) -> void { callbacks.onComplete(CheckStatus::OK); })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(Filters::Common::ExtAuthz::CheckStatus::OK);
+          })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -291,6 +309,34 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
-} // namespace TcpFilter
+TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_authz_server
+      stat_prefix: google
+  failure_mode_allow: false
+  stat_prefix: name
+)EOF";
+
+  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
+  MessageUtil::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ExtAuthzConfigFactory factory;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+      }));
+  Server::Configuration::NetworkFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, context);
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
 } // namespace ExtAuthz
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -18,7 +18,6 @@ envoy_cc_test(
         "//source/common/router:router_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:dynamo_lib",
-        "//source/server/config/http:ext_authz_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",

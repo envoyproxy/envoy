@@ -8,6 +8,18 @@ namespace Envoy {
 TEST(ExampleConfigsTest, All) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
-  EXPECT_EQ(26UL, ConfigTest::run(TestEnvironment::temporaryDirectory() + "/test/config_test"));
+
+  // Change working directory, otherwise we won't be able to read files using relative paths.
+  char cwd[PATH_MAX];
+  const std::string& directory = TestEnvironment::temporaryDirectory() + "/test/config_test";
+  RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr);
+  RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
+
+  EXPECT_EQ(37UL, ConfigTest::run(directory));
+  ConfigTest::testMerge();
+  ConfigTest::testIncompatibleMerge();
+
+  // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
+  RELEASE_ASSERT(::chdir(cwd) == 0);
 }
 } // namespace Envoy
