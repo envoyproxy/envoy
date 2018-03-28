@@ -31,6 +31,8 @@
 namespace Envoy {
 namespace Server {
 
+class AdminFilter;
+
 /**
  * Implementation of Server::admin.
  */
@@ -44,8 +46,8 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response);
+  Http::Code runCallback(absl::string_view path_and_query, AdminFilter* admin_filter,
+                         Http::HeaderMap& response_headers, Buffer::Instance& response);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -236,13 +238,14 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& response_headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
+
+  const Http::HeaderMap& requestHeaders() const { return *request_headers_; }
 
 private:
   /**

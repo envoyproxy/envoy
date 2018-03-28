@@ -109,6 +109,8 @@ A few general notes on our error handling philosophy:
   that there is complete test coverage for the degraded case.** Additionally, the user should be
   aware of the degraded state minimally via an error log of level warn or greater and via the
   increment of a stat.
+* If you do need to log a non-fatal warning or error, you can unit-test it by instantiating a 
+  MockLogSink from test/mocks/common.h.
 * The error handling philosophy described herein is based on the assumption that Envoy is deployed
   using industry best practices (primarily canary). Major and obvious errors should always be
   caught in canary. If a low rate error leads to periodic crash cycling when deployed to
