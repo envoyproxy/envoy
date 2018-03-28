@@ -73,6 +73,8 @@ public:
     off = spdlog::level::off
   } levels;
 
+  static const char* DEFAULT_LOG_FORMAT;
+
 private:
   Logger(const std::string& name);
 
@@ -196,18 +198,25 @@ public:
   /*
    * Initialize the logging system with the specified lock and log level.
    */
-  static void initialize(uint64_t log_level, Thread::BasicLockable& lock) {
+  static void initialize(uint64_t log_level, const std::string& log_format,
+                         Thread::BasicLockable& lock) {
     // TODO(jmarantz): I think it would be more robust to push a separate lockable
     // SinkDelegate onto the stack for the lifetime of the lock, so we don't crash
     // if we try to log anything after the context owning the lock is destroyed.
     getSink()->setLock(lock);
     setLogLevel(log_level);
+    setLogFormat(log_format);
   }
 
   /**
-   * Initialize the logging system from server options.
+   * Sets the log level.
    */
   static void setLogLevel(uint64_t log_level);
+
+  /**
+   * Sets the log format.
+   */
+  static void setLogFormat(const std::string& log_format);
 
   /**
    * @return const std::vector<Logger>& the installed loggers.
