@@ -6,18 +6,19 @@
 #include <vector>
 
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
 namespace ExtAuthz {
-namespace TcpFilter {
 
 /**
  * All tcp external authorization stats. @see stats_macros.h
@@ -66,13 +67,13 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * connection will be closed without any further filters being called. Otherwise all buffered
  * data will be released to further filters.
  */
-class Instance : public Network::ReadFilter,
-                 public Network::ConnectionCallbacks,
-                 public RequestCallbacks {
+class Filter : public Network::ReadFilter,
+               public Network::ConnectionCallbacks,
+               public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
-  Instance(ConfigSharedPtr config, ClientPtr&& client)
+  Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Instance() {}
+  ~Filter() {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -88,20 +89,20 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // ExtAuthz::RequestCallbacks
-  void onComplete(CheckStatus status) override;
+  void onComplete(Filters::Common::ExtAuthz::CheckStatus status) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };
   void callCheck();
 
   ConfigSharedPtr config_;
-  ClientPtr client_;
+  Filters::Common::ExtAuthz::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
   bool calling_check_{};
   envoy::service::auth::v2::CheckRequest check_request_{};
 };
-
-} // TcpFilter
-} // namespace ExtAuthz
+}
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

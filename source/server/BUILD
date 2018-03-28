@@ -36,7 +36,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/ext_authz:ext_authz_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",

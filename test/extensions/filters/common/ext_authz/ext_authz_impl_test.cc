@@ -2,10 +2,11 @@
 #include <cstdint>
 #include <string>
 
-#include "common/ext_authz/ext_authz_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
+
+#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -29,6 +30,9 @@ using testing::WithArg;
 using testing::_;
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace ExtAuthz {
 
 class MockRequestCallbacks : public RequestCallbacks {
@@ -183,4 +187,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
 }
 
 } // namespace ExtAuthz
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

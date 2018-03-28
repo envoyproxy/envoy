@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ext_authz/ext_authz.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -19,7 +18,12 @@
 
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/common/ext_authz/ext_authz.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace ExtAuthz {
 
 typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>
@@ -109,4 +113,7 @@ private:
 };
 
 } // namespace ExtAuthz
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
