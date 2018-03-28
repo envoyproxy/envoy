@@ -243,9 +243,9 @@ TEST_P(AdminInstanceTest, Runtime) {
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
       {"string_key", {"override", {}}}, {"extra_key", {"bar", {}}}};
 
-  ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRef("layer1"));
+  ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
-  ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRef("layer2"));
+  ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer2"}));
   ON_CALL(*layer2, values()).WillByDefault(testing::ReturnRef(entries2));
 
   std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers{layer1, layer2};
