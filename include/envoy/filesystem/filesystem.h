@@ -7,6 +7,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Filesystem {
 
@@ -20,7 +22,7 @@ public:
   /**
    * Write data to the file.
    */
-  virtual void write(const std::string& data) PURE;
+  virtual void write(absl::string_view) PURE;
 
   /**
    * Reopen the file.
