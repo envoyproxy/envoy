@@ -46,15 +46,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
-    RequestInfoFormatter start_time_format("START_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
-  }
-
-  {
-    RequestInfoFormatter start_time_format("START_TIME", "%Y/%m/%d");
+    StartTimeFormatter start_time_format("%Y/%m/%d");
     SystemTime time;
     EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTimeWithFormat(time, "%Y/%m/%d"),

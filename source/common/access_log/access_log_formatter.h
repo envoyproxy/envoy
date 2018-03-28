@@ -116,7 +116,7 @@ public:
  */
 class RequestInfoFormatter : public Formatter {
 public:
-  RequestInfoFormatter(const std::string& field_name, const std::string& arguments = "");
+  RequestInfoFormatter(const std::string& field_name);
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
@@ -124,6 +124,19 @@ public:
 
 private:
   std::function<std::string(const RequestInfo::RequestInfo&)> field_extractor_;
+};
+
+/**
+ * Formatter
+ */
+class StartTimeFormatter : public Formatter {
+public:
+  StartTimeFormatter(const std::string& format);
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+                     const RequestInfo::RequestInfo&) const override;
+
+private:
+  std::string format_;
 };
 
 } // namespace AccessLog

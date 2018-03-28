@@ -146,10 +146,11 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         formatters.emplace_back(
             FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
-      } else if (token.find("START_TIME(") == 0) {
+      } else if (token.find("START_TIME") == 0) {
         const size_t start = 11;
-        const std::string args = token.substr(start, command_end_position - (pos + start + 1));
-        formatters.emplace_back(FormatterPtr(new RequestInfoFormatter("START_TIME", args)));
+
+        const std::string args = token[start] == '(' ? token.substr(start, command_end_position - (pos + start + 1)) : "";
+        formatters.emplace_back(FormatterPtr(new StartTimeFormatter(args)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
       }
@@ -166,13 +167,9 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   return formatters;
 }
 
-RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name,
-                                           const std::string& arguments) {
-  if (field_name == "START_TIME") {
-    field_extractor_ = [arguments](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogDateTimeFormatter::fromTimeWithFormat(request_info.startTime(), arguments);
-    };
-  } else if (field_name == "REQUEST_DURATION") {
+RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
+
+  if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());
     };
@@ -311,6 +308,14 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
                                            const Http::HeaderMap&,
                                            const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(request_headers);
+}
+
+StartTimeFormatter::StartTimeFormatter(const std::string& format) : format_(format) {}
+
+std::string StartTimeFormatter::format(const Http::HeaderMap&,
+                                       const Http::HeaderMap&,
+                                       const RequestInfo::RequestInfo& request_info) const {
+  return AccessLogDateTimeFormatter::fromTimeWithFormat(request_info.startTime(), format_);
 }
 
 } // namespace AccessLog
