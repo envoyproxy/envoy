@@ -167,7 +167,6 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc);
-  UNREFERENCED_PARAMETER(rc);
 
   // man getifaddrs(3)
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
@@ -304,7 +303,6 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #else
   // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
-  UNREFERENCED_PARAMETER(fd);
   return nullptr;
 #endif
 }

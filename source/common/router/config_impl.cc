@@ -679,7 +679,6 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
       routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
     } else {
       ASSERT(has_regex);
-      UNREFERENCED_PARAMETER(has_regex);
       routes_.emplace_back(new RegexRouteEntryImpl(*this, route, runtime));
     }
 
