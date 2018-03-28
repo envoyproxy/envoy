@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import common
 import fileinput
 import os
 import os.path
@@ -87,8 +88,9 @@ def isBuildFile(file_path):
 
 def checkFileContents(file_path):
   findSubstringAndPrintError('.  ', file_path, "over-enthusiastic spaces")
-  findSubstringAndPrintError('#include <envoy', file_path,
-                             "envoy includes should not have angle brackets")
+  for subdir in common.include_dir_order():
+    prefix = "#include <" + subdir
+    findSubstringAndPrintError(prefix, file_path, "envoy includes should not have angle brackets")
 
 
 def fixFileContents(file_path):
@@ -96,8 +98,10 @@ def fixFileContents(file_path):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
     line = line.replace('.  ', '. ')
-    if line.startswith("#include <envoy/"):
-      line = line.replace("#include <envoy/", '#include "envoy/').replace(">", '"')
+    for subdir in common.include_dir_order():
+      angle_prefix = "#include <" + subdir
+      if line.startswith(angle_prefix):
+        line = line.replace('<', '"').replace(">", '"')
     sys.stdout.write("%s" % line)
 
 
