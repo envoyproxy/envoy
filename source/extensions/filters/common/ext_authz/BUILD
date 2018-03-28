@@ -9,11 +9,20 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "ext_authz_interface",
+    hdrs = ["ext_authz.h"],
+    deps = [
+        "//include/envoy/tracing:http_tracer_interface",
+        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "ext_authz_lib",
     srcs = ["ext_authz_impl.cc"],
     hdrs = ["ext_authz_impl.h"],
     deps = [
-        "//include/envoy/ext_authz:ext_authz_interface",
+        ":ext_authz_interface",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/http:filter_interface",

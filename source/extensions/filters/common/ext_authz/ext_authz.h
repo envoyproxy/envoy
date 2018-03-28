@@ -10,6 +10,9 @@
 #include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace ExtAuthz {
 
 /**
@@ -64,4 +67,7 @@ public:
 typedef std::unique_ptr<Client> ClientPtr;
 
 } // namespace ExtAuthz
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

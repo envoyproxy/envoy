@@ -31,16 +31,23 @@ public:
       : config_path_(config_path), local_address_ip_version_(ip_version),
         service_cluster_name_("cluster_name"), service_node_name_("node_name"),
         service_zone_("zone_name") {}
+  TestOptionsImpl(const std::string& config_path, const std::string& config_yaml,
+                  Network::Address::IpVersion ip_version)
+      : config_path_(config_path), config_yaml_(config_yaml), local_address_ip_version_(ip_version),
+        service_cluster_name_("cluster_name"), service_node_name_("node_name"),
+        service_zone_("zone_name") {}
 
   // Server::Options
   uint64_t baseId() override { return 0; }
   uint32_t concurrency() override { return 1; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& configYaml() override { return config_yaml_; }
   bool v2ConfigOnly() override { return false; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
+  const std::string& logFormat() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
   const std::string& logPath() override { return log_path_; }
   uint64_t restartEpoch() override { return 0; }
@@ -55,8 +62,12 @@ public:
   uint64_t maxObjNameLength() override { return 60; }
   bool hotRestartDisabled() override { return false; }
 
+  // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
+  Server::TestOptionsImpl asConfigYaml();
+
 private:
   const std::string config_path_;
+  const std::string config_yaml_;
   const std::string admin_address_path_;
   const Network::Address::IpVersion local_address_ip_version_;
   const std::string service_cluster_name_;

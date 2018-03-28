@@ -19,7 +19,7 @@ public:
   ~MockFile();
 
   // Filesystem::File
-  MOCK_METHOD1(write, void(const std::string& data));
+  MOCK_METHOD1(write, void(absl::string_view data));
   MOCK_METHOD0(reopen, void());
   MOCK_METHOD0(flush, void());
 };

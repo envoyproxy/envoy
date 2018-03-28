@@ -3,11 +3,14 @@
 #include <string>
 #include <vector>
 
-#include "envoy/ext_authz/ext_authz.h"
+#include "extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace ExtAuthz {
 
 class MockClient : public Client {
@@ -23,4 +26,7 @@ public:
 };
 
 } // namespace ExtAuthz
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
