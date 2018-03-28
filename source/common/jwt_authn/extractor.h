@@ -88,16 +88,18 @@ private:
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderMapValue {
-    HeaderMapValue(const Http::LowerCaseString& header) : header_(header) {}
+    HeaderMapValue(const Http::LowerCaseString& header, const std::string value_prefix)
+        : header_(header), value_prefix_(value_prefix) {}
     // The header name.
     Http::LowerCaseString header_;
-    // Issuers that specified this header.
-    std::unordered_set<std::string> specified_issuers_;
     // The value prefix.
     std::string value_prefix_;
+    // Issuers that specified this header.
+    std::unordered_set<std::string> specified_issuers_;
   };
+  typedef std::unique_ptr<HeaderMapValue> HeaderMapValuePtr;
   // The map of (header + value_prefix) to HeaderMapValue
-  std::map<std::string, HeaderMapValue> header_maps_;
+  std::map<std::string, HeaderMapValuePtr> header_maps_;
 
   // ParamMap value type to store issuers that specified this header.
   struct ParamMapValue {

@@ -210,7 +210,7 @@ public:
   } VaryValues;
 
   struct {
-    const std::string BeararPrefix{"Bearer "};
+    const std::string BearerPrefix{"Bearer "};
     const std::string AccessTokenParam{"access_token"};
   } JwtValues;
 };

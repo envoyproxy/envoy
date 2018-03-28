@@ -1,6 +1,7 @@
 #include "common/jwt_authn/extractor.h"
 
 #include "common/common/utility.h"
+#include "common/http/headers.h"
 #include "common/http/utility.h"
 
 using ::Envoy::Http::LowerCaseString;
@@ -83,11 +84,12 @@ Extractor::Extractor(const JwtAuthentication& config) {
 
 void Extractor::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                 const std::string& value_prefix) {
-  std::string key = header_name.get() + value_prefix;
-  auto it = header_maps_.empace
-  map_value.header_ = header_name;
-  map_value.value_prefix_ = value_prefix;
-  map_value.specified_issuers_.insert(issuer);
+  std::string map_key = header_name.get() + value_prefix;
+  auto& map_value = header_maps_[map_key];
+  if (!map_value) {
+    map_value.reset(new HeaderMapValue(header_name, value_prefix));
+  }
+  map_value->specified_issuers_.insert(issuer);
 }
 
 void Extractor::addParamConfig(const std::string& issuer, const std::string& param) {
@@ -100,18 +102,18 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
   // Check header first
   for (const auto& header_it : header_maps_) {
     const auto& map_value = header_it.second;
-    const Http::HeaderEntry* entry = headers.get(map_value.header_);
+    const Http::HeaderEntry* entry = headers.get(map_value->header_);
     if (entry) {
       std::string value_str = std::string(entry->value().c_str(), entry->value().size());
-      if (!map_value.value_prefix_.empty()) {
-        if (!StringUtil::startsWith(value_str.c_str(), map_value.value_prefix_, true)) {
+      if (!map_value->value_prefix_.empty()) {
+        if (!StringUtil::startsWith(value_str.c_str(), map_value->value_prefix_, true)) {
           // prefix doesn't match, skip it.
           continue;
         }
-        value_str = value_str.substr(map_value.value_prefix_.size());
+        value_str = value_str.substr(map_value->value_prefix_.size());
       }
       tokens.emplace_back(
-          new JwtHeaderLocation(value_str, map_value.specified_issuers_, map_value.header_));
+          new JwtHeaderLocation(value_str, map_value->specified_issuers_, map_value->header_));
     }
   }
 

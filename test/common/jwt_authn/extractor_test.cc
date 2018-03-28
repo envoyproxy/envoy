@@ -31,7 +31,11 @@ rules:
   - issuer: issuer5
     from_headers:
       - name: prefix-header
-        value_prefix: prefix
+        value_prefix: AAA
+  - issuer: issuer6
+    from_headers:
+      - name: prefix-header
+        value_prefix: AAABBB
 )";
 
 class ExtractorTest : public ::testing::Test {
@@ -123,18 +127,17 @@ TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
-  auto headers = TestHeaderMapImpl{{"prefix-header", "prefixjwt_token"}};
+  auto headers = TestHeaderMapImpl{{"prefix-header", "AAABBBjwt_token"}};
   auto tokens = extractor_->extract(headers);
-  EXPECT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens.size(), 2);
 
-  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  // Match issuer 5 with map key as: prefix-header + AAA
+  EXPECT_EQ(tokens[0]->token(), "BBBjwt_token");
+  // Match issuer 6 with map key as: prefix-header + AAABBB which is after AAA
+  EXPECT_EQ(tokens[1]->token(), "jwt_token");
+
   EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer5"));
-
-  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer1"));
-  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
-  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer3"));
-  EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
-  EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+  EXPECT_TRUE(tokens[1]->isIssuerSpecified("issuer6"));
 
   // Test token remove
   tokens[0]->removeJwt(headers);
@@ -161,7 +164,7 @@ TEST_F(ExtractorTest, TestMultipleTokens) {
       {":path", "/path?token_param=token3&access_token=token4"},
       {"token-header", "token2"},
       {"authorization", "Bearer token1"},
-      {"prefix-header", "prefixtoken5"},
+      {"prefix-header", "AAAtoken5"},
   };
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 5);
