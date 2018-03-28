@@ -91,6 +91,11 @@ public:
   virtual spdlog::level::level_enum logLevel() PURE;
 
   /**
+   * @return const std::string& the log format string.
+   */
+  virtual const std::string& logFormat() PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() PURE;

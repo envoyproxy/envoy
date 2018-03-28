@@ -283,7 +283,8 @@ int main(int argc, char** argv) {
   // TODO(mattklein123): Provide a common bazel benchmark wrapper much like we do for normal tests,
   // fuzz, etc.
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn, lock);
+  Envoy::Logger::Registry::initialize(spdlog::level::warn,
+                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

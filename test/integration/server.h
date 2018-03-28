@@ -41,6 +41,7 @@ public:
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
+  const std::string& logFormat() override { NOT_IMPLEMENTED; }
   std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
   const std::string& logPath() override { return log_path_; }
   uint64_t restartEpoch() override { return 0; }
