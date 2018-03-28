@@ -470,7 +470,7 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::vector<NiceMock<Event::MockTimer>*> connect_timers_;
   std::unique_ptr<TcpProxyFilter> filter_;
-  std::string access_log_data_;
+  StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
