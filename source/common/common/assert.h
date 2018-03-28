@@ -8,18 +8,23 @@ namespace Envoy {
  * sinks.
  */
 #define RELEASE_ASSERT(X)                                                                          \
-  {                                                                                                \
+  do {                                                                                             \
     if (!(X)) {                                                                                    \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
                           "assert failure: {}", #X);                                               \
       abort();                                                                                     \
     }                                                                                              \
-  }
+  } while (false)
 
 #ifndef NDEBUG
 #define ASSERT(X) RELEASE_ASSERT(X)
 #else
-#define ASSERT(X)
+// This non-implementation ensures that its argument is a valid expression that can be statically
+// casted to a bool, but doesn't generate any code, since the argument to sizeof() is not evaluated.
+#define ASSERT(X)                                                                                  \
+  do {                                                                                             \
+    (void)sizeof(static_cast<bool>(X));                                                            \
+  } while (false)
 #endif
 
 /**
