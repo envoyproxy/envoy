@@ -44,10 +44,7 @@ FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
 void FileSinkDelegate::log(absl::string_view msg) {
   // Logfiles have internal locking to ensure serial, non-interleaved
   // writes, so no additional locking needed here.
-  //
-  // TODO(jmarantz): filesystem file write should take string_view. Adding that requires
-  // finding a way to make that work for mocked filesystem writes.
-  log_file_->write(std::string(msg));
+  log_file_->write(msg);
 }
 
 void FileSinkDelegate::flush() {
