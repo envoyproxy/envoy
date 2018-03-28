@@ -101,9 +101,7 @@ public:
 
   void expectEnableUpstreamReady() {
     EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_))
-        .Times(1)
-        .RetiresOnSaturation();
+    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_)).Times(1).RetiresOnSaturation();
   }
 
   void expectAndRunUpstreamReady() {
