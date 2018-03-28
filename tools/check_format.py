@@ -86,22 +86,45 @@ def isBuildFile(file_path):
   return False
 
 
-def checkFileContents(file_path):
-  findSubstringAndPrintError('.  ', file_path, "over-enthusiastic spaces")
-  for subdir in common.include_dir_order():
-    prefix = "#include <" + subdir
-    findSubstringAndPrintError(prefix, file_path, "envoy includes should not have angle brackets")
+def headerSubdirDict():
+  subdir_dict = {}
+  for subdir in common.includeDirOrder():
+    subdir_dict[subdir] = True
+  return subdir_dict
 
+SUBDIR_DICT = headerSubdirDict()
+INCLUDE_ANGLE = "#include <"
+INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+
+def hasInvalidAngleBracketDirectory(line):
+  if not line.startswith(INCLUDE_ANGLE):
+    return False
+  path = line[INCLUDE_ANGLE_LEN:]
+  slash = path.find("/")
+  if slash == -1:
+    return False
+  subdir = path[0:slash]
+  return SUBDIR_DICT.has_key(subdir)
+
+def printLineError(path, line_number, message):
+  printError("%s:%d: %s" % (path, line_number, message))
+
+def checkFileContents(file_path):
+  line_number = 0
+  for line in fileinput.input(file_path):
+    line_number += 1
+    if line.find(".  ") != -1:
+      printLineError(file_path, line_number, "over-enthusiastic spaces")
+    if hasInvalidAngleBracketDirectory(line):
+      printLineError(file_path, line_number, "envoy includes should not have angle brackets")
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
     line = line.replace('.  ', '. ')
-    for subdir in common.include_dir_order():
-      angle_prefix = "#include <" + subdir
-      if line.startswith(angle_prefix):
-        line = line.replace('<', '"').replace(">", '"')
+    if hasInvalidAngleBracketDirectory(line):
+      line = line.replace('<', '"').replace(">", '"')
     sys.stdout.write("%s" % line)
 
 

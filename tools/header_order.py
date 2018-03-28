@@ -68,8 +68,8 @@ def ReorderHeaders(path):
       regex_filter('<.*\.h>'),
       regex_filter('<.*>'),
   ]
-  for subdir in common.include_dir_order():
-    block_filters.append(regex_filter('"' + subdir + '.*"'))
+  for subdir in common.includeDirOrder():
+    block_filters.append(regex_filter('"' + subdir + '/.*"'))
 
   blocks = []
   already_included = set([])

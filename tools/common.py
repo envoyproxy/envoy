@@ -1,10 +1,10 @@
-def include_dir_order():
+def includeDirOrder():
   return (
-      "envoy/",
-      "common/",
-      "source/",
-      "exe/",
-      "server/",
-      "extensions/",
-      "test/",
+      "envoy",
+      "common",
+      "source",
+      "exe",
+      "server",
+      "extensions",
+      "test",
   )
