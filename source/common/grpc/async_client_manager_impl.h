@@ -11,7 +11,7 @@ namespace Grpc {
 class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
-                         const envoy::api::v2::core::GrpcService& config);
+                         const envoy::api::v2::core::GrpcService& config, bool skip_cluster_check);
 
   AsyncClientPtr create() override;
 
@@ -41,7 +41,8 @@ public:
 
   // Grpc::AsyncClientManager
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
-                                              Stats::Scope& scope) override;
+                                              Stats::Scope& scope,
+                                              bool skip_cluster_check) override;
 
 private:
   Upstream::ClusterManager& cm_;

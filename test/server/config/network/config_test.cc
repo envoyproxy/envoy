@@ -420,8 +420,8 @@ TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
   NiceMock<MockFactoryContext> context;
   ExtAuthzConfigFactory factory;
 
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);

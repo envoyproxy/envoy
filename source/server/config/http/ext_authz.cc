@@ -25,8 +25,8 @@ HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
   return [ grpc_service = proto_config.grpc_service(), &context, filter_config,
            timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks) {
     auto async_client_factory =
-        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(grpc_service,
-                                                                                context.scope());
+        context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+            grpc_service, context.scope(), false);
     auto client = std::make_unique<Envoy::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
     callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{

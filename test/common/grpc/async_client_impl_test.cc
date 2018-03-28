@@ -11,6 +11,7 @@
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::Throw;
 using testing::_;
 
 namespace Envoy {
@@ -130,6 +131,18 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
                                           active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
+}
+
+// Validate that when HTTP Async client thows an exception grpc_client returns immediately with
+// status UNAVAILABLE and error message "Cluster not available"
+TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
+  ON_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
+      .WillByDefault(Throw(EnvoyException("Unknow cluster test_cluster")));
+  EXPECT_CALL(grpc_callbacks,
+              onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available"));
+  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 } // namespace

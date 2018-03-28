@@ -27,8 +27,8 @@ public:
     message_ = factory_->createEmptyConfigProto();
     ASSERT_NE(nullptr, message_);
 
-    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
-        .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
         }));
 
