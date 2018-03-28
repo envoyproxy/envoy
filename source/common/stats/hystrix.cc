@@ -257,7 +257,6 @@ void HystrixSink::endFlush() {
   }
   Buffer::OwnedImpl data;
   data.add(ss.str());
-  // std::cout << "endflush : " << ss.str() << std::endl;
   callbacks_->encodeData(data, false);
 
   // send keep alive ping

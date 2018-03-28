@@ -150,6 +150,7 @@ void InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* cal
         dynamic_cast<Stats::HystrixNameSpace::HystrixSink*>(sink.get());
     if (hystrix_sink != nullptr) {
       hystrix_sink->registerConnection(callbacks);
+      return;
     }
   }
 }
@@ -162,7 +163,9 @@ void InstanceImpl::unregisterHystrixSink() {
     if (hystrix_sink != nullptr) {
       // TODO (@trabetti) :  will want to move to a vector of connections,
       // need a parameter (callback, hope it will work) to identify which connection to remove
+      // also better to return success value.
       hystrix_sink->unregisterConnection();
+      return;
     }
   }
 }
