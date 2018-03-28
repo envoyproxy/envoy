@@ -74,6 +74,8 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
 
+  void mergeHistograms() override;
+
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;

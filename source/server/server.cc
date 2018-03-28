@@ -139,6 +139,7 @@ void InstanceImpl::flushStats() {
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
 
+  stats_store_.mergeHistograms();
   InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }

@@ -294,6 +294,8 @@ public:
    * down.
    */
   virtual void shutdownThreading() PURE;
+
+  virtual void mergeHistograms() {}
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

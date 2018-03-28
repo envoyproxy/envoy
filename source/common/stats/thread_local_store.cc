@@ -75,6 +75,24 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 }
 
+void ThreadLocalStoreImpl::mergeHistograms() {
+  std::cout << "mergeHistograms is called"
+            << "\n";
+  std::unique_lock<std::mutex> lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    for (auto histogram : scope->central_cache_.histograms_) {
+      ParentHistogramSharedPtr parent_hist_ptr =
+          std::dynamic_pointer_cast<HistogramParentImpl>(histogram.second);
+      std::cout << "merging ..." << histogram.first << "\n";
+      for (auto tls_histogram : parent_hist_ptr->tls_histograms_) {
+        TlsHistogramSharedPtr tls_histogram_ptr =
+            std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(tls_histogram);
+        std::cout << "merging child ..." << tls_histogram_ptr->name() << "\n";
+      }
+    }
+  }
+}
+
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   std::unique_lock<std::mutex> lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
@@ -215,18 +233,22 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
   HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
+
+  std::vector<Tag> tags;
+  std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
   if (!central_ref) {
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        new HistogramImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+    central_ref.reset(new HistogramParentImpl(final_name, parent_, std::move(tag_extracted_name),
+                                              std::move(tags)));
   }
+  HistogramSharedPtr hist_tls_ptr;
+  hist_tls_ptr.reset(new ThreadLocalHistogramImpl(final_name, parent_,
+                                                  std::move(tag_extracted_name), std::move(tags)));
+  dynamic_cast<HistogramParentImpl&>(*central_ref).addTlsHistogram(hist_tls_ptr);
 
   if (tls_ref) {
-    *tls_ref = central_ref;
+    *tls_ref = hist_tls_ptr;
   }
-
-  return *central_ref;
+  return *hist_tls_ptr;
 }
 
 } // namespace Stats

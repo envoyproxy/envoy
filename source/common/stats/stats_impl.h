@@ -23,6 +23,10 @@
 
 #include "absl/strings/string_view.h"
 
+extern "C" {
+#include <circllhist.h>
+}
+
 namespace Envoy {
 namespace Stats {
 
@@ -368,6 +372,56 @@ public:
 
   Store& parent_;
 };
+
+/**
+ * Log Linear Histogram implementation per thread.
+ */
+class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+public:
+  ThreadLocalHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+    histograms_[0] = hist_alloc();
+    histograms_[1] = hist_alloc();
+    current_active_ = 0;
+  }
+
+  ~ThreadLocalHistogramImpl() {
+    hist_free(histograms_[0]);
+    hist_free(histograms_[1]);
+  }
+  // Stats::Histogram
+  void recordValue(uint64_t value) override {
+    hist_insert_intscale(histograms_[current_active_], value, 0, 1);
+    parent_.deliverHistogramToSinks(*this, value);
+  }
+
+  Store& parent_;
+  int current_active_;
+  histogram_t* histograms_[2];
+};
+
+typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
+
+/**
+ * Log Linear Histogram implementation that is stored in the main thread.
+ */
+class HistogramParentImpl : public Histogram, public MetricImpl {
+public:
+  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                      std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
+
+  // Stats::Histogram
+  void recordValue(uint64_t) override {}
+
+  void addTlsHistogram(HistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
+
+  Store& parent_;
+  std::list<HistogramSharedPtr> tls_histograms_;
+};
+
+typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;
 
 /**
  * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns
