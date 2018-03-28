@@ -48,13 +48,23 @@ public:
   MOCK_METHOD0(currentTime, MonotonicTime());
 };
 
+// This Mock logging sink is not implemented using the gmock infrastructure, due to
+// apparent limitations in the g++ type system, which fails to compile
+// EXPECT_CALL(mock_logger_, log(HasSubstr("substr"))) due to difficulty between
+// std::string and absl::string_view. clang compiles it fine.
 class MockLogSink : public Logger::SinkDelegate {
 public:
   MockLogSink() : Logger::SinkDelegate(Logger::Registry::getSink()) {}
   virtual ~MockLogSink(){};
 
-  MOCK_METHOD1(log, void(absl::string_view msg));
-  MOCK_METHOD0(flush, void());
+  // Logger::SinkDelgate
+  void log(absl::string_view msg) override { messages_.push_back(std::string(msg)); }
+  void flush() override {}
+
+  const std::vector<std::string>& messages() const { return messages_; }
+
+private:
+  std::vector<std::string> messages_;
 };
 
 } // namespace Envoy

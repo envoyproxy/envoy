@@ -140,11 +140,13 @@ TEST_P(AdminInstanceTest, MutatesWarnWithGet) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
-  EXPECT_CALL(mock_logger_, log(HasSubstr("admin path \"" + path +
-                                          "\" mutates state, method=GET rather than POST")));
   // TODO(jmarantz): this should be made to fail, but as an interim we will just issue a
   // warning, so that scripts using curl GET comamnds to mutate state can be fixed.
   EXPECT_EQ(Http::Code::OK, getCallback(path, header_map, data));
+  ASSERT_EQ(1, mock_logger_.messages().size());
+  EXPECT_NE(std::string::npos,
+            mock_logger_.messages()[0].find("admin path \"" + path +
+                                            "\" mutates state, method=GET rather than POST"));
 }
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
@@ -170,12 +172,13 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  EXPECT_CALL(mock_logger_,
-              log(HasSubstr("cannot open admin address output file " + bad_path + " for writing")));
-  EXPECT_CALL(mock_logger_, flush());
   AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                        server_, listener_scope_.createScope("listener.admin."));
+  ASSERT_EQ(1, mock_logger_.messages().size());
+  EXPECT_NE(std::string::npos,
+            mock_logger_.messages()[0].find("cannot open admin address output file " + bad_path +
+                                            " for writing"));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
