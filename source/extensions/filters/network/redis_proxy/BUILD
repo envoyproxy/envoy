@@ -46,12 +46,12 @@ envoy_cc_library(
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
     deps = [
+        ":command_splitter_interface",
+        ":conn_pool_interface",
         ":supported_commands_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:to_lower_table_lib",
-        "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
-        "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
     ],
 )
 
@@ -61,6 +61,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_impl.h"],
     deps = [
         ":codec_lib",
+        ":conn_pool_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -68,7 +69,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
@@ -79,13 +79,13 @@ envoy_cc_library(
     hdrs = ["proxy_filter.h"],
     deps = [
         ":codec_interface",
+        ":command_splitter_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
