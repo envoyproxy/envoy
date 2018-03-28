@@ -50,7 +50,7 @@ def findSubstringAndPrintError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
     if pattern in text:
-      printError(error_message)
+      printError(file_path + ': ' + error_message)
       for i, line in enumerate(text.splitlines()):
         if pattern in line:
           printError("  %s:%s" % (file_path, i + 1))
@@ -60,8 +60,8 @@ def findSubstringAndPrintError(pattern, file_path, error_message):
 def checkProtobufExternalDepsBuild(file_path):
   if whitelistedForProtobufDeps(file_path):
     return True
-  message = ("%s has unexpected direct external dependency on protobuf, use "
-    "//source/common/protobuf instead." % file_path)
+  message = ("unexpected direct external dependency on protobuf, use "
+    "//source/common/protobuf instead.")
   return findSubstringAndPrintError('"protobuf"', file_path, message)
 
 
@@ -86,15 +86,19 @@ def isBuildFile(file_path):
 
 
 def checkFileContents(file_path):
-  message = "%s has over-enthusiastic spaces:" % file_path
-  findSubstringAndPrintError('.  ', file_path, message)
+  findSubstringAndPrintError('.  ', file_path, "over-enthusiastic spaces")
+  findSubstringAndPrintError('#include <envoy', file_path,
+                             "envoy includes should not have angle brackets")
 
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
-    sys.stdout.write("%s" % (line.replace('.  ', '. ')))
+    line = line.replace('.  ', '. ')
+    if line.startswith("#include <envoy/"):
+      line = line.replace("#include <envoy/", '#include "envoy/').replace(">", '"')
+    sys.stdout.write("%s" % line)
 
 
 def checkFilePath(file_path):
