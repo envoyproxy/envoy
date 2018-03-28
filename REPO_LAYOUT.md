@@ -11,9 +11,11 @@ are:
 * [docs/](docs/): Project level documentation is well as scripts for publishing final docs during
   releases.
 * [examples/](examples/): Larger Envoy examples using Docker and Docker Compose.
-* [include/](include/): "Public" interface headers for "core" Envoy (not extensions). In general,
+* [include/](include/): "Public" interface headers for "core" Envoy. In general,
   these are almost entirely 100% abstract classes. There are a few cases of not-abstract classes in
-  the "public" headers, typically for performance reasons.
+  the "public" headers, typically for performance reasons. Note that "core" includes some
+  "extensions" such as the HTTP connection manager filter and associated functionality which are
+  so fundamental to Envoy that they will likely never be optional from a compilation perspective.
 * [restarter/](restarter/): Envoy's hot restart wrapper Python script.
 * [source/](source/): Source code for core Envoy as well as extensions. The layout of this directory
   is discussed in further detail below.
@@ -24,7 +26,7 @@ are:
 
 ## [source/](source/)
 
-* [common/](source/[common/): Core Envoy code (not specific to extensions) that is also not
+* [common/](source/common/): Core Envoy code (not specific to extensions) that is also not
   specific to a standalone server implementation. I.e., this is code that could be used if Envoy
   were eventually embedded as a library.
 * [docs/](source/docs/): Miscellaneous developer/design documentation that is not relevant for
@@ -34,7 +36,7 @@ are:
 * [extensions/](source/extensions/): Extensions to the core Envoy code. The layout of this
   directory is discussed in further detail below.
 * [server/](source/server/): Code specific to running Envoy as a standalone server. E.g,
-  configuration, server startup, workers, etc. Overtime, the line between `common/` and `server/`
+  configuration, server startup, workers, etc. Over time, the line between `common/` and `server/`
   has become somewhat blurred. Use best judgment as to where to place something.
 
 ## [test/](test/)
@@ -46,7 +48,11 @@ Not every directory within test is described below, but a few highlights:
 * Extension unit tests also match their source equivalents in [extensions/](test/extensions/).
 * [integration/](test/integration/) holds end-to-end integration tests using roughly the real
   Envoy server code, fake downstream clients, and fake upstream servers. Integration tests also
-  test some of the extensions found in the repository.
+  test some of the extensions found in the repository. Note that in the future, we would like to
+  allow integration tests that are specific to extensions and are not required for covering
+  "core" Envoy functionality. Those integration tests will likely end up in the
+  [extensions/](test/extensions/) directory but further work and thinking is required before
+  we get to that point.
 * [mocks/](test/mocks/) contains mock implementations of all of the core Envoy interfaces found in
   [include/](include/).
 * Other directories include tooling used for configuration testing, coverage testing, fuzz testing,
