@@ -28,7 +28,7 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(Server::TestOptionsImpl options) : options_(options) {
+  ConfigTest(const Server::TestOptionsImpl& options) : options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -92,6 +92,16 @@ void testMerge() {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
+}
+
+void testIncompatibleMerge() {
+  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  Server::TestOptionsImpl options("google_com_proxy.v1.yaml", overlay,
+                                  Network::Address::IpVersion::v6);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, options),
+                            EnvoyException,
+                            "V1 config (detected) with --config-yaml is not supported");
 }
 
 uint32_t run(const std::string& directory) {

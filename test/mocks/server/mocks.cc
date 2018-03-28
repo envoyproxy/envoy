@@ -18,8 +18,7 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-MockOptions::MockOptions(const std::string& config_path)
-    : config_path_(config_path), config_yaml_(""), admin_address_path_("") {
+MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, v2ConfigOnly()).WillByDefault(Invoke([this] { return v2_config_only_; }));

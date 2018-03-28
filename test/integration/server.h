@@ -28,7 +28,7 @@ namespace Server {
 class TestOptionsImpl : public Options {
 public:
   TestOptionsImpl(const std::string& config_path, Network::Address::IpVersion ip_version)
-      : config_path_(config_path), config_yaml_(""), local_address_ip_version_(ip_version),
+      : config_path_(config_path), local_address_ip_version_(ip_version),
         service_cluster_name_("cluster_name"), service_node_name_("node_name"),
         service_zone_("zone_name") {}
   TestOptionsImpl(const std::string& config_path, const std::string& config_yaml,

@@ -17,6 +17,7 @@ TEST(ExampleConfigsTest, All) {
 
   EXPECT_EQ(37UL, ConfigTest::run(directory));
   ConfigTest::testMerge();
+  ConfigTest::testIncompatibleMerge();
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0);

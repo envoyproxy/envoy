@@ -18,5 +18,10 @@ uint32_t run(const std::string& path);
  */
 void testMerge();
 
+/**
+ * Test --config-yaml overlay merge fails with v1.
+ */
+void testIncompatibleMerge();
+
 } // namespace ConfigTest
 } // namespace Envoy
