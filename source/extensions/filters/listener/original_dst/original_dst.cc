@@ -1,4 +1,4 @@
-#include "common/filter/listener/original_dst.h"
+#include "extensions/filters/listener/original_dst/original_dst.h"
 
 #include "envoy/network/listen_socket.h"
 
@@ -6,14 +6,15 @@
 #include "common/network/utility.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
+namespace OriginalDst {
 
-Network::Address::InstanceConstSharedPtr OriginalDst::getOriginalDst(int fd) {
+Network::Address::InstanceConstSharedPtr OriginalDstFilter::getOriginalDst(int fd) {
   return Network::Utility::getOriginalDst(fd);
 }
 
-Network::FilterStatus OriginalDst::onAccept(Network::ListenerFilterCallbacks& cb) {
+Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "original_dst: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   const Network::Address::Instance& local_address = *socket.localAddress();
@@ -34,6 +35,7 @@ Network::FilterStatus OriginalDst::onAccept(Network::ListenerFilterCallbacks& cb
   return Network::FilterStatus::Continue;
 }
 
-} // namespace Listener
-} // namespace Filter
+} // namespace OriginalDst
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

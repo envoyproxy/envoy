@@ -1,4 +1,4 @@
-#include "common/filter/listener/proxy_protocol.h"
+#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include <unistd.h>
 
@@ -24,7 +24,7 @@ namespace ProxyProtocol {
 
 Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
 
-Network::FilterStatus Instance::onAccept(Network::ListenerFilterCallbacks& cb) {
+Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
@@ -39,7 +39,7 @@ Network::FilterStatus Instance::onAccept(Network::ListenerFilterCallbacks& cb) {
   return Network::FilterStatus::StopIteration;
 }
 
-void Instance::onRead() {
+void Filter::onRead() {
   try {
     onReadWorker();
   } catch (const EnvoyException& ee) {
@@ -48,7 +48,7 @@ void Instance::onRead() {
   }
 }
 
-void Instance::onReadWorker() {
+void Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
   std::string proxy_line;
   if (!readLine(socket.fd(), proxy_line)) {
@@ -121,7 +121,7 @@ void Instance::onReadWorker() {
   cb_->continueFilterChain(true);
 }
 
-bool Instance::readLine(int fd, std::string& s) {
+bool Filter::readLine(int fd, std::string& s) {
   while (buf_off_ < MAX_PROXY_PROTO_LEN) {
     ssize_t nread = recv(fd, buf_ + buf_off_, MAX_PROXY_PROTO_LEN - buf_off_, MSG_PEEK);
 
