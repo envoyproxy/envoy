@@ -24,6 +24,7 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -38,15 +39,45 @@ namespace {
 
 const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
-                 const Network::Address::InstanceConstSharedPtr source_address) {
+                 const envoy::api::v2::core::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   if (cluster.upstream_bind_config().has_source_address()) {
     return Network::Address::resolveProtoSocketAddress(
         cluster.upstream_bind_config().source_address());
   }
   // If there's no source address in the cluster config, use any default from the bootstrap proto.
-  return source_address;
+  if (bind_config.has_source_address()) {
+    return Network::Address::resolveProtoSocketAddress(bind_config.source_address());
+  }
+
+  return nullptr;
 }
+
+uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
+                       const envoy::api::v2::core::BindConfig bind_config) {
+  uint64_t features = 0;
+  if (config.has_http2_protocol_options()) {
+    features |= ClusterInfoImpl::Features::HTTP2;
+  }
+  if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
+    features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
+  }
+  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
+  if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
+      config.upstream_bind_config().freebind().value()) {
+    features |= ClusterInfoImpl::Features::FREEBIND;
+  }
+  return features;
+}
+
+// Socket::Option implementation for API-defined upstream options. This same
+// object can be extended to handle additional upstream socket options.
+class UpstreamSocketOption : public Network::SocketOptionImpl {
+public:
+  UpstreamSocketOption(const ClusterInfo& cluster_info)
+      : Network::SocketOptionImpl(cluster_info.features() & ClusterInfo::Features::FREEBIND) {}
+};
+
 } // namespace
 
 Host::CreateConnectionData
@@ -59,9 +90,19 @@ Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) {
+  Network::ConnectionSocket::OptionsSharedPtr cluster_options;
+  if (cluster.features() & ClusterInfo::Features::FREEBIND) {
+    cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
+    if (options) {
+      *cluster_options = *options;
+    }
+    cluster_options->emplace_back(new UpstreamSocketOption(cluster));
+  } else {
+    cluster_options = options;
+  }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      options);
+      cluster_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -110,7 +151,7 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 }
 
 ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
@@ -125,11 +166,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
           config.alt_stat_name().empty() ? name_ : std::string(config.alt_stat_name())))),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      features_(parseFeatures(config)),
+      features_(parseFeatures(config, bind_config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(getSourceAddress(config, source_address)),
+      source_address_(getSourceAddress(config, bind_config)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
@@ -276,10 +317,10 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 }
 
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                                 const Network::Address::InstanceConstSharedPtr source_address,
+                                 const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, source_address, runtime, stats,
+    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
                                                    ssl_context_manager, added_via_api)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
@@ -319,17 +360,6 @@ ClusterImplBase::createHealthyHostLists(const HostsPerLocality& hosts) {
 
 bool ClusterInfoImpl::maintenanceMode() const {
   return runtime_.snapshot().featureEnabled(maintenance_mode_runtime_key_, 0);
-}
-
-uint64_t ClusterInfoImpl::parseFeatures(const envoy::api::v2::Cluster& config) {
-  uint64_t features = 0;
-  if (config.has_http2_protocol_options()) {
-    features |= Features::HTTP2;
-  }
-  if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
-    features |= Features::USE_DOWNSTREAM_PROTOCOL;
-  }
-  return features;
 }
 
 ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) const {
@@ -497,8 +527,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
-                      added_via_api),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -617,7 +646,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, cm.sourceAddress(), runtime, stats, ssl_context_manager,
+    : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                              added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(

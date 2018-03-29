@@ -391,10 +391,10 @@ public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
 
-  void addListenSocketOption(Network::Socket::OptionPtr&& option) override {
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
     addListenSocketOption_(option);
   }
-  MOCK_METHOD1(addListenSocketOption_, void(Network::Socket::OptionPtr&));
+  MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
 };
 
 } // namespace Configuration

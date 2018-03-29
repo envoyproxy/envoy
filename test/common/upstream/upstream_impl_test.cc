@@ -672,14 +672,12 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
 
-  Network::Address::InstanceConstSharedPtr bootstrap_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
   {
     // If the cluster manager gets a source address from the bootstrap proto, use it.
     NiceMock<MockClusterManager> cm;
-    cm.source_address_ = bootstrap_address;
+    cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ(bootstrap_address->asString(), cluster.info()->sourceAddress()->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -694,7 +692,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
     NiceMock<MockClusterManager> cm;
-    cm.source_address_ = bootstrap_address;
+    cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }

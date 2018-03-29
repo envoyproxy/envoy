@@ -181,9 +181,7 @@ public:
     active_clusters_.clear();
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  }
+  const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
@@ -309,7 +307,7 @@ private:
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
-  Network::Address::InstanceConstSharedPtr source_address_;
+  envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;

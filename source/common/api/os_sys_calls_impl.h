@@ -19,6 +19,8 @@ public:
   int ftruncate(int fd, off_t length) override;
   void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) override;
   int stat(const char* pathname, struct stat* buf) override;
+  int setsockopt(int sockfd, int level, int optname, const void* optval, socklen_t optlen) override;
+  int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) override;
 };
 
 typedef ThreadSafeSingleton<OsSysCallsImpl> OsSysCallsSingleton;
