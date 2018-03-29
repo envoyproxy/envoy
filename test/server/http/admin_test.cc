@@ -41,9 +41,7 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  void TearDown() override  {
-    EXPECT_EQ(0, mock_logger_.messages().size());
-  }
+  void TearDown() override { EXPECT_EQ(0, mock_logger_.messages().size()); }
 
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
@@ -93,7 +91,7 @@ public:
     Logger::Registry::setLogLevel(Logger::Logger::warn);
   }
 
-  void TearDown() override  {
+  void TearDown() override {
     if (expect_no_logs_) {
       EXPECT_EQ(0, mock_logger_.messages().size());
     }
@@ -110,8 +108,7 @@ public:
   bool log0Contains(absl::string_view substr) {
     expect_no_logs_ = false;
     EXPECT_EQ(1, mock_logger_.messages().size());
-    absl::string_view log_0 = log0();
-    return log_0.find(substr) != absl::string_view::npos;
+    return absl::string_view(log0()).find(substr) != absl::string_view::npos;
   }
 
   std::string address_out_path_;
@@ -165,8 +162,8 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                        server_, listener_scope_.createScope("listener.admin."));
   EXPECT_FALSE(std::ifstream(bad_path));
-  EXPECT_TRUE(log0Contains("cannot open admin address output file " + bad_path +
-                           " for writing.")) << log0();
+  EXPECT_TRUE(log0Contains("cannot open admin address output file " + bad_path + " for writing."))
+      << log0();
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
