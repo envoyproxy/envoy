@@ -23,7 +23,6 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
 
   int rc = address->connect(fd_);
   ASSERT(rc != -1);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 Writer::~Writer() {
@@ -113,11 +112,9 @@ TcpStatsdSink::TlsSink::~TlsSink() {
 void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
   ASSERT(!expect_empty_buffer || buffer_.length() == 0);
   ASSERT(current_slice_mem_ == nullptr);
-  UNREFERENCED_PARAMETER(expect_empty_buffer);
 
   uint64_t num_iovecs = buffer_.reserve(FLUSH_SLICE_SIZE_BYTES, &current_buffer_slice_, 1);
   ASSERT(num_iovecs == 1);
-  UNREFERENCED_PARAMETER(num_iovecs);
 
   ASSERT(current_buffer_slice_.len_ >= FLUSH_SLICE_SIZE_BYTES);
   current_slice_mem_ = reinterpret_cast<char*>(current_buffer_slice_.mem_);
@@ -147,7 +144,6 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   *current_slice_mem_++ = '\n';
 
   ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < max_size);
-  UNREFERENCED_PARAMETER(snapped_current);
 }
 
 void TcpStatsdSink::TlsSink::flushCounter(const std::string& name, uint64_t delta) {
