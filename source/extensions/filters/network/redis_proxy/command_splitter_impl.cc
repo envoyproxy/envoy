@@ -1,4 +1,4 @@
-#include "common/redis/command_splitter_impl.h"
+#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -7,10 +7,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/redis/supported_commands.h"
+
+#include "extensions/filters/network/redis_proxy/supported_commands.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace CommandSplitter {
 
 RespValuePtr Utility::makeError(const std::string& error) {
@@ -384,5 +387,7 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
 }
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

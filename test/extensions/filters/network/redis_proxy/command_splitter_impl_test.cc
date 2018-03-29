@@ -4,12 +4,13 @@
 #include <vector>
 
 #include "common/common/fmt.h"
-#include "common/redis/command_splitter_impl.h"
-#include "common/redis/supported_commands.h"
 #include "common/stats/stats_impl.h"
 
+#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "extensions/filters/network/redis_proxy/supported_commands.h"
+
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/redis/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -25,7 +26,9 @@ using testing::WithArg;
 using testing::_;
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace CommandSplitter {
 
 class RedisCommandSplitterImplTest : public testing::Test {
@@ -678,5 +681,7 @@ INSTANTIATE_TEST_CASE_P(RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumRes
                         testing::ValuesIn(SupportedCommands::hashMultipleSumResultCommands()));
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

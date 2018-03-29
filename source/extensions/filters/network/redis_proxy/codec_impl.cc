@@ -1,4 +1,4 @@
-#include "common/redis/codec_impl.h"
+#include "extensions/filters/network/redis_proxy/codec_impl.h"
 
 #include <cstdint>
 #include <string>
@@ -9,7 +9,9 @@
 #include "common/common/utility.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 std::string RespValue::toString() const {
   switch (type_) {
@@ -417,5 +419,7 @@ void EncoderImpl::encodeSimpleString(const std::string& string, Buffer::Instance
   out.add("\r\n", 2);
 }
 
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

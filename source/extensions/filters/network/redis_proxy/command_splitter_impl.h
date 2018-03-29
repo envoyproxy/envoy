@@ -5,14 +5,16 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/redis/command_splitter.h"
-#include "envoy/redis/conn_pool.h"
-
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
 
+#include "extensions/filters/network/redis_proxy/command_splitter.h"
+#include "extensions/filters/network/redis_proxy/conn_pool.h"
+
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace CommandSplitter {
 
 class Utility {
@@ -235,5 +237,7 @@ private:
 };
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

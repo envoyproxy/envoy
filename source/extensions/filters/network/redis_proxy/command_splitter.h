@@ -3,10 +3,13 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/redis/codec.h"
+
+#include "extensions/filters/network/redis_proxy/codec.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace CommandSplitter {
 
 /**
@@ -58,5 +61,7 @@ public:
 };
 
 } // namespace CommandSplitter
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

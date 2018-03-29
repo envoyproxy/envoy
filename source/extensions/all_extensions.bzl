@@ -9,6 +9,7 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/filters/network/echo:config",
     repository + "//source/extensions/filters/network/ext_authz:config",
     repository + "//source/extensions/filters/network/mongo_proxy:config",
+    repository + "//source/extensions/filters/network/redis_proxy:config",
     repository + "//source/extensions/filters/network/tcp_proxy:config",
   ]
 

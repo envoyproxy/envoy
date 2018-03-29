@@ -9,11 +9,32 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "codec_interface",
+    hdrs = ["codec.h"],
+    deps = ["//include/envoy/buffer:buffer_interface"],
+)
+
+envoy_cc_library(
+    name = "command_splitter_interface",
+    hdrs = ["command_splitter.h"],
+    deps = [":codec_interface"],
+)
+
+envoy_cc_library(
+    name = "conn_pool_interface",
+    hdrs = ["conn_pool.h"],
+    deps = [
+        ":codec_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
-        "//include/envoy/redis:codec_interface",
+        ":codec_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
@@ -25,9 +46,9 @@ envoy_cc_library(
     srcs = ["command_splitter_impl.cc"],
     hdrs = ["command_splitter_impl.h"],
     deps = [
+        ":command_splitter_interface",
+        ":conn_pool_interface",
         ":supported_commands_lib",
-        "//include/envoy/redis:command_splitter_interface",
-        "//include/envoy/redis:conn_pool_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:to_lower_table_lib",
@@ -40,7 +61,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_impl.h"],
     deps = [
         ":codec_lib",
-        "//include/envoy/redis:conn_pool_interface",
+        ":conn_pool_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -57,10 +78,10 @@ envoy_cc_library(
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
+        ":codec_interface",
+        ":command_splitter_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/redis:codec_interface",
-        "//include/envoy/redis:command_splitter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -74,5 +95,21 @@ envoy_cc_library(
     hdrs = ["supported_commands.h"],
     deps = [
         "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
+        "//source/extensions/filters/network/redis_proxy:codec_lib",
+        "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
+        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
     ],
 )

@@ -2,16 +2,19 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
-#include "common/redis/codec_impl.h"
 
-#include "test/mocks/redis/mocks.h"
+#include "extensions/filters/network/redis_proxy/codec_impl.h"
+
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
 public:
@@ -186,5 +189,7 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

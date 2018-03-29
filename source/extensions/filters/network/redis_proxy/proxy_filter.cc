@@ -1,4 +1,4 @@
-#include "common/redis/proxy_filter.h"
+#include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -8,7 +8,9 @@
 #include "common/config/utility.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
@@ -120,5 +122,7 @@ ProxyFilter::PendingRequest::~PendingRequest() {
   parent_.config_->stats_.downstream_rq_active_.dec();
 }
 
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
