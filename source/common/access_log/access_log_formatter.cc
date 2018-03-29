@@ -149,7 +149,9 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
       } else if (token.find("START_TIME") == 0) {
         const size_t start = 11;
 
-        const std::string args = token[start-1] == '(' ? token.substr(start, command_end_position - (pos + start + 1)) : "";
+        const std::string args = token[start - 1] == '('
+                                     ? token.substr(start, command_end_position - (pos + start + 1))
+                                     : "";
         formatters.emplace_back(FormatterPtr(new StartTimeFormatter(args)));
       } else {
         formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
@@ -312,8 +314,7 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
 
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : format_(format) {}
 
-std::string StartTimeFormatter::format(const Http::HeaderMap&,
-                                       const Http::HeaderMap&,
+std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                        const RequestInfo::RequestInfo& request_info) const {
   return AccessLogDateTimeFormatter::fromTimeWithFormat(request_info.startTime(), format_);
 }

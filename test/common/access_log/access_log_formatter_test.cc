@@ -233,6 +233,14 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTimeWithFormat(time, "%Y/%m/%d"),
               start_time_format.format(header, header, request_info));
   }
+
+  {
+    StartTimeFormatter start_time_format("");
+    SystemTime time;
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
+  }
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
@@ -261,14 +269,24 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format =
-        "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%|%START_TIME(%Y/%m/%d)%";
+        "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%";
+
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("GET|G|PU|GET", formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
+                               "%START_TIME%";
 
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("GET|G|PU|GET|2018/03/28", formatter.format(request_header, response_header, request_info));
+    EXPECT_EQ("2018/03/28|1522280158|bad_format|2018-03-28T23:35:58.000Z",
+              formatter.format(request_header, response_header, request_info));
   }
 }
 
