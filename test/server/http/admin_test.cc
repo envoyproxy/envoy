@@ -11,7 +11,6 @@
 
 #include "server/http/admin.h"
 
-#include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -23,7 +22,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::HasSubstr;
 using testing::NiceMock;
 using testing::_;
 
