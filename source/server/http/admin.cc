@@ -36,6 +36,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -392,6 +393,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
+  std::map<std::string, std::string> all_histograms;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
   }
@@ -400,10 +402,23 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
+  for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
+    Stats::ParentHistogramSharedPtr parent_hist_ptr =
+        std::dynamic_pointer_cast<Stats::HistogramParentImpl>(histogram);
+    all_histograms.emplace(
+        parent_hist_ptr->name(),
+        fmt::format("\n \t Interval:   {} \n \t Cumulative: {}",
+                    parent_hist_ptr->getIntervalHistogramStatistics().summary(),
+                    parent_hist_ptr->getCumulativieHistogramStatistics().summary()));
+  }
+
   if (params.size() == 0) {
     // No Arguments so use the standard.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    }
+    for (auto histogram : all_histograms) {
+      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   } else {
     const std::string format_key = params.begin()->first;

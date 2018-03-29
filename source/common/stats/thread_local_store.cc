@@ -61,6 +61,22 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   return ret;
 }
 
+std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
+  // Handle de-dup due to overlapping scopes.
+  std::list<HistogramSharedPtr> ret;
+  std::unordered_set<std::string> names;
+  std::unique_lock<std::mutex> lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    for (auto histogram : scope->central_cache_.histograms_) {
+      if (names.insert(histogram.first).second) {
+        ret.push_back(histogram.second);
+      }
+    }
+  }
+
+  return ret;
+}
+
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
   main_thread_dispatcher_ = &main_thread_dispatcher;
@@ -76,19 +92,31 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 }
 
 void ThreadLocalStoreImpl::mergeHistograms() {
-  std::cout << "mergeHistograms is called"
-            << "\n";
+  if (!shutting_down_) {
+    std::unique_lock<std::mutex> lock(lock_);
+    // TODO: Wait till all threads have been checked-in
+    tls_->runOnAllThreads([this]() -> void {
+      for (ScopeImpl* scope : scopes_) {
+        for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
+          TlsHistogramSharedPtr tls_histogram_ptr =
+              std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(histogram.second);
+          tls_histogram_ptr->beginMerge();
+        }
+      }
+    });
+    if (main_thread_dispatcher_) {
+      main_thread_dispatcher_->post([this]() -> void { mergeInternal(); });
+    }
+  }
+}
+
+void ThreadLocalStoreImpl::mergeInternal() {
   std::unique_lock<std::mutex> lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto histogram : scope->central_cache_.histograms_) {
       ParentHistogramSharedPtr parent_hist_ptr =
           std::dynamic_pointer_cast<HistogramParentImpl>(histogram.second);
-      std::cout << "merging ..." << histogram.first << "\n";
-      for (auto tls_histogram : parent_hist_ptr->tls_histograms_) {
-        TlsHistogramSharedPtr tls_histogram_ptr =
-            std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(tls_histogram);
-        std::cout << "merging child ..." << tls_histogram_ptr->name() << "\n";
-      }
+      parent_hist_ptr->merge();
     }
   }
 }

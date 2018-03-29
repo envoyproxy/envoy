@@ -263,6 +263,11 @@ public:
    * @return a list of all known gauges.
    */
   virtual std::list<GaugeSharedPtr> gauges() const PURE;
+
+  virtual std::list<HistogramSharedPtr> histograms() const {
+    std::list<HistogramSharedPtr> empty_list;
+    return empty_list;
+  }
 };
 
 typedef std::unique_ptr<Store> StorePtr;

@@ -374,6 +374,27 @@ public:
 };
 
 /**
+ * Structure to hold statistical data of histogram.
+ */
+struct HistogramStatistics {
+public:
+  HistogramStatistics(histogram_t* histogram_ptr) {
+    double quantile_in[] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+    hist_approx_quantile(histogram_ptr, quantile_in, ARRAY_SIZE(quantile_in), quantile_out_);
+  }
+
+  std::string summary() const {
+    return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
+                       quantile_out_[0], quantile_out_[1], quantile_out_[2], quantile_out_[3],
+                       quantile_out_[4], quantile_out_[5], quantile_out_[6], quantile_out_[7],
+                       quantile_out_[8]);
+  }
+
+private:
+  double quantile_out_[9];
+};
+
+/**
  * Log Linear Histogram implementation per thread.
  */
 class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
@@ -396,6 +417,25 @@ public:
     parent_.deliverHistogramToSinks(*this, value);
   }
 
+  void beginMerge() {
+    if (current_active_ == 0) {
+      current_active_ = 1;
+    } else {
+      current_active_ = 0;
+    }
+  }
+
+  void merge(histogram_t* target) {
+    histogram_t* hist_array[1];
+    if (current_active_ == 0) {
+      hist_array[0] = histograms_[1];
+    } else {
+      hist_array[0] = histograms_[0];
+    }
+    hist_accumulate(target, hist_array, 1);
+    hist_clear(hist_array[0]);
+  }
+
   Store& parent_;
   int current_active_;
   histogram_t* histograms_[2];
@@ -410,15 +450,47 @@ class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
   HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                       std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+    interval_histogram_ = hist_alloc();
+    cumulative_histogram_ = hist_alloc();
+  }
+
+  ~HistogramParentImpl() {
+    hist_free(interval_histogram_);
+    hist_free(cumulative_histogram_);
+  }
 
   // Stats::Histogram
   void recordValue(uint64_t) override {}
 
   void addTlsHistogram(HistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
 
+  void merge() {
+    hist_clear(interval_histogram_);
+    for (auto tls_histogram : tls_histograms_) {
+      TlsHistogramSharedPtr tls_histogram_ptr =
+          std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(tls_histogram);
+      tls_histogram_ptr->merge(interval_histogram_);
+    }
+    histogram_t* hist_array[1];
+    hist_array[0] = interval_histogram_;
+    hist_accumulate(cumulative_histogram_, hist_array, 1);
+  }
+
+  HistogramStatistics getIntervalHistogramStatistics() {
+    HistogramStatistics interval_histogram(interval_histogram_);
+    return interval_histogram;
+  }
+
+  HistogramStatistics getCumulativieHistogramStatistics() {
+    HistogramStatistics cumulative_histogram(cumulative_histogram_);
+    return cumulative_histogram_;
+  }
+
   Store& parent_;
   std::list<HistogramSharedPtr> tls_histograms_;
+  histogram_t* interval_histogram_;
+  histogram_t* cumulative_histogram_;
 };
 
 typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;

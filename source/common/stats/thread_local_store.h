@@ -64,6 +64,7 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override;
   std::list<GaugeSharedPtr> gauges() const override;
+  std::list<HistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -75,6 +76,8 @@ public:
   void shutdownThreading() override;
 
   void mergeHistograms() override;
+
+  void mergeInternal();
 
 private:
   struct TlsCacheEntry {
