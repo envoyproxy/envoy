@@ -60,35 +60,37 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
     : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
-  try {
-    auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
-    dispatcher_ = &http_async_client.dispatcher();
-    stream_ = http_async_client.start(*this, absl::optional<std::chrono::milliseconds>(timeout_),
-                                      buffer_body_for_retry);
-
-    if (stream_ == nullptr) {
-      callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);
-      http_reset_ = true;
-      return;
-    }
-
-    // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
-    // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-    headers_message_ =
-        Common::prepareHeaders(parent_.remote_cluster_name_, service_method_.service()->full_name(),
-                               service_method_.name());
-    // Fill service-wide initial metadata.
-    for (const auto& header_value : parent_.initial_metadata_) {
-      headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
-                                          header_value.value());
-    }
-    callbacks_.onCreateInitialMetadata(headers_message_->headers());
-    stream_->sendHeaders(headers_message_->headers(), false);
-  } catch (const EnvoyException&) {
+  auto clusters = parent_.cm_.clusters();
+  const auto& it = clusters.find(parent_.remote_cluster_name_);
+  if (it == clusters.end()) {
     stream_ = nullptr;
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
+    return;
   }
+
+  auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
+  dispatcher_ = &http_async_client.dispatcher();
+  stream_ = http_async_client.start(*this, absl::optional<std::chrono::milliseconds>(timeout_),
+                                    buffer_body_for_retry);
+
+  if (stream_ == nullptr) {
+    callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);
+    http_reset_ = true;
+    return;
+  }
+
+  // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
+  // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
+  headers_message_ = Common::prepareHeaders(
+      parent_.remote_cluster_name_, service_method_.service()->full_name(), service_method_.name());
+  // Fill service-wide initial metadata.
+  for (const auto& header_value : parent_.initial_metadata_) {
+    headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
+                                        header_value.value());
+  }
+  callbacks_.onCreateInitialMetadata(headers_message_->headers());
+  stream_->sendHeaders(headers_message_->headers(), false);
 }
 
 // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see

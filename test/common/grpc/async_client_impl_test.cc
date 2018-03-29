@@ -25,13 +25,17 @@ public:
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
     grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config);
+    cluster_map_.emplace("test_cluster", cluster_);
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
+    ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_map_));
   }
 
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Upstream::MockCluster> cluster_;
   std::unique_ptr<AsyncClientImpl> grpc_client_;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
 };
 
 // Validate that a failure in the HTTP client returns immediately with status
@@ -137,8 +141,8 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 // status UNAVAILABLE and error message "Cluster not available"
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
-  ON_CALL(cm_, httpAsyncClientForCluster("test_cluster"))
-      .WillByDefault(Throw(EnvoyException("Unknow cluster test_cluster")));
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_map));
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available"));
   auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
