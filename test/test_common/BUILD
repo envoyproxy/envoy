@@ -89,6 +89,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "logging_lib",
+    srcs = ["logging.cc"],
+    hdrs = ["logging.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "lua_wrappers_lib",
     hdrs = ["lua_wrappers.h"],
     deps = [

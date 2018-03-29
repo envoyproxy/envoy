@@ -75,7 +75,7 @@ DelegatingLogSinkPtr DelegatingLogSink::init() {
   return delegating_sink;
 }
 
-void Registry::initialize(uint64_t log_level, const std::string& log_format,
+void Registry::initialize(spdlog::level::level_enum log_level, const std::string& log_format,
                           Thread::BasicLockable& lock) {
   // TODO(jmarantz): I think it would be more robust to push a separate lockable
   // SinkDelegate onto the stack for the lifetime of the lock, so we don't crash
@@ -93,7 +93,7 @@ std::vector<Logger>& Registry::allLoggers() {
 
 spdlog::logger& Registry::getLog(Id id) { return *allLoggers()[static_cast<int>(id)].logger_; }
 
-void Registry::setLogLevel(uint64_t log_level) {
+void Registry::setLogLevel(spdlog::level::level_enum log_level) {
   for (Logger& logger : allLoggers()) {
     logger.logger_->set_level(static_cast<spdlog::level::level_enum>(log_level));
   }

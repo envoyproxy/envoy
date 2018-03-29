@@ -54,10 +54,6 @@ enum class Id {
  */
 class Logger {
 public:
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
-  std::string name() const { return logger_->name(); }
-  void setLevel(spdlog::level::level_enum level) const { logger_->set_level(level); }
-
   /* This is simple mapping between Logger severity levels and spdlog severity levels.
    * The only reason for this mapping is to go around the fact that spdlog defines level as err
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
@@ -72,6 +68,11 @@ public:
     critical = spdlog::level::critical,
     off = spdlog::level::off
   } levels;
+
+  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
+  std::string name() const { return logger_->name(); }
+  void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
+  spdlog::level::level_enum level() const { return logger_->level(); }
 
   static const char* DEFAULT_LOG_FORMAT;
 
@@ -98,6 +99,9 @@ public:
 
   virtual void log(absl::string_view msg) PURE;
   virtual void flush() PURE;
+
+protected:
+  SinkDelegate* previous_delegate() { return previous_delegate_; }
 
 private:
   SinkDelegate* previous_delegate_;
@@ -201,13 +205,13 @@ public:
    * can be called individually as well, e.g. to set the log level without
    * changing the lock or format.
    */
-  static void initialize(uint64_t log_level, const std::string& log_format,
+  static void initialize(spdlog::level::level_enum log_level, const std::string& log_format,
                          Thread::BasicLockable& lock);
 
   /**
    * Sets the log level.
    */
-  static void setLogLevel(uint64_t log_level);
+  static void setLogLevel(spdlog::level::level_enum log_level);
 
   /**
    * Sets the log format.
@@ -217,7 +221,7 @@ public:
   /**
    * @return const std::vector<Logger>& the installed loggers.
    */
-  static const std::vector<Logger>& loggers() { return allLoggers(); }
+  static std::vector<Logger>& loggers() { return allLoggers(); }
 
   /**
    * @Return bool whether the registry has been initialized.

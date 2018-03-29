@@ -15,6 +15,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -33,7 +34,8 @@ class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersio
 public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
+      : log_level_setter_(spdlog::level::warn),
+        admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
                TestEnvironment::temporaryPath("admin.address"),
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
@@ -45,7 +47,8 @@ public:
 
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  MockLogSink mock_logger_;
+  LogLevelSetter log_level_setter_;
+  LogRecordingSink mock_logger_;
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -80,6 +83,7 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
+        log_level_setter_(spdlog::level::warn),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
@@ -88,7 +92,6 @@ public:
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
-    Logger::Registry::setLogLevel(Logger::Logger::warn);
   }
 
   void TearDown() override {
@@ -115,7 +118,8 @@ public:
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  MockLogSink mock_logger_;
+  LogLevelSetter log_level_setter_;
+  LogRecordingSink mock_logger_;
   AdminImpl admin_;
   bool expect_no_logs_;
 };
@@ -200,6 +204,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   };
   EXPECT_FALSE(
       admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
+  EXPECT_TRUE(log0Contains("filter \"/foo<script>alert('hi')</script>\" contains invalid "
+                           "character '<'"))
+      << log0();
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
@@ -207,6 +214,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
+  EXPECT_TRUE(log0Contains("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid "
+                           "character '?'"))
+      << log0();
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
