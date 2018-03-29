@@ -32,7 +32,7 @@ public:
   std::string toString() const;
 
   /**
-   * The following are getters and setters for the internal value. A RespValue start as null,
+   * The following are getters and setters for the internal value. A RespValue starts as null,
    * and must change type via type() before the following methods can be used.
    */
   std::vector<RespValue>& asArray();
