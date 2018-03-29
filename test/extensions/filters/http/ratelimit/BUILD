@@ -27,3 +27,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/ratelimit:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)
