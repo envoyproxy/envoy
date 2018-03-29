@@ -57,8 +57,10 @@ private:
    * @param handle supplies the callback handle to remove.
    */
   void remove(CallbackHandle* handle) {
-    const auto comp = [handle](const CallbackHolder& holder) -> bool { return handle == &holder; };
-    ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(), comp) != callbacks_.end());
+    ASSERT(std::find_if(callbacks_.begin(), callbacks_.end(),
+                        [handle](const CallbackHolder& holder) -> bool {
+                          return handle == &holder;
+                        }) != callbacks_.end());
     callbacks_.remove_if(
         [handle](const CallbackHolder& holder) -> bool { return handle == &holder; });
   }

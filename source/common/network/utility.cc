@@ -303,6 +303,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #else
   // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
+  UNREFERENCED_PARAMETER(fd);
   return nullptr;
 #endif
 }

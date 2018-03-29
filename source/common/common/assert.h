@@ -20,10 +20,11 @@ namespace Envoy {
 #define ASSERT(X) RELEASE_ASSERT(X)
 #else
 // This non-implementation ensures that its argument is a valid expression that can be statically
-// casted to a bool, but doesn't generate any code, since the argument to sizeof() is not evaluated.
+// casted to a bool, but the expression is never evaluated and will be compiled away.              
 #define ASSERT(X)                                                                                  \
   do {                                                                                             \
-    (void)sizeof(static_cast<bool>(X));                                                            \
+    constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
+    (void)__assert_dummy_variable;                                                                 \
   } while (false)
 #endif
 
