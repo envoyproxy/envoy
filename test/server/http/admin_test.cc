@@ -11,6 +11,7 @@
 
 #include "server/http/admin.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -21,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::NiceMock;
 using testing::_;
 
@@ -39,8 +41,13 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
+  void TearDown() override  {
+    EXPECT_EQ(0, mock_logger_.messages().size());
+  }
+
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
+  MockLogSink mock_logger_;
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -77,17 +84,43 @@ public:
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")) {
+               listener_scope_.createScope("listener.admin.")),
+        expect_no_logs_(true) {
+
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
+    Logger::Registry::setLogLevel(Logger::Logger::warn);
+  }
+
+  void TearDown() override  {
+    if (expect_no_logs_) {
+      EXPECT_EQ(0, mock_logger_.messages().size());
+    }
+  }
+
+  std::string log0() {
+    const std::vector<std::string> logs = mock_logger_.messages();
+    if (!logs.empty()) {
+      return logs[0];
+    }
+    return "";
+  }
+
+  bool log0Contains(absl::string_view substr) {
+    expect_no_logs_ = false;
+    EXPECT_EQ(1, mock_logger_.messages().size());
+    absl::string_view log_0 = log0();
+    return log_0.find(substr) != absl::string_view::npos;
   }
 
   std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
+  MockLogSink mock_logger_;
   AdminImpl admin_;
+  bool expect_no_logs_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
@@ -132,6 +165,8 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                        server_, listener_scope_.createScope("listener.admin."));
   EXPECT_FALSE(std::ifstream(bad_path));
+  EXPECT_TRUE(log0Contains("cannot open admin address output file " + bad_path +
+                           " for writing.")) << log0();
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {

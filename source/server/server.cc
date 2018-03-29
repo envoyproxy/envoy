@@ -56,7 +56,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     if (!options.logPath().empty()) {
       try {
-        Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
+        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+            options.logPath(), access_log_manager_, Logger::Registry::getSink());
       } catch (const EnvoyException& e) {
         throw EnvoyException(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
@@ -80,7 +81,7 @@ InstanceImpl::~InstanceImpl() {
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
-  Logger::Registry::getSink()->logToStdErr();
+  file_logger_.reset();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clusterManager(); }
