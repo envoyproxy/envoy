@@ -170,7 +170,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
+      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
+      local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -185,11 +186,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     eds_config_ = bootstrap.dynamic_resources().deprecated_v1().sds_config();
-  }
-
-  if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
-    source_address_ = Network::Address::resolveProtoSocketAddress(
-        bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all

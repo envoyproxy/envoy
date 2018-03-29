@@ -18,12 +18,13 @@
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/lua.h"
-#include "server/config/http/ratelimit.h"
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
 #include "server/config/http/zipkin_http_tracer.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
+
+#include "extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
@@ -41,6 +42,7 @@ namespace Server {
 namespace Configuration {
 
 // Negative test for protoc-gen-validate constraints.
+// TODO(mattklein123): Break this test apart into per extension tests.
 TEST(HttpFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
@@ -53,7 +55,7 @@ TEST(HttpFilterConfigTest, ValidateFail) {
   envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder grpc_json_transcoder_proto;
   LuaFilterConfig lua_factory;
   envoy::config::filter::http::lua::v2::Lua lua_proto;
-  RateLimitFilterConfig rate_limit_factory;
+  Extensions::HttpFilters::RateLimitFilter::RateLimitFilterConfig rate_limit_factory;
   envoy::config::filter::http::rate_limit::v2::RateLimit rate_limit_proto;
   const std::vector<std::pair<NamedHttpFilterConfigFactory&, Protobuf::Message&>> filter_cases = {
       {buffer_factory, buffer_proto},
@@ -128,80 +130,6 @@ TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, RateLimitFilterCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, RateLimitFilterCorrectProto) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
-
-  NiceMock<MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, RateLimitFilterEmptyProto) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 1337
-  }
-  )EOF";
-
-  NiceMock<MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config =
-      *dynamic_cast<envoy::config::filter::http::rate_limit::v2::RateLimit*>(
-          factory.createEmptyConfigProto().get());
-  Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
-
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BadRateLimitFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "domain" : "test",
-    "timeout_ms" : 0
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RateLimitFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
 TEST(HttpFilterConfigTest, DynamoFilter) {

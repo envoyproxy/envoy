@@ -127,7 +127,6 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
         [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
           ASSERT(priority == 0);
-          UNREFERENCED_PARAMETER(priority);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
           regenerateLocalityRoutingStructures();

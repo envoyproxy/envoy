@@ -32,7 +32,6 @@ Network::FilterStatus Instance::onAccept(Network::ListenerFilterCallbacks& cb) {
       cb.dispatcher().createFileEvent(socket.fd(),
                                       [this](uint32_t events) {
                                         ASSERT(events == Event::FileReadyType::Read);
-                                        UNREFERENCED_PARAMETER(events);
                                         onRead();
                                       },
                                       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
