@@ -1,4 +1,4 @@
-#include "common/http/filter/ratelimit.h"
+#include "extensions/filters/http/ratelimit/ratelimit.h"
 
 #include <string>
 #include <vector>
@@ -12,20 +12,21 @@
 #include "common/router/config_impl.h"
 
 namespace Envoy {
-namespace Http {
-namespace RateLimit {
+namespace Extensions {
+namespace HttpFilters {
+namespace RateLimitFilter {
 
 namespace {
 
 static const Http::HeaderMap* getTooManyRequestsHeader() {
   static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Code::TooManyRequests))}};
+      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::TooManyRequests))}};
   return header_map;
 }
 
 } // namespace
 
-void Filter::initiateCall(const HeaderMap& headers) {
+void Filter::initiateCall(const Http::HeaderMap& headers) {
   bool is_internal_request =
       headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
 
@@ -46,7 +47,7 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
   cluster_ = cluster->info();
 
-  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  std::vector<RateLimit::Descriptor> descriptors;
 
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, route_entry, headers);
@@ -66,33 +67,33 @@ void Filter::initiateCall(const HeaderMap& headers) {
   }
 }
 
-FilterHeadersStatus Filter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (!config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enabled", 100)) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
-             ? FilterHeadersStatus::StopIteration
-             : FilterHeadersStatus::Continue;
+             ? Http::FilterHeadersStatus::StopIteration
+             : Http::FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
+Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
   ASSERT(state_ != State::Responded);
   if (state_ != State::Calling) {
-    return FilterDataStatus::Continue;
+    return Http::FilterDataStatus::Continue;
   }
   // If the request is too large, stop reading new data until the buffer drains.
-  return FilterDataStatus::StopIterationAndWatermark;
+  return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-FilterTrailersStatus Filter::decodeTrailers(HeaderMap&) {
+Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
   ASSERT(state_ != State::Responded);
-  return state_ == State::Calling ? FilterTrailersStatus::StopIteration
-                                  : FilterTrailersStatus::Continue;
+  return state_ == State::Calling ? Http::FilterTrailersStatus::StopIteration
+                                  : Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
@@ -103,22 +104,22 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(Envoy::RateLimit::LimitStatus status) {
+void Filter::complete(RateLimit::LimitStatus status) {
   state_ = State::Complete;
 
   switch (status) {
-  case Envoy::RateLimit::LimitStatus::OK:
+  case RateLimit::LimitStatus::OK:
     cluster_->statsScope().counter("ratelimit.ok").inc();
     break;
-  case Envoy::RateLimit::LimitStatus::Error:
+  case RateLimit::LimitStatus::Error:
     cluster_->statsScope().counter("ratelimit.error").inc();
     break;
-  case Envoy::RateLimit::LimitStatus::OverLimit:
+  case RateLimit::LimitStatus::OverLimit:
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeUtility::ResponseStatInfo info{config_->scope(),
                                              cluster_->statsScope(),
                                              EMPTY_STRING,
-                                             enumToInt(Code::TooManyRequests),
+                                             enumToInt(Http::Code::TooManyRequests),
                                              true,
                                              EMPTY_STRING,
                                              EMPTY_STRING,
@@ -129,10 +130,10 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
     break;
   }
 
-  if (status == Envoy::RateLimit::LimitStatus::OverLimit &&
+  if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    Http::HeaderMapPtr response_headers{new HeaderMapImpl(*getTooManyRequestsHeader())};
+    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getTooManyRequestsHeader())};
     callbacks_->encodeHeaders(std::move(response_headers), true);
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
@@ -141,9 +142,9 @@ void Filter::complete(Envoy::RateLimit::LimitStatus status) {
 }
 
 void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                          std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                          std::vector<RateLimit::Descriptor>& descriptors,
                                           const Router::RouteEntry* route_entry,
-                                          const HeaderMap& headers) const {
+                                          const Http::HeaderMap& headers) const {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
@@ -157,6 +158,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
   }
 }
 
-} // namespace RateLimit
-} // namespace Http
+} // namespace RateLimitFilter
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

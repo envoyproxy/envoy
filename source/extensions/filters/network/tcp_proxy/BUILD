@@ -1,4 +1,6 @@
 licenses(["notice"])  # Apache 2
+# TCP proxy L4 network filter.
+# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/network_filters/tcp_proxy_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

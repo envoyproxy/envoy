@@ -1,4 +1,4 @@
-#include "common/filter/ratelimit.h"
+#include "extensions/filters/network/ratelimit/ratelimit.h"
 
 #include <cstdint>
 #include <string>
@@ -7,8 +7,9 @@
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
-namespace RateLimit {
-namespace TcpFilter {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RateLimitFilter {
 
 Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
@@ -16,7 +17,7 @@ Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& 
       runtime_(runtime) {
 
   for (const auto& descriptor : config.descriptors()) {
-    Descriptor new_descriptor;
+    RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
@@ -30,12 +31,12 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
                                    POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-Network::FilterStatus Instance::onData(Buffer::Instance&, bool) {
+Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
   return status_ == Status::Calling ? Network::FilterStatus::StopIteration
                                     : Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus Instance::onNewConnection() {
+Network::FilterStatus Filter::onNewConnection() {
   if (status_ == Status::NotStarted &&
       !config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enabled", 100)) {
     status_ = Status::Complete;
@@ -54,7 +55,7 @@ Network::FilterStatus Instance::onNewConnection() {
                                     : Network::FilterStatus::Continue;
 }
 
-void Instance::onEvent(Network::ConnectionEvent event) {
+void Filter::onEvent(Network::ConnectionEvent event) {
   // Make sure that any pending request in the client is cancelled. This will be NOP if the
   // request already completed.
   if (event == Network::ConnectionEvent::RemoteClose ||
@@ -66,24 +67,24 @@ void Instance::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Instance::complete(LimitStatus status) {
+void Filter::complete(RateLimit::LimitStatus status) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
   switch (status) {
-  case LimitStatus::OK:
+  case RateLimit::LimitStatus::OK:
     config_->stats().ok_.inc();
     break;
-  case LimitStatus::Error:
+  case RateLimit::LimitStatus::Error:
     config_->stats().error_.inc();
     break;
-  case LimitStatus::OverLimit:
+  case RateLimit::LimitStatus::OverLimit:
     config_->stats().over_limit_.inc();
     break;
   }
 
   // We fail open if there is an error contacting the service.
-  if (status == LimitStatus::OverLimit &&
+  if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -95,6 +96,7 @@ void Instance::complete(LimitStatus status) {
   }
 }
 
-} // namespace TcpFilter
-} // namespace RateLimit
+} // namespace RateLimitFilter
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -19,7 +19,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/filters/network/tcp_proxy",
         "//source/server/config/access_log:file_access_log_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -28,5 +28,14 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/mocks/server:server_mocks",
     ],
 )

@@ -155,6 +155,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:version_lib",
+        "//source/extensions/filters/http/ratelimit:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/server:server_lib",
         "//source/server/config/stats:statsd_lib",
