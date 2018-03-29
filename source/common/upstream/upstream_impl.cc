@@ -37,11 +37,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-// Priority levels are considered overprovisioned with this factor. This means that we don't
-// consider a priority level unhealthy until the ratio of healthy hosts multiplied by
-// kOverProvisioningFactor drops below 1.0.
-static constexpr double kOverProvisioningFactor = 1.4;
-
 const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const envoy::api::v2::core::BindConfig& bind_config) {
@@ -192,7 +187,7 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
   // Eventually the overprovision factor will likely be made configurable.
   const double effective_locality_health_ratio =
-      std::min(1.0, kOverProvisioningFactor * locality_healthy_ratio);
+      std::min(1.0, (kOverProvisioningFactor / 100.0) * locality_healthy_ratio);
   return weight * effective_locality_health_ratio;
 }
 

@@ -15,11 +15,6 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-// Priority levels are considered overprovisioned with this factor. This means that we don't
-// consider a priority level unhealthy until the percentage of healthy hosts multiplied by
-// kOverProvisioningFactor drops below 100.
-static constexpr uint32_t kOverProvisioningFactor = 140;
-
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
