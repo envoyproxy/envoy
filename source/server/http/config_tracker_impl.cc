@@ -19,7 +19,6 @@ ConfigTrackerImpl::EntryOwnerImpl::EntryOwnerImpl(const std::shared_ptr<ConfigTr
 ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
   size_t erased = map_->erase(key_);
   ASSERT(erased == 1);
-  UNREFERENCED_PARAMETER(erased);
 }
 
 } // namespace Server

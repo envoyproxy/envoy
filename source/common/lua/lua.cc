@@ -89,7 +89,6 @@ ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : stat
   luaL_openlibs(state_.get());
   int rc = luaL_dostring(state_.get(), code.c_str());
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 } // namespace Lua

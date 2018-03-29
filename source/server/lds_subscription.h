@@ -31,7 +31,6 @@ private:
              Config::SubscriptionCallbacks<envoy::api::v2::Listener>& callbacks) override {
     // LDS subscribes to all clusters.
     ASSERT(resources.empty());
-    UNREFERENCED_PARAMETER(resources);
     callbacks_ = &callbacks;
     RestApiFetcher::initialize();
   }
