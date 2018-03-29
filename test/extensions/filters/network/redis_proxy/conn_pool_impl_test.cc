@@ -2,11 +2,12 @@
 #include <string>
 
 #include "common/network/utility.h"
-#include "common/redis/conn_pool_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/redis/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -24,7 +25,9 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 namespace ConnPool {
 
 envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
@@ -492,5 +495,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 }
 
 } // namespace ConnPool
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -8,7 +8,9 @@
 #include "envoy/common/exception.h"
 
 namespace Envoy {
-namespace Redis {
+namespace Extensions {
+namespace NetworkFilters {
+namespace RedisProxy {
 
 /**
  * All RESP types as defined here: https://redis.io/topics/protocol
@@ -131,5 +133,7 @@ public:
   ProtocolError(const std::string& error) : EnvoyException(error) {}
 };
 
-} // namespace Redis
+} // namespace RedisProxy
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
