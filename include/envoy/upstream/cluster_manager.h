@@ -145,12 +145,10 @@ public:
   virtual void shutdown() PURE;
 
   /**
-   * Returns an optional source address for upstream connections to bind to.
-   *
-   * @return Network::Address::InstanceConstSharedPtr a source address to bind to or nullptr if no
-   * bind need occur.
+   * @return const envoy::api::v2::core::BindConfig& cluster manager wide bind configuration for new
+   *         upstream connections.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+  virtual const envoy::api::v2::core::BindConfig& bindConfig() const PURE;
 
   /**
    * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This

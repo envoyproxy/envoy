@@ -369,6 +369,8 @@ public:
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    // Use IP_FREEBIND socket option when binding.
+    static const uint64_t FREEBIND = 0x4;
   };
 
   virtual ~ClusterInfo() {}

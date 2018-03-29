@@ -1,10 +1,12 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
 #include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/socket_option_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
@@ -12,6 +14,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1386,6 +1389,76 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
                             EnvoyException,
                             "MockListenerComponentFactory: Setting socket options failed");
   EXPECT_EQ(0U, manager_->listeners().size());
+}
+
+// Validate that when freebind is set in the Listener, we see no socket option
+// set.
+TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerDisabled) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: "FreebindListener"
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           bool) -> Network::SocketSharedPtr {
+        EXPECT_EQ(options.get(), nullptr);
+        return listener_factory_.socket_;
+      }));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+// Validate that when freebind is set in the Listener, we see the socket option
+// propagated to setsockopt(). This is as close to an end-to-end test as we have
+// for this feature, due to the complexity of creating an integration test
+// involving the network stack. We only test the IPv4 case here, as the logic
+// around IPv4/IPv6 handling is tested generically in
+// socket_option_impl_test.cc.
+TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: FreebindListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+    freebind: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                bool) -> Network::SocketSharedPtr {
+          EXPECT_NE(options.get(), nullptr);
+          EXPECT_EQ(options->size(), 1);
+          EXPECT_TRUE(
+              (*options->begin())
+                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          return listener_factory_.socket_;
+        }));
+    EXPECT_CALL(os_sys_calls,
+                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+    EXPECT_EQ(1U, manager_->listeners().size());
+  } else {
+    // MockListenerSocket is not a real socket, so this always fails in testing.
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                              EnvoyException,
+                              "MockListenerComponentFactory: Setting socket options failed");
+    EXPECT_EQ(0U, manager_->listeners().size());
+  }
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
