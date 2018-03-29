@@ -55,10 +55,9 @@ envoy_cc_test(
         ":redis_mocks",
         "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/extensions/filters/network/redis_proxy:config",
+        "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -73,5 +72,14 @@ envoy_cc_mock(
         "//source/extensions/filters/network/redis_proxy:codec_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/redis_proxy:config",
+        "//test/mocks/server:server_mocks",
     ],
 )

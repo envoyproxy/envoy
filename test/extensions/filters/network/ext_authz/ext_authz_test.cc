@@ -10,13 +10,11 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 
-#include "extensions/filters/network/ext_authz/config.h"
 #include "extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -307,33 +305,6 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
-}
-
-TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    google_grpc:
-      target_uri: ext_authz_server
-      stat_prefix: google
-  failure_mode_allow: false
-  stat_prefix: name
-)EOF";
-
-  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ExtAuthzConfigFactory factory;
-
-  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
-  Server::Configuration::NetworkFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
 }
 
 } // namespace ExtAuthz

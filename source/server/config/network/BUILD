@@ -37,20 +37,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ratelimit_lib",
-    srcs = ["ratelimit.cc"],
-    hdrs = ["ratelimit.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:ratelimit_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "raw_buffer_socket_lib",
     srcs = ["raw_buffer_socket.cc"],
     hdrs = ["raw_buffer_socket.h"],

@@ -19,12 +19,20 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/network/ext_authz:config",
+        "//source/extensions/filters/network/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/ext_authz:config",
+        "//test/mocks/server:server_mocks",
     ],
 )
