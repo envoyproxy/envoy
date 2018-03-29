@@ -13,6 +13,9 @@ namespace Envoy {
 /**
  * Provides a mechanism to temporarily set the logging level on
  * construction, restoring its previous state on dstruction.
+ *
+ * The log_level is the minimum log severity required to print messages.
+ * Messages below this loglevel will be suppressed.
  */
 class LogLevelSetter {
 public:

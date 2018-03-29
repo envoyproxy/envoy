@@ -98,7 +98,7 @@ public:
     }
   }
 
-  std::string log0() {
+  std::string recordedLog() {
     const std::vector<std::string> logs = mock_logger_.messages();
     if (!logs.empty()) {
       return logs[0];
@@ -106,10 +106,10 @@ public:
     return "";
   }
 
-  bool log0Contains(absl::string_view substr) {
+  bool recordedLogContains(absl::string_view substr) {
     expect_no_logs_ = false;
     EXPECT_EQ(1, mock_logger_.messages().size());
-    return absl::string_view(log0()).find(substr) != absl::string_view::npos;
+    return absl::string_view(recordedLog()).find(substr) != absl::string_view::npos;
   }
 
   std::string address_out_path_;
@@ -164,8 +164,9 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
                                        Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                        server_, listener_scope_.createScope("listener.admin."));
   EXPECT_FALSE(std::ifstream(bad_path));
-  EXPECT_TRUE(log0Contains("cannot open admin address output file " + bad_path + " for writing."))
-      << log0();
+  EXPECT_TRUE(
+      recordedLogContains("cannot open admin address output file " + bad_path + " for writing."))
+      << recordedLog();
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
@@ -202,9 +203,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   };
   EXPECT_FALSE(
       admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
-  EXPECT_TRUE(log0Contains("filter \"/foo<script>alert('hi')</script>\" contains invalid "
-                           "character '<'"))
-      << log0();
+  EXPECT_TRUE(recordedLogContains("filter \"/foo<script>alert('hi')</script>\" contains invalid "
+                                  "character '<'"))
+      << recordedLog();
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
@@ -212,9 +213,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
     return Http::Code::Accepted;
   };
   EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
-  EXPECT_TRUE(log0Contains("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid "
-                           "character '?'"))
-      << log0();
+  EXPECT_TRUE(recordedLogContains("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid "
+                                  "character '?'"))
+      << recordedLog();
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {

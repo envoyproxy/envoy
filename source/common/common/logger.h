@@ -209,7 +209,8 @@ public:
                          Thread::BasicLockable& lock);
 
   /**
-   * Sets the log level.
+   * Sets the minimum log severity required to print messages.
+   * Messages below this loglevel will be suppressed.
    */
   static void setLogLevel(spdlog::level::level_enum log_level);
 
