@@ -33,7 +33,7 @@ public:
 
   /**
    * The following are getters and setters for the internal value. A RespValue start as null,
-   * and much change type via type() before the following methods can be used.
+   * and must change type via type() before the following methods can be used.
    */
   std::vector<RespValue>& asArray();
   const std::vector<RespValue>& asArray() const;
