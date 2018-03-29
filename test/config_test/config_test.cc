@@ -109,15 +109,13 @@ uint32_t run(const std::string& directory) {
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
     Server::TestOptionsImpl options(filename, Network::Address::IpVersion::v6);
     ConfigTest test1(options);
-    num_tested++;
-
     // Config flag --config-yaml is only supported for v2 configs.
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
     if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
       ConfigTest test2(options.asConfigYaml());
-      num_tested++;
     }
+    num_tested++;
   }
   return num_tested;
 }
