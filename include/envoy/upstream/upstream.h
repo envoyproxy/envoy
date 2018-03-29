@@ -38,7 +38,9 @@ public:
     // The host is currently failing active health checks.
     FAILED_ACTIVE_HC = 0x1,
     // The host is currently considered an outlier and has been ejected.
-    FAILED_OUTLIER_CHECK = 0x02
+    FAILED_OUTLIER_CHECK = 0x02,
+    // The host is currently marked as unhealthy by EDS.
+    FAILED_EDS_HEALTH = 0x04,
   };
 
   /**
