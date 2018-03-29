@@ -229,6 +229,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "protocol_integration_lib",
+    srcs = [
+        "protocol_integration.cc",
+    ],
+    hdrs = [
+        "protocol_integration.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//test/common/upstream:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "integration_lib",
     srcs = [
         "autonomous_upstream.cc",
@@ -348,6 +362,17 @@ envoy_cc_test(
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "buffer_filter_integration_test",
+    srcs = [
+        "buffer_filter_integration_test.cc",
+    ],
+    deps = [
+        ":protocol_integration_lib",
+        "//test/config:utility_lib",
     ],
 )
 
