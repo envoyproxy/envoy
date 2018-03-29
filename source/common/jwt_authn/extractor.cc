@@ -50,16 +50,14 @@ private:
 class JwtParamLocation : public JwtLocationBase {
 public:
   JwtParamLocation(const std::string& token, const std::unordered_set<std::string>& issuers,
-                   const std::string& param)
-      : JwtLocationBase(token, issuers), param_(param) {}
+                   const std::string&)
+      : JwtLocationBase(token, issuers) {}
 
   void removeJwt(Http::HeaderMap&) const override {
     // TODO(qiwzhang): remove JWT from parameter.
   }
 
 private:
-  // the parameter key the JWT is extracted from.
-  const std::string& param_;
 };
 
 } // namespace
@@ -112,8 +110,8 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
         }
         value_str = value_str.substr(map_value->value_prefix_.size());
       }
-      tokens.emplace_back(
-          new JwtHeaderLocation(value_str, map_value->specified_issuers_, map_value->header_));
+      tokens.push_back(std::make_unique<JwtHeaderLocation>(value_str, map_value->specified_issuers_,
+                                                           map_value->header_));
     }
   }
 
@@ -128,7 +126,8 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
     const auto& map_value = param_it.second;
     const auto& it = current_params.find(map_key);
     if (it != current_params.end()) {
-      tokens.emplace_back(new JwtParamLocation(it->second, map_value.specified_issuers_, map_key));
+      tokens.push_back(
+          std::make_unique<JwtParamLocation>(it->second, map_value.specified_issuers_, map_key));
     }
   }
   return tokens;
