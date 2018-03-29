@@ -291,9 +291,9 @@ class ClusterInfoImpl : public ClusterInfo,
                         public Server::Configuration::TransportSocketFactoryContext {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                  const Network::Address::InstanceConstSharedPtr source_address,
-                  Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -349,8 +349,6 @@ private:
 
     Managers managers_;
   };
-
-  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
 
   Runtime::Loader& runtime_;
   const std::string name_;
@@ -427,9 +425,9 @@ public:
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                  const Network::Address::InstanceConstSharedPtr source_address,
-                  Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);

@@ -169,6 +169,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "socket_option_impl_test",
+    srcs = ["socket_option_impl_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_option_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [

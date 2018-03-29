@@ -174,6 +174,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "socket_option_lib",
+    srcs = ["socket_option_impl.cc"],
+    hdrs = ["socket_option_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

@@ -54,7 +54,6 @@ uint64_t RandomGeneratorImpl::random() {
   if (buffered_idx >= prefetch) {
     int rc = RAND_bytes(reinterpret_cast<uint8_t*>(buffered), sizeof(buffered));
     ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
     buffered_idx = 0;
   }
 
@@ -89,7 +88,6 @@ std::string RandomGeneratorImpl::uuid() {
   if (buffered_idx + 16 > sizeof(buffered)) {
     int rc = RAND_bytes(buffered, sizeof(buffered));
     ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
     buffered_idx = 0;
   }
 
