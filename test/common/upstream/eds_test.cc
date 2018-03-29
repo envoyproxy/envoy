@@ -269,7 +269,7 @@ TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
-// Validate that onConfigUpdate() propagatees locality weights to the host set when locality
+// Validate that onConfigUpdate() propagates locality weights to the host set when locality
 // weighted balancing is configured.
 TEST_F(EdsTest, EndpointLocalityWeights) {
   resetCluster(R"EOF(
