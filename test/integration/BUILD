@@ -297,13 +297,10 @@ envoy_cc_test_library(
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:lua_lib",
-        "//source/server/config/http:ratelimit_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "//source/server/config/network:ratelimit_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
-        "//source/server/config/network:redis_proxy_lib",
         "//source/server/config/network:ssl_socket_lib",
         "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
@@ -393,12 +390,12 @@ envoy_cc_test(
         "proxy_proto_integration_test.cc",
         "proxy_proto_integration_test.h",
     ],
-    data = ["//test/config/integration:server_proxy_proto.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:codec_client_lib",
+        "//source/extensions/filters/listener/proxy_protocol:config",
     ],
 )
 
@@ -411,6 +408,7 @@ envoy_cc_test(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/ratelimit:ratelimit_proto",
+        "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
     ],
 )

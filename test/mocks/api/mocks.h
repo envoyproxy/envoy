@@ -67,7 +67,9 @@ public:
   Thread::MutexBasicLockable open_mutex_;
   std::condition_variable_any write_event_;
   std::condition_variable_any open_event_;
-  std::unordered_map<uint64_t, bool> boolsockopts_;
+  // Map from (sockfd,level,optname) to boolean socket option.
+  using SockOptKey = std::tuple<int, int, int>;
+  std::map<SockOptKey, bool> boolsockopts_;
 };
 
 } // namespace Api

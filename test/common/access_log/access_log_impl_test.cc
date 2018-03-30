@@ -209,7 +209,7 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   TestRequestInfo request_info_;
   std::shared_ptr<Filesystem::MockFile> file_;
-  std::string output_;
+  StringViewSaver output_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;

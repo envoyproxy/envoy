@@ -36,13 +36,12 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
-        "//source/extensions/filters/network/mongo_proxy:config",
+        "//source/extensions/filters/network/mongo_proxy:proxy_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:server_mocks",
     ],
 )
 
@@ -53,5 +52,14 @@ envoy_cc_test(
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
         "//source/extensions/filters/network/mongo_proxy:codec_lib",
         "//source/extensions/filters/network/mongo_proxy:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/network/mongo_proxy:config",
+        "//test/mocks/server:server_mocks",
     ],
 )

@@ -178,7 +178,6 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                                client_session.size(), client_ssl_context);
     int rc = SSL_set_session(client_ssl_socket, client_ssl_session);
     ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
     SSL_SESSION_free(client_ssl_session);
   }
 
@@ -222,7 +221,6 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
       size_t session_len;
       int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
       ASSERT(rc == 1);
-      UNREFERENCED_PARAMETER(rc);
       new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
       OPENSSL_free(session_data);
       server_connection->close(Network::ConnectionCloseType::NoFlush);

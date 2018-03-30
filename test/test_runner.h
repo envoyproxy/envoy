@@ -28,7 +28,8 @@ public:
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;
-    Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(), lock);
+    Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
+                                 TestEnvironment::getOptions().logFormat(), lock);
 
     return RUN_ALL_TESTS();
   }

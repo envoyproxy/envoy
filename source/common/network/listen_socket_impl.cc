@@ -45,6 +45,7 @@ TcpListenSocket::TcpListenSocket(const Address::InstanceConstSharedPtr& address,
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
   RELEASE_ASSERT(fd_ != -1);
 
+  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
   int on = 1;
   int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   RELEASE_ASSERT(rc != -1);

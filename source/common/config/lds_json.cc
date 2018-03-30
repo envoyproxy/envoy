@@ -43,7 +43,6 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
   }
 
   const std::string drain_type = json_listener.getString("drain_type", "default");
