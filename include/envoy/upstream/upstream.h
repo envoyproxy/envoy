@@ -169,6 +169,11 @@ public:
 typedef std::shared_ptr<HostsPerLocality> HostsPerLocalitySharedPtr;
 typedef std::shared_ptr<const HostsPerLocality> HostsPerLocalityConstSharedPtr;
 
+// Weight for each locality index in HostsPerLocality.
+typedef std::vector<uint32_t> LocalityWeights;
+typedef std::shared_ptr<LocalityWeights> LocalityWeightsSharedPtr;
+typedef std::shared_ptr<const LocalityWeights> LocalityWeightsConstSharedPtr;
+
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
@@ -201,18 +206,30 @@ public:
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
 
   /**
+   * @return weights for each locality in the host set.
+   */
+  virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
+
+  /**
+   * @return next locality index to route to if performing locality weighted balancing.
+   */
+  virtual absl::optional<uint32_t> chooseLocality() PURE;
+
+  /**
    * Updates the hosts in a given host set.
    *
    * @param hosts supplies the (usually new) list of hosts in the host set.
    * @param healthy hosts supplies the subset of hosts which are healthy.
    * @param hosts_per_locality supplies the hosts subdivided by locality.
    * @param hosts_per_locality supplies the healthy hosts subdivided by locality.
+   * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                           LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
 
   /**

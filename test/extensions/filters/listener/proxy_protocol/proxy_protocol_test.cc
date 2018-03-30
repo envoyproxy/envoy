@@ -32,8 +32,8 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
 namespace ProxyProtocol {
 
 // Build again on the basis of the connection_handler_test.cc
@@ -446,6 +446,6 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 }
 
 } // namespace ProxyProtocol
-} // namespace Listener
-} // namespace Filter
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

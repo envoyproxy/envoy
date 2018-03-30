@@ -46,7 +46,7 @@ void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *thi
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   typedef std::unique_ptr<HostVector> HostListPtr;
-  std::vector<HostListPtr> new_hosts(1);
+  std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state(1);
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -69,22 +69,27 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
     }
-    if (new_hosts.size() <= priority) {
-      new_hosts.resize(priority + 1);
+    if (priority_state.size() <= priority) {
+      priority_state.resize(priority + 1);
     }
-    if (new_hosts[priority] == nullptr) {
-      new_hosts[priority] = HostListPtr{new HostVector};
+    if (priority_state[priority].first == nullptr) {
+      priority_state[priority].first.reset(new HostVector());
+    }
+    if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+      priority_state[priority].second[locality_lb_endpoint.locality()] =
+          locality_lb_endpoint.load_balancing_weight().value();
     }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      new_hosts[priority]->emplace_back(new HostImpl(
+      priority_state[priority].first->emplace_back(new HostImpl(
           info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()), lb_endpoint.metadata(),
           lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality()));
     }
   }
 
-  for (size_t i = 0; i < new_hosts.size(); ++i) {
-    if (new_hosts[i] != nullptr) {
-      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *new_hosts[i]);
+  for (size_t i = 0; i < priority_state.size(); ++i) {
+    if (priority_state[i].first != nullptr) {
+      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *priority_state[i].first,
+                             priority_state[i].second);
     }
   }
 
@@ -93,45 +98,69 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   onPreInitComplete();
 }
 
-void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, HostVector& new_hosts) {
+void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                                            LocalityWeightsMap& locality_weights_map) {
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
   HostVector hosts_removed;
+  // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
+  // when the locality weight map changes.
+  // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
+  // since this has the knock on effect that we rebuild the load balancers and locality scheduler.
+  // We could make this happen lazily, as we do for host-level weight updates, where as things age
+  // out of the locality scheduler, we discover their new weights. We don't currently have a shared
+  // object for locality weights that we can update here, we should add something like this to
+  // improve performance and scalability of locality weight updates.
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            health_checker_ != nullptr)) {
-    ENVOY_LOG(debug, "EDS hosts changed for cluster: {} ({}) priority {}", info_->name(),
-              host_set.hosts().size(), host_set.priority());
+                            health_checker_ != nullptr) ||
+      current_locality_weights_map_ != locality_weights_map) {
+    current_locality_weights_map_ = locality_weights_map;
+    LocalityWeightsSharedPtr locality_weights;
+    ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
+              info_->name(), host_set.hosts().size(), host_set.priority());
     std::vector<HostVector> per_locality;
 
+    // If we are configured for locality weighted LB we populate the locality
+    // weights.
+    const bool locality_weighted_lb = info()->lbConfig().has_locality_weighted_lb_config();
+    if (locality_weighted_lb) {
+      locality_weights = std::make_shared<LocalityWeights>();
+    }
     // If local locality is not defined then skip populating per locality hosts.
-    const Locality local_locality(local_info_.node().locality());
+    const auto& local_locality = local_info_.node().locality();
     ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
 
     // We use std::map to guarantee a stable ordering for zone aware routing.
-    std::map<Locality, HostVector> hosts_per_locality;
+    std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
     for (const HostSharedPtr& host : *current_hosts_copy) {
-      hosts_per_locality[Locality(host->locality())].push_back(host);
+      hosts_per_locality[host->locality()].push_back(host);
     }
 
     // Do we have hosts for the local locality?
     const bool non_empty_local_locality =
-        !local_locality.empty() &&
+        local_info_.node().has_locality() &&
         hosts_per_locality.find(local_locality) != hosts_per_locality.end();
 
     // As per HostsPerLocality::get(), the per_locality vector must have the
     // local locality hosts first if non_empty_local_locality.
     if (non_empty_local_locality) {
-      per_locality.push_back(hosts_per_locality[local_locality]);
+      per_locality.emplace_back(hosts_per_locality[local_locality]);
+      if (locality_weighted_lb) {
+        locality_weights->emplace_back(locality_weights_map[local_locality]);
+      }
     }
 
     // After the local locality hosts (if any), we place the remaining locality
     // host groups in lexicographic order. This provides a stable ordering for
     // zone aware routing.
     for (auto& entry : hosts_per_locality) {
-      if (!non_empty_local_locality || local_locality != entry.first) {
-        per_locality.push_back(entry.second);
+      if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+        per_locality.emplace_back(entry.second);
+        if (locality_weighted_lb) {
+          locality_weights->emplace_back(locality_weights_map[entry.first]);
+        }
       }
     }
 
@@ -140,7 +169,7 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, HostVector& new_h
 
     host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
                          per_locality_shared, createHealthyHostLists(*per_locality_shared),
-                         hosts_added, hosts_removed);
+                         std::move(locality_weights), hosts_added, hosts_removed);
   }
 }
 

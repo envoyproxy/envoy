@@ -113,7 +113,7 @@ void LogicalDnsCluster::startResolve() {
             auto& first_host_set = priority_set_.getOrCreateHostSet(0);
             first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
                                        HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
-                                       *new_hosts, {});
+                                       {}, *new_hosts, {});
           }
         }
 
