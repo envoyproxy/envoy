@@ -6,7 +6,7 @@
 
 namespace Envoy {
 
-struct ProtocolTestParams {
+struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecClient::Type downstream_protocol;
   FakeHttpConnection::Type upstream_protocol;
@@ -16,32 +16,32 @@ struct ProtocolTestParams {
 //
 // Usage:
 //
-// typedef ProtocolIntegrationTest MyTest
+// typedef HttpProtocolIntegrationTest MyTest
 //
 // INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
-//                        testing::ValuesIn(ProtocolIntegrationTest::GetProtocolTestParams()),
-//                        ProtocolIntegrationTest::protocolTestParamsToString);
+//                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+//                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 //
 //
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
-class ProtocolIntegrationTest : public HttpIntegrationTest,
-                                public testing::TestWithParam<ProtocolTestParams> {
+class HttpProtocolIntegrationTest : public HttpIntegrationTest,
+                                    public testing::TestWithParam<HttpProtocolTestParams> {
 public:
   // Returns 8 combinations of
   // [HTTP  upstream / HTTP  downstream] x [Ipv4, IPv6]
   // [HTTP  upstream / HTTP2 downstream] x [Ipv4, IPv6]
   // [HTTP2 upstream / HTTP2 downstream] x [IPv4, Ipv6]
   // [HTTP upstream  / HTTP2 downstream] x [IPv4, Ipv6]
-  static std::vector<ProtocolTestParams> GetProtocolTestParams();
+  static std::vector<HttpProtocolTestParams> getProtocolTestParams();
 
   // Allows pretty printed test names of the form
   // FooTestCase.BarInstance/IPv4_Http2Downstream_HttpUpstream
   static std::string
-  protocolTestParamsToString(const testing::TestParamInfo<ProtocolTestParams>& p);
+  protocolTestParamsToString(const testing::TestParamInfo<HttpProtocolTestParams>& p);
 
-  ProtocolIntegrationTest()
+  HttpProtocolIntegrationTest()
       : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
 
   void SetUp() override {

@@ -229,12 +229,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "protocol_integration_lib",
+    name = "http_protocol_integration_lib",
     srcs = [
-        "protocol_integration.cc",
+        "http_protocol_integration.cc",
     ],
     hdrs = [
-        "protocol_integration.h",
+        "http_protocol_integration.h",
     ],
     deps = [
         ":http_integration_lib",
@@ -371,7 +371,7 @@ envoy_cc_test(
         "buffer_filter_integration_test.cc",
     ],
     deps = [
-        ":protocol_integration_lib",
+        ":http_protocol_integration_lib",
         "//test/config:utility_lib",
     ],
 )

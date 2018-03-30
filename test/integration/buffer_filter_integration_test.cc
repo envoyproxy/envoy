@@ -1,14 +1,12 @@
-#include "test/integration/protocol_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
 
-typedef ProtocolIntegrationTest BufferIntegrationTest;
-
-typedef ProtocolIntegrationTest OtherIntegrationTest;
+typedef HttpProtocolIntegrationTest BufferIntegrationTest;
 
 INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
-                        testing::ValuesIn(ProtocolIntegrationTest::GetProtocolTestParams()),
-                        ProtocolIntegrationTest::protocolTestParamsToString);
+                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                        HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
@@ -34,8 +32,5 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithZeroByteBodyBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
-
-// Verifies the typedef saves us from all ProtocolIntergrationTests from being rerun.
-TEST_P(OtherIntegrationTest, Foo) { ASSERT(0); }
 
 } // namespace Envoy
