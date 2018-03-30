@@ -82,9 +82,9 @@ public:
   MockAsyncClientManager();
   ~MockAsyncClientManager();
 
-  MOCK_METHOD2(factoryForGrpcService,
+  MOCK_METHOD3(factoryForGrpcService,
                AsyncClientFactoryPtr(const envoy::api::v2::core::GrpcService& grpc_service,
-                                     Stats::Scope& scope));
+                                     Stats::Scope& scope, bool skip_cluster_check));
 };
 
 } // namespace Grpc
