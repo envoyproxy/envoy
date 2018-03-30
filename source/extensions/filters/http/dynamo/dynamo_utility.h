@@ -3,11 +3,13 @@
 #include <string>
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 class Utility {
 public:
-  /*
+  /**
    * Creates the partition id stats string.
    * The stats format is
    * "<stat_prefix>table.<table_name>.capacity.<operation>.__partition_id=<partition_id>".
@@ -25,4 +27,6 @@ public:
 };
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

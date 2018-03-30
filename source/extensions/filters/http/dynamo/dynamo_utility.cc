@@ -1,12 +1,12 @@
-#include "common/dynamo/dynamo_utility.h"
+#include "extensions/filters/http/dynamo/dynamo_utility.h"
 
 #include <string>
 
 #include "common/stats/stats_impl.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
@@ -30,4 +30,6 @@ std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
 }
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

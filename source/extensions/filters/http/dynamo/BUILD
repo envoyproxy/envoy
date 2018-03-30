@@ -40,3 +40,16 @@ envoy_cc_library(
     hdrs = ["dynamo_utility.h"],
     deps = ["//source/common/stats:stats_lib"],
 )
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":dynamo_filter_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)

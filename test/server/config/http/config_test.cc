@@ -11,7 +11,6 @@
 #include "common/router/router.h"
 
 #include "server/config/http/buffer.h"
-#include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_json_transcoder.h"
@@ -129,21 +128,6 @@ TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
   HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, DynamoFilter) {
-  std::string json_string = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  DynamoFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

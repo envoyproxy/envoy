@@ -1,4 +1,4 @@
-#include "common/dynamo/dynamo_request_parser.h"
+#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 #include <cmath>
 #include <cstdint>
@@ -8,9 +8,11 @@
 #include "common/common/utility.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
-/*
+/**
  * Basic json request/response format:
  * http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Appendix.CurrentAPI.html
  */
@@ -142,4 +144,6 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
 }
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
