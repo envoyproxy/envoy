@@ -3,6 +3,7 @@
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/singleton/const_singleton.h"
 
 using ::Envoy::Http::LowerCaseString;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
@@ -10,6 +11,18 @@ using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 namespace Envoy {
 namespace JwtAuthn {
 namespace {
+
+/**
+ * Contant values
+ */
+struct JwtConstValueStruct {
+  // The header value prefix for Authorization.
+  const std::string BearerPrefix{"Bearer "};
+
+  // The default query parameter name to extract JWT token
+  const std::string AccessTokenParam{"access_token"};
+};
+typedef ConstSingleton<JwtConstValueStruct> JwtConstValues;
 
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
@@ -74,8 +87,8 @@ Extractor::Extractor(const JwtAuthentication& config) {
     // If not specified, use default locations.
     if (rule.from_headers().empty() && rule.from_params().empty()) {
       addHeaderConfig(rule.issuer(), Http::Headers::get().Authorization,
-                      Http::Headers::get().JwtValues.BearerPrefix);
-      addParamConfig(rule.issuer(), Http::Headers::get().JwtValues.AccessTokenParam);
+                      JwtConstValues::get().BearerPrefix);
+      addParamConfig(rule.issuer(), JwtConstValues::get().AccessTokenParam);
     }
   }
 }

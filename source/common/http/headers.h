@@ -208,11 +208,6 @@ public:
     const std::string AcceptEncoding{"Accept-Encoding"};
     const std::string Wildcard{"*"};
   } VaryValues;
-
-  struct {
-    const std::string BearerPrefix{"Bearer "};
-    const std::string AccessTokenParam{"access_token"};
-  } JwtValues;
 };
 
 typedef ConstSingleton<HeaderValues> Headers;
