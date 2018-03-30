@@ -1,6 +1,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -42,7 +43,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");

@@ -162,6 +162,7 @@ envoy_cc_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

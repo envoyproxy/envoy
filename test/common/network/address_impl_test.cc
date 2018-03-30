@@ -105,7 +105,8 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, AddressImplSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port with an IP loopback address.

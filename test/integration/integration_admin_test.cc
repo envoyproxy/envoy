@@ -6,6 +6,7 @@
 #include "common/json/json_loader.h"
 
 #include "test/integration/utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -13,7 +14,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();

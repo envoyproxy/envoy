@@ -122,7 +122,8 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
