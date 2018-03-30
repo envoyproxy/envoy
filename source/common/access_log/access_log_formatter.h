@@ -8,6 +8,8 @@
 #include "envoy/common/time.h"
 #include "envoy/request_info/request_info.h"
 
+#include "common/common/utility.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -137,6 +139,7 @@ public:
 
 private:
   std::string format_;
+  std::unique_ptr<Envoy::DateFormatter> date_formatter_;
 };
 
 } // namespace AccessLog

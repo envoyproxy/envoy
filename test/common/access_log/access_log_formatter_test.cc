@@ -228,10 +228,10 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
 
   {
     StartTimeFormatter start_time_format("%Y/%m/%d");
-    SystemTime time;
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTimeWithFormat(time, "%Y/%m/%d"),
-              start_time_format.format(header, header, request_info));
+    EXPECT_EQ("2018/03/28", start_time_format.format(header, header, request_info));
   }
 
   {

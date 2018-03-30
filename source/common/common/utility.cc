@@ -256,17 +256,6 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
           1000);
 }
 
-std::string AccessLogDateTimeFormatter::fromTimeWithFormat(const SystemTime& time,
-                                                           const std::string& format) {
-
-  if (!format.empty()) {
-    DateFormatter formatter(format);
-    return formatter.fromTime(time);
-  }
-
-  return fromTime(time);
-}
-
 bool StringUtil::endsWith(const std::string& source, const std::string& end) {
   if (source.length() < end.length()) {
     return false;

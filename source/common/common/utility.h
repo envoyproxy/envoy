@@ -37,6 +37,11 @@ public:
    */
   std::string now();
 
+  /**
+   * @return std::string the format string used.
+   */
+  std::string formatString() { return format_string_; }
+
 private:
   std::string fromTimeT(time_t time);
 
@@ -49,7 +54,6 @@ private:
 class AccessLogDateTimeFormatter {
 public:
   static std::string fromTime(const SystemTime& time);
-  static std::string fromTimeWithFormat(const SystemTime& time, const std::string& format);
 };
 
 /**
