@@ -72,7 +72,7 @@ public:
     virtual const std::string& name() const PURE;
   };
 
-  typedef std::shared_ptr<const OverrideLayer> OverrideLayerConstSharedPtr;
+  typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
 
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
@@ -139,9 +139,9 @@ public:
    * to top; for instance, the second layer's entries override the first layer's entries, and so on.
    * Any layer can add a key in addition to overriding keys in layers below. The layer vector is
    * safe only for the lifetime of the Snapshot.
-   * @return const std::vector<OverrideLayerConstSharedPtr>& the raw map of loaded values.
+   * @return const std::vector<OverrideLayerConstPtr>& the raw map of loaded values.
    */
-  virtual const std::vector<OverrideLayerConstSharedPtr>& getLayers() const PURE;
+  virtual const std::vector<OverrideLayerConstPtr>& getLayers() const PURE;
 };
 
 /**

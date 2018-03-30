@@ -236,8 +236,8 @@ TEST_P(AdminInstanceTest, Runtime) {
 
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
-  auto layer1 = std::make_shared<NiceMock<Runtime::MockOverrideLayer>>();
-  auto layer2 = std::make_shared<NiceMock<Runtime::MockOverrideLayer>>();
+  auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
+  auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
       {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
@@ -248,7 +248,9 @@ TEST_P(AdminInstanceTest, Runtime) {
   ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer2"}));
   ON_CALL(*layer2, values()).WillByDefault(testing::ReturnRef(entries2));
 
-  std::vector<Runtime::Snapshot::OverrideLayerConstSharedPtr> layers{layer1, layer2};
+  std::vector<Runtime::Snapshot::OverrideLayerConstPtr> layers;
+  layers.push_back(std::move(layer1));
+  layers.push_back(std::move(layer2));
   EXPECT_CALL(snapshot, getLayers()).WillRepeatedly(testing::ReturnRef(layers));
 
   const std::string expected_json = R"EOF({

@@ -57,12 +57,12 @@ struct RuntimeStats {
 };
 
 /**
- * Implementation of Snapshot whose source the vector of layers passed to the constructor.
+ * Implementation of Snapshot whose source is the vector of layers passed to the constructor.
  */
 class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
-               std::vector<OverrideLayerConstSharedPtr>&& layers);
+               std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
@@ -72,12 +72,12 @@ public:
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
-  const std::vector<OverrideLayerConstSharedPtr>& getLayers() const override;
+  const std::vector<OverrideLayerConstPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
 
 private:
-  const std::vector<OverrideLayerConstSharedPtr> layers_;
+  const std::vector<OverrideLayerConstPtr> layers_;
   std::unordered_map<std::string, const Snapshot::Entry> values_;
   RandomGenerator& generator_;
 };
@@ -100,12 +100,17 @@ protected:
 
 /**
  * Extension of OverrideLayerImpl that maintains an in-memory set of values. These values can be
- * modified programmatically via mergeValues(). AdminLayer is so named because it can be access and
- * manipulated by Envoy's admin interface.
+ * modified programmatically via mergeValues(). AdminLayer is so named because it can be accessed
+ * and manipulated by Envoy's admin interface.
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
-  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_(stats) {}
+  explicit AdminLayer(RuntimeStats& stats) : OverrideLayerImpl{"admin"}, stats_{stats} {}
+  /**
+   * Copy-constructible so that it can snapshotted.
+   */
+  AdminLayer(const AdminLayer& o) : AdminLayer{o.stats_} { values_ = o.values(); }
+
   /**
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
@@ -172,7 +177,7 @@ protected:
 
   RandomGenerator& generator_;
   RuntimeStats stats_;
-  std::shared_ptr<AdminLayer> admin_layer_;
+  AdminLayer admin_layer_;
 
 private:
   RuntimeStats generateStats(Stats::Store& store);
@@ -193,10 +198,10 @@ public:
 private:
   std::unique_ptr<SnapshotImpl> createNewSnapshot() override;
 
-  Filesystem::WatcherPtr watcher_;
-  std::string root_path_;
-  std::string override_path_;
-  Api::OsSysCallsPtr os_sys_calls_;
+  const Filesystem::WatcherPtr watcher_;
+  const std::string root_path_;
+  const std::string override_path_;
+  const Api::OsSysCallsPtr os_sys_calls_;
 };
 
 } // namespace Runtime
