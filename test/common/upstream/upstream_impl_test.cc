@@ -735,7 +735,7 @@ TEST(PrioritySet, Extend) {
   HostVector hosts_removed{};
 
   priority_set.hostSetsPerPriority()[1]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, hosts_added, hosts_removed);
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
   EXPECT_EQ(1, changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
@@ -839,6 +839,106 @@ TEST(HostsPerLocalityImpl, Filter) {
     const std::vector<HostVector> expected_locality_hosts = {{}, {host_1}};
     EXPECT_EQ(expected_locality_hosts, filtered->get());
   }
+}
+
+class HostSetImplLocalityTest : public ::testing::Test {
+public:
+  LocalityWeightsConstSharedPtr locality_weights_;
+  HostSetImpl host_set_{0};
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  HostVector hosts_{
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
+};
+
+// When no locality weights belong to the host set, there's an empty pick.
+TEST_F(HostSetImplLocalityTest, Empty) {
+  EXPECT_EQ(nullptr, host_set_.localityWeights());
+  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+}
+
+// When all locality weights are the same we have unweighted RR behavior.
+TEST_F(HostSetImplLocalityTest, Unweighted) {
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
+  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(2, host_set_.chooseLocality().value());
+}
+
+// When locality weights differ, we have weighted RR behavior.
+TEST_F(HostSetImplLocalityTest, Weighted) {
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
+  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseLocality().value());
+}
+
+// Localities with no weight assignment are never picked.
+TEST_F(HostSetImplLocalityTest, MissingWeight) {
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 0, 1}};
+  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(2, host_set_.chooseLocality().value());
+}
+
+// Gentle failover between localities as health diminishes.
+TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
+  const auto setHealthyHostCount = [this](uint32_t host_count) {
+    LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
+    HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
+        {{hosts_[0], hosts_[1], hosts_[2], hosts_[3], hosts_[4]}, {hosts_[5]}});
+    HostVector healthy_hosts;
+    for (uint32_t i = 0; i < host_count; ++i) {
+      healthy_hosts.emplace_back(hosts_[i]);
+    }
+    HostsPerLocalitySharedPtr healthy_hosts_per_locality =
+        makeHostsPerLocality({healthy_hosts, {hosts_[5]}});
+    host_set_.updateHosts({}, {}, hosts_per_locality, healthy_hosts_per_locality, locality_weights,
+                          {}, {});
+  };
+
+  const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
+    uint32_t count[2] = {0, 0};
+    for (uint32_t i = 0; i < 100; ++i) {
+      const uint32_t locality_index = host_set_.chooseLocality().value();
+      ASSERT_LT(locality_index, 2);
+      ++count[locality_index];
+    }
+    ENVOY_LOG_MISC(debug, "Locality picks {} {}", count[0], count[1]);
+    EXPECT_EQ(locality_0_picks, count[0]);
+    EXPECT_EQ(locality_1_picks, count[1]);
+  };
+
+  setHealthyHostCount(5);
+  expectPicks(33, 67);
+  setHealthyHostCount(4);
+  expectPicks(33, 67);
+  setHealthyHostCount(3);
+  expectPicks(29, 71);
+  setHealthyHostCount(2);
+  expectPicks(22, 78);
+  setHealthyHostCount(1);
+  expectPicks(12, 88);
+  setHealthyHostCount(0);
+  expectPicks(0, 100);
 }
 
 } // namespace

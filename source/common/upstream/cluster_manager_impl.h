@@ -243,6 +243,7 @@ private:
                                         HostVectorConstSharedPtr healthy_hosts,
                                         HostsPerLocalityConstSharedPtr hosts_per_locality,
                                         HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
