@@ -126,10 +126,12 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
   }
 }
 
-// Transparent settings have no effect on post-bind behavior.
+// Transparent settings can be applied post-bind.
+// In this test, we fail to set the option because the underlying setsockopt
+// syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionTransparentPostBind) {
   SocketOptionImpl socket_option{true, {}};
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
+  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
 }
 
 // Freebind settings have no effect on post-bind behavior.

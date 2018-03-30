@@ -1445,9 +1445,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                   ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
           return listener_factory_.socket_;
         }));
+    // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
     EXPECT_CALL(os_sys_calls,
                 setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        .Times(2)
+        .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
