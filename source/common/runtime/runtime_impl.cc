@@ -186,16 +186,12 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-const std::unordered_map<std::string, const Snapshot::Entry>& SnapshotImpl::getAll() const {
-  return values_;
-}
-
-const std::vector<Snapshot::OverrideLayerSharedPtr>& SnapshotImpl::getAllLayers() const {
+const std::vector<Snapshot::OverrideLayerConstSharedPtr>& SnapshotImpl::getLayers() const {
   return layers_;
 }
 
 SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
-                           const std::vector<OverrideLayerSharedPtr>& layers)
+                           std::vector<OverrideLayerConstSharedPtr>&& layers)
     : layers_{layers}, generator_{generator} {
   for (const auto& layer : layers_) {
     for (const auto& kv : layer->values()) {
@@ -302,13 +298,12 @@ LoaderImpl::LoaderImpl(RandomGenerator& generator, Stats::Store& store,
 
 LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
                        Stats::Store& store, ThreadLocal::SlotAllocator& tls)
-    : generator_(generator), stats_(generateStats(store)), tls_(tls.allocateSlot()) {
-  adminLayer_ = std::make_shared<AdminLayer>(stats_);
-}
+    : generator_(generator), stats_(generateStats(store)),
+      admin_layer_(std::make_shared<AdminLayer>(stats_)), tls_(tls.allocateSlot()) {}
 
 std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
-  return std::make_unique<SnapshotImpl>(generator_, stats_,
-                                        std::vector<Snapshot::OverrideLayerSharedPtr>{adminLayer_});
+  return std::make_unique<SnapshotImpl>(
+      generator_, stats_, std::vector<Snapshot::OverrideLayerConstSharedPtr>{admin_layer_});
 }
 
 void LoaderImpl::loadNewSnapshot() {
@@ -321,7 +316,7 @@ void LoaderImpl::loadNewSnapshot() {
 Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
-  adminLayer_->mergeValues(values);
+  admin_layer_->mergeValues(values);
   loadNewSnapshot();
 }
 
@@ -350,7 +345,7 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
 }
 
 std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
-  std::vector<Snapshot::OverrideLayerSharedPtr> layers;
+  std::vector<Snapshot::OverrideLayerConstSharedPtr> layers;
   try {
     layers.push_back(std::make_unique<DiskLayer>("root", root_path_, *os_sys_calls_));
     if (Filesystem::directoryExists(override_path_)) {
@@ -363,8 +358,8 @@ std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
     stats_.load_error_.inc();
     ENVOY_LOG(debug, "error creating runtime snapshot: {}", e.what());
   }
-  layers.push_back(adminLayer_);
-  return std::make_unique<SnapshotImpl>(generator_, stats_, layers);
+  layers.push_back(admin_layer_);
+  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
 
 } // namespace Runtime

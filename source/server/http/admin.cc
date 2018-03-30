@@ -549,21 +549,20 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   rapidjson::Document document;
   document.SetObject();
   auto& allocator = document.GetAllocator();
-
-  const auto& layers = server_.runtime().snapshot().getAllLayers();
   std::map<std::string, rapidjson::Value> value_arrays;
-
   rapidjson::Value layer_names{rapidjson::kArrayType};
+  const auto& layers = server_.runtime().snapshot().getLayers();
+
   for (const auto& layer : layers) {
     rapidjson::Value layer_name;
     layer_name.SetString(layer->name().c_str(), allocator);
-    layer_names.PushBack(layer_name, allocator);
+    layer_names.PushBack(std::move(layer_name), allocator);
 
     for (const auto& kv : layer->values()) {
       value_arrays.emplace(kv.first, rapidjson::Value{rapidjson::kArrayType});
     }
   }
-  document.AddMember("layers", layer_names, allocator);
+  document.AddMember("layers", std::move(layer_names), allocator);
 
   for (const auto& layer : layers) {
     for (auto& kv : value_arrays) {
@@ -571,7 +570,7 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
       const auto& value = it == layer->values().end() ? "" : it->second.string_value_;
       rapidjson::Value value_obj;
       value_obj.SetString(value.c_str(), allocator);
-      kv.second.PushBack(value_obj, allocator);
+      kv.second.PushBack(std::move(value_obj), allocator);
     }
   }
 

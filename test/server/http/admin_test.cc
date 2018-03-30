@@ -248,8 +248,8 @@ TEST_P(AdminInstanceTest, Runtime) {
   ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer2"}));
   ON_CALL(*layer2, values()).WillByDefault(testing::ReturnRef(entries2));
 
-  std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers{layer1, layer2};
-  EXPECT_CALL(snapshot, getAllLayers()).WillRepeatedly(testing::ReturnRef(layers));
+  std::vector<Runtime::Snapshot::OverrideLayerConstSharedPtr> layers{layer1, layer2};
+  EXPECT_CALL(snapshot, getLayers()).WillRepeatedly(testing::ReturnRef(layers));
 
   const std::string expected_json = R"EOF({
     "layers": [

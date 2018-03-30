@@ -47,6 +47,7 @@ public:
   GAUGE  (num_keys)                                                                                \
   GAUGE  (admin_overrides_active)
 // clang-format on
+// TODO XXX TESTME num_keys
 
 /**
  * Struct definition for all runtime stats. @see stats_macros.h
@@ -61,7 +62,7 @@ struct RuntimeStats {
 class SnapshotImpl : public Snapshot, public ThreadLocal::ThreadLocalObject {
 public:
   SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
-               const std::vector<OverrideLayerSharedPtr>& layers);
+               std::vector<OverrideLayerConstSharedPtr>&& layers);
 
   // Runtime::Snapshot
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
@@ -71,13 +72,12 @@ public:
                       uint64_t random_value) const override;
   const std::string& get(const std::string& key) const override;
   uint64_t getInteger(const std::string& key, uint64_t default_value) const override;
-  const std::unordered_map<std::string, const Snapshot::Entry>& getAll() const override;
-  const std::vector<OverrideLayerSharedPtr>& getAllLayers() const override;
+  const std::vector<OverrideLayerConstSharedPtr>& getLayers() const override;
 
   static Entry createEntry(const std::string& value);
 
 private:
-  const std::vector<OverrideLayerSharedPtr> layers_;
+  const std::vector<OverrideLayerConstSharedPtr> layers_;
   std::unordered_map<std::string, const Snapshot::Entry> values_;
   RandomGenerator& generator_;
 };
@@ -170,9 +170,9 @@ protected:
   // Load a new Snapshot into TLS
   void loadNewSnapshot();
 
-  std::shared_ptr<AdminLayer> adminLayer_;
   RandomGenerator& generator_;
   RuntimeStats stats_;
+  std::shared_ptr<AdminLayer> admin_layer_;
 
 private:
   RuntimeStats generateStats(Stats::Store& store);
