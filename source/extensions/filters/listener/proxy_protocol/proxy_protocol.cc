@@ -18,8 +18,8 @@
 #include "common/network/utility.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
 namespace ProxyProtocol {
 
 Config::Config(Stats::Scope& scope) : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {}
@@ -159,6 +159,6 @@ bool Filter::readLine(int fd, std::string& s) {
 }
 
 } // namespace ProxyProtocol
-} // namespace Listener
-} // namespace Filter
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

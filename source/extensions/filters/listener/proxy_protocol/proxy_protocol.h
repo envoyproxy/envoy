@@ -7,8 +7,8 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
 namespace ProxyProtocol {
 
 /**
@@ -78,6 +78,6 @@ private:
 };
 
 } // namespace ProxyProtocol
-} // namespace Listener
-} // namespace Filter
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy

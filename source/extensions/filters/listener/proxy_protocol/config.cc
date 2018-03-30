@@ -8,8 +8,8 @@
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
 namespace ProxyProtocol {
 
 /**
@@ -42,6 +42,6 @@ static Registry::RegisterFactory<ProxyProtocolConfigFactory,
     registered_;
 
 } // namespace ProxyProtocol
-} // namespace Listener
-} // namespace Filter
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy
