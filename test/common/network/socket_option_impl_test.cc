@@ -97,13 +97,16 @@ TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessFalse) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
     EXPECT_CALL(os_sys_calls_,
                 setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        .Times(2)
+        .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(0, *static_cast<const int*>(optval));
           return 0;
         }));
     EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
   } else {
     EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
   }
 }
 
@@ -124,14 +127,6 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
   } else {
     EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
   }
-}
-
-// Transparent settings can be applied post-bind.
-// In this test, we fail to set the option because the underlying setsockopt
-// syscall fails.
-TEST_F(SocketOptionImplTest, SetOptionTransparentPostBind) {
-  SocketOptionImpl socket_option{true, {}};
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
 }
 
 // Freebind settings have no effect on post-bind behavior.
