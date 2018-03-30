@@ -3,17 +3,17 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams() {
+std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams(
+    const std::vector<Http::CodecClient::Type>& downstream_protocols,
+    const std::vector<FakeHttpConnection::Type>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
+
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-    ret.push_back(HttpProtocolTestParams{ip_version, Http::CodecClient::Type::HTTP1,
-                                         FakeHttpConnection::Type::HTTP1});
-    ret.push_back(HttpProtocolTestParams{ip_version, Http::CodecClient::Type::HTTP2,
-                                         FakeHttpConnection::Type::HTTP1});
-    ret.push_back(HttpProtocolTestParams{ip_version, Http::CodecClient::Type::HTTP1,
-                                         FakeHttpConnection::Type::HTTP2});
-    ret.push_back(HttpProtocolTestParams{ip_version, Http::CodecClient::Type::HTTP2,
-                                         FakeHttpConnection::Type::HTTP2});
+    for (auto downstream_protocol : downstream_protocols) {
+      for (auto upstream_protocol : upstream_protocols) {
+        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
+      }
+    }
   }
   return ret;
 }
