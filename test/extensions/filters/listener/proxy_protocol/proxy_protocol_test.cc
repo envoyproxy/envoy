@@ -4,7 +4,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/filter/listener/proxy_protocol.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -12,6 +11,8 @@
 #include "common/stats/stats_impl.h"
 
 #include "server/connection_handler_impl.h"
+
+#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -30,11 +31,13 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Network {
+namespace Filter {
+namespace Listener {
+namespace ProxyProtocol {
 
 // Build again on the basis of the connection_handler_test.cc
 
-class ProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
+class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           protected Logger::Loggable<Logger::Id::main> {
 public:
@@ -64,25 +67,23 @@ public:
 
   void connect(bool read = true) {
     EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
+        .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
-                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
-                      listenerScope())));
+              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
     conn_->connect();
     if (read) {
-      read_filter_.reset(new NiceMock<MockReadFilter>());
+      read_filter_.reset(new NiceMock<Network::MockReadFilter>());
       EXPECT_CALL(factory_, createNetworkFilterChain(_))
-          .WillOnce(Invoke([&](Connection& connection) -> bool {
+          .WillOnce(Invoke([&](Network::Connection& connection) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
             return true;
           }));
     }
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
@@ -95,7 +96,7 @@ public:
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();
@@ -106,17 +107,17 @@ public:
   }
 
   void disconnect() {
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
-    EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
-    conn_->close(ConnectionCloseType::NoFlush);
+    conn_->close(Network::ConnectionCloseType::NoFlush);
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
   void expectProxyProtoError() {
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -125,16 +126,16 @@ public:
   }
 
   Event::DispatcherImpl dispatcher_;
-  TcpListenSocket socket_;
+  Network::TcpListenSocket socket_;
   Network::RawBufferSocketFactory transport_socket_factory_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
-  ClientConnectionPtr conn_;
-  NiceMock<MockConnectionCallbacks> connection_callbacks_;
+  Network::ClientConnectionPtr conn_;
+  NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
-  std::shared_ptr<MockReadFilter> read_filter_;
+  std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
 };
 
@@ -288,9 +289,9 @@ TEST_P(ProxyProtocolTest, Truncated) {
   write("PROXY TCP4 1.2.3.4 5.6.7.8 1234 5678");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
+  EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-  conn_->close(ConnectionCloseType::NoFlush);
+  conn_->close(Network::ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -300,9 +301,9 @@ TEST_P(ProxyProtocolTest, Closed) {
   write("PROXY TCP4 1.2.3");
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose))
+  EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-  conn_->close(ConnectionCloseType::NoFlush);
+  conn_->close(Network::ConnectionCloseType::NoFlush);
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
@@ -312,11 +313,11 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   EXPECT_CALL(factory_, createListenerFilterChain(_)).Times(AtLeast(0));
   EXPECT_CALL(factory_, createNetworkFilterChain(_)).Times(AtLeast(0));
   conn_->connect();
-  conn_->close(ConnectionCloseType::NoFlush);
+  conn_->close(Network::ConnectionCloseType::NoFlush);
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class WildcardProxyProtocolTest : public testing::TestWithParam<Address::IpVersion>,
+class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
@@ -334,11 +335,9 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](ListenerFilterManager& filter_manager) -> bool {
+        .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
-              std::make_unique<Envoy::Filter::Listener::ProxyProtocol::Instance>(
-                  std::make_shared<Envoy::Filter::Listener::ProxyProtocol::Config>(
-                      listenerScope())));
+              std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
           return true;
         }));
   }
@@ -346,7 +345,9 @@ public:
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
   Network::Socket& socket() override { return socket_; }
-  TransportSocketFactory& transportSocketFactory() override { return transport_socket_factory_; }
+  Network::TransportSocketFactory& transportSocketFactory() override {
+    return transport_socket_factory_;
+  }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -356,15 +357,15 @@ public:
 
   void connect() {
     conn_->connect();
-    read_filter_.reset(new NiceMock<MockReadFilter>());
+    read_filter_.reset(new NiceMock<Network::MockReadFilter>());
     EXPECT_CALL(factory_, createNetworkFilterChain(_))
-        .WillOnce(Invoke([&](Connection& connection) -> bool {
+        .WillOnce(Invoke([&](Network::Connection& connection) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
           connection.addReadFilter(read_filter_);
           return true;
         }));
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::Connected))
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
@@ -377,7 +378,7 @@ public:
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> FilterStatus {
+        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();
@@ -388,26 +389,26 @@ public:
   }
 
   void disconnect() {
-    EXPECT_CALL(connection_callbacks_, onEvent(ConnectionEvent::LocalClose));
-    conn_->close(ConnectionCloseType::NoFlush);
-    EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+    EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    conn_->close(Network::ConnectionCloseType::NoFlush);
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
 
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
   Event::DispatcherImpl dispatcher_;
-  TcpListenSocket socket_;
+  Network::TcpListenSocket socket_;
   Network::RawBufferSocketFactory transport_socket_factory_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
-  ClientConnectionPtr conn_;
-  NiceMock<MockConnectionCallbacks> connection_callbacks_;
+  Network::ClientConnectionPtr conn_;
+  NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   Network::Connection* server_connection_;
   Network::MockConnectionCallbacks server_callbacks_;
-  std::shared_ptr<MockReadFilter> read_filter_;
+  std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
 };
 
@@ -441,5 +442,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
-} // namespace Network
+} // namespace ProxyProtocol
+} // namespace Listener
+} // namespace Filter
 } // namespace Envoy

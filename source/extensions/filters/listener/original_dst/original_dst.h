@@ -5,13 +5,14 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
-namespace Filter {
-namespace Listener {
+namespace Extensions {
+namespace ListenerFilters {
+namespace OriginalDst {
 
 /**
  * Implementation of an original destination listener filter.
  */
-class OriginalDst : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
+class OriginalDstFilter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   virtual Network::Address::InstanceConstSharedPtr getOriginalDst(int fd);
 
@@ -19,6 +20,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 };
 
-} // namespace Listener
-} // namespace Filter
+} // namespace OriginalDst
+} // namespace ListenerFilters
+} // namespace Extensions
 } // namespace Envoy
