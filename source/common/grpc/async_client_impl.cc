@@ -60,9 +60,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
     : parent_(parent), service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
-  auto clusters = parent_.cm_.clusters();
-  const auto& it = clusters.find(parent_.remote_cluster_name_);
-  if (it == clusters.end()) {
+  if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
     stream_ = nullptr;
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
