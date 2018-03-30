@@ -62,7 +62,6 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckRe
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  UNREFERENCED_PARAMETER(status);
   callbacks_->onComplete(CheckStatus::Error);
   callbacks_ = nullptr;
 }

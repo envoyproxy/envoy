@@ -170,7 +170,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), local_info_(local_info), cm_stats_(generateStats(stats)),
+      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
+      local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -185,11 +186,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (bootstrap.dynamic_resources().deprecated_v1().has_sds_config()) {
     eds_config_ = bootstrap.dynamic_resources().deprecated_v1().sds_config();
-  }
-
-  if (bootstrap.cluster_manager().upstream_bind_config().has_source_address()) {
-    source_address_ = Network::Address::resolveProtoSocketAddress(
-        bootstrap.cluster_manager().upstream_bind_config().source_address());
   }
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
@@ -551,6 +547,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
                                                       const HostVector& hosts_removed) {
   const auto& host_set = cluster.prioritySet().hostSetsPerPriority()[priority];
 
+  // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
   HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
   HostVectorConstSharedPtr healthy_hosts_copy(new HostVector(host_set->healthyHosts()));
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
@@ -559,14 +556,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
 
   tls_->runOnAllThreads([
     this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-    hosts_per_locality_copy, healthy_hosts_per_locality_copy, hosts_added, hosts_removed
-  ]()
-                            ->void {
-                              ThreadLocalClusterManagerImpl::updateClusterMembership(
-                                  name, priority, hosts_copy, healthy_hosts_copy,
-                                  hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-                                  hosts_added, hosts_removed, *tls_);
-                            });
+    hosts_per_locality_copy, healthy_hosts_per_locality_copy,
+    locality_weights = host_set->localityWeights(), hosts_added, hosts_removed
+  ]() {
+    ThreadLocalClusterManagerImpl::updateClusterMembership(
+        name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+        healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -710,7 +706,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
     HostVectorConstSharedPtr healthy_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
-    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality, const HostVector& hosts_added,
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
 
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
@@ -720,7 +717,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   ENVOY_LOG(debug, "membership update for TLS cluster {}", name);
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
-      std::move(healthy_hosts_per_locality), hosts_added, hosts_removed);
+      std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,
+      hosts_removed);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {

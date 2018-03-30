@@ -1,4 +1,5 @@
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -81,7 +82,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LuaIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {

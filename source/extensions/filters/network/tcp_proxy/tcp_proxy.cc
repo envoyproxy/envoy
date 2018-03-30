@@ -531,7 +531,6 @@ TcpProxyUpstreamDrainManager::~TcpProxyUpstreamDrainManager() {
     // cancelDrain() should cause that drainer to be removed from drainers_.
     // ASSERT so that we don't end up in an infinite loop.
     ASSERT(drainers_.find(key) == drainers_.end());
-    UNREFERENCED_PARAMETER(key);
   }
 }
 

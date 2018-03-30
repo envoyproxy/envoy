@@ -167,7 +167,6 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
   int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc);
-  UNREFERENCED_PARAMETER(rc);
 
   // man getifaddrs(3)
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
