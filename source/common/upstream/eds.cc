@@ -87,7 +87,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
           health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
           health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
-        new_hosts[priority]->back()->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+        priority_state[priority].first->back()->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
       }
     }
   }
