@@ -16,12 +16,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Combine;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::Values;
+using testing::_;
 
 namespace Envoy {
 namespace Grpc {
