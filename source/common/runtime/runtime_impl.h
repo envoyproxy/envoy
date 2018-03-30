@@ -47,7 +47,6 @@ public:
   GAUGE  (num_keys)                                                                                \
   GAUGE  (admin_overrides_active)
 // clang-format on
-// TODO XXX TESTME num_keys
 
 /**
  * Struct definition for all runtime stats. @see stats_macros.h
