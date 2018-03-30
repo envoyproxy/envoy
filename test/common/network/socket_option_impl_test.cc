@@ -33,20 +33,45 @@ TEST_F(SocketOptionImplTest, BadFd) {
 
 // Nop when there are no socket options set.
 TEST_F(SocketOptionImplTest, SetOptionEmptyNop) {
-  SocketOptionImpl socket_option{{}};
+  SocketOptionImpl socket_option{{}, {}};
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
 }
 
 // We fail to set the option when the underlying setsockopt syscall fails.
-TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
-  SocketOptionImpl socket_option{true};
+TEST_F(SocketOptionImplTest, SetOptionTransparentFailure) {
+  SocketOptionImpl socket_option{true, {}};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
 }
 
-// The happy path for setOpion(); IP_FREEBIND is set true.
-TEST_F(SocketOptionImplTest, SetOptionFreeebindSuccessTrue) {
-  SocketOptionImpl socket_option{true};
+// We fail to set the option when the underlying setsockopt syscall fails.
+TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
+  SocketOptionImpl socket_option{{}, true};
+  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+}
+
+// The happy path for setOption(); IP_TRANSPARENT is set to true.
+TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessTrue) {
+  SocketOptionImpl socket_option{true, {}};
+  if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+    Address::Ipv4Instance address("1.2.3.4", 5678);
+    const int fd = address.socket(Address::SocketType::Stream);
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  }
+}
+
+// The happy path for setOption(); IP_FREEBIND is set to true.
+TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessTrue) {
+  SocketOptionImpl socket_option{{}, true};
   if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
     Address::Ipv4Instance address("1.2.3.4", 5678);
     const int fd = address.socket(Address::SocketType::Stream);
@@ -63,9 +88,31 @@ TEST_F(SocketOptionImplTest, SetOptionFreeebindSuccessTrue) {
   }
 }
 
-// The happy path for setOpion(); IP_FREEBIND is set false.
-TEST_F(SocketOptionImplTest, SetOptionFreeebindSuccessFalse) {
-  SocketOptionImpl socket_option{true};
+// The happy path for setOpion(); IP_TRANSPARENT is set to false.
+TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessFalse) {
+  SocketOptionImpl socket_option{false, {}};
+  if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+    Address::Ipv4Instance address("1.2.3.4", 5678);
+    const int fd = address.socket(Address::SocketType::Stream);
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
+        .Times(2)
+        .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(0, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
+  }
+}
+
+// The happy path for setOpion(); IP_FREEBIND is set to false.
+TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
+  SocketOptionImpl socket_option{{}, false};
   if (ENVOY_SOCKET_IP_FREEBIND.has_value()) {
     Address::Ipv4Instance address("1.2.3.4", 5678);
     const int fd = address.socket(Address::SocketType::Stream);
@@ -73,7 +120,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreeebindSuccessFalse) {
     EXPECT_CALL(os_sys_calls_,
                 setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND.value(), _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          EXPECT_EQ(0, *static_cast<const int*>(optval));
           return 0;
         }));
     EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
@@ -84,7 +131,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreeebindSuccessFalse) {
 
 // Freebind settings have no effect on post-bind behavior.
 TEST_F(SocketOptionImplTest, SetOptionFreebindPostBind) {
-  SocketOptionImpl socket_option{true};
+  SocketOptionImpl socket_option{{}, true};
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
 }
 
