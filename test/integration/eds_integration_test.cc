@@ -19,7 +19,7 @@ public:
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
-  void updateEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints) {
+  void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints) {
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
@@ -45,17 +45,24 @@ public:
     if (eds_path_.empty()) {
       eds_path_ =
           TestEnvironment::writeStringToFileForTest("eds.pb_text", eds_response.DebugString());
+      // cluster.cluster_0.update_success will be incremented on the initial
+      // load when Envoy comes up.
+      ++update_successes_;
     } else {
       std::string path = TestEnvironment::writeStringToFileForTest("eds.update.pb_text",
                                                                    eds_response.DebugString());
       ASSERT_EQ(0, ::rename(path.c_str(), eds_path_.c_str()));
+      // Make sure Envoy has consumed the update now that it is running.
+      test_server_->waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
+      EXPECT_EQ(update_successes_,
+                test_server_->counter("cluster.cluster_0.update_success")->value());
     }
   }
 
   void createUpstreams() override {}
 
   void initialize() override {
-    updateEndpoints(0, 0);
+    setEndpoints(0, 0);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -70,9 +77,10 @@ public:
     }
   }
 
-  static constexpr uint32_t upstream_endpoints_ = 5;
+  static constexpr uint32_t upstream_endpoints_{5};
   std::string eds_path_;
   uint32_t eds_version_{};
+  uint32_t update_successes_{};
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, EdsIntegrationTest,
@@ -82,35 +90,26 @@ INSTANTIATE_TEST_CASE_P(IpVersions, EdsIntegrationTest,
 TEST_P(EdsIntegrationTest, HealthUpdate) {
   initialize();
   // Initial state, no cluster members.
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.update_success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // 2/2 healthy endpoints.
-  updateEndpoints(2, 2);
-  test_server_->waitForCounterGe("cluster.cluster_0.update_success", 2);
-  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.update_success")->value());
+  setEndpoints(2, 2);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Drop to 0/2 healthy endpoints.
-  updateEndpoints(2, 0);
-  test_server_->waitForCounterGe("cluster.cluster_0.update_success", 3);
-  EXPECT_EQ(3, test_server_->counter("cluster.cluster_0.update_success")->value());
+  setEndpoints(2, 0);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Increase to 1/2 healthy endpoints.
-  updateEndpoints(2, 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.update_success", 4);
-  EXPECT_EQ(4, test_server_->counter("cluster.cluster_0.update_success")->value());
+  setEndpoints(2, 1);
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   // Add host and modify health to 2/3 healthy endpoints.
-  updateEndpoints(3, 2);
-  test_server_->waitForCounterGe("cluster.cluster_0.update_success", 5);
-  EXPECT_EQ(5, test_server_->counter("cluster.cluster_0.update_success")->value());
+  setEndpoints(3, 2);
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
