@@ -222,6 +222,119 @@ std::string ReplyMessageImpl::toString(bool full) const {
       full ? documentListToString(documents_) : std::to_string(documents_.size()));
 }
 
+/*
+ * OP_COMMAND mongo message implementation
+ */
+void CommandMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding COMMAND message");
+  uint64_t original_data_length = data.length();
+
+  database_ = Bson::BufferHelper::removeCString(data);
+  commandName_ = Bson::BufferHelper::removeCString(data);
+  metadata_ = Bson::DocumentImpl::create(data);
+  commandArgs_ = Bson::DocumentImpl::create(data);
+
+  // There may be additional docs
+  if (data.length() - (original_data_length - message_length) > 0) {
+    inputDocs_.emplace_back(Bson::DocumentImpl::create(data));
+  }
+
+  ENVOY_LOG(trace, "{}", toString(true));
+}
+
+std::string CommandMessageImpl::toString(bool full) const {
+  return fmt::format(
+      R"EOF({{"opcode": "OP_COMMAND", "id": {}, "response_to": {}, "database": "{}", )EOF"
+      R"EOF("commandName": "{}", "metadata": {}, )EOF"
+      R"EOF("commandArgs": {}, "inputDocs": {}}})EOF",
+      request_id_, response_to_, database_.c_str(), commandName_.c_str(), metadata_->toString(),
+      commandArgs_->toString(),
+      full ? documentListToString(inputDocs_) : std::to_string(inputDocs_.size()));
+}
+
+bool CommandMessageImpl::operator==(const CommandMessage& rhs) const {
+  if (!(requestId() == rhs.requestId() && responseTo() == rhs.responseTo() &&
+        database_ == rhs.database() && commandName_ == rhs.commandName() &&
+        !metadata_ == !rhs.metadata() && !commandArgs_ == !rhs.commandArgs() &&
+        inputDocs_.size() == rhs.inputDocs().size())) {
+    return false;
+  }
+
+  // Compare documents now
+  if (metadata_) {
+    if (!(*metadata_ == *rhs.metadata())) {
+      return false;
+    }
+  }
+
+  if (commandArgs_) {
+    if (!(*commandArgs_ == *rhs.commandArgs())) {
+      return false;
+    }
+  }
+
+  for (auto i = inputDocs_.begin(), j = rhs.inputDocs().begin(); i != inputDocs_.end(); i++, j++) {
+    if (!(**i == **j)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// OP_COMMANDREPLY implementaion
+void CommandReplyMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding COMMAND REPLY message");
+  uint64_t original_data_length = data.length();
+
+  metadata_ = Bson::DocumentImpl::create(data);
+  commandReply_ = Bson::DocumentImpl::create(data);
+
+  // There may be additional docs
+  if (data.length() - (original_data_length - message_length) > 0) {
+    outputDocs_.emplace_back(Bson::DocumentImpl::create(data));
+  }
+
+  ENVOY_LOG(trace, "{}", toString(true));
+}
+
+std::string CommandReplyMessageImpl::toString(bool full) const {
+  return fmt::format(
+      R"EOF({{"opcode": "OP_COMMANDREPLY", "id": {}, "response_to": {}, )EOF"
+      R"EOF("metadata": {}, "commandReply": {}, "outputDocs":{}}} )EOF",
+      request_id_, response_to_, metadata_->toString(), commandReply_->toString(),
+      full ? documentListToString(outputDocs_) : std::to_string(outputDocs_.size()));
+}
+
+bool CommandReplyMessageImpl::operator==(const CommandReplyMessage& rhs) const {
+  if (!(requestId() == rhs.requestId() && responseTo() == rhs.responseTo() &&
+        !metadata_ == !rhs.metadata() && !commandReply_ == !rhs.commandReply() &&
+        outputDocs_.size() == rhs.outputDocs().size())) {
+    return false;
+  }
+
+  // Compare documents now
+  if (metadata_) {
+    if (!(*metadata_ == *rhs.metadata())) {
+      return false;
+    }
+  }
+
+  if (commandReply_) {
+    if (!(*commandReply_ == *rhs.commandReply())) {
+      return false;
+    }
+  }
+
+  for (auto i = outputDocs_.begin(), j = rhs.outputDocs().begin(); i != outputDocs_.end();
+       i++, j++) {
+    if (!(**i == **j)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 bool DecoderImpl::decode(Buffer::Instance& data) {
   // See if we have enough data for the message length.
   ENVOY_LOG(trace, "decoding {} bytes", data.length());
@@ -279,6 +392,21 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
         new KillCursorsMessageImpl(request_id, response_to));
     message->fromBuffer(message_length, data);
     callbacks_.decodeKillCursors(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_COMMAND: {
+    std::unique_ptr<CommandMessageImpl> message(new CommandMessageImpl(request_id, response_to));
+    message->fromBuffer(message_length, data);
+    callbacks_.decodeCommand(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_COMMANDREPLY: {
+    std::unique_ptr<CommandReplyMessageImpl> message(
+        new CommandReplyMessageImpl(request_id, response_to));
+    message->fromBuffer(message_length, data);
+    callbacks_.decodeCommandReply(std::move(message));
     break;
   }
 
@@ -395,6 +523,43 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
   }
 }
 
+void EncoderImpl::encodeCommand(const CommandMessage& message) {
+  int32_t total_size = 16;
+  total_size += message.database().size() + 1;
+  total_size += message.commandName().size() + 1;
+  total_size += message.metadata()->byteSize();
+  total_size += message.commandArgs()->byteSize();
+  for (const Bson::DocumentSharedPtr& document : message.inputDocs()) {
+    total_size += document->byteSize();
+  }
+
+  // Now encode
+  encodeCommonHeader(total_size, message, Message::OpCode::OP_COMMAND);
+  Bson::BufferHelper::writeCString(output_, message.database());
+  Bson::BufferHelper::writeCString(output_, message.commandName());
+  message.metadata()->encode(output_);
+  message.commandArgs()->encode(output_);
+  for (const Bson::DocumentSharedPtr& document : message.inputDocs()) {
+    document->encode(output_);
+  }
+}
+
+void EncoderImpl::encodeCommandReply(const CommandReplyMessage& message) {
+  int32_t total_size = 16;
+  total_size += message.metadata()->byteSize();
+  total_size += message.commandReply()->byteSize();
+  for (const Bson::DocumentSharedPtr& document : message.outputDocs()) {
+    total_size += document->byteSize();
+  }
+
+  // Now encode
+  encodeCommonHeader(total_size, message, Message::OpCode::OP_COMMANDREPLY);
+  message.metadata()->encode(output_);
+  message.commandReply()->encode(output_);
+  for (const Bson::DocumentSharedPtr& document : message.outputDocs()) {
+    document->encode(output_);
+  }
+}
 } // namespace MongoProxy
 } // namespace NetworkFilters
 } // namespace Extensions

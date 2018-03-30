@@ -27,12 +27,18 @@ public:
   void decodeKillCursors(KillCursorsMessagePtr&& message) override { decodeKillCursors_(message); }
   void decodeQuery(QueryMessagePtr&& message) override { decodeQuery_(message); }
   void decodeReply(ReplyMessagePtr&& message) override { decodeReply_(message); }
+  void decodeCommand(CommandMessagePtr&& message) override { decodeCommand_(message); }
+  void decodeCommandReply(CommandReplyMessagePtr&& message) override {
+    decodeCommandReply_(message);
+  }
 
   MOCK_METHOD1(decodeGetMore_, void(GetMoreMessagePtr& message));
   MOCK_METHOD1(decodeInsert_, void(InsertMessagePtr& message));
   MOCK_METHOD1(decodeKillCursors_, void(KillCursorsMessagePtr& message));
   MOCK_METHOD1(decodeQuery_, void(QueryMessagePtr& message));
   MOCK_METHOD1(decodeReply_, void(ReplyMessagePtr& message));
+  MOCK_METHOD1(decodeCommand_, void(CommandMessagePtr& message));
+  MOCK_METHOD1(decodeCommandReply_, void(CommandReplyMessagePtr& message));
 };
 
 class MongoCodecImplTest : public testing::Test {
@@ -333,6 +339,36 @@ TEST_F(MongoCodecImplTest, QueryToStringWithEscape) {
 
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(true)));
   EXPECT_NO_THROW(Json::Factory::loadFromString(query.toString(false)));
+}
+
+TEST_F(MongoCodecImplTest, Command) {
+  CommandMessageImpl command(15, 25);
+
+  command.database(std::string("Test database"));
+  command.commandName(std::string("Test command name"));
+  command.metadata(Bson::DocumentImpl::create());
+  command.commandArgs(Bson::DocumentImpl::create());
+
+  EXPECT_NO_THROW(Json::Factory::loadFromString(command.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(command.toString(false)));
+
+  encoder_.encodeCommand(command);
+  EXPECT_CALL(callbacks_, decodeCommand_(Pointee(Eq(command))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MongoCodecImplTest, CommandReply) {
+  CommandReplyMessageImpl commandReply(16, 26);
+
+  commandReply.metadata(Bson::DocumentImpl::create());
+  commandReply.commandReply(Bson::DocumentImpl::create());
+
+  EXPECT_NO_THROW(Json::Factory::loadFromString(commandReply.toString(true)));
+  EXPECT_NO_THROW(Json::Factory::loadFromString(commandReply.toString(false)));
+
+  encoder_.encodeCommandReply(commandReply);
+  EXPECT_CALL(callbacks_, decodeCommandReply_(Pointee(Eq(commandReply))));
+  decoder_.onData(output_);
 }
 
 } // namespace MongoProxy

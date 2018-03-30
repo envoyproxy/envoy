@@ -29,7 +29,9 @@ public:
     OP_QUERY = 2004,
     OP_GET_MORE = 2005,
     OP_DELETE = 2006,
-    OP_KILL_CURSORS = 2007
+    OP_KILL_CURSORS = 2007,
+    OP_COMMAND = 2010,
+    OP_COMMANDREPLY = 2011
   };
 
   virtual ~Message(){};
@@ -148,6 +150,35 @@ public:
 
 typedef std::unique_ptr<ReplyMessage> ReplyMessagePtr;
 
+class CommandMessage : public virtual Message {
+public:
+  // CommandMessage accessors
+  virtual bool operator==(const CommandMessage& rhs) const PURE;
+  virtual std::string database() const PURE;
+  virtual void database(std::string database) PURE;
+  virtual std::string commandName() const PURE;
+  virtual void commandName(std::string commandName) PURE;
+  virtual const Bson::Document* metadata() const PURE;
+  virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
+  virtual const Bson::Document* commandArgs() const PURE;
+  virtual void commandArgs(Bson::DocumentSharedPtr&& commandArgs) PURE;
+  virtual const std::list<Bson::DocumentSharedPtr>& inputDocs() const PURE;
+};
+
+typedef std::unique_ptr<CommandMessage> CommandMessagePtr;
+
+class CommandReplyMessage : public virtual Message {
+public:
+  virtual bool operator==(const CommandReplyMessage& rhs) const PURE;
+  virtual const Bson::Document* metadata() const PURE;
+  virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
+  virtual const Bson::Document* commandReply() const PURE;
+  virtual void commandReply(Bson::DocumentSharedPtr&& commandReply) PURE;
+  virtual const std::list<Bson::DocumentSharedPtr>& outputDocs() const PURE;
+};
+
+typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
+
 /**
  * General callbacks for dispatching decoded mongo messages to a sink.
  */
@@ -160,6 +191,8 @@ public:
   virtual void decodeKillCursors(KillCursorsMessagePtr&& message) PURE;
   virtual void decodeQuery(QueryMessagePtr&& message) PURE;
   virtual void decodeReply(ReplyMessagePtr&& message) PURE;
+  virtual void decodeCommand(CommandMessagePtr&& message) PURE;
+  virtual void decodeCommandReply(CommandReplyMessagePtr&& message) PURE;
 };
 
 /**
@@ -186,6 +219,8 @@ public:
   virtual void encodeKillCursors(const KillCursorsMessage& message) PURE;
   virtual void encodeQuery(const QueryMessage& message) PURE;
   virtual void encodeReply(const ReplyMessage& message) PURE;
+  virtual void encodeCommand(const CommandMessage& message) PURE;
+  virtual void encodeCommandReply(const CommandReplyMessage& message) PURE;
 };
 
 } // namespace MongoProxy
