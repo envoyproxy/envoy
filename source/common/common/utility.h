@@ -40,7 +40,7 @@ public:
   /**
    * @return std::string the format string used.
    */
-  std::string formatString() { return format_string_; }
+  const std::string& formatString() const { return format_string_; }
 
 private:
   std::string fromTimeT(time_t time);
