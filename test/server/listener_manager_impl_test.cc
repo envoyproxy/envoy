@@ -1407,7 +1407,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerDisabled) {
       .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
                            const Network::Socket::OptionsSharedPtr& options,
                            bool) -> Network::SocketSharedPtr {
-        EXPECT_EQ(options.get(), nullptr);
+        EXPECT_NE(options.get(), nullptr);
         return listener_factory_.socket_;
       }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);

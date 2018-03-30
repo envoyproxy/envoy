@@ -75,10 +75,9 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
 class UpstreamSocketOption : public Network::SocketOptionImpl {
 public:
   UpstreamSocketOption(const ClusterInfo& cluster_info)
-      : Network::SocketOptionImpl(absl::optional<bool>{},
-                                  cluster_info.features() & ClusterInfo::Features::FREEBIND
-                                      ? true
-                                      : absl::optional<bool>{}) {}
+      : Network::SocketOptionImpl({}, cluster_info.features() & ClusterInfo::Features::FREEBIND
+                                          ? true
+                                          : absl::optional<bool>{}) {}
 };
 
 } // namespace
