@@ -6,6 +6,7 @@
 
 #include "common/common/logger.h"
 
+#include "absl/strings/str_join.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -77,7 +78,8 @@ private:
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
-    ASSERT_EQ(0, log_recorder.messages().size()) << "msg[0]: " << log_recorder.messages()[0];      \
+    const std::vector<std::string> logs = log_recorder.messages();                                 \
+    ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "\n  ");                     \
   } while (false)
 
 } // namespace Envoy
