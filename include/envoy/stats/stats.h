@@ -195,6 +195,11 @@ public:
   virtual void flushGauge(const Gauge& gauge, uint64_t value) PURE;
 
   /**
+   * Flush a histogram.
+   */
+  virtual void flushHistogram(const Histogram&){};
+
+  /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of
    * flushGauge(). Sinks can use this to optimize writing if desired.
    */

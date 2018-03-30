@@ -14,7 +14,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -133,6 +133,26 @@ public:
     metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
     auto* gauage_metric = metric->mutable_gauge();
     gauage_metric->set_value(value);
+  }
+
+  void flushHistogram(const Histogram& histogram) override {
+    //  ParentHistogramSharedPtr parent_histogram =
+    //  std::dynamic_pointer_cast<HistogramParentImpl>(&histogram);
+    const HistogramParentImpl& parent_histogram =
+        dynamic_cast<const HistogramParentImpl&>(histogram);
+    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+    metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
+    metrics_family->set_name(parent_histogram.name());
+    auto* metric = metrics_family->add_metric();
+    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+    auto* summary_metric = metric->mutable_summary();
+    double quantiles[] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+    const HistogramStatistics hist_stats = parent_histogram.getIntervalHistogramStatistics();
+    for (size_t i = 0; i < ARRAY_SIZE(quantiles); i++) {
+      auto* quantile = summary_metric->add_quantile();
+      quantile->set_quantile(quantiles[i]);
+      quantile->set_value(hist_stats.quantile_out_[i]);
+    }
   }
 
   void endFlush() override {

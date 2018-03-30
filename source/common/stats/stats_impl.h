@@ -389,8 +389,6 @@ public:
                        quantile_out_[4], quantile_out_[5], quantile_out_[6], quantile_out_[7],
                        quantile_out_[8]);
   }
-
-private:
   double quantile_out_[9];
 };
 
@@ -477,12 +475,12 @@ public:
     hist_accumulate(cumulative_histogram_, hist_array, 1);
   }
 
-  HistogramStatistics getIntervalHistogramStatistics() {
+  HistogramStatistics getIntervalHistogramStatistics() const {
     HistogramStatistics interval_histogram(interval_histogram_);
     return interval_histogram;
   }
 
-  HistogramStatistics getCumulativieHistogramStatistics() {
+  HistogramStatistics getCumulativieHistogramStatistics() const {
     HistogramStatistics cumulative_histogram(cumulative_histogram_);
     return cumulative_histogram_;
   }

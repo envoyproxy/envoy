@@ -121,6 +121,12 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
     }
   }
 
+  for (const Stats::HistogramSharedPtr& histogram : store.histograms()) {
+    for (const auto& sink : sinks) {
+      sink->flushHistogram(*histogram);
+    }
+  }
+
   for (const auto& sink : sinks) {
     sink->endFlush();
   }
