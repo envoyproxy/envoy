@@ -6,6 +6,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -22,7 +23,8 @@ protected:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenSocketImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ListenSocketImplTest, BindSpecificPort) {
   // Pick a free port.

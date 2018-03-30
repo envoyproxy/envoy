@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -338,7 +339,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

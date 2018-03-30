@@ -7,6 +7,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -54,7 +55,8 @@ static void errorCallbackTest(Address::IpVersion version) {
 
 class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
   EXPECT_DEATH(errorCallbackTest(GetParam()), ".*listener accept failure.*");
@@ -81,7 +83,8 @@ protected:
   const Address::InstanceConstSharedPtr alt_address_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;

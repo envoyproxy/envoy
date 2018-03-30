@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -260,7 +261,8 @@ class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
   std::string client_ctx_json = R"EOF(
@@ -2216,7 +2218,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);

@@ -15,7 +15,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 

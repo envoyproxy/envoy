@@ -13,7 +13,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2UpstreamIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(Http2UpstreamIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 

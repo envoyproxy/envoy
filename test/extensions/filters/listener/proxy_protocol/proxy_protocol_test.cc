@@ -20,6 +20,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -141,7 +142,8 @@ public:
 
 // Parameterize the listener socket address version.
 INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtocolTest, Basic) {
   connect();
@@ -414,7 +416,8 @@ public:
 
 // Parameterize the listener socket address version.
 INSTANTIATE_TEST_CASE_P(IpVersions, WildcardProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(WildcardProxyProtocolTest, Basic) {
   connect();

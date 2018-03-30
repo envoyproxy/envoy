@@ -121,6 +121,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/protobuf",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
@@ -152,6 +153,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -177,6 +179,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/decompressor:decompressor_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -207,6 +210,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
+        "//test/test_common:utility_lib",
     ],
     deps = [
         ":http_integration_lib",
@@ -359,6 +363,7 @@ envoy_cc_test(
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -379,6 +384,7 @@ envoy_cc_test(
     deps = [
         ":integration_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
@@ -391,6 +397,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/config:resources_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
     ],
 )
@@ -421,6 +428,7 @@ envoy_cc_test(
         "//source/common/config:well_known_names",
         "//source/common/http:codec_client_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -456,6 +464,7 @@ envoy_cc_test(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -474,6 +483,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -500,6 +510,7 @@ envoy_cc_test(
     data = ["//test/config/integration:server_xds_files"],
     deps = [
         ":http_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
