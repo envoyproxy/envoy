@@ -99,7 +99,6 @@ public:
 
   void initialize() override {
     setUpstreamCount(upstream_endpoints_);
-    eds_helper_.setEds({}, *test_server_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();

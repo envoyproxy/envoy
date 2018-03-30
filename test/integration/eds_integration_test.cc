@@ -35,7 +35,6 @@ public:
 
   void initialize() override {
     setUpstreamCount(3);
-    eds_helper_.setEds({}, *test_server_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);

@@ -366,6 +366,12 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
   });
 }
 
+EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
+  // cluster.cluster_0.update_success will be incremented on the initial
+  // load when Envoy comes up.
+  ++update_successes_;
+}
+
 void EdsHelper::setEds(
     const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
     IntegrationTestServerStats& server_stats) {
@@ -378,21 +384,13 @@ void EdsHelper::setEds(
   }
   // Past the initial write, need move semantics to trigger inotify move event that the
   // FilesystemSubscriptionImpl is subscribed to.
-  if (eds_path_.empty()) {
-    eds_path_ =
-        TestEnvironment::writeStringToFileForTest("eds.pb_text", eds_response.DebugString());
-    // cluster.cluster_0.update_success will be incremented on the initial
-    // load when Envoy comes up.
-    ++update_successes_;
-  } else {
-    std::string path =
-        TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
-    RELEASE_ASSERT(::rename(path.c_str(), eds_path_.c_str()) == 0);
-    // Make sure Envoy has consumed the update now that it is running.
-    server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
-    RELEASE_ASSERT(update_successes_ ==
-                   server_stats.counter("cluster.cluster_0.update_success")->value());
-  }
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
+  RELEASE_ASSERT(::rename(path.c_str(), eds_path_.c_str()) == 0);
+  // Make sure Envoy has consumed the update now that it is running.
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
+  RELEASE_ASSERT(update_successes_ ==
+                 server_stats.counter("cluster.cluster_0.update_success")->value());
 }
 
 } // namespace Envoy
