@@ -1,4 +1,8 @@
 licenses(["notice"])  # Apache 2
+# Proxy protocol V1 listener filter: https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
+# Note: Currently there are no public docs for this filter as it is implicitly loaded by
+#       configuration options. In the future it will likely be configurable on a per filter chain
+#       basis and will need public docs.
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -7,19 +11,6 @@ load(
 )
 
 envoy_package()
-
-envoy_cc_library(
-    name = "original_dst_lib",
-    srcs = ["original_dst.cc"],
-    hdrs = ["original_dst.h"],
-    deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/network:utility_lib",
-    ],
-)
 
 envoy_cc_library(
     name = "proxy_protocol_lib",
@@ -35,5 +26,16 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
+        "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
     ],
 )

@@ -42,9 +42,9 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * Implementation the PROXY Protocol V1 listener filter
  * (http://www.haproxy.org/download/1.5/doc/proxy-protocol.txt)
  */
-class Instance : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Instance(const ConfigSharedPtr& config) : config_(config) {}
+  Filter(const ConfigSharedPtr& config) : config_(config) {}
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;

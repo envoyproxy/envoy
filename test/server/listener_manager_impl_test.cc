@@ -3,13 +3,14 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"
-#include "common/filter/listener/original_dst.h"
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
+
+#include "extensions/filters/listener/original_dst/original_dst.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
@@ -1257,7 +1258,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
-class OriginalDstTest : public Filter::Listener::OriginalDst {
+class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.0.0.2", 2345)};
@@ -1284,7 +1285,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
           }));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
       };
     }
 
@@ -1354,7 +1355,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
           .WillOnce(Return(false));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
-        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTest>());
+        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
       };
     }
 
