@@ -542,77 +542,53 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response) {
-  Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+
+  rapidjson::Document document;
+  document.SetObject();
+  auto& allocator = document.GetAllocator();
 
   const auto& layers = server_.runtime().snapshot().getAllLayers();
-  if (params.size() == 0) {
-    std::set<std::string> keys;
-    static constexpr absl::string_view key_header = "KEY";
+  std::map<std::string, rapidjson::Value> value_arrays;
 
-    // Determine the maximum width for each column.
-    std::vector<size_t> column_widths;
-    size_t key_column_width = key_header.size();
-    for (const auto& layer : layers) {
-      column_widths.push_back(layer->name().size());
-      for (const auto& kv : layer->values()) {
-        key_column_width = std::max(key_column_width, kv.first.size());
-        column_widths.back() = std::max(column_widths.back(), kv.second.string_value_.size());
-        keys.insert(kv.first);
-      }
-    }
+  rapidjson::Value layer_names{rapidjson::kArrayType};
+  for (const auto& layer : layers) {
+    rapidjson::Value layer_name;
+    layer_name.SetString(layer->name().c_str(), allocator);
+    layer_names.PushBack(layer_name, allocator);
 
-    static const std::string cell_format = "{:<{}}\t";
-    // Add header row.
-    response.add(fmt::format(cell_format, key_header, key_column_width));
-    for (size_t i = 0; i < layers.size(); i++) {
-      response.add(
-          fmt::format(cell_format, StringUtil::toUpper(layers[i]->name()), column_widths[i]));
+    for (const auto& kv : layer->values()) {
+      value_arrays.emplace(kv.first, rapidjson::Value{rapidjson::kArrayType});
     }
-    response.add("\n");
+  }
+  document.AddMember("layers", layer_names, allocator);
 
-    // Add a row for each key.
-    for (const auto& key : keys) {
-      response.add(fmt::format(cell_format, key, key_column_width));
-      for (size_t i = 0; i < layers.size(); i++) {
-        const auto& layer_values = layers[i]->values();
-        const auto value_it = layer_values.find(key);
-        const auto& value = value_it != layer_values.end() ? value_it->second.string_value_ : "";
-        response.add(fmt::format(cell_format, value, column_widths[i]));
-      }
-      response.add("\n");
-    }
-  } else {
-    if (params.begin()->first == "format" && params.begin()->second == "json") {
-      // TODO: Reviewers, do we want to proto-ize this now? Or continue manually constructing JSON?
-      // Or skip JSON altogether?
-      response_headers.insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
-    } else {
-      response.add("usage: /runtime?format=json\n");
-      rc = Http::Code::BadRequest;
+  for (const auto& layer : layers) {
+    for (auto& kv : value_arrays) {
+      const auto it = layer->values().find(kv.first);
+      const auto& value = it == layer->values().end() ? "" : it->second.string_value_;
+      rapidjson::Value value_obj;
+      value_obj.SetString(value.c_str(), allocator);
+      kv.second.PushBack(value_obj, allocator);
     }
   }
 
-  return rc;
-}
-
-Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  if (params.empty()) {
-    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
-    response.add("use an empty value to remove a previously added override");
-    return Http::Code::BadRequest;
+  rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
+  for (auto& kv : value_arrays) {
+    value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
+                               allocator);
   }
-  std::unordered_map<std::string, std::string> overrides;
-  overrides.insert(params.begin(), params.end());
-  server_.runtime().mergeValues(overrides);
-  response.add("OK\n");
+
+  document.AddMember("entries", std::move(value_arrays_obj), allocator);
+
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  response.add(strbuf.GetString());
   return Http::Code::OK;
 }
-
-ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
@@ -642,6 +618,23 @@ std::string AdminImpl::runtimeAsJson(
   document.Accept(writer);
   return strbuf.GetString();
 }
+
+Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  if (params.empty()) {
+    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+    response.add("use an empty value to remove a previously added override");
+    return Http::Code::BadRequest;
+  }
+  std::unordered_map<std::string, std::string> overrides;
+  overrides.insert(params.begin(), params.end());
+  server_.runtime().mergeValues(overrides);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();

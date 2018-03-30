@@ -251,37 +251,35 @@ TEST_P(AdminInstanceTest, Runtime) {
   std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers{layer1, layer2};
   EXPECT_CALL(snapshot, getAllLayers()).WillRepeatedly(testing::ReturnRef(layers));
 
-  const std::string expected_table = "KEY       \tLAYER1\tLAYER2  \t\n"
-                                     "extra_key \t      \tbar     \t\n"
-                                     "int_key   \t1     \t        \t\n"
-                                     "other_key \tbar   \t        \t\n"
-                                     "string_key\tfoo   \toverride\t\n";
+  const std::string expected_json = R"EOF({
+    "layers": [
+        "layer1",
+        "layer2"
+    ],
+    "entries": {
+        "extra_key": [
+            "",
+            "bar"
+        ],
+        "int_key": [
+            "1",
+            ""
+        ],
+        "other_key": [
+            "bar",
+            ""
+        ],
+        "string_key": [
+            "foo",
+            "override"
+        ]
+    }
+})EOF";
 
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
   EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
-  EXPECT_EQ(expected_table, TestUtility::bufferToString(response));
-}
-
-TEST_P(AdminInstanceTest, RuntimeJSON) {
-  // TODO Reviewers, see comment in admin.cc about JSON output
-}
-
-TEST_P(AdminInstanceTest, RuntimeBadFormat) {
-  Http::HeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-
-  std::vector<Runtime::Snapshot::OverrideLayerSharedPtr> layers;
-  Runtime::MockSnapshot snapshot;
-  Runtime::MockLoader loader;
-
-  EXPECT_CALL(snapshot, getAllLayers()).WillRepeatedly(testing::ReturnRef(layers));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
-  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
-  EXPECT_EQ(Http::Code::BadRequest,
-            admin_.runCallback("/runtime?format=foo", header_map, response));
-  EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
+  EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
