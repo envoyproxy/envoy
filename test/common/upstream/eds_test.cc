@@ -259,6 +259,36 @@ TEST_F(EdsTest, EndpointHealthStatus) {
       EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
     }
   }
+
+  // Mark host 0 unhealthy from active health checking as well, we should have
+  // the same situation as above.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_FALSE(hosts[0]->healthy());
+  }
+
+  // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
+  // active health check failure.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::HEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_FALSE(hosts[0]->healthy());
+  }
+
+  // Finally, mark host 0 healthy again via active health check. It should be
+  // immediately healthy again.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    EXPECT_TRUE(hosts[0]->healthy());
+  }
 }
 
 // Validate that onConfigUpdate() updates the endpoint locality.
