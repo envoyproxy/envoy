@@ -220,7 +220,7 @@ public:
   static void setLogFormat(const std::string& log_format);
 
   /**
-   * @return const std::vector<Logger>& the installed loggers.
+   * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
 
@@ -267,7 +267,9 @@ protected:
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
   (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
 
-// Compare levels before invoking logger
+// Compare levels before invoking logger. This is an optimization to avoid
+// executing expressions computing log contents when they would be suppressed.
+// The same filtering will also occur in spdlog::logger.
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \

@@ -32,8 +32,7 @@ class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersio
 public:
   // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : log_level_setter_(spdlog::level::warn),
-        admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
+      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
                TestEnvironment::temporaryPath("admin.address"),
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
@@ -41,12 +40,8 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  void TearDown() override { EXPECT_EQ(0, mock_logger_.messages().size()); }
-
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  LogLevelSetter log_level_setter_;
-  LogRecordingSink mock_logger_;
   AdminImpl admin_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -81,7 +76,6 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-        log_level_setter_(spdlog::level::warn),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
@@ -92,32 +86,10 @@ public:
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
   }
 
-  void TearDown() override {
-    if (expect_no_logs_) {
-      EXPECT_EQ(0, mock_logger_.messages().size());
-    }
-  }
-
-  std::string recordedLog() {
-    const std::vector<std::string> logs = mock_logger_.messages();
-    if (!logs.empty()) {
-      return logs[0];
-    }
-    return "";
-  }
-
-  bool recordedLogContains(absl::string_view substr) {
-    expect_no_logs_ = false;
-    EXPECT_EQ(1, mock_logger_.messages().size());
-    return absl::string_view(recordedLog()).find(substr) != absl::string_view::npos;
-  }
-
   std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
-  LogLevelSetter log_level_setter_;
-  LogRecordingSink mock_logger_;
   AdminImpl admin_;
   bool expect_no_logs_;
 };
@@ -160,13 +132,13 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
-                                       Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                       server_, listener_scope_.createScope("listener.admin."));
+  std::unique_ptr<AdminImpl> admin_bad_address_out_path;
+  EXPECT_LOG_CONTAINS("cannot open admin address output file " + bad_path + " for writing.",
+                      admin_bad_address_out_path = std::make_unique<AdminImpl>(
+                          "/dev/null", cpu_profile_path_, bad_path,
+                          Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
+                          listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
-  EXPECT_TRUE(
-      recordedLogContains("cannot open admin address output file " + bad_path + " for writing."))
-      << recordedLog();
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
@@ -175,7 +147,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   };
 
   // Test removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false));
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
@@ -201,21 +173,18 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(
-      admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
-  EXPECT_TRUE(recordedLogContains("filter \"/foo<script>alert('hi')</script>\" contains invalid "
-                                  "character '<'"))
-      << recordedLog();
+  EXPECT_LOG_CONTAINS("filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
+                      EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
-  EXPECT_TRUE(recordedLogContains("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid "
-                                  "character '?'"))
-      << recordedLog();
+  EXPECT_LOG_CONTAINS("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
+                      EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
