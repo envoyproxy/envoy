@@ -114,6 +114,36 @@ public:
    *         address the socket was initially accepted at.
    */
   virtual bool localAddressRestored() const PURE;
+
+  /**
+   * Set detected transport protocol (e.g. RAW_BUFFER, TLS).
+   */
+  virtual void setDetectedTransportProtocol(const std::string& protocol) PURE;
+
+  /**
+   * @return detected transport protocol (e.g. RAW_BUFFER, TLS), if any.
+   */
+  virtual const std::string& detectedTransportProtocol() const PURE;
+
+  /**
+   * Set requested server name (e.g. SNI in TLS).
+   */
+  virtual void setRequestedServerName(const std::string& server_name) PURE;
+
+  /**
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  virtual const std::string& requestedServerName() const PURE;
+
+  /**
+   * Set requested next protocol(s) (e.g. ALPN in TLS).
+   */
+  virtual void setRequestedNextProtocol(const std::vector<std::string>& protocols) PURE;
+
+  /**
+   * @return requested next protocol(s) (e.g. ALPN in TLS), if any.
+   */
+  virtual const std::vector<std::string>& requestedNextProtocol() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
