@@ -110,23 +110,19 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         current_token = "";
       }
 
-      pos += 1;
-      size_t command_end_position;
-
-      // special consideration is made for START_TIME to escape date format strings which likely
-      // contain '%'
-      if (format.find("START_TIME(", pos) == pos) {
-        command_end_position = format.find(")%", pos) + 1;
-      } else {
-        command_end_position = format.find('%', pos);
-      }
-
-      if (command_end_position == std::string::npos) {
+      static const std::regex command_w_args_regex("%([A-Z]|_)+(\\([^\\)]*\\))?(:[0-9]+)?(%)");
+      std::smatch m;
+      std::string search_space = format.substr(pos);
+      if (!(std::regex_search(search_space, m, command_w_args_regex) || m.position() == 0)) {
         throw EnvoyException(fmt::format(
             "Incorrect configuration: {}. Expected end of operation '%', around position {}",
             format, pos));
       }
-      const std::string token = format.substr(pos, command_end_position - pos);
+
+      const std::string match = m.str(0);
+      const std::string token = match.substr(1, match.length() - 2);
+      pos += 1;
+      int command_end_position = pos + token.length();
 
       if (token.find("REQ(") == 0) {
         std::string main_header, alternative_header;
