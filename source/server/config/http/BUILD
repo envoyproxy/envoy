@@ -23,19 +23,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lua_lib",
-    srcs = ["lua.cc"],
-    hdrs = ["lua.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/http/filter/lua:lua_filter_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "empty_http_filter_config_lib",
     hdrs = ["empty_http_filter_config.h"],
     deps = [

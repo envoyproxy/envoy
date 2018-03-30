@@ -147,17 +147,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "lua_integration_test",
-    srcs = [
-        "lua_integration_test.cc",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "http2_upstream_integration_test",
     srcs = [
         "http2_upstream_integration_test.cc",
@@ -314,7 +303,6 @@ envoy_cc_test_library(
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
-        "//source/server/config/http:lua_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:http_connection_manager_lib",

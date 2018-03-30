@@ -1,6 +1,9 @@
-#include "common/lua/wrappers.h"
+#include "extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 int BufferWrapper::luaLength(lua_State* state) {
@@ -120,5 +123,9 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
   return 1;
 }
+
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

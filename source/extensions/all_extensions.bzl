@@ -5,6 +5,7 @@
 def envoy_all_extensions(repository = ""):
   return [
     repository + "//source/extensions/filters/http/ext_authz:config",
+    repository + "//source/extensions/filters/http/lua:config",
     repository + "//source/extensions/filters/http/ratelimit:config",
     repository + "//source/extensions/filters/listener/proxy_protocol:config",
     repository + "//source/extensions/filters/listener/original_dst:config",

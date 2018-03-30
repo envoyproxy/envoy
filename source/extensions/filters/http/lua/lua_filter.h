@@ -4,16 +4,17 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/well_known_names.h"
-#include "common/http/filter/lua/wrappers.h"
-#include "common/lua/wrappers.h"
+
+#include "extensions/filters/common/lua/wrappers.h"
+#include "extensions/filters/http/lua/wrappers.h"
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
 namespace {
-const ProtobufWkt::Struct& getMetadata(StreamFilterCallbacks* callbacks) {
+const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
   }
@@ -62,7 +63,7 @@ public:
    * @param body supplies the optional response body.
    * @param state supplies the active Lua state.
    */
-  virtual void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
+  virtual void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) PURE;
 
   /**
    * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
@@ -77,8 +78,8 @@ class Filter;
  * A wrapper for a currently running request/response. This is the primary handle passed to Lua.
  * The script interacts with Envoy entirely through this handle.
  */
-class StreamHandleWrapper : public Envoy::Lua::BaseLuaObject<StreamHandleWrapper>,
-                            public AsyncClient::Callbacks {
+class StreamHandleWrapper : public Filters::Common::Lua::BaseLuaObject<StreamHandleWrapper>,
+                            public Http::AsyncClient::Callbacks {
 public:
   /**
    * The state machine for a stream handler. In the current implementation everything the filter
@@ -102,12 +103,12 @@ public:
     Responded
   };
 
-  StreamHandleWrapper(Envoy::Lua::CoroutinePtr&& coroutine, HeaderMap& headers, bool end_stream,
-                      Filter& filter, FilterCallbacks& callbacks);
+  StreamHandleWrapper(Filters::Common::Lua::CoroutinePtr&& coroutine, Http::HeaderMap& headers,
+                      bool end_stream, Filter& filter, FilterCallbacks& callbacks);
 
-  FilterHeadersStatus start(int function_ref);
-  FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
-  FilterTrailersStatus onTrailers(HeaderMap& trailers);
+  Http::FilterHeadersStatus start(int function_ref);
+  Http::FilterDataStatus onData(Buffer::Instance& data, bool end_stream);
+  Http::FilterTrailersStatus onTrailers(Http::HeaderMap& trailers);
 
   void onReset() {
     if (http_request_) {
@@ -193,9 +194,9 @@ private:
    */
   DECLARE_LUA_CLOSURE(StreamHandleWrapper, luaBodyIterator);
 
-  static HeaderMapPtr buildHeadersFromTable(lua_State* state, int table_index);
+  static Http::HeaderMapPtr buildHeadersFromTable(lua_State* state, int table_index);
 
-  // Envoy::Lua::BaseLuaObject
+  // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
     // again across yields if needed.
@@ -206,25 +207,25 @@ private:
   }
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(MessagePtr&&) override;
-  void onFailure(AsyncClient::FailureReason) override;
+  void onSuccess(Http::MessagePtr&&) override;
+  void onFailure(Http::AsyncClient::FailureReason) override;
 
-  Envoy::Lua::CoroutinePtr coroutine_;
-  HeaderMap& headers_;
+  Filters::Common::Lua::CoroutinePtr coroutine_;
+  Http::HeaderMap& headers_;
   bool end_stream_;
   bool headers_continued_{};
   bool buffered_body_{};
   bool saw_body_{};
   Filter& filter_;
   FilterCallbacks& callbacks_;
-  HeaderMap* trailers_{};
-  Envoy::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
-  Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> body_wrapper_;
-  Envoy::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
-  Envoy::Lua::LuaDeathRef<Envoy::Lua::MetadataMapWrapper> metadata_wrapper_;
+  Http::HeaderMap* trailers_{};
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
-  AsyncClient::Request* http_request_{};
+  Http::AsyncClient::Request* http_request_{};
 };
 
 /**
@@ -234,14 +235,14 @@ class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
   FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                Upstream::ClusterManager& cluster_manager);
-  Envoy::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
+  Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
   int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
   int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  Envoy::Lua::ThreadLocalState lua_state_;
+  Filters::Common::Lua::ThreadLocalState lua_state_;
   uint64_t request_function_slot_;
   uint64_t response_function_slot_;
 };
@@ -253,47 +254,47 @@ typedef std::shared_ptr<FilterConfig> FilterConfigConstSharedPtr;
 /**
  * The HTTP Lua filter. Allows scripts to run in both the request an response flow.
  */
-class Filter : public StreamFilter, Logger::Loggable<Logger::Id::lua> {
+class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::lua> {
 public:
   Filter(FilterConfigConstSharedPtr config) : config_(config) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
-  void scriptError(const Envoy::Lua::LuaException& e);
+  void scriptError(const Filters::Common::Lua::LuaException& e);
   virtual void scriptLog(spdlog::level::level_enum level, const char* message);
 
   // Http::StreamFilterBase
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
     return doHeaders(request_stream_wrapper_, decoder_callbacks_, config_->requestFunctionRef(),
                      headers, end_stream);
   }
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
   }
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override {
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override {
     return doTrailers(request_stream_wrapper_, trailers);
   }
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_.callbacks_ = &callbacks;
   }
 
   // Http::StreamEncoderFilter
-  FilterHeadersStatus encode100ContinueHeaders(HeaderMap&) override {
-    return FilterHeadersStatus::Continue;
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+    return Http::FilterHeadersStatus::Continue;
   }
-  FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
     return doHeaders(response_stream_wrapper_, encoder_callbacks_, config_->responseFunctionRef(),
                      headers, end_stream);
   }
-  FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
   };
-  FilterTrailersStatus encodeTrailers(HeaderMap& trailers) override {
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
     return doTrailers(response_stream_wrapper_, trailers);
   };
-  void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) override {
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_.callbacks_ = &callbacks;
   };
 
@@ -308,12 +309,12 @@ private:
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
     void onHeadersModified() override { callbacks_->clearRouteCache(); }
-    void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
 
     Filter& parent_;
-    StreamDecoderFilterCallbacks* callbacks_{};
+    Http::StreamDecoderFilterCallbacks* callbacks_{};
   };
 
   struct EncoderCallbacks : public FilterCallbacks {
@@ -326,20 +327,20 @@ private:
     const Buffer::Instance* bufferedBody() override { return callbacks_->encodingBuffer(); }
     void continueIteration() override { return callbacks_->continueEncoding(); }
     void onHeadersModified() override {}
-    void respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
+    void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
 
     Filter& parent_;
-    StreamEncoderFilterCallbacks* callbacks_{};
+    Http::StreamEncoderFilterCallbacks* callbacks_{};
   };
 
-  typedef Envoy::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
+  typedef Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
 
-  FilterHeadersStatus doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
-                                int function_ref, HeaderMap& headers, bool end_stream);
-  FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
-  FilterTrailersStatus doTrailers(StreamHandleRef& handle, HeaderMap& trailers);
+  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                      int function_ref, Http::HeaderMap& headers, bool end_stream);
+  Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
+  Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;
   DecoderCallbacks decoder_callbacks_{*this};
@@ -350,6 +351,6 @@ private:
 };
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
