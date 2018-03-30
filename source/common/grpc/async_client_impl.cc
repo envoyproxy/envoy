@@ -61,7 +61,6 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent,
 
 void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   if (parent_.cm_.get(parent_.remote_cluster_name_) == nullptr) {
-    stream_ = nullptr;
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available");
     http_reset_ = true;
     return;
