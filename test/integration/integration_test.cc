@@ -21,11 +21,6 @@ TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
 
-TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterNotFoundWithBody();
-}
-
 TEST_P(IntegrationTest, RouterClusterNotFound404) { testRouterClusterNotFound404(); }
 
 TEST_P(IntegrationTest, RouterClusterNotFound503) { testRouterClusterNotFound503(); }
@@ -59,16 +54,6 @@ TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(1024, 512, false);
-}
-
-TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
-}
-
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
@@ -79,11 +64,6 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
-}
-
-TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   testRouterHeaderOnlyRequestAndResponse(true);
 }
 
