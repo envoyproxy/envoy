@@ -71,7 +71,7 @@ private:
         << "\n Actual Log:         " << recorded_log << "\n Expected Substring: " << substr;       \
   } while (false)
 
-// Validates that when stmt is executed, exactly logs will be emitted.
+// Validates that when stmt is executed, no logs will be emitted.
 #define EXPECT_NO_LOGS(stmt)                                                                       \
   do {                                                                                             \
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
