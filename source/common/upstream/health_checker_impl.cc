@@ -287,6 +287,14 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
+
+  for (const auto& header_entry_option : config.http_health_check().request_headers_to_add()) {
+    HeaderValueWrapperPtr header_value(
+        new HeaderValueWrapper(header_entry_option.header().value(),
+                               PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry_option, append, true)));
+    headers_to_add_.emplace_back(Http::LowerCaseString(header_entry_option.header().key()),
+                                 std::move(header_value));
+  }
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -338,6 +346,14 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
        parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
+
+  for (const auto& header_entry : parent_.headers_to_add_) {
+    if (header_entry.second->append_) {
+      request_headers.addReferenceKey(header_entry.first, header_entry.second->value_);
+    } else {
+      request_headers.setReferenceKey(header_entry.first, header_entry.second->value_);
+    }
+  }
 
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
