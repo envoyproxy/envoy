@@ -208,6 +208,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
+        "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/proxy_protocol:config",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
