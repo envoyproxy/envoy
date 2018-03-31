@@ -15,5 +15,6 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/filters/network/ratelimit:config",
     repository + "//source/extensions/filters/network/redis_proxy:config",
     repository + "//source/extensions/filters/network/tcp_proxy:config",
+    repository + "//source/extensions/health_checkers/redis_health_checker:config",
   ]
 
