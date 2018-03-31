@@ -24,7 +24,7 @@
 #include "absl/strings/string_view.h"
 
 extern "C" {
-#include <circllhist.h>
+#include "circllhist.h"
 }
 
 namespace Envoy {

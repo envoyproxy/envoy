@@ -123,7 +123,7 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
 
   for (const Stats::HistogramSharedPtr& histogram : store.histograms()) {
     for (const auto& sink : sinks) {
-      sink->flushHistogram(*histogram);
+      sink->flushHistogram(*histogram); // TODO(ramaraochavali) : implement used also for Histogram
     }
   }
 

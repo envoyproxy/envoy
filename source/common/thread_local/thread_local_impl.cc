@@ -91,6 +91,22 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   cb();
 }
 
+void InstanceImpl::runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) {
+  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  ASSERT(!shutdown_);
+  std::atomic<int> worker_counter(registered_threads_.size());
+  // Handle main thread.
+  cb();
+  for (Event::Dispatcher& dispatcher : registered_threads_) {
+    dispatcher.post([this, &worker_counter, cb, main_callback]() -> void {
+      cb();
+      if (--worker_counter == 0) {
+        main_thread_dispatcher_->post(main_callback);
+      }
+    });
+  }
+}
+
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
   ASSERT(!parent_.shutdown_);

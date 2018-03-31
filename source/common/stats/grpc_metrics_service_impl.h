@@ -136,8 +136,6 @@ public:
   }
 
   void flushHistogram(const Histogram& histogram) override {
-    //  ParentHistogramSharedPtr parent_histogram =
-    //  std::dynamic_pointer_cast<HistogramParentImpl>(&histogram);
     const HistogramParentImpl& parent_histogram =
         dynamic_cast<const HistogramParentImpl&>(histogram);
     io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();

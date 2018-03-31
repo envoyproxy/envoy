@@ -94,19 +94,17 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 void ThreadLocalStoreImpl::mergeHistograms() {
   if (!shutting_down_) {
     std::unique_lock<std::mutex> lock(lock_);
-    // TODO: Wait till all threads have been checked-in
-    tls_->runOnAllThreads([this]() -> void {
-      for (ScopeImpl* scope : scopes_) {
-        for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
-          TlsHistogramSharedPtr tls_histogram_ptr =
-              std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(histogram.second);
-          tls_histogram_ptr->beginMerge();
-        }
-      }
-    });
-    if (main_thread_dispatcher_) {
-      main_thread_dispatcher_->post([this]() -> void { mergeInternal(); });
-    }
+    tls_->runOnAllThreadsWithBarrier(
+        [this]() -> void {
+          for (ScopeImpl* scope : scopes_) {
+            for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
+              TlsHistogramSharedPtr tls_histogram_ptr =
+                  std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(histogram.second);
+              tls_histogram_ptr->beginMerge();
+            }
+          }
+        },
+        [this]() -> void { mergeInternal(); });
   }
 }
 

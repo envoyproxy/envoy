@@ -47,6 +47,13 @@ public:
   virtual void runOnAllThreads(Event::PostCb cb) PURE;
 
   /**
+   * Run a callback on all registered threads with a barrier.
+   * @param cb supplies the callback to run on each thread.
+   * @param main_callback supplies the callback to run on main thread after threads are done.
+   */
+  virtual void runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) PURE;
+
+  /**
    * Set thread local data on all threads previously registered via registerThread().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
