@@ -109,7 +109,7 @@ JwksPtr Jwks::createFrom(const std::string& pkey, Type type) {
     keys->createFromPemCore(pkey);
     break;
   default:
-    PANIC("can not reach here");
+    NOT_REACHED;
   }
   return keys;
 }
@@ -129,6 +129,7 @@ void Jwks::createFromPemCore(const std::string& pkey_pem) {
 void Jwks::createFromJwksCore(const std::string& pkey_jwks) {
   keys_.clear();
 
+  // TODO(qiwzhang): define a proto for JWKS and use JSON to proto parser.
   Json::ObjectSharedPtr jwks_json;
   try {
     jwks_json = Json::Factory::loadFromString(pkey_jwks);
