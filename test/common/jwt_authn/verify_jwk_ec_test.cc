@@ -28,24 +28,28 @@ namespace {
 // "7CF5bCDTXlrwI5n3ZsIFO8wVDyUptLYxuCNPdh+Zijoec8QTa2wCpZQnDw=="
 // "-----END PUBLIC KEY-----"
 
-const std::string PublicKeyJwkEC = "{\"keys\": ["
-                                   "{"
-                                   "\"kty\": \"EC\","
-                                   "\"crv\": \"P-256\","
-                                   "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                   "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                   "\"alg\": \"ES256\","
-                                   "\"kid\": \"abc\""
-                                   "},"
-                                   "{"
-                                   "\"kty\": \"EC\","
-                                   "\"crv\": \"P-256\","
-                                   "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                   "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                   "\"alg\": \"ES256\","
-                                   "\"kid\": \"xyz\""
-                                   "}"
-                                   "]}";
+const std::string PublicKeyJwkEC = R"(
+{
+  "keys": [
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "alg": "ES256",
+      "kid": "abc",
+      "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+      "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8"
+    },
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "alg": "ES256",
+      "kid": "xyz",
+      "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+      "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8"
+    }
+  ]
+}
+)";
 
 // "{"kid":"abc"}"
 const std::string JwtTextEC = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImFiYyJ9.eyJpc3MiOiI2Mj"
@@ -105,7 +109,7 @@ TEST_F(VerifyJwkECTest, NonExistKidFail) {
 
 TEST_F(VerifyJwkECTest, PubkeyNoAlgOK) {
   // Remove "alg" claim from public key.
-  std::string alg_claim = "\"alg\": \"ES256\",";
+  std::string alg_claim = R"("alg": "ES256",)";
   std::string pubkey_no_alg = PublicKeyJwkEC;
   std::size_t alg_pos = pubkey_no_alg.find(alg_claim);
   while (alg_pos != std::string::npos) {
@@ -123,8 +127,8 @@ TEST_F(VerifyJwkECTest, PubkeyNoAlgOK) {
 
 TEST_F(VerifyJwkECTest, PubkeyNoKidOK) {
   // Remove "kid" claim from public key.
-  std::string kid_claim1 = ",\"kid\": \"abc\"";
-  std::string kid_claim2 = ",\"kid\": \"xyz\"";
+  std::string kid_claim1 = R"("kid": "abc",)";
+  std::string kid_claim2 = R"("kid": "xyz",)";
   std::string pubkey_no_kid = PublicKeyJwkEC;
   std::size_t kid_pos = pubkey_no_kid.find(kid_claim1);
   pubkey_no_kid.erase(kid_pos, kid_claim1.length());

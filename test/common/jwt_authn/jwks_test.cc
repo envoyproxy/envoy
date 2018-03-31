@@ -33,26 +33,28 @@ TEST(JwksParseTest, BadPem) {
 }
 
 TEST(JwksParseTest, GoodJwks) {
-  const std::string jwks_text =
-      "{\"keys\": [{\"kty\": \"RSA\",\"alg\": \"RS256\",\"use\": "
-      "\"sig\",\"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\",\"n\": "
-      "\"0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_"
-      "2xNgcaVpkW0VT2l4mU3KftR-6s3Oa5Rnz5BrWEUkCTVVolR7VYksfqIB2I_"
-      "x5yZHdOiomMTcm3DheUUCgbJRv5OKRnNqszA4xHn3tA3Ry8VO3X7BgKZYAUh9fyZTFLlkeAh"
-      "0-"
-      "bLK5zvqCmKW5QgDIXSxUTJxPjZCgfx1vmAfGqaJb-"
-      "nvmrORXQ6L284c73DUL7mnt6wj3H6tVqPKA27j56N0TB1Hfx4ja6Slr8S4EB3F1luYhATa1P"
-      "KU"
-      "SH8mYDW11HolzZmTQpRoLV8ZoHbHEaTfqX_aYahIw\",\"e\": \"AQAB\"},{\"kty\": "
-      "\"RSA\",\"alg\": \"RS256\",\"use\": \"sig\",\"kid\": "
-      "\"b3319a147514df7ee5e4bcdee51350cc890cc89e\",\"n\": "
-      "\"qDi7Tx4DhNvPQsl1ofxxc2ePQFcs-L0mXYo6TGS64CY_"
-      "2WmOtvYlcLNZjhuddZVV2X88m0MfwaSA16wE-"
-      "RiKM9hqo5EY8BPXj57CMiYAyiHuQPp1yayjMgoE1P2jvp4eqF-"
-      "BTillGJt5W5RuXti9uqfMtCQdagB8EC3MNRuU_KdeLgBy3lS3oo4LOYd-"
-      "74kRBVZbk2wnmmb7IhP9OoLc1-7-9qU1uhpDxmE6JwBau0mDSwMnYDS4G_ML17dC-"
-      "ZDtLd1i24STUw39KH0pcSdfFbL2NtEZdNeam1DDdk0iUtJSPZliUHJBI_pj8M-2Mn_"
-      "oA8jBuI8YKwBqYkZCN1I95Q\",\"e\": \"AQAB\"}]}";
+  const std::string jwks_text = R"(
+      {
+        "keys": [
+          {
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
+            "n": "0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_2xNgcaVpkW0VT2l4mU3KftR-6s3Oa5Rnz5BrWEUkCTVVolR7VYksfqIB2I_x5yZHdOiomMTcm3DheUUCgbJRv5OKRnNqszA4xHn3tA3Ry8VO3X7BgKZYAUh9fyZTFLlkeAh0-bLK5zvqCmKW5QgDIXSxUTJxPjZCgfx1vmAfGqaJb-nvmrORXQ6L284c73DUL7mnt6wj3H6tVqPKA27j56N0TB1Hfx4ja6Slr8S4EB3F1luYhATa1PKUSH8mYDW11HolzZmTQpRoLV8ZoHbHEaTfqX_aYahIw",
+            "e": "AQAB"
+          },
+          {
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
+            "n": "qDi7Tx4DhNvPQsl1ofxxc2ePQFcs-L0mXYo6TGS64CY_2WmOtvYlcLNZjhuddZVV2X88m0MfwaSA16wE-RiKM9hqo5EY8BPXj57CMiYAyiHuQPp1yayjMgoE1P2jvp4eqF-BTillGJt5W5RuXti9uqfMtCQdagB8EC3MNRuU_KdeLgBy3lS3oo4LOYd-74kRBVZbk2wnmmb7IhP9OoLc1-7-9qU1uhpDxmE6JwBau0mDSwMnYDS4G_ML17dC-ZDtLd1i24STUw39KH0pcSdfFbL2NtEZdNeam1DDdk0iUtJSPZliUHJBI_pj8M-2Mn_oA8jBuI8YKwBqYkZCN1I95Q",
+            "e": "AQAB"
+         }
+      ]
+   }
+)";
 
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
@@ -73,24 +75,28 @@ TEST(JwksParseTest, GoodJwks) {
 
 TEST(JwksParseTest, GoodEC) {
   // Public key JwkEC
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"EC\","
-                                "\"crv\": \"P-256\","
-                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                "\"alg\": \"ES256\","
-                                "\"kid\": \"abc\""
-                                "},"
-                                "{"
-                                "\"kty\": \"EC\","
-                                "\"crv\": \"P-256\","
-                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                "\"alg\": \"ES256\","
-                                "\"kid\": \"xyz\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+    {
+       "keys": [
+          {
+             "kty": "EC",
+             "crv": "P-256",
+             "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+             "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8",
+             "alg": "ES256",
+             "kid": "abc"
+          },
+          {
+             "kty": "EC",
+             "crv": "P-256",
+             "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+             "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8",
+             "alg": "ES256",
+             "kid": "xyz"
+          }
+      ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::Ok);
   EXPECT_EQ(jwks->keys().size(), 2);
@@ -121,94 +127,123 @@ TEST(JwksParseTest, JwksNoKeys) {
 }
 
 TEST(JwksParseTest, JwksWrongKeys) {
-  auto jwks = Jwks::createFrom("{\"keys\": 123}", Jwks::JWKS);
+  auto jwks = Jwks::createFrom(R"({"keys": 123})", Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksBadKeys);
 }
 
 TEST(JwksParseTest, JwksInvalidKty) {
   // Invalid kty field
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"XYZ\","
-                                "\"crv\": \"P-256\","
-                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k\","
-                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8\","
-                                "\"alg\": \"ES256\","
-                                "\"kid\": \"abc\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+   {
+      "keys": [
+        {
+           "kty": "XYZ",
+           "crv": "P-256",
+           "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k",
+           "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8",
+           "alg": "ES256",
+           "kid": "abc"
+        }
+     ]
+   }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty1) {
   // kty doesn't match with alg
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"RSA\","
-                                "\"alg\": \"ES256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+              "kty": "RSA",
+              "alg": "ES256"
+           }
+        ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksMismatchKty2) {
   // kty doesn't match with alg
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"EC\","
-                                "\"alg\": \"RS256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+               "kty": "EC",
+               "alg": "RS256"
+           }
+        ]
+     }
+)";
+
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECNoXY) {
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"EC\","
-                                "\"alg\": \"ES256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+              "kty": "EC",
+              "alg": "ES256"
+           }
+        ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksRSANoNE) {
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"RSA\","
-                                "\"alg\": \"RS256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+               "kty": "RSA",
+               "alg": "RS256"
+           }
+        ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksNoValidKeys);
 }
 
 TEST(JwksParseTest, JwksECWrongXY) {
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"EC\","
-                                "\"x\": \"EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111\","
-                                "\"y\": \"92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111\","
-                                "\"alg\": \"ES256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+               "kty": "EC",
+               "x": "EB54wykhS7YJFD6RYJNnwbWEz3cI7CF5bCDTXlrwI5k111",
+               "y": "92bCBTvMFQ8lKbS2MbgjT3YfmYo6HnPEE2tsAqWUJw8111",
+               "alg": "ES256"
+           }
+        ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksEcParseError);
 }
 
 TEST(JwksParseTest, JwksRSAWrongNE) {
-  const std::string jwks_text = "{\"keys\": ["
-                                "{"
-                                "\"kty\": \"RSA\","
-                                "\"n\": \"EB54wykhS7YJFD6RYJNnwbW\","
-                                "\"e\": \"92bCBTvMFQ8lKbS2MbgjT3YfmY\","
-                                "\"alg\": \"RS256\""
-                                "}"
-                                "]}";
+  const std::string jwks_text = R"(
+     {
+        "keys": [
+           {
+               "kty": "RSA",
+               "n": "EB54wykhS7YJFD6RYJNnwbW",
+               "e": "92bCBTvMFQ8lKbS2MbgjT3YfmY",
+               "alg": "RS256"
+           }
+        ]
+     }
+)";
   auto jwks = Jwks::createFrom(jwks_text, Jwks::JWKS);
   EXPECT_EQ(jwks->getStatus(), Status::JwksRsaParseError);
 }
