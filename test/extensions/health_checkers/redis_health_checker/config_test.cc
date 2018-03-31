@@ -4,7 +4,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
-
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
