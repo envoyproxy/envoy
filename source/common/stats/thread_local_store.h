@@ -77,13 +77,17 @@ public:
 
   void mergeHistograms() override;
 
-  void mergeInternal();
-
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, HistogramSharedPtr> histograms_;
+    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
+  };
+
+  struct CentralCacheEntry {
+    std::unordered_map<std::string, CounterSharedPtr> counters_;
+    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
+    std::unordered_map<std::string, ParentHistogramSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public Scope {
@@ -102,7 +106,7 @@ private:
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
-    TlsCacheEntry central_cache_;
+    CentralCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -118,6 +122,7 @@ private:
   void clearScopeFromCaches(ScopeImpl* scope);
   void releaseScopeCrossThread(ScopeImpl* scope);
   SafeAllocData safeAlloc(const std::string& name);
+  void mergeInternal();
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};

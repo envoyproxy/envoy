@@ -152,6 +152,8 @@ public:
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
+struct HistogramStatistics;
+
 /**
  * A histogram that records values one at a time.
  * Note: Histograms now incorporate what used to be timers because the only difference between the
@@ -167,6 +169,21 @@ public:
    * Records an unsigned value. If a timer, values are in units of milliseconds.
    */
   virtual void recordValue(uint64_t value) PURE;
+
+  /**
+   * Merges the histogram values collected during the flush interval.
+   */
+  virtual void merge() PURE;
+
+  /**
+   * Returns the Histogram Summary Statistics for the flush interval.
+   */
+  virtual HistogramStatistics getIntervalHistogramStatistics() const PURE;
+
+  /**
+   * Returns the Cumulative Histogram Summary Statistics.
+   */
+  virtual HistogramStatistics getCumulativieHistogramStatistics() const PURE;
 };
 
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
@@ -197,7 +214,7 @@ public:
   /**
    * Flush a histogram.
    */
-  virtual void flushHistogram(const Histogram&){};
+  virtual void flushHistogram(const Histogram&) PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of
@@ -269,10 +286,10 @@ public:
    */
   virtual std::list<GaugeSharedPtr> gauges() const PURE;
 
-  virtual std::list<HistogramSharedPtr> histograms() const {
-    std::list<HistogramSharedPtr> empty_list;
-    return empty_list;
-  }
+  /**
+   * @return a list of all known histograms.
+   */
+  virtual std::list<HistogramSharedPtr> histograms() const PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;
@@ -305,7 +322,10 @@ public:
    */
   virtual void shutdownThreading() PURE;
 
-  virtual void mergeHistograms() {}
+  /**
+   * Called during the flush process to merge all the thread local histograms.
+   */
+  virtual void mergeHistograms() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

@@ -98,9 +98,7 @@ void ThreadLocalStoreImpl::mergeHistograms() {
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
             for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
-              TlsHistogramSharedPtr tls_histogram_ptr =
-                  std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(histogram.second);
-              tls_histogram_ptr->beginMerge();
+              histogram.second->beginMerge();
             }
           }
         },
@@ -109,13 +107,8 @@ void ThreadLocalStoreImpl::mergeHistograms() {
 }
 
 void ThreadLocalStoreImpl::mergeInternal() {
-  std::unique_lock<std::mutex> lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto histogram : scope->central_cache_.histograms_) {
-      ParentHistogramSharedPtr parent_hist_ptr =
-          std::dynamic_pointer_cast<HistogramParentImpl>(histogram.second);
-      parent_hist_ptr->merge();
-    }
+  for (auto histogram : histograms()) {
+    histogram->merge();
   }
 }
 
@@ -248,7 +241,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  HistogramSharedPtr* tls_ref = nullptr;
+  TlsHistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
   }
@@ -258,7 +251,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  ParentHistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
 
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
@@ -266,10 +259,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     central_ref.reset(new HistogramParentImpl(final_name, parent_, std::move(tag_extracted_name),
                                               std::move(tags)));
   }
-  HistogramSharedPtr hist_tls_ptr;
-  hist_tls_ptr.reset(new ThreadLocalHistogramImpl(final_name, parent_,
-                                                  std::move(tag_extracted_name), std::move(tags)));
-  dynamic_cast<HistogramParentImpl&>(*central_ref).addTlsHistogram(hist_tls_ptr);
+  TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
+      final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+  central_ref->addTlsHistogram(hist_tls_ptr);
 
   if (tls_ref) {
     *tls_ref = hist_tls_ptr;

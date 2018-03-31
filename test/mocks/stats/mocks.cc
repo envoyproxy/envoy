@@ -5,6 +5,7 @@
 
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 using testing::_;
 
@@ -33,6 +34,8 @@ MockHistogram::MockHistogram() {
   }));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+  ON_CALL(*this, getIntervalHistogramStatistics()).WillByDefault(Return(histogram_stats_));
+  ON_CALL(*this, getCumulativieHistogramStatistics()).WillByDefault(Return(histogram_stats_));
 }
 MockHistogram::~MockHistogram() {}
 

@@ -115,43 +115,9 @@ public:
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
-  void flushCounter(const Counter& counter, uint64_t) override {
-    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
-    metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
-    metrics_family->set_name(counter.name());
-    auto* metric = metrics_family->add_metric();
-    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
-    auto* counter_metric = metric->mutable_counter();
-    counter_metric->set_value(counter.value());
-  }
-
-  void flushGauge(const Gauge& gauge, uint64_t value) override {
-    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
-    metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
-    metrics_family->set_name(gauge.name());
-    auto* metric = metrics_family->add_metric();
-    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
-    auto* gauage_metric = metric->mutable_gauge();
-    gauage_metric->set_value(value);
-  }
-
-  void flushHistogram(const Histogram& histogram) override {
-    const HistogramParentImpl& parent_histogram =
-        dynamic_cast<const HistogramParentImpl&>(histogram);
-    io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
-    metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
-    metrics_family->set_name(parent_histogram.name());
-    auto* metric = metrics_family->add_metric();
-    metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
-    auto* summary_metric = metric->mutable_summary();
-    double quantiles[] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
-    const HistogramStatistics hist_stats = parent_histogram.getIntervalHistogramStatistics();
-    for (size_t i = 0; i < ARRAY_SIZE(quantiles); i++) {
-      auto* quantile = summary_metric->add_quantile();
-      quantile->set_quantile(quantiles[i]);
-      quantile->set_value(hist_stats.quantile_out_[i]);
-    }
-  }
+  void flushCounter(const Counter& counter, uint64_t) override;
+  void flushGauge(const Gauge& gauge, uint64_t value) override;
+  void flushHistogram(const Histogram& histogram) override;
 
   void endFlush() override {
     grpc_metrics_streamer_->send(message_);
@@ -161,9 +127,7 @@ public:
     }
   }
 
-  void onHistogramComplete(const Histogram&, uint64_t) override {
-    // TODO : Need to figure out how to map existing histogram to Proto Model
-  }
+  void onHistogramComplete(const Histogram&, uint64_t) override {}
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;

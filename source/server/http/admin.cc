@@ -403,13 +403,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   }
 
   for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
-    Stats::ParentHistogramSharedPtr parent_hist_ptr =
-        std::dynamic_pointer_cast<Stats::HistogramParentImpl>(histogram);
-    all_histograms.emplace(
-        parent_hist_ptr->name(),
-        fmt::format("\n \t Interval:   {} \n \t Cumulative: {}",
-                    parent_hist_ptr->getIntervalHistogramStatistics().summary(),
-                    parent_hist_ptr->getCumulativieHistogramStatistics().summary()));
+    all_histograms.emplace(histogram->name(),
+                           fmt::format("\n \t Interval:   {} \n \t Cumulative: {}",
+                                       histogram->getIntervalHistogramStatistics().summary(),
+                                       histogram->getCumulativieHistogramStatistics().summary()));
   }
 
   if (params.size() == 0) {

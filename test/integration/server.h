@@ -165,11 +165,17 @@ public:
     return store_.gauges();
   }
 
+  std::list<HistogramSharedPtr> histograms() const override {
+    std::unique_lock<std::mutex> lock(lock_);
+    return store_.histograms();
+  }
+
   // Stats::StoreRoot
   void addSink(Sink&) override {}
   void setTagProducer(TagProducerPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
+  void mergeHistograms() override {}
 
 private:
   mutable std::mutex lock_;

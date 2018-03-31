@@ -98,8 +98,8 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                                 Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                       Stats::Store& store) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
@@ -123,7 +123,7 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
 
   for (const Stats::HistogramSharedPtr& histogram : store.histograms()) {
     for (const auto& sink : sinks) {
-      sink->flushHistogram(*histogram); // TODO(ramaraochavali) : implement used also for Histogram
+      sink->flushHistogram(*histogram); // TODO(ramaraochavali): implement used also for Histogram
     }
   }
 
@@ -144,9 +144,9 @@ void InstanceImpl::flushStats() {
   server_stats_->total_connections_.set(numConnections() + info.num_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       sslContextManager().daysUntilFirstCertExpires());
-
+  // TODO(ramaraochavali): consider adding different flush interval for histograms.
   stats_store_.mergeHistograms();
-  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
+  InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 

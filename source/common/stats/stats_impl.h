@@ -359,6 +359,29 @@ private:
 };
 
 /**
+ * Structure to hold statistical data of histogram.
+ */
+struct HistogramStatistics {
+public:
+  HistogramStatistics() {}
+
+  HistogramStatistics(histogram_t* histogram_ptr) {
+    hist_approx_quantile(histogram_ptr, const_cast<double*>(quantiles_in_),
+                         ARRAY_SIZE(quantiles_in_), quantiles_out_);
+  }
+
+  std::string summary() const {
+    return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
+                       quantiles_out_[0], quantiles_out_[1], quantiles_out_[2], quantiles_out_[3],
+                       quantiles_out_[4], quantiles_out_[5], quantiles_out_[6], quantiles_out_[7],
+                       quantiles_out_[8]);
+  }
+
+  double quantiles_in_[9] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  double quantiles_out_[ARRAY_SIZE(quantiles_in_)];
+};
+
+/**
  * Histogram implementation for the heap.
  */
 class HistogramImpl : public Histogram, public MetricImpl {
@@ -370,26 +393,19 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
+  void merge() override {}
+
+  HistogramStatistics getIntervalHistogramStatistics() const override {
+    HistogramStatistics empty_histogram_stats;
+    return empty_histogram_stats;
+  }
+
+  HistogramStatistics getCumulativieHistogramStatistics() const override {
+    HistogramStatistics empty_histogram_stats;
+    return empty_histogram_stats;
+  }
+
   Store& parent_;
-};
-
-/**
- * Structure to hold statistical data of histogram.
- */
-struct HistogramStatistics {
-public:
-  HistogramStatistics(histogram_t* histogram_ptr) {
-    double quantile_in[] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
-    hist_approx_quantile(histogram_ptr, quantile_in, ARRAY_SIZE(quantile_in), quantile_out_);
-  }
-
-  std::string summary() const {
-    return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
-                       quantile_out_[0], quantile_out_[1], quantile_out_[2], quantile_out_[3],
-                       quantile_out_[4], quantile_out_[5], quantile_out_[6], quantile_out_[7],
-                       quantile_out_[8]);
-  }
-  double quantile_out_[9];
 };
 
 /**
@@ -415,22 +431,24 @@ public:
     parent_.deliverHistogramToSinks(*this, value);
   }
 
-  void beginMerge() {
-    if (current_active_ == 0) {
-      current_active_ = 1;
-    } else {
-      current_active_ = 0;
-    }
+  void beginMerge() { current_active_ = 1 - current_active_; }
+
+  void merge() override {}
+
+  HistogramStatistics getIntervalHistogramStatistics() const override {
+    HistogramStatistics empty_histogram_stats;
+    return empty_histogram_stats;
+  }
+
+  HistogramStatistics getCumulativieHistogramStatistics() const override {
+    HistogramStatistics empty_histogram_stats;
+    return empty_histogram_stats;
   }
 
   void merge(histogram_t* target) {
     histogram_t* hist_array[1];
-    if (current_active_ == 0) {
-      hist_array[0] = histograms_[1];
-    } else {
-      hist_array[0] = histograms_[0];
-    }
-    hist_accumulate(target, hist_array, 1);
+    hist_array[0] = histograms_[1 - current_active_];
+    hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
     hist_clear(hist_array[0]);
   }
 
@@ -461,32 +479,35 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t) override {}
 
-  void addTlsHistogram(HistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
 
-  void merge() {
+  /**
+   * This method is called during the main stats flush process for each of the histogram. This
+   * method iterates through the Tls histograms and collects the histogram data of all of them
+   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
+   * "cumulative_histogram". More details about threading model at
+   * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
+   */
+  void merge() override {
     hist_clear(interval_histogram_);
     for (auto tls_histogram : tls_histograms_) {
-      TlsHistogramSharedPtr tls_histogram_ptr =
-          std::dynamic_pointer_cast<ThreadLocalHistogramImpl>(tls_histogram);
-      tls_histogram_ptr->merge(interval_histogram_);
+      tls_histogram->merge(interval_histogram_);
     }
     histogram_t* hist_array[1];
     hist_array[0] = interval_histogram_;
-    hist_accumulate(cumulative_histogram_, hist_array, 1);
+    hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
   }
 
-  HistogramStatistics getIntervalHistogramStatistics() const {
-    HistogramStatistics interval_histogram(interval_histogram_);
-    return interval_histogram;
+  HistogramStatistics getIntervalHistogramStatistics() const override {
+    return HistogramStatistics(interval_histogram_);
   }
 
-  HistogramStatistics getCumulativieHistogramStatistics() const {
-    HistogramStatistics cumulative_histogram(cumulative_histogram_);
-    return cumulative_histogram_;
+  HistogramStatistics getCumulativieHistogramStatistics() const override {
+    return HistogramStatistics(cumulative_histogram_);
   }
 
   Store& parent_;
-  std::list<HistogramSharedPtr> tls_histograms_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
 };
@@ -570,6 +591,7 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
   std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
+  std::list<HistogramSharedPtr> histograms() const override { return histograms_.toList(); }
 
 private:
   struct ScopeImpl : public Scope {
