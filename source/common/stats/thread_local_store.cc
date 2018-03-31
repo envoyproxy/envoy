@@ -107,8 +107,10 @@ void ThreadLocalStoreImpl::mergeHistograms() {
 }
 
 void ThreadLocalStoreImpl::mergeInternal() {
-  for (auto histogram : histograms()) {
-    histogram->merge();
+  if (!shutting_down_) {
+    for (auto histogram : histograms()) {
+      histogram->merge();
+    }
   }
 }
 
