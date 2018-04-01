@@ -29,7 +29,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/eds.h"
-#include "common/upstream/health_checker_impl.h"
+#include "common/upstream/health_checker/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
 

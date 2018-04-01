@@ -11,7 +11,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
+#include "common/upstream/health_checker/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
