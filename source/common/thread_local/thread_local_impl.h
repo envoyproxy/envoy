@@ -60,6 +60,7 @@ private:
   std::thread::id main_thread_id_;
   Event::Dispatcher* main_thread_dispatcher_{};
   std::atomic<bool> shutdown_{};
+  std::atomic<int> worker_counter_;
 };
 
 } // namespace ThreadLocal
