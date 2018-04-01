@@ -64,8 +64,8 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
-                                                     dispatcher_, runtime_, random_, *this));
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
+                                                 runtime_, random_, *this));
   }
 
   void setupExistsHealthcheck() {
@@ -85,8 +85,8 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
-                                                     dispatcher_, runtime_, random_, *this));
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
+                                                 runtime_, random_, *this));
   }
 
   void setupDontReuseConnection() {
@@ -106,8 +106,8 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
-                                                     dispatcher_, runtime_, random_, *this));
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
+                                                 runtime_, random_, *this));
   }
 
   Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr

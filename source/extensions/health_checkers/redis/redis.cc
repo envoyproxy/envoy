@@ -34,8 +34,7 @@ RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSessio
   }
 }
 
-void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(
-    Network::ConnectionEvent event) {
+void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // This should only happen after any active requests have been failed/cancelled.
