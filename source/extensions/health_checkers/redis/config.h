@@ -4,12 +4,16 @@
 
 #include "common/config/well_known_names.h"
 
-#include "extensions/health_checkers/redis_health_checker/redis_health_checker.h"
+#include "extensions/health_checkers/redis/redis.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
+
+/**
+ * Config registration for the redis health checker.
+ */
 class RedisHealthCheckerFactory : public Upstream::ExtensionHealthCheckerFactory {
 public:
   Upstream::HealthCheckerSharedPtr

@@ -16,9 +16,9 @@ namespace RedisHealthChecker {
  * TODO(mattklein123): Redis health checking should be via a pluggable module and not in the
  * "core".
  */
-class RedisHealthCheckerImpl : public Upstream::HealthCheckerImplBase {
+class RedisHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
-  RedisHealthCheckerImpl(
+  RedisHealthChecker(
       const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
@@ -41,7 +41,7 @@ private:
         public Extensions::NetworkFilters::RedisProxy::ConnPool::Config,
         public Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks,
         public Network::ConnectionCallbacks {
-    RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent,
+    RedisActiveHealthCheckSession(RedisHealthChecker& parent,
                                   const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
     // ActiveHealthCheckSession
@@ -64,7 +64,7 @@ private:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    RedisHealthCheckerImpl& parent_;
+    RedisHealthChecker& parent_;
     Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr client_;
     Extensions::NetworkFilters::RedisProxy::ConnPool::PoolRequest* current_request_{};
   };

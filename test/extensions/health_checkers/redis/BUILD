@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
-        "//source/extensions/health_checkers/redis_health_checker:config",
+        "//source/extensions/health_checkers/redis:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -20,10 +20,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "redis_health_checker_test",
-    srcs = ["redis_health_checker_test.cc"],
+    name = "redis_test",
+    srcs = ["redis_test.cc"],
     deps = [
-        "//source/extensions/health_checkers/redis_health_checker",
+        "//source/extensions/health_checkers/redis",
         "//test/common/upstream:utility_lib",
         "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",

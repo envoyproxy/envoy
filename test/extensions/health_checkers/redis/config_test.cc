@@ -1,20 +1,8 @@
-#include "extensions/health_checkers/redis_health_checker/config.h"
+#include "extensions/health_checkers/redis/config.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-
-using testing::DoAll;
-using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
-using testing::NiceMock;
-using testing::Ref;
-using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
-using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +39,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
   RedisHealthCheckerFactory factory;
   EXPECT_NE(
       nullptr,
-      dynamic_cast<Extensions::HealthCheckers::RedisHealthChecker::RedisHealthCheckerImpl*>(
+      dynamic_cast<RedisHealthChecker*>(
           factory.createExtensionHealthChecker(hc_config, cluster, runtime, random, dispatcher)
               .get()));
 }

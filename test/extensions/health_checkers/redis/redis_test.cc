@@ -1,4 +1,4 @@
-#include "extensions/health_checkers/redis_health_checker/redis_health_checker.h"
+#include "extensions/health_checkers/redis/redis.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
@@ -42,11 +42,11 @@ getRedisConfigFromHealthCheck(const envoy::api::v2::core::HealthCheck& hc) {
       *config);
 }
 
-class RedisHealthCheckerImplTest
+class RedisHealthCheckerTest
     : public testing::Test,
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
-  RedisHealthCheckerImplTest() : cluster_(new NiceMock<Upstream::MockCluster>()) {}
+  RedisHealthCheckerTest() : cluster_(new NiceMock<Upstream::MockCluster>()) {}
 
   void setup() {
     const std::string yaml = R"EOF(
@@ -64,7 +64,7 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, hc_config, redis_config,
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
                                                      dispatcher_, runtime_, random_, *this));
   }
 
@@ -85,7 +85,7 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, hc_config, redis_config,
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
                                                      dispatcher_, runtime_, random_, *this));
   }
 
@@ -106,7 +106,7 @@ public:
     const auto& hc_config = parseHealthCheckFromYaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, hc_config, redis_config,
+    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config,
                                                      dispatcher_, runtime_, random_, *this));
   }
 
@@ -130,13 +130,13 @@ public:
   }
 
   void expectExistsRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::existsHealthCheckRequest("")), _))
+    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::existsHealthCheckRequest("")), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     EXPECT_CALL(*timeout_timer_, enableTimer(_));
   }
 
   void expectPingRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::pingHealthCheckRequest()), _))
+    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::pingHealthCheckRequest()), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     EXPECT_CALL(*timeout_timer_, enableTimer(_));
   }
@@ -150,10 +150,10 @@ public:
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks* pool_callbacks_{};
-  std::shared_ptr<RedisHealthCheckerImpl> health_checker_;
+  std::shared_ptr<RedisHealthChecker> health_checker_;
 };
 
-TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
+TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   InSequence s;
   setup();
 
@@ -220,7 +220,7 @@ TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
-TEST_F(RedisHealthCheckerImplTest, Exists) {
+TEST_F(RedisHealthCheckerTest, Exists) {
   InSequence s;
   setupExistsHealthcheck();
 
@@ -272,7 +272,7 @@ TEST_F(RedisHealthCheckerImplTest, Exists) {
 }
 
 // Tests that redis client will behave appropriately when reuse_connection is false.
-TEST_F(RedisHealthCheckerImplTest, NoConnectionReuse) {
+TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   InSequence s;
   setupDontReuseConnection();
 

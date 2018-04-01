@@ -1,11 +1,11 @@
-#include "extensions/health_checkers/redis_health_checker/redis_health_checker.h"
+#include "extensions/health_checkers/redis/redis.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
 
-RedisHealthCheckerImpl::RedisHealthCheckerImpl(
+RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
@@ -19,11 +19,11 @@ RedisHealthCheckerImpl::RedisHealthCheckerImpl(
   }
 }
 
-RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
-    RedisHealthCheckerImpl& parent, const Upstream::HostSharedPtr& host)
+RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
+    RedisHealthChecker& parent, const Upstream::HostSharedPtr& host)
     : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
-RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
+RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
@@ -34,7 +34,7 @@ RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSe
   }
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onEvent(
+void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(
     Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
@@ -44,7 +44,7 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onEvent(
   }
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
+void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ = parent_.client_factory_.create(host_, parent_.dispatcher_, *this);
     client_->addConnectionCallbacks(*this);
@@ -64,7 +64,7 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
   }
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
+void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
     Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) {
   current_request_ = nullptr;
 
@@ -94,18 +94,18 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
   }
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onFailure() {
+void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   current_request_ = nullptr;
   handleFailure(FailureType::Network);
 }
 
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
+void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;
   client_->close();
 }
 
-RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
+RedisHealthChecker::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
   std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(2);
   values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
   values[0].asString() = "EXISTS";
@@ -115,7 +115,7 @@ RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string
   request_.asArray().swap(values);
 }
 
-RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
+RedisHealthChecker::HealthCheckRequest::HealthCheckRequest() {
   std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(1);
   values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
   values[0].asString() = "PING";

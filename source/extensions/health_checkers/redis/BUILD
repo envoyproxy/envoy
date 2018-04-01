@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+# Redis extension health checker.
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -9,9 +10,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "redis_health_checker",
-    srcs = ["redis_health_checker.cc"],
-    hdrs = ["redis_health_checker.h"],
+    name = "redis",
+    srcs = ["redis.cc"],
+    hdrs = ["redis.h"],
     deps = [
         "//source/common/upstream/health_checker:health_checker_base_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
@@ -25,7 +26,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":redis_health_checker",
+        ":redis",
         "//include/envoy/registry",
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/common:assert_lib",
