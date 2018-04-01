@@ -11,7 +11,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
+#include "common/upstream/health_checker/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -46,12 +46,6 @@ envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& js
   envoy::api::v2::core::HealthCheck health_check;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
-  return health_check;
-}
-
-envoy::api::v2::core::HealthCheck parseHealthCheckFromYaml(const std::string& yaml_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
   return health_check;
 }
 
@@ -159,7 +153,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -222,7 +216,7 @@ public:
     )EOF",
                                    host);
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
