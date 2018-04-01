@@ -107,6 +107,7 @@ void ThreadLocalStoreImpl::mergeHistograms() {
 }
 
 void ThreadLocalStoreImpl::mergeInternal() {
+  std::unique_lock<std::mutex> lock(lock_);
   if (!shutting_down_) {
     for (auto histogram : histograms()) {
       histogram->merge();
