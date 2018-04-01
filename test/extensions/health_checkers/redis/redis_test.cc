@@ -23,12 +23,6 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
 
-envoy::api::v2::core::HealthCheck parseHealthCheckFromYaml(const std::string& yaml_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
-  return health_check;
-}
-
 envoy::config::health_checker::redis::v2::Redis
 getRedisConfigFromHealthCheck(const envoy::api::v2::core::HealthCheck& hc) {
   ProtobufTypes::MessagePtr config =
@@ -61,7 +55,7 @@ public:
       config:
     )EOF";
 
-    const auto& hc_config = parseHealthCheckFromYaml(yaml);
+    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
@@ -82,7 +76,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& hc_config = parseHealthCheckFromYaml(yaml);
+    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
@@ -103,7 +97,7 @@ public:
       config:
     )EOF";
 
-    const auto& hc_config = parseHealthCheckFromYaml(yaml);
+    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
