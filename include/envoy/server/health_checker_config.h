@@ -20,9 +20,9 @@ public:
    * @param config supplies the configuration for the health check, which should contains
    * extension_health_check.
    * @param cluster the upstream cluster.
-   * @param runtime
-   * @param random
-   * @param dispatcher
+   * @param runtime supplies the runtime loader.
+   * @param random supplies the random generator.
+   * @param dispatcher supplies the dispatcher.
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual HealthCheckerSharedPtr createExtensionHealthChecker(const Protobuf::Message& config,
@@ -31,10 +31,8 @@ public:
                                                               Runtime::RandomGenerator& random,
                                                               Event::Dispatcher& dispatcher) PURE;
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   * @return ProtobufTypes::MessagePtr create empty config proto message which arrives in as an
+   * opaque google.protobuf.Struct message.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
