@@ -12,6 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
+        "//source/common/upstream/health_checker:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/network:network_mocks",

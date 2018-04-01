@@ -1,3 +1,5 @@
+#include "common/upstream/health_checker/health_checker_impl.h"
+
 #include "extensions/health_checkers/redis/config.h"
 
 #include "test/common/upstream/utility.h"
@@ -10,6 +12,9 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
 
+typedef Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker
+    ExtensionRedisHealthChecker;
+
 TEST(HealthCheckerFactoryTest, createRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -19,7 +24,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     extension_health_check:
-      name: envoy.redis
+      name: envoy.health_checker.redis
       config:
         key: foo
     )EOF";
@@ -31,10 +36,35 @@ TEST(HealthCheckerFactoryTest, createRedis) {
 
   RedisHealthCheckerFactory factory;
   EXPECT_NE(nullptr,
-            dynamic_cast<RedisHealthChecker*>(
+            dynamic_cast<ExtensionRedisHealthChecker*>(
                 factory
                     .createExtensionHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml),
                                                   cluster, runtime, random, dispatcher)
+                    .get()));
+}
+
+TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    extension_health_check:
+      name: envoy.health_checker.redis
+      config:
+        key: foo
+    )EOF";
+
+  NiceMock<Upstream::MockCluster> cluster;
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+  EXPECT_NE(nullptr,
+            dynamic_cast<ExtensionRedisHealthChecker*>(
+                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
+                                                       cluster, runtime, random, dispatcher)
                     .get()));
 }
 
