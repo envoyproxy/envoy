@@ -55,6 +55,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "eds_integration_test",
+    srcs = ["eds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/config:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
 # TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
 # This will go away when we delete v1 configuration.
 envoy_cc_test(
@@ -266,6 +277,7 @@ envoy_cc_test_library(
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
+        ":server_stats_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -396,6 +408,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/config:resources_lib",
+        "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
@@ -444,6 +457,12 @@ envoy_cc_test(
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "server_stats_interface",
+    hdrs = ["server_stats.h"],
+    deps = ["//include/envoy/stats:stats_interface"],
 )
 
 envoy_cc_test(

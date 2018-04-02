@@ -628,6 +628,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed, bool depend_on_hc) {
   uint64_t max_host_weight = 1;
+  // Has the EDS health status changed the health of any endpoint? If so, we
+  // rebuild the hosts vectors. We only do this if the health status of an
+  // endpoint has materially changed (e.g. if previously failing active health
+  // checks, we just note it's now failing EDS health status but don't rebuild).
+  // TODO(htuch): We can be smarter about this potentially, and not force a full
+  // host set update on health status change. The way this would work is to
+  // implement a HealthChecker subclass that provides thread local health
+  // updates to the Cluster objeect. This will probably make sense to do in
+  // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
+  bool health_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
   // new host list and raise a change notification. This uses an N^2 search given that this does not
@@ -650,6 +660,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
+        }
+
+        if ((*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
+            host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+          const bool previously_healthy = (*i)->healthy();
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+            (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+            // If the host was previously healthy and we're now unhealthy, we need to
+            // rebuild.
+            health_changed |= previously_healthy;
+          } else {
+            (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+            // If the host was previously unhealthy and now healthy, we need to
+            // rebuild.
+            health_changed |= !previously_healthy && (*i)->healthy();
+          }
         }
 
         (*i)->weight(host->weight());
@@ -702,7 +728,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-    return false;
+    // We return false here in the absence of EDS health status, because we
+    // have no changes to host vector status (modulo weights). When we have EDS
+    // health status, we return true, causing updateHosts() to fire in the
+    // caller.
+    return health_changed;
   }
 }
 

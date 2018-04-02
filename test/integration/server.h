@@ -17,6 +17,7 @@
 #include "server/server.h"
 #include "server/test_hooks.h"
 
+#include "test/integration/server_stats.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -196,6 +197,7 @@ typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
  */
 class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
                               public TestHooks,
+                              public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
@@ -218,39 +220,39 @@ public:
              std::function<void()> pre_worker_start_test_steps);
   void start();
 
-  void waitForCounterGe(const std::string& name, uint64_t value) {
+  void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value) {
+  void waitForGaugeGe(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() < value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value) {
+  void waitForGaugeEq(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 
-  Stats::CounterSharedPtr counter(const std::string& name) {
+  Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findCounter(*stat_store_, name);
   }
 
-  Stats::GaugeSharedPtr gauge(const std::string& name) {
+  Stats::GaugeSharedPtr gauge(const std::string& name) override {
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(*stat_store_, name);
   }
 
-  std::list<Stats::CounterSharedPtr> counters() { return stat_store_->counters(); }
+  std::list<Stats::CounterSharedPtr> counters() override { return stat_store_->counters(); }
 
-  std::list<Stats::GaugeSharedPtr> gauges() { return stat_store_->gauges(); }
+  std::list<Stats::GaugeSharedPtr> gauges() override { return stat_store_->gauges(); }
 
   // TestHooks
   void onWorkerListenerAdded() override;
