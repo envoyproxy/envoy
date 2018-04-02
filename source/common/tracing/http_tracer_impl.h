@@ -14,19 +14,6 @@
 namespace Envoy {
 namespace Tracing {
 
-enum class Reason {
-  NotTraceableRequestId,
-  HealthCheck,
-  Sampling,
-  ServiceForced,
-  ClientForced,
-};
-
-struct Decision {
-  Reason reason;
-  bool is_tracing;
-};
-
 /**
  * Tracing tag names.
  */
@@ -143,7 +130,8 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const RequestInfo::RequestInfo&) override {
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const RequestInfo::RequestInfo&,
+                    const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
 };
@@ -154,7 +142,8 @@ public:
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const RequestInfo::RequestInfo& request_info) override;
+                    const RequestInfo::RequestInfo& request_info,
+                    const Tracing::Decision tracing_decision) override;
 
 private:
   DriverPtr driver_;

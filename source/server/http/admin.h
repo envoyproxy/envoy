@@ -24,6 +24,7 @@
 #include "common/network/raw_buffer_socket.h"
 
 #include "server/config/network/http_connection_manager.h"
+#include "server/http/config_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -50,9 +51,12 @@ public:
   Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
+  // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
+  // Wins would be no manual removeHandler() and code reuse.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
+  ConfigTracker& getConfigTracker() override;
 
   // Network::FilterChainFactory
   bool createNetworkFilterChain(Network::Connection& connection) override;
@@ -112,6 +116,9 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
+    const envoy::api::v2::RouteConfiguration& configAsProto() const override {
+      return envoy::api::v2::RouteConfiguration::default_instance();
+    }
     const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
     Router::ConfigConstSharedPtr config_;
@@ -144,6 +151,8 @@ private:
                           Buffer::Instance& response);
   Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response);
+  Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response) const;
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
@@ -213,6 +222,7 @@ private:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   AdminListener listener_;
   Http::Http1Settings http1_settings_;
+  ConfigTrackerImpl config_tracker_;
 };
 
 /**

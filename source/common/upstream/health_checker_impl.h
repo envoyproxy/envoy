@@ -14,7 +14,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/redis/conn_pool.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -23,6 +22,8 @@
 #include "common/http/codec_client.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 
@@ -360,44 +361,48 @@ private:
 
 /**
  * Redis health checker implementation. Sends PING and expects PONG.
+ * TODO(mattklein123): Redis health checking should be via a pluggable module and not in the
+ * "core".
  */
 class RedisHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  RedisHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
-                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random,
-                         Redis::ConnPool::ClientFactory& client_factory);
+  RedisHealthCheckerImpl(
+      const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory);
 
-  static const Redis::RespValue& pingHealthCheckRequest() {
+  static const Extensions::NetworkFilters::RedisProxy::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
     return request->request_;
   }
 
-  static const Redis::RespValue& existsHealthCheckRequest(const std::string& key) {
+  static const Extensions::NetworkFilters::RedisProxy::RespValue&
+  existsHealthCheckRequest(const std::string& key) {
     static HealthCheckRequest* request = new HealthCheckRequest(key);
     return request->request_;
   }
 
 private:
-  struct RedisActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                         public Redis::ConnPool::Config,
-                                         public Redis::ConnPool::PoolCallbacks,
-                                         public Network::ConnectionCallbacks {
+  struct RedisActiveHealthCheckSession
+      : public ActiveHealthCheckSession,
+        public Extensions::NetworkFilters::RedisProxy::ConnPool::Config,
+        public Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks,
+        public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
 
-    // Redis::ConnPool::Config
+    // Extensions::NetworkFilters::RedisProxy::ConnPool::Config
     bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
       // Allow the main HC infra to control timeout.
       return parent_.timeout_ * 2;
     }
 
-    // Redis::ConnPool::PoolCallbacks
-    void onResponse(Redis::RespValuePtr&& value) override;
+    // Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks
+    void onResponse(Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) override;
     void onFailure() override;
 
     // Network::ConnectionCallbacks
@@ -406,8 +411,8 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthCheckerImpl& parent_;
-    Redis::ConnPool::ClientPtr client_;
-    Redis::ConnPool::PoolRequest* current_request_{};
+    Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr client_;
+    Extensions::NetworkFilters::RedisProxy::ConnPool::PoolRequest* current_request_{};
   };
 
   enum class Type { Ping, Exists };
@@ -416,7 +421,7 @@ private:
     HealthCheckRequest(const std::string& key);
     HealthCheckRequest();
 
-    Redis::RespValue request_;
+    Extensions::NetworkFilters::RedisProxy::RespValue request_;
   };
 
   typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;
@@ -426,7 +431,7 @@ private:
     return std::make_unique<RedisActiveHealthCheckSession>(*this, host);
   }
 
-  Redis::ConnPool::ClientFactory& client_factory_;
+  Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
 };

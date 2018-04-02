@@ -288,17 +288,22 @@ public:
   std::string name_{"fake_config"};
 };
 
-class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {
+class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
-  MOCK_METHOD5(getRouteConfigProvider,
+  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD5(getRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Upstream::ClusterManager& cm, Stats::Scope& scope,
                    const std::string& stat_prefix, Init::Manager& init_manager));
+  MOCK_METHOD3(getStaticRouteConfigProvider,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
+                                            Runtime::Loader& runtime,
+                                            Upstream::ClusterManager& cm));
+
   MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
 };
 

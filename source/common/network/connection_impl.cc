@@ -181,7 +181,6 @@ void ConnectionImpl::noDelay(bool enable) {
 #endif
 
   RELEASE_ASSERT(0 == rc);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 uint64_t ConnectionImpl::id() const { return id_; }
@@ -458,7 +457,6 @@ void ConnectionImpl::onWriteReady() {
     socklen_t error_size = sizeof(error);
     int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
     ASSERT(0 == rc);
-    UNREFERENCED_PARAMETER(rc);
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);

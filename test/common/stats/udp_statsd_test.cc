@@ -8,6 +8,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -26,7 +27,8 @@ public:
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -63,7 +65,8 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
 
 class UdpStatsdSinkWithTagsTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkWithTagsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;

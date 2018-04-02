@@ -3,11 +3,13 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -105,6 +107,16 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
+// Socket::Option implementation for API-defined listener socket options.
+// This same object can be extended to handle additional listener socket options.
+class ListenerSocketOption : public Network::SocketOptionImpl {
+public:
+  ListenerSocketOption(const envoy::api::v2::Listener& config)
+      : Network::SocketOptionImpl(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{})) {}
+};
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
@@ -125,6 +137,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
+
+  // Add listen socket options from the config.
+  addListenSocketOption(std::make_unique<ListenerSocketOption>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =

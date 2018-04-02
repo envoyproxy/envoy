@@ -4,6 +4,7 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
+#include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
 #include "test/test_common/environment.h"
@@ -133,18 +134,23 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
 
   uint32_t port_idx = 0;
+  bool eds_hosts = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    for (int j = 0; j < cluster->hosts_size(); ++j) {
-      if (cluster->mutable_hosts(j)->has_socket_address()) {
-        auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-        RELEASE_ASSERT(ports.size() > port_idx);
-        host_socket_addr->set_port_value(ports[port_idx++]);
+    if (cluster->type() == envoy::api::v2::Cluster::EDS) {
+      eds_hosts = true;
+    } else {
+      for (int j = 0; j < cluster->hosts_size(); ++j) {
+        if (cluster->mutable_hosts(j)->has_socket_address()) {
+          auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+          RELEASE_ASSERT(ports.size() > port_idx);
+          host_socket_addr->set_port_value(ports[port_idx++]);
+        }
       }
     }
   }
-  ASSERT(port_idx == ports.size());
+  ASSERT(port_idx == ports.size() || eds_hosts);
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__
@@ -358,6 +364,33 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });
+}
+
+EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {
+  // cluster.cluster_0.update_success will be incremented on the initial
+  // load when Envoy comes up.
+  ++update_successes_;
+}
+
+void EdsHelper::setEds(
+    const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+    IntegrationTestServerStats& server_stats) {
+  // Write to file the DiscoveryResponse and trigger inotify watch.
+  envoy::api::v2::DiscoveryResponse eds_response;
+  eds_response.set_version_info(std::to_string(eds_version_++));
+  eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+  for (const auto& cluster_load_assignment : cluster_load_assignments) {
+    eds_response.add_resources()->PackFrom(cluster_load_assignment);
+  }
+  // Past the initial write, need move semantics to trigger inotify move event that the
+  // FilesystemSubscriptionImpl is subscribed to.
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("eds.update.pb_text", eds_response.DebugString());
+  RELEASE_ASSERT(::rename(path.c_str(), eds_path_.c_str()) == 0);
+  // Make sure Envoy has consumed the update now that it is running.
+  server_stats.waitForCounterGe("cluster.cluster_0.update_success", ++update_successes_);
+  RELEASE_ASSERT(update_successes_ ==
+                 server_stats.counter("cluster.cluster_0.update_success")->value());
 }
 
 } // namespace Envoy

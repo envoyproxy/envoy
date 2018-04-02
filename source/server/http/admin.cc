@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -273,6 +274,23 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
     }
   }
 
+  return Http::Code::OK;
+}
+
+// TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
+Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
+                                        Buffer::Instance& response) const {
+  envoy::admin::v2::ConfigDump dump;
+  auto& config_dump_map = *(dump.mutable_configs());
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    RELEASE_ASSERT(message);
+    Protobuf::Any any_message;
+    any_message.PackFrom(*message);
+    config_dump_map[key_callback_pair.first] = any_message;
+  }
+
+  response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
 
@@ -562,6 +580,8 @@ const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::s
   return pairs;
 }
 
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
+
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
   rapidjson::Document document;
@@ -636,6 +656,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
           {"/clusters", "upstream cluster status", MAKE_ADMIN_HANDLER(handlerClusters), false,
            false},
+          {"/config_dump", "dump current Envoy configs", MAKE_ADMIN_HANDLER(handlerConfigDump),
+           false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",

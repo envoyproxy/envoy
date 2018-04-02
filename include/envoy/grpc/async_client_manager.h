@@ -34,12 +34,14 @@ public:
    * will raise an exception on failure.
    * @param grpc_service envoy::api::v2::core::GrpcService configuration.
    * @param scope stats scope.
+   * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
+   * configured.
    * @return AsyncClientFactoryPtr factory for grpc_service.
    * @throws EnvoyException when grpc_service validation fails.
    */
   virtual AsyncClientFactoryPtr
-  factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service,
-                        Stats::Scope& scope) PURE;
+  factoryForGrpcService(const envoy::api::v2::core::GrpcService& grpc_service, Stats::Scope& scope,
+                        bool skip_cluster_check) PURE;
 };
 
 typedef std::unique_ptr<AsyncClientManager> AsyncClientManagerPtr;

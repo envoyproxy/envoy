@@ -126,8 +126,10 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/redis:conn_pool_lib",
         "//source/common/router:router_lib",
+        # TODO(mattklein123): The following should not be required once we allow pluggable health
+        # checkers.
+        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
     ],
 )
@@ -165,6 +167,15 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_lib",
+    hdrs = ["locality.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -258,6 +269,7 @@ envoy_cc_library(
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
     deps = [
+        ":locality_lib",
         ":sds_subscription_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
@@ -340,6 +352,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -371,6 +384,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

@@ -26,9 +26,9 @@ public:
       fd_ = -1;
     }
   }
-  void addOption(OptionPtr&& option) override {
+  void addOption(const OptionConstSharedPtr& option) override {
     if (!options_) {
-      options_ = std::make_shared<std::vector<OptionPtr>>();
+      options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
     }
     options_->emplace_back(std::move(option));
   }
@@ -81,7 +81,6 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
                        bool restored) override {
-    ASSERT(!restored || *local_address != *local_address_);
     local_address_ = local_address;
     local_address_restored_ = restored;
   }

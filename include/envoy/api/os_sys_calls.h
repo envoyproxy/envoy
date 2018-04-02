@@ -63,6 +63,17 @@ public:
    * @see man 2 stat
    */
   virtual int stat(const char* pathname, struct stat* buf) PURE;
+
+  /**
+   * @see man 2 setsockopt
+   */
+  virtual int setsockopt(int sockfd, int level, int optname, const void* optval,
+                         socklen_t optlen) PURE;
+
+  /**
+   * @see man 2 getsockopt
+   */
+  virtual int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

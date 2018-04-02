@@ -60,7 +60,6 @@ SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options
   if (options.restartEpoch() == 0) {
     int rc = os_sys_calls.ftruncate(shmem_fd, total_size);
     RELEASE_ASSERT(rc != -1);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
@@ -137,7 +136,6 @@ HotRestartImpl::HotRestartImpl(Options& options)
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);
   RELEASE_ASSERT(rc != -1);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
@@ -170,7 +168,6 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
-  UNREFERENCED_PARAMETER(key_removed);
   memset(&data, 0, Stats::RawStatData::size());
 }
 
@@ -272,7 +269,6 @@ void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance&
       dispatcher.createFileEvent(my_domain_socket_,
                                  [this](uint32_t events) -> void {
                                    ASSERT(events == Event::FileReadyType::Read);
-                                   UNREFERENCED_PARAMETER(events);
                                    onSocketEvent();
                                  },
                                  Event::FileTriggerType::Edge, Event::FileReadyType::Read);
@@ -284,7 +280,6 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, 0);
     RELEASE_ASSERT(rc != -1);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   iovec iov[1];
@@ -314,7 +309,6 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK);
     RELEASE_ASSERT(rc != -1);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   RpcBase* rpc = reinterpret_cast<RpcBase*>(&rpc_buffer_[0]);
@@ -352,7 +346,6 @@ void HotRestartImpl::sendMessage(sockaddr_un& address, RpcBase& rpc) {
   message.msg_iovlen = 1;
   int rc = sendmsg(my_domain_socket_, &message, 0);
   RELEASE_ASSERT(rc != -1);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
@@ -396,7 +389,6 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
 
     int rc = sendmsg(my_domain_socket_, &message, 0);
     RELEASE_ASSERT(rc != -1);
-    UNREFERENCED_PARAMETER(rc);
   }
 }
 
