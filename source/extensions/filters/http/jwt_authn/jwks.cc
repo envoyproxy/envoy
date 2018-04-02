@@ -1,9 +1,9 @@
-#include "common/jwt_authn/jwks.h"
+#include "extensions/filters/http/jwt_authn/jwks.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/json/json_loader.h"
-#include "common/jwt_authn/utils.h"
+#include "extensions/filters/http/jwt_authn/utils.h"
 
 #include "openssl/bn.h"
 #include "openssl/ecdsa.h"
@@ -12,6 +12,8 @@
 #include "openssl/sha.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
@@ -246,4 +248,6 @@ void Jwks::extractJwkFromJwkEC(Json::ObjectSharedPtr jwk_json) {
 }
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

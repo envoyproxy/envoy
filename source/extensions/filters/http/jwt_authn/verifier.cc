@@ -1,6 +1,6 @@
-#include "common/jwt_authn/verifier.h"
+#include "extensions/filters/http/jwt_authn/verifier.h"
 
-#include "common/jwt_authn/utils.h"
+#include "extensions/filters/http/jwt_authn/utils.h"
 
 #include "openssl/bn.h"
 #include "openssl/ecdsa.h"
@@ -9,6 +9,8 @@
 #include "openssl/sha.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
@@ -87,4 +89,6 @@ Status verifyJwt(const Jwt& jwt, const Jwks& jwks) {
 }
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

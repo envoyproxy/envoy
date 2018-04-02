@@ -6,12 +6,14 @@
 #include "envoy/json/json_object.h"
 
 #include "common/common/logger.h"
-#include "common/jwt_authn/status.h"
+#include "extensions/filters/http/jwt_authn/status.h"
 
 #include "openssl/ec.h"
 #include "openssl/evp.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
@@ -65,4 +67,6 @@ private:
 typedef std::unique_ptr<Jwks> JwksPtr;
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

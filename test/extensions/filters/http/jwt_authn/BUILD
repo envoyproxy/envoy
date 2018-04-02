@@ -14,7 +14,7 @@ envoy_cc_test(
         "jwt_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
         "//test/test_common:utility_lib",
     ],
@@ -26,7 +26,7 @@ envoy_cc_test(
         "jwks_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
         "//test/test_common:utility_lib",
     ],
@@ -38,7 +38,7 @@ envoy_cc_test(
         "verify_pem_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
         "//test/test_common:utility_lib",
     ],
@@ -50,7 +50,7 @@ envoy_cc_test(
         "verify_jwk_rsa_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
         "//test/test_common:utility_lib",
     ],
@@ -62,7 +62,7 @@ envoy_cc_test(
         "verify_jwk_ec_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
         "//test/test_common:utility_lib",
     ],

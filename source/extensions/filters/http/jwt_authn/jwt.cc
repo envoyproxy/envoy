@@ -1,4 +1,4 @@
-#include "common/jwt_authn/jwt.h"
+#include "extensions/filters/http/jwt_authn/jwt.h"
 
 #include <algorithm>
 
@@ -7,6 +7,8 @@
 #include "common/json/json_loader.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 Status Jwt::parseFromString(const std::string& jwt) {
@@ -88,4 +90,6 @@ Status Jwt::parseFromString(const std::string& jwt) {
 }
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

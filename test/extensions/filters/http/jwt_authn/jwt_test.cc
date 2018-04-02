@@ -1,8 +1,10 @@
-#include "common/jwt_authn/jwt.h"
+#include "extensions/filters/http/jwt_authn/jwt.h"
 
 #include "test/test_common/utility.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
@@ -152,4 +154,6 @@ TEST(JwtParseTest, InvalidSignature) {
 
 } // namespace
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

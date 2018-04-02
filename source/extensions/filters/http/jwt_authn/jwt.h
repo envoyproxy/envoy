@@ -3,9 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "common/jwt_authn/status.h"
+#include "extensions/filters/http/jwt_authn/status.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
@@ -44,4 +46,6 @@ struct Jwt {
 };
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -1,10 +1,12 @@
 #pragma once
 
-#include "common/jwt_authn/jwks.h"
-#include "common/jwt_authn/jwt.h"
-#include "common/jwt_authn/status.h"
+#include "extensions/filters/http/jwt_authn/jwks.h"
+#include "extensions/filters/http/jwt_authn/jwt.h"
+#include "extensions/filters/http/jwt_authn/status.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
@@ -17,4 +19,6 @@ namespace JwtAuthn {
 Status verifyJwt(const Jwt& jwt, const Jwks& jwks);
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

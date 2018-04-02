@@ -1,8 +1,10 @@
-#include "common/jwt_authn/status.h"
+#include "extensions/filters/http/jwt_authn/status.h"
 
 #include <map>
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 std::string getStatusString(Status status) {
@@ -40,4 +42,6 @@ std::string getStatusString(Status status) {
 }
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
