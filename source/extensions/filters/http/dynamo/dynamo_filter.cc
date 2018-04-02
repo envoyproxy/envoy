@@ -1,4 +1,4 @@
-#include "common/dynamo/dynamo_filter.h"
+#include "extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,14 +8,17 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/dynamo/dynamo_request_parser.h"
-#include "common/dynamo/dynamo_utility.h"
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/utility.h"
 #include "common/json/json_loader.h"
 
+#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+#include "extensions/filters/http/dynamo/dynamo_utility.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 Http::FilterHeadersStatus DynamoFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
@@ -240,4 +243,6 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
 }
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

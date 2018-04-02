@@ -9,9 +9,11 @@
 #include "common/json/json_loader.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
-/*
+/**
  * Request parser for dynamodb request/response.
  *
  * Basic dynamodb json request/response format:
@@ -101,4 +103,6 @@ private:
 };
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

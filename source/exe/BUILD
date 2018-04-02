@@ -58,21 +58,11 @@ envoy_cc_library(
     ] + envoy_all_extensions(),
 )
 
-# Non-core HTTP/TCP proxy libraries.
-# TODO(mattklein123): Delete this when extension migration is complete.
-envoy_cc_library(
-    name = "extra_protocol_proxies_lib",
-    deps = [
-        "//source/server/config/http:dynamo_lib",
-    ],
-)
-
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
-        ":extra_protocol_proxies_lib",
         "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",

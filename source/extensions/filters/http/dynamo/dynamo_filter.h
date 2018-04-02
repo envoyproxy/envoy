@@ -7,10 +7,13 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
-#include "common/dynamo/dynamo_request_parser.h"
 #include "common/json/json_loader.h"
 
+#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
+
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 /**
@@ -74,4 +77,6 @@ private:
 };
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

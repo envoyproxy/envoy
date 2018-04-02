@@ -151,6 +151,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/dynamo:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -308,7 +309,6 @@ envoy_cc_test_library(
         "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
-        "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
@@ -346,6 +346,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/server/config/stats:statsd_lib",
         "//test/test_common:utility_lib",
     ],
