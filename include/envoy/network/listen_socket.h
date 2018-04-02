@@ -31,7 +31,7 @@ public:
    */
   virtual void close() PURE;
 
-  enum class SocketState { PreBind, PostBind };
+  enum class SocketState { PreBind, PostBind, Listening };
 
   /**
    * Visitor class for setting socket options.

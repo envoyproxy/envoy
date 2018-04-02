@@ -102,7 +102,6 @@ public:
    */
   virtual Network::ListenerPtr createListener(Network::Socket& socket,
                                               Network::ListenerCallbacks& cb, bool bind_to_port,
-                                              bool enable_tcp_fast_open,
                                               bool hand_off_restored_destination_connections) PURE;
 
   /**

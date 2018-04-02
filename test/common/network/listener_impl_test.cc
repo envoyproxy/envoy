@@ -30,7 +30,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
-      dispatcher.createListener(socket, listener_callbacks, true, false, false);
+      dispatcher.createListener(socket, listener_callbacks, true, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -65,9 +65,8 @@ TEST_P(ListenerImplDeathTest, ErrorCallback) {
 class TestListenerImpl : public ListenerImpl {
 public:
   TestListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                   bool bind_to_port, bool enable_tcp_fast_open,
-                   bool hand_off_restored_destination_connections)
-      : ListenerImpl(dispatcher, socket, cb, bind_to_port, enable_tcp_fast_open,
+                   bool bind_to_port, bool hand_off_restored_destination_connections)
+      : ListenerImpl(dispatcher, socket, cb, bind_to_port,
                      hand_off_restored_destination_connections) {}
 
   MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
@@ -96,10 +95,9 @@ TEST_P(ListenerImplTest, UseActualDst) {
   Network::MockListenerCallbacks listener_callbacks1;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks1, true, false, true);
+  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks1, true, true);
   Network::MockListenerCallbacks listener_callbacks2;
-  Network::TestListenerImpl listenerDst(dispatcher, socketDst, listener_callbacks2, false, false,
-                                        false);
+  Network::TestListenerImpl listenerDst(dispatcher, socketDst, listener_callbacks2, false, false);
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -133,7 +131,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, false, true);
+  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, true);
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
@@ -180,7 +178,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   ASSERT_TRUE(socket.localAddress()->ip()->isAnyAddress());
 
   // Do not redirect since use_original_dst is false.
-  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, false, true);
+  Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, true);
 
   auto listener_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());

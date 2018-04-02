@@ -48,6 +48,7 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
+
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
@@ -215,7 +216,6 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
-  bool enableTcpFastOpen() override { return enable_tcp_fast_open_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
@@ -277,7 +277,6 @@ private:
   std::vector<Ssl::ServerContextPtr> tls_contexts_;
   std::vector<Network::TransportSocketFactoryPtr> transport_socket_factories_;
   const bool bind_to_port_;
-  const bool enable_tcp_fast_open_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;

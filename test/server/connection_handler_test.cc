@@ -30,10 +30,8 @@ public:
   class TestListener : public Network::ListenerConfig, public LinkedObject<TestListener> {
   public:
     TestListener(ConnectionHandlerTest& parent, uint64_t tag, bool bind_to_port,
-                 bool enable_tcp_fast_open, bool hand_off_restored_destination_connections,
-                 const std::string& name)
+                 bool hand_off_restored_destination_connections, const std::string& name)
         : parent_(parent), tag_(tag), bind_to_port_(bind_to_port),
-          enable_tcp_fast_open_(enable_tcp_fast_open),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
           name_(name) {}
 
@@ -43,7 +41,6 @@ public:
       return transport_socket_factory_;
     }
     bool bindToPort() override { return bind_to_port_; }
-    bool enableTcpFastOpen() override { return enable_tcp_fast_open_; }
     bool handOffRestoredDestinationConnections() const override {
       return hand_off_restored_destination_connections_;
     }
@@ -57,18 +54,17 @@ public:
     Network::RawBufferSocketFactory transport_socket_factory_;
     uint64_t tag_;
     bool bind_to_port_;
-    bool enable_tcp_fast_open_;
     const bool hand_off_restored_destination_connections_;
     const std::string name_;
   };
 
   typedef std::unique_ptr<TestListener> TestListenerPtr;
 
-  TestListener* addListener(uint64_t tag, bool bind_to_port, bool enable_tcp_fast_open,
+  TestListener* addListener(uint64_t tag, bool bind_to_port,
                             bool hand_off_restored_destination_connections,
                             const std::string& name) {
-    TestListener* listener = new TestListener(*this, tag, bind_to_port, enable_tcp_fast_open,
-                                              hand_off_restored_destination_connections, name);
+    TestListener* listener =
+        new TestListener(*this, tag, bind_to_port, hand_off_restored_destination_connections, name);
     listener->moveIntoListBack(TestListenerPtr{listener}, listeners_);
     return listener;
   }
@@ -85,14 +81,14 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
 
   Network::MockListener* listener = new NiceMock<Network::MockListener>();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, false))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks = &cb;
-        return listener;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
 
-      }));
-  TestListener* test_listener = addListener(1, true, false, false, "test_listener");
+          }));
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -123,14 +119,14 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
 
   Network::MockListener* listener = new NiceMock<Network::MockListener>();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks = &cb;
-        return listener;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
 
-      }));
-  TestListener* test_listener = addListener(1, true, false, false, "test_listener");
+          }));
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -150,14 +146,14 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
 
   Network::MockListener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks = &cb;
-        return listener;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
 
-      }));
-  TestListener* test_listener = addListener(1, true, false, false, "test_listener");
+          }));
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -176,14 +172,14 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 
   Network::MockListener* listener = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks = &cb;
-        return listener;
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks = &cb;
+            return listener;
 
-      }));
-  TestListener* test_listener = addListener(1, true, false, false, "test_listener");
+          }));
+  TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
   handler_->addListener(*test_listener);
 
@@ -197,28 +193,28 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
 }
 
 TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
-  TestListener* test_listener1 = addListener(1, true, false, true, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, true, "test_listener1");
   Network::Address::InstanceConstSharedPtr alt_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
 
   Network::MockListener* listener = new Network::MockListener();
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, true))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool, bool,
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, true))
+      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool,
                            bool) -> Network::Listener* { return listener; }));
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(ReturnRef(alt_address));
   handler_->addListener(*test_listener1);
 
   EXPECT_EQ(listener, handler_->findListenerByAddress(ByRef(*alt_address)));
 
-  TestListener* test_listener2 = addListener(2, true, false, false, "test_listener2");
+  TestListener* test_listener2 = addListener(2, true, false, "test_listener2");
   Network::Address::InstanceConstSharedPtr alt_address2(
       new Network::Address::Ipv4Instance("0.0.0.0", 10001));
   Network::Address::InstanceConstSharedPtr alt_address3(
       new Network::Address::Ipv4Instance("127.0.0.2", 10001));
 
   Network::MockListener* listener2 = new Network::MockListener();
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, false))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool, bool,
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool,
                            bool) -> Network::Listener* { return listener2; }));
   EXPECT_CALL(test_listener2->socket_, localAddress()).WillRepeatedly(ReturnRef(alt_address2));
   handler_->addListener(*test_listener2);
@@ -235,8 +231,8 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
   handler_->stopListeners(2);
 
   Network::MockListener* listener3 = new Network::MockListener();
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, _))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool, bool,
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
+      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks&, bool,
                            bool) -> Network::Listener* { return listener3; }));
   handler_->addListener(*test_listener2);
 
@@ -247,29 +243,29 @@ TEST_F(ConnectionHandlerTest, FindListenerByAddress) {
 }
 
 TEST_F(ConnectionHandlerTest, NormalRedirect) {
-  TestListener* test_listener1 = addListener(1, true, false, true, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, true))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks1 = &cb;
-        return listener1;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, true))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks1 = &cb;
+            return listener1;
+          }));
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
   handler_->addListener(*test_listener1);
 
-  TestListener* test_listener2 = addListener(1, false, false, false, "test_listener2");
+  TestListener* test_listener2 = addListener(1, false, false, "test_listener2");
   Network::MockListener* listener2 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks2;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, false))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks2 = &cb;
-        return listener2;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks2 = &cb;
+            return listener2;
+          }));
   Network::Address::InstanceConstSharedPtr alt_address(
       new Network::Address::Ipv4Instance("127.0.0.2", 20002));
   EXPECT_CALL(test_listener2->socket_, localAddress()).WillRepeatedly(ReturnRef(alt_address));
@@ -306,29 +302,29 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
 }
 
 TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
-  TestListener* test_listener1 = addListener(1, true, false, true, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, true))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks1 = &cb;
-        return listener1;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, true))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks1 = &cb;
+            return listener1;
+          }));
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001));
   EXPECT_CALL(test_listener1->socket_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
   handler_->addListener(*test_listener1);
 
-  TestListener* test_listener2 = addListener(1, false, false, false, "test_listener2");
+  TestListener* test_listener2 = addListener(1, false, false, "test_listener2");
   Network::MockListener* listener2 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks2;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, false))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks2 = &cb;
-        return listener2;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, false))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks2 = &cb;
+            return listener2;
+          }));
   Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getIpv4AnyAddress();
   EXPECT_CALL(test_listener2->socket_, localAddress()).WillRepeatedly(ReturnRef(any_address));
   handler_->addListener(*test_listener2);
@@ -367,15 +363,15 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
-  TestListener* test_listener1 = addListener(1, true, false, true, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, true))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks1 = &cb;
-        return listener1;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, true))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks1 = &cb;
+            return listener1;
+          }));
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 80));
   // Original dst address nor port number match that of the listener's address.
@@ -412,15 +408,15 @@ TEST_F(ConnectionHandlerTest, WildcardListenerWithOriginalDst) {
 }
 
 TEST_F(ConnectionHandlerTest, WildcardListenerWithNoOriginalDst) {
-  TestListener* test_listener1 = addListener(1, true, false, true, "test_listener1");
+  TestListener* test_listener1 = addListener(1, true, true, "test_listener1");
   Network::MockListener* listener1 = new Network::MockListener();
   Network::ListenerCallbacks* listener_callbacks1;
-  EXPECT_CALL(dispatcher_, createListener_(_, _, _, _, true))
-      .WillOnce(Invoke([&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool,
-                           bool) -> Network::Listener* {
-        listener_callbacks1 = &cb;
-        return listener1;
-      }));
+  EXPECT_CALL(dispatcher_, createListener_(_, _, _, true))
+      .WillOnce(Invoke(
+          [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
+            listener_callbacks1 = &cb;
+            return listener1;
+          }));
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 80));
   Network::Address::InstanceConstSharedPtr any_address = Network::Utility::getAddressWithPort(

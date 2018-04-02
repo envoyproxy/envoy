@@ -32,8 +32,25 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
         return false;
       }
     }
-  }
+  } else if (state == Socket::SocketState::Listening) {
+    if (accept_tcp_fast_open_.has_value()) {
+      const int tfo_value = accept_tcp_fast_open_.value() ? ENVOY_TCP_FASTOPEN_BACKLOG : 0;
+      const SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
+      int error = -1;
+      if (option_name) {
+        error = Api::OsSysCallsSingleton::get().setsockopt(
+            socket.fd(), IPPROTO_TCP, option_name.value(),
+            reinterpret_cast<const void*>(&tfo_value), sizeof(tfo_value));
+      } else {
+        error = ENOTSUP;
+      }
 
+      if (error != 0) {
+        ENVOY_LOG(warn, "Setting IP_TCP_FASTOPEN on listener socket failed: {}", strerror(error));
+        return false;
+      }
+    }
+  }
   return true;
 }
 

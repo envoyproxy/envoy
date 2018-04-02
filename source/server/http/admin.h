@@ -195,7 +195,6 @@ private:
       return parent_.transport_socket_factory_;
     }
     bool bindToPort() override { return true; }
-    bool enableTcpFastOpen() override { return false; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
     Stats::Scope& listenerScope() override { return *scope_; }
