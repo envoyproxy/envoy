@@ -1,18 +1,22 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/lua/wrappers.h"
 
-#include "test/test_common/lua_wrappers.h"
+#include "extensions/filters/common/lua/wrappers.h"
+
+#include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 class LuaBufferWrapperTest : public LuaWrappersTestBase<BufferWrapper> {};
 
-class LuaMetadataMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<MetadataMapWrapper> {
+class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper> {
 public:
   virtual void setup(const std::string& script) {
-    Envoy::Lua::LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
+    LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
     state_->registerType<MetadataMapIterator>();
   }
 
@@ -216,9 +220,12 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
   const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
   EXPECT_THROW_WITH_MESSAGE(
-      start("callMe"), Envoy::Lua::LuaException,
+      start("callMe"), LuaException,
       "[string \"...\"]:5: cannot create a second iterator before completing the first");
 }
 
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

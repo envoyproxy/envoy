@@ -1,4 +1,4 @@
-#include "common/lua/lua.h"
+#include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -11,6 +11,9 @@ using testing::NiceMock;
 using testing::_;
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 class TestObject : public BaseLuaObject<TestObject> {
@@ -150,4 +153,7 @@ TEST_F(LuaTest, MarkDead) {
 }
 
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

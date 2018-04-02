@@ -1,17 +1,17 @@
-#include "common/http/filter/lua/wrappers.h"
+#include "extensions/filters/http/lua/wrappers.h"
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
 HeaderMapIterator::HeaderMapIterator(HeaderMapWrapper& parent) : parent_(parent) {
   entries_.reserve(parent_.headers_.size());
   parent_.headers_.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         HeaderMapIterator* iterator = static_cast<HeaderMapIterator*>(context);
         iterator->entries_.push_back(&header);
-        return HeaderMap::Iterate::Continue;
+        return Http::HeaderMap::Iterate::Continue;
       },
       this);
 }
@@ -33,13 +33,13 @@ int HeaderMapWrapper::luaAdd(lua_State* state) {
 
   const char* key = luaL_checkstring(state, 2);
   const char* value = luaL_checkstring(state, 3);
-  headers_.addCopy(LowerCaseString(key), value);
+  headers_.addCopy(Http::LowerCaseString(key), value);
   return 0;
 }
 
 int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
-  const HeaderEntry* entry = headers_.get(LowerCaseString(key));
+  const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
   if (entry != nullptr) {
     lua_pushstring(state, entry->value().c_str());
     return 1;
@@ -70,9 +70,9 @@ int HeaderMapWrapper::luaReplace(lua_State* state) {
 
   const char* key = luaL_checkstring(state, 2);
   const char* value = luaL_checkstring(state, 3);
-  const LowerCaseString lower_key(key);
+  const Http::LowerCaseString lower_key(key);
 
-  HeaderEntry* entry = headers_.get(lower_key);
+  Http::HeaderEntry* entry = headers_.get(lower_key);
   if (entry != nullptr) {
     entry->value(value, strlen(value));
   } else {
@@ -86,7 +86,7 @@ int HeaderMapWrapper::luaRemove(lua_State* state) {
   checkModifiable(state);
 
   const char* key = luaL_checkstring(state, 2);
-  headers_.remove(LowerCaseString(key));
+  headers_.remove(Http::LowerCaseString(key));
   return 0;
 }
 
@@ -101,6 +101,6 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
 }
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

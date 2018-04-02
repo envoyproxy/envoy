@@ -47,7 +47,6 @@ envoy_cc_library(
         "//source/server/config/http:grpc_web_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
-        "//source/server/config/http:lua_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
