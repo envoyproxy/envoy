@@ -128,7 +128,6 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable std::mutex lock_;
-  mutable std::mutex merge_lock_;
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
