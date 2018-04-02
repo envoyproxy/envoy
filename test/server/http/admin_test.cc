@@ -14,6 +14,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -80,6 +81,7 @@ public:
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")) {
+
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
@@ -131,9 +133,13 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
-                                       Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                       server_, listener_scope_.createScope("listener.admin."));
+  std::unique_ptr<AdminImpl> admin_bad_address_out_path;
+  EXPECT_LOG_CONTAINS(
+      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      admin_bad_address_out_path =
+          std::make_unique<AdminImpl>("/dev/null", cpu_profile_path_, bad_path,
+                                      Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                      server_, listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -143,7 +149,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   };
 
   // Test removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false));
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
@@ -169,15 +175,20 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(
-      admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
+                      EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
+                      EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {

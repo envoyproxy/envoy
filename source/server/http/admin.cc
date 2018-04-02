@@ -173,13 +173,13 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   // Now either change all levels or a single level.
   if (name == "level") {
     ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (const Logger::Logger& logger : Logger::Registry::loggers()) {
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
       logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
     }
   } else {
     ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    const Logger::Logger* logger_to_change = nullptr;
-    for (const Logger::Logger& logger : Logger::Registry::loggers()) {
+    Logger::Logger* logger_to_change = nullptr;
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
       if (logger.name() == name) {
         logger_to_change = &logger;
         break;
@@ -846,7 +846,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   // make no sense as part of a URL path: ? and :.
   const std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
-    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix[pos]);
+    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix, prefix[pos]);
     return false;
   }
 
