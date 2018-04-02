@@ -171,6 +171,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_lib",
+    hdrs = ["locality.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
@@ -260,6 +269,7 @@ envoy_cc_library(
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
     deps = [
+        ":locality_lib",
         ":sds_subscription_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
@@ -374,6 +384,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

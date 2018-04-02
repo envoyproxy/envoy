@@ -2,7 +2,7 @@ REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
         commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
-        remote = "https://boringssl.googlesource.com/boringssl",
+        remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
@@ -76,7 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "ec157d3d8b359a1bd65c22116ba4387a459cc53a",
+        commit = "92ffa417b5d2e8ab3912ff4da4daa6aa93f8df0f",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

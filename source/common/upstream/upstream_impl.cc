@@ -75,7 +75,9 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
 class UpstreamSocketOption : public Network::SocketOptionImpl {
 public:
   UpstreamSocketOption(const ClusterInfo& cluster_info)
-      : Network::SocketOptionImpl(cluster_info.features() & ClusterInfo::Features::FREEBIND) {}
+      : Network::SocketOptionImpl({}, cluster_info.features() & ClusterInfo::Features::FREEBIND
+                                          ? true
+                                          : absl::optional<bool>{}) {}
 };
 
 } // namespace
@@ -126,6 +128,69 @@ HostsPerLocalityImpl::filter(std::function<bool(const Host&)> predicate) const {
   }
 
   return shared_filtered_clone;
+}
+
+void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
+                              HostVectorConstSharedPtr healthy_hosts,
+                              HostsPerLocalityConstSharedPtr hosts_per_locality,
+                              HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                              LocalityWeightsConstSharedPtr locality_weights,
+                              const HostVector& hosts_added, const HostVector& hosts_removed) {
+  hosts_ = std::move(hosts);
+  healthy_hosts_ = std::move(healthy_hosts);
+  hosts_per_locality_ = std::move(hosts_per_locality);
+  healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
+  locality_weights_ = std::move(locality_weights);
+  // Rebuild the locality scheduler.
+  // TODO(htuch): if the underlying locality index ->
+  // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
+  // could just update locality_weight_ without rebuilding. Similar to how host
+  // level WRR works, we would age out the existing entries via picks and lazily
+  // apply the new weights.
+  if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
+      !locality_weights_->empty()) {
+    locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
+    locality_entries_.clear();
+    for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {
+      const double effective_weight = effectiveLocalityWeight(i);
+      if (effective_weight > 0) {
+        locality_entries_.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
+        locality_scheduler_->add(effective_weight, locality_entries_.back());
+      }
+    }
+  } else {
+    locality_scheduler_ = nullptr;
+  }
+  runUpdateCallbacks(hosts_added, hosts_removed);
+}
+
+absl::optional<uint32_t> HostSetImpl::chooseLocality() {
+  if (locality_scheduler_ == nullptr) {
+    return {};
+  }
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
+  // We don't build a schedule if there are no weighted localities, so we should always succeed.
+  ASSERT(locality != nullptr);
+  // If we picked it before, its weight must have been positive.
+  ASSERT(locality->effective_weight_ > 0);
+  locality_scheduler_->add(locality->effective_weight_, locality);
+  return locality->index_;
+}
+
+double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
+  ASSERT(locality_weights_ != nullptr);
+  ASSERT(hosts_per_locality_ != nullptr);
+  const auto& locality_hosts = hosts_per_locality_->get()[index];
+  const auto& locality_healthy_hosts = healthy_hosts_per_locality_->get()[index];
+  ASSERT(!locality_hosts.empty());
+  const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
+  const uint32_t weight = (*locality_weights_)[index];
+  // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
+  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
+  // Eventually the overprovision factor will likely be made configurable.
+  const double effective_locality_health_ratio =
+      std::min(1.0, (kOverProvisioningFactor / 100.0) * locality_healthy_ratio);
+  return weight * effective_locality_health_ratio;
 }
 
 HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
@@ -450,11 +515,12 @@ void ClusterImplBase::reloadHealthyHosts() {
   }
 
   for (auto& host_set : prioritySet().hostSetsPerPriority()) {
+    // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-    host_set->updateHosts(hosts_copy, createHealthyHostList(host_set->hosts()),
-                          hosts_per_locality_copy,
-                          createHealthyHostLists(host_set->hostsPerLocality()), {}, {});
+    host_set->updateHosts(
+        hosts_copy, createHealthyHostList(host_set->hosts()), hosts_per_locality_copy,
+        createHealthyHostLists(host_set->hostsPerLocality()), host_set->localityWeights(), {}, {});
   }
 }
 
@@ -550,7 +616,7 @@ void StaticClusterImpl::startPreInit() {
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
                              *initial_hosts_, {});
   initial_hosts_ = nullptr;
 
@@ -562,6 +628,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed, bool depend_on_hc) {
   uint64_t max_host_weight = 1;
+  // Has the EDS health status changed the health of any endpoint? If so, we
+  // rebuild the hosts vectors. We only do this if the health status of an
+  // endpoint has materially changed (e.g. if previously failing active health
+  // checks, we just note it's now failing EDS health status but don't rebuild).
+  // TODO(htuch): We can be smarter about this potentially, and not force a full
+  // host set update on health status change. The way this would work is to
+  // implement a HealthChecker subclass that provides thread local health
+  // updates to the Cluster objeect. This will probably make sense to do in
+  // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
+  bool health_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
   // new host list and raise a change notification. This uses an N^2 search given that this does not
@@ -584,6 +660,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
+        }
+
+        if ((*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
+            host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+          const bool previously_healthy = (*i)->healthy();
+          if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+            (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+            // If the host was previously healthy and we're now unhealthy, we need to
+            // rebuild.
+            health_changed |= previously_healthy;
+          } else {
+            (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+            // If the host was previously unhealthy and now healthy, we need to
+            // rebuild.
+            health_changed |= !previously_healthy && (*i)->healthy();
+          }
         }
 
         (*i)->weight(host->weight());
@@ -636,7 +728,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-    return false;
+    // We return false here in the absence of EDS health status, because we
+    // have no changes to host vector status (modulo weights). When we have EDS
+    // health status, we return true, causing updateHosts() to fire in the
+    // caller.
+    return health_changed;
   }
 }
 
@@ -693,7 +789,7 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
                              hosts_added, hosts_removed);
 }
 

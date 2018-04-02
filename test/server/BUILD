@@ -133,8 +133,8 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
+        "//source/extensions/filters/listener/original_dst:config",
         "//source/server:listener_manager_lib",
-        "//source/server/config/listener:original_dst_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
@@ -155,6 +155,7 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/common:version_lib",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/ratelimit:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/server:server_lib",
@@ -162,6 +163,7 @@ envoy_cc_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

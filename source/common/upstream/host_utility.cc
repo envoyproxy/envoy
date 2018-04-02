@@ -19,6 +19,10 @@ std::string HostUtility::healthFlagsToString(const Host& host) {
     ret += "/failed_outlier_check";
   }
 
+  if (host.healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+    ret += "/failed_eds_health";
+  }
+
   return ret;
 }
 

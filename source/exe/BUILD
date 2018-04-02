@@ -47,10 +47,7 @@ envoy_cc_library(
         "//source/server/config/http:grpc_web_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
-        "//source/server/config/http:lua_lib",
         "//source/server/config/http:router_lib",
-        "//source/server/config/listener:original_dst_lib",
-        "//source/server/config/listener:proxy_protocol_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
@@ -61,21 +58,11 @@ envoy_cc_library(
     ] + envoy_all_extensions(),
 )
 
-# Non-core HTTP/TCP proxy libraries.
-# TODO(mattklein123): Delete this when extension migration is complete.
-envoy_cc_library(
-    name = "extra_protocol_proxies_lib",
-    deps = [
-        "//source/server/config/http:dynamo_lib",
-    ],
-)
-
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
-        ":extra_protocol_proxies_lib",
         "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/http:lightstep_lib",
         "//source/server/config/http:zipkin_lib",

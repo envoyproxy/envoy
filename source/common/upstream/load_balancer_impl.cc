@@ -14,9 +14,11 @@
 namespace Envoy {
 namespace Upstream {
 
+namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
+} // namespace
 
 uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
                                           const std::vector<uint32_t>& per_priority_load) {
@@ -57,13 +59,13 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
-  // somewhat arbitrary overprovision factor of 1.4.
+  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
   // Eventually the overprovision factor will likely be made configurable.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
   per_priority_health_[priority] = 0;
   if (host_set.hosts().size() > 0) {
-    per_priority_health_[priority] =
-        std::min<uint32_t>(100, 140 * host_set.healthyHosts().size() / host_set.hosts().size());
+    per_priority_health_[priority] = std::min<uint32_t>(
+        100, kOverProvisioningFactor * host_set.healthyHosts().size() / host_set.hosts().size());
   }
 
   // Now that we've updated health for the changed priority level, we need to caculate percentage
@@ -95,7 +97,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   }
 }
 
-const HostSet& LoadBalancerBase::chooseHostSet() {
+HostSet& LoadBalancerBase::chooseHostSet() {
   const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
   return *priority_set_.hostSetsPerPriority()[priority];
 }
@@ -340,7 +342,7 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
 }
 
 ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUse() {
-  const HostSet& host_set = chooseHostSet();
+  HostSet& host_set = chooseHostSet();
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 
@@ -348,6 +350,14 @@ ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUs
   if (isGlobalPanic(host_set)) {
     stats_.lb_healthy_panic_.inc();
     hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+    return hosts_source;
+  }
+
+  // If we're doing locality weighted balancing, pick locality.
+  const absl::optional<uint32_t> locality = host_set.chooseLocality();
+  if (locality.has_value()) {
+    hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+    hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
 

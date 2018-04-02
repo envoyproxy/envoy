@@ -82,7 +82,7 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
       envoy::config::ratelimit::v2::RateLimitServiceConfig::kClusterName) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
-  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);
+  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
