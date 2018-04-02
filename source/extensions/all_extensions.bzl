@@ -4,6 +4,8 @@
 # selection options such as maturity.
 def envoy_all_extensions(repository = ""):
   return [
+    repository + "//source/extensions/access_loggers/file:config",
+    repository + "//source/extensions/access_loggers/http_grpc:config",
     repository + "//source/extensions/filters/http/dynamo:config",
     repository + "//source/extensions/filters/http/ext_authz:config",
     repository + "//source/extensions/filters/http/lua:config",

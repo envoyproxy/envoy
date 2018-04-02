@@ -1,4 +1,4 @@
-#include "common/access_log/grpc_access_log_impl.h"
+#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"
@@ -6,7 +6,9 @@
 #include "common/request_info/utility.h"
 
 namespace Envoy {
-namespace AccessLog {
+namespace Extensions {
+namespace AccessLoggers {
+namespace HttpGrpc {
 
 GrpcAccessLogStreamerImpl::GrpcAccessLogStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                                                      ThreadLocal::SlotAllocator& tls,
@@ -61,7 +63,8 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
 }
 
 HttpGrpcAccessLog::HttpGrpcAccessLog(
-    FilterPtr&& filter, const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
+    AccessLog::FilterPtr&& filter,
+    const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
       grpc_access_log_streamer_(grpc_access_log_streamer) {}
@@ -285,5 +288,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   grpc_access_log_streamer_->send(message, config_.common_config().log_name());
 }
 
-} // namespace AccessLog
+} // namespace HttpGrpc
+} // namespace AccessLoggers
+} // namespace Extensions
 } // namespace Envoy

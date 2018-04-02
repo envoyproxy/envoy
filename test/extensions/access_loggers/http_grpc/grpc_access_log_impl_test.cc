@@ -1,5 +1,6 @@
-#include "common/access_log/grpc_access_log_impl.h"
 #include "common/network/address_impl.h"
+
+#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -15,7 +16,9 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace AccessLog {
+namespace Extensions {
+namespace AccessLoggers {
+namespace HttpGrpc {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
@@ -112,7 +115,7 @@ public:
   HttpGrpcAccessLogTest() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    access_log_.reset(new HttpGrpcAccessLog(FilterPtr{filter_}, config_, streamer_));
+    access_log_.reset(new HttpGrpcAccessLog(AccessLog::FilterPtr{filter_}, config_, streamer_));
   }
 
   void expectLog(const std::string& expected_request_msg_yaml) {
@@ -126,7 +129,7 @@ public:
             }));
   }
 
-  MockFilter* filter_{new NiceMock<MockFilter>()};
+  AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogStreamer> streamer_{new MockGrpcAccessLogStreamer()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;
@@ -314,5 +317,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
-} // namespace AccessLog
+} // namespace HttpGrpc
+} // namespace AccessLoggers
+} // namespace Extensions
 } // namespace Envoy
