@@ -50,7 +50,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  ProtobufWkt::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
+  Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>::const_iterator current_;
 };
 
 /**
@@ -86,7 +86,7 @@ private:
 
   void setValue(lua_State* state, const ProtobufWkt::Value& value);
   void createTable(lua_State* state,
-                   const ProtobufWkt::Map<std::string, ProtobufWkt::Value>& fields);
+                   const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields);
 
   const ProtobufWkt::Struct metadata_;
   Envoy::Lua::LuaDeathRef<MetadataMapIterator> iterator_;
