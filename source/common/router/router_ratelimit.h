@@ -9,7 +9,6 @@
 #include "envoy/router/router_ratelimit.h"
 
 #include "common/config/rds_json.h"
-#include "common/http/filter/ratelimit.h"
 #include "common/router/config_utility.h"
 
 namespace Envoy {

@@ -125,7 +125,6 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
     for (Buffer::RawSlice& slice : slices) {
       ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
       ASSERT(rc == static_cast<ssize_t>(slice.len_));
-      UNREFERENCED_PARAMETER(rc);
       stats_.write_completed_.inc();
     }
   }
@@ -199,7 +198,7 @@ void FileImpl::flush() {
   doWrite(about_to_write_buffer_);
 }
 
-void FileImpl::write(const std::string& data) {
+void FileImpl::write(absl::string_view data) {
   std::lock_guard<std::mutex> lock(write_lock_);
 
   if (flush_thread_ == nullptr) {
@@ -208,7 +207,7 @@ void FileImpl::write(const std::string& data) {
 
   stats_.write_buffered_.inc();
   stats_.write_total_buffered_.add(data.length());
-  flush_buffer_.add(data);
+  flush_buffer_.add(data.data(), data.size());
   if (flush_buffer_.length() > MIN_FLUSH_SIZE) {
     flush_event_.notify_one();
   }

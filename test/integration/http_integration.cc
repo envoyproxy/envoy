@@ -20,6 +20,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -28,7 +29,9 @@
 #include "gtest/gtest.h"
 
 using testing::AnyNumber;
+using testing::HasSubstr;
 using testing::Invoke;
+using testing::Not;
 using testing::_;
 
 namespace Envoy {
@@ -45,6 +48,12 @@ void setAllowAbsoluteUrl(
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };
+
+void setAllowHttp10WithDefaultHost(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  hcm.mutable_http_protocol_options()->set_accept_http_10(true);
+  hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
+}
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
@@ -65,7 +74,7 @@ typeToCodecType(Http::CodecClient::Type type) {
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Network::ClientConnectionPtr&& conn,
     Upstream::HostDescriptionConstSharedPtr host_description, CodecClient::Type type)
-    : CodecClientProd(type, std::move(conn), host_description), callbacks_(*this),
+    : CodecClientProd(type, std::move(conn), host_description, dispatcher), callbacks_(*this),
       codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
@@ -839,6 +848,94 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
+void HttpIntegrationTest::testIdleTimeoutBasic() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(1000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     1024, *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Do not send any requests and validate if idle time out kicks in.
+  fake_upstream_connection_->waitForDisconnect();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+}
+
+void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
+    auto* idle_time_out = http_protocol_options->mutable_idle_timeout();
+    std::chrono::milliseconds timeout(1000);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
+    idle_time_out->set_seconds(seconds.count());
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1.
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     1024, *response_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Request 2.
+  response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     512, *response_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024, true);
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+
+  // Do not send any requests and validate if idle time out kicks in.
+  fake_upstream_connection_->waitForDisconnect();
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+}
+
 void HttpIntegrationTest::testTwoRequests() {
   initialize();
 
@@ -912,18 +1009,65 @@ void HttpIntegrationTest::testInvalidVersion() {
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
-void HttpIntegrationTest::testHttp10Request() {
+void HttpIntegrationTest::testHttp10Disabled() {
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 }
 
-void HttpIntegrationTest::testNoHost() {
+// Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
+void HttpIntegrationTest::testHttp10Enabled() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+}
+
+// Verify for HTTP/1.0 a keep-alive header results in no connection: close.
+// Also verify existing host headers are passed through for the HTTP/1.0 case.
+void HttpIntegrationTest::testHttp10WithHostAndKeepAlive() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.0\r\nHost: foo.com\r\nConnection:Keep-alive\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("connection: close")));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+}
+
+// Turn HTTP/1.0 support on and verify 09 style requests work.
+void HttpIntegrationTest::testHttp09Enabled() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 }
 
 void HttpIntegrationTest::testAbsolutePath() {
@@ -1013,6 +1157,19 @@ void HttpIntegrationTest::testBadPath() {
                                 "GET http://api.lyft.com HTTP/1.1\r\nHost: host\r\n\r\n", &response,
                                 true);
   EXPECT_TRUE(response.find("HTTP/1.1 404 Not Found\r\n") == 0);
+}
+
+void HttpIntegrationTest::testNoHost() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+  response_->waitForEndStream();
+
+  ASSERT_TRUE(response_->complete());
+  EXPECT_STREQ("400", response_->headers().Status()->value().c_str());
 }
 
 void HttpIntegrationTest::testValidZeroLengthContent() {

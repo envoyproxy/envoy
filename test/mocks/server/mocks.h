@@ -48,11 +48,13 @@ public:
   MOCK_METHOD0(baseId, uint64_t());
   MOCK_METHOD0(concurrency, uint32_t());
   MOCK_METHOD0(configPath, const std::string&());
+  MOCK_METHOD0(configYaml, const std::string&());
   MOCK_METHOD0(v2ConfigOnly, bool());
   MOCK_METHOD0(adminAddressPath, const std::string&());
   MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_METHOD0(drainTime, std::chrono::seconds());
   MOCK_METHOD0(logLevel, spdlog::level::level_enum());
+  MOCK_METHOD0(logFormat, const std::string&());
   MOCK_METHOD0(logPath, const std::string&());
   MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_METHOD0(restartEpoch, uint64_t());
@@ -66,6 +68,7 @@ public:
   MOCK_METHOD0(hotRestartDisabled, bool());
 
   std::string config_path_;
+  std::string config_yaml_;
   bool v2_config_only_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
@@ -73,6 +76,16 @@ public:
   std::string service_zone_name_;
   std::string log_path_;
   bool hot_restart_disabled_{};
+};
+
+class MockConfigTracker : public ConfigTracker {
+public:
+  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
+  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
+  EntryOwnerPtr add(const std::string& key, Cb callback) override {
+    return EntryOwnerPtr{addReturnsRaw(key, std::move(callback))};
+  }
+  struct MockEntryOwner : public EntryOwner {};
 };
 
 class MockAdmin : public Admin {
@@ -85,6 +98,9 @@ public:
                                 HandlerCb callback, bool removable, bool mutates_server_state));
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
+  MOCK_METHOD0(getConfigTracker, ConfigTracker&());
+
+  NiceMock<MockConfigTracker> config_tracker;
 };
 
 class MockDrainManager : public DrainManager {
@@ -165,8 +181,9 @@ public:
                std::vector<Configuration::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD2(createListenSocket,
+  MOCK_METHOD3(createListenSocket,
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
+                                        const Network::Socket::OptionsSharedPtr& options,
                                         bool bind_to_port));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
@@ -368,12 +385,16 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
 };
 
-class MockListenerFactoryContext : public MockFactoryContext {
+class MockListenerFactoryContext : public virtual MockFactoryContext,
+                                   public virtual ListenerFactoryContext {
 public:
   MockListenerFactoryContext();
   ~MockListenerFactoryContext();
 
-  MOCK_METHOD1(setListenSocketOptions, void(const Network::Socket::OptionsSharedPtr&));
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
+    addListenSocketOption_(option);
+  }
+  MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
 };
 
 } // namespace Configuration

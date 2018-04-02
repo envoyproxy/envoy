@@ -16,8 +16,8 @@
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/redis/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -86,24 +86,6 @@ TEST(HealthCheckerFactoryTest, createRedis) {
                              .get()));
 }
 
-// TODO(htuch): This provides coverage on MissingFieldException and missing health check type
-// handling for HealthCheck construction, but should eventually be subsumed by whatever we do for
-// #1308.
-TEST(HealthCheckerFactoryTest, MissingFieldiException) {
-  NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
-  envoy::api::v2::core::HealthCheck health_check;
-  // No health checker type set
-  EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
-               EnvoyException);
-  health_check.mutable_http_health_check();
-  // No timeout field set.
-  EXPECT_THROW(HealthCheckerFactory::create(health_check, cluster, runtime, random, dispatcher),
-               MissingFieldException);
-}
-
 TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   NiceMock<Upstream::MockCluster> cluster;
   EXPECT_CALL(*cluster.info_, features()).WillRepeatedly(Return(0));
@@ -165,19 +147,19 @@ public:
   HttpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
 
   void setupNoServiceValidationHC() {
-    std::string json = R"EOF(
-    {
-      "type": "http",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "interval_jitter_ms": 1000,
-      "unhealthy_threshold": 2,
-      "healthy_threshold": 2,
-      "path": "/healthcheck"
-    }
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -277,8 +259,12 @@ public:
               uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
-              return new CodecClientForTest(std::move(conn_data.connection_), test_session.codec_,
-                                            nullptr, nullptr);
+              std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                  new NiceMock<Upstream::MockClusterInfo>()};
+              Event::MockDispatcher dispatcher_;
+              return new CodecClientForTest(
+                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
             }));
   }
 
@@ -648,7 +634,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(60000)));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000)));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, true, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
@@ -1394,7 +1380,9 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
-class RedisHealthCheckerImplTest : public testing::Test, public Redis::ConnPool::ClientFactory {
+class RedisHealthCheckerImplTest
+    : public testing::Test,
+      public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
   RedisHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
 
@@ -1445,12 +1433,13 @@ public:
                                                      dispatcher_, runtime_, random_, *this));
   }
 
-  Redis::ConnPool::ClientPtr create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-                                    const Redis::ConnPool::Config&) override {
-    return Redis::ConnPool::ClientPtr{create_()};
+  Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
+  create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
+         const Extensions::NetworkFilters::RedisProxy::ConnPool::Config&) override {
+    return Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr{create_()};
   }
 
-  MOCK_METHOD0(create_, Redis::ConnPool::Client*());
+  MOCK_METHOD0(create_, Extensions::NetworkFilters::RedisProxy::ConnPool::Client*());
 
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
@@ -1458,7 +1447,7 @@ public:
   }
 
   void expectClientCreate() {
-    client_ = new Redis::ConnPool::MockClient();
+    client_ = new Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient();
     EXPECT_CALL(*this, create_()).WillOnce(Return(client_));
     EXPECT_CALL(*client_, addConnectionCallbacks(_));
   }
@@ -1481,9 +1470,9 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
-  Redis::ConnPool::MockClient* client_{};
-  Redis::ConnPool::MockPoolRequest pool_request_;
-  Redis::ConnPool::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
+  Extensions::NetworkFilters::RedisProxy::ConnPool::MockPoolRequest pool_request_;
+  Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisHealthCheckerImpl> health_checker_;
 };
 
@@ -1505,8 +1494,9 @@ TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Redis::RespValuePtr response(new Redis::RespValue());
-  response->type(Redis::RespType::SimpleString);
+  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
+      new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -1516,7 +1506,7 @@ TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
   // Failure
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Redis::RespValue());
+  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
@@ -1571,8 +1561,9 @@ TEST_F(RedisHealthCheckerImplTest, Exists) {
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Redis::RespValuePtr response(new Redis::RespValue());
-  response->type(Redis::RespType::Integer);
+  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
+      new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
   response->asInteger() = 0;
   pool_callbacks_->onResponse(std::move(response));
 
@@ -1582,8 +1573,8 @@ TEST_F(RedisHealthCheckerImplTest, Exists) {
   // Failure, exists
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Redis::RespValue());
-  response->type(Redis::RespType::Integer);
+  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
   response->asInteger() = 1;
   pool_callbacks_->onResponse(std::move(response));
 
@@ -1593,7 +1584,7 @@ TEST_F(RedisHealthCheckerImplTest, Exists) {
   // Failure, no value
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Redis::RespValue());
+  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
   pool_callbacks_->onResponse(std::move(response));
 
   EXPECT_CALL(*client_, close());
@@ -1620,8 +1611,9 @@ TEST_F(RedisHealthCheckerImplTest, NoConnectionReuse) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
-  Redis::RespValuePtr response(new Redis::RespValue());
-  response->type(Redis::RespType::SimpleString);
+  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
+      new Extensions::NetworkFilters::RedisProxy::RespValue());
+  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -1633,7 +1625,7 @@ TEST_F(RedisHealthCheckerImplTest, NoConnectionReuse) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
-  response.reset(new Redis::RespValue());
+  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();
@@ -1824,14 +1816,20 @@ public:
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;
         }));
+
     EXPECT_CALL(*health_checker_, createCodecClient_(_))
         .WillRepeatedly(
             Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
               uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
+              std::shared_ptr<Upstream::MockClusterInfo> cluster{
+                  new NiceMock<Upstream::MockClusterInfo>()};
+              Event::MockDispatcher dispatcher_;
+
               test_session.codec_client_ = new CodecClientForTest(
-                  std::move(conn_data.connection_), test_session.codec_, nullptr, nullptr);
+                  std::move(conn_data.connection_), test_session.codec_, nullptr,
+                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
               return test_session.codec_client_;
             }));
   }

@@ -49,6 +49,7 @@ public:
     return createListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
@@ -207,6 +208,8 @@ public:
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
   void setSocket(const Network::SocketSharedPtr& socket);
+  void setSocketAndOptions(const Network::SocketSharedPtr& socket);
+  const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
 
   // Network::ListenerConfig
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
@@ -246,8 +249,12 @@ public:
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::core::Metadata& listenerMetadata() const override { return metadata_; };
-  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-    listen_socket_options_ = options;
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
+    if (!listen_socket_options_) {
+      listen_socket_options_ =
+          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+    }
+    listen_socket_options_->emplace_back(std::move(option));
   }
 
   // Network::DrainDecision

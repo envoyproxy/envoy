@@ -57,6 +57,23 @@ public:
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) const { logger_->set_level(level); }
 
+  /* This is simple mapping between Logger severity levels and spdlog severity levels.
+   * The only reason for this mapping is to go around the fact that spdlog defines level as err
+   * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
+   * fine spdlog::info corresponds to LOGGER.info method.
+   */
+  typedef enum {
+    trace = spdlog::level::trace,
+    debug = spdlog::level::debug,
+    info = spdlog::level::info,
+    warn = spdlog::level::warn,
+    error = spdlog::level::err,
+    critical = spdlog::level::critical,
+    off = spdlog::level::off
+  } levels;
+
+  static const char* DEFAULT_LOG_FORMAT;
+
 private:
   Logger(const std::string& name);
 
@@ -130,7 +147,8 @@ public:
   /**
    * Initialize the logging system from server options.
    */
-  static void initialize(uint64_t log_level, Thread::BasicLockable& lock);
+  static void initialize(uint64_t log_level, const std::string& log_format,
+                         Thread::BasicLockable& lock);
 
   /**
    * @return const std::vector<Logger>& the installed loggers.
@@ -176,23 +194,27 @@ protected:
  * Base logging macros. It is expected that users will use the convenience macros below rather than
  * invoke these directly.
  */
-#ifdef NVLOG
-#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...)
-#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...)
-#else
-#define ENVOY_LOG_trace_TO_LOGGER(LOGGER, ...) LOGGER.trace(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_debug_TO_LOGGER(LOGGER, ...) LOGGER.debug(LOG_PREFIX __VA_ARGS__)
-#endif
 
-#define ENVOY_LOG_info_TO_LOGGER(LOGGER, ...) LOGGER.info(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_warn_TO_LOGGER(LOGGER, ...) LOGGER.warn(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_error_TO_LOGGER(LOGGER, ...) LOGGER.error(LOG_PREFIX __VA_ARGS__)
-#define ENVOY_LOG_critical_TO_LOGGER(LOGGER, ...) LOGGER.critical(LOG_PREFIX __VA_ARGS__)
+#define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
+
+// Compare levels before invoking logger
+#define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      LOGGER.LEVEL(LOG_PREFIX __VA_ARGS__);                                                        \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_LOG_CHECK_LEVEL(LEVEL) ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)
 
 /**
  * Convenience macro to log to a user-specified logger.
+ * Maps directly to ENVOY_LOG_COMP_AND_LOG - it could contain macro logic itself, without
+ * redirection, but left in case various implementations are required in the future (based on log
+ * level for example).
  */
-#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_##LEVEL##_TO_LOGGER(LOGGER, ##__VA_ARGS__)
+#define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...) ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__)
 
 /**
  * Convenience macro to get logger.

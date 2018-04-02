@@ -12,13 +12,7 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
-    :
-#ifndef NVLOG
-      logger_(logger),
-#endif
-      dispatcher_(dispatcher) {
-  UNREFERENCED_PARAMETER(logger);
-}
+    : logger_(logger), dispatcher_(dispatcher) {}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerPtr l(new ActiveListener(*this, config));

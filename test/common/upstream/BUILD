@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
@@ -41,14 +42,22 @@ envoy_cc_test(
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
         "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test(
+    name = "edf_scheduler_test",
+    srcs = ["edf_scheduler_test.cc"],
+    deps = ["//source/common/upstream:edf_scheduler_lib"],
 )
 
 envoy_cc_test(
@@ -84,8 +93,8 @@ envoy_cc_test(
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
+        "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/redis:redis_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -288,11 +297,14 @@ envoy_cc_test(
     srcs = ["subset_lb_test.cc"],
     deps = [
         ":utility_lib",
+        "//source/common/common:logger_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:subset_lb_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],

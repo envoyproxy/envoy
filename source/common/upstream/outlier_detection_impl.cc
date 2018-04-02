@@ -203,7 +203,7 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   std::chrono::milliseconds base_eject_time =
       std::chrono::milliseconds(runtime_.snapshot().getInteger(
           "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
-  ASSERT(monitor->numEjections() > 0)
+  ASSERT(monitor->numEjections() > 0);
   if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
     stats_.ejections_active_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -466,7 +466,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
     "\"type\": \"{}\", " +
-    "\"num_ejections\": \"{}\", " +
+    "\"num_ejections\": {}, " +
     "\"enforced\": \"{}\"" +
     "}}\n";
 
@@ -478,7 +478,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"upstream_url\": \"{}\", " +
     "\"action\": \"eject\", " +
     "\"type\": \"{}\", " +
-    "\"num_ejections\": \"{}\", " +
+    "\"num_ejections\": {}, " +
     "\"enforced\": \"{}\", " +
     "\"host_success_rate\": \"{}\", " +
     "\"cluster_average_success_rate\": \"{}\", " +

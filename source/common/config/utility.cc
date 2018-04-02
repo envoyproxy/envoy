@@ -190,7 +190,7 @@ Utility::factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manage
     grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
   }
 
-  return async_client_manager.factoryForGrpcService(grpc_service, scope);
+  return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
 } // namespace Config

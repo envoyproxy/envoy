@@ -168,7 +168,8 @@ HttpTracerImpl::HttpTracerImpl(DriverPtr&& driver, const LocalInfo::LocalInfo& l
     : driver_(std::move(driver)), local_info_(local_info) {}
 
 SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request_headers,
-                                  const RequestInfo::RequestInfo& request_info) {
+                                  const RequestInfo::RequestInfo& request_info,
+                                  const Tracing::Decision tracing_decision) {
   std::string span_name = HttpTracerUtility::toString(config.operationName());
 
   if (config.operationName() == OperationName::Egress) {
@@ -176,8 +177,8 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
     span_name.append(request_headers.Host()->value().c_str());
   }
 
-  SpanPtr active_span =
-      driver_->startSpan(config, request_headers, span_name, request_info.startTime());
+  SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,
+                                           request_info.startTime(), tracing_decision);
   if (active_span) {
     active_span->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
     active_span->setTag(Tracing::Tags::get().NODE_ID, local_info_.nodeName());

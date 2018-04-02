@@ -46,10 +46,13 @@ public:
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
-  MOCK_METHOD6(updateHosts, void(std::shared_ptr<const HostVector> hosts,
+  MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
+  MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
+  MOCK_METHOD7(updateHosts, void(std::shared_ptr<const HostVector> hosts,
                                  std::shared_ptr<const HostVector> healthy_hosts,
                                  HostsPerLocalityConstSharedPtr hosts_per_locality,
                                  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                 LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed));
   MOCK_CONST_METHOD0(priority, uint32_t());
 
@@ -57,6 +60,7 @@ public:
   HostVector healthy_hosts_;
   HostsPerLocalitySharedPtr hosts_per_locality_{new HostsPerLocalityImpl()};
   HostsPerLocalitySharedPtr healthy_hosts_per_locality_{new HostsPerLocalityImpl()};
+  LocalityWeightsConstSharedPtr locality_weights_{{}};
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
 };
@@ -142,7 +146,7 @@ public:
   }
 
   // Upstream::ClusterManager
-  MOCK_METHOD1(addOrUpdatePrimaryCluster, bool(const envoy::api::v2::Cluster& cluster));
+  MOCK_METHOD1(addOrUpdateCluster, bool(const envoy::api::v2::Cluster& cluster));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
@@ -154,18 +158,20 @@ public:
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));
   MOCK_METHOD1(httpAsyncClientForCluster, Http::AsyncClient&(const std::string& cluster));
-  MOCK_METHOD1(removePrimaryCluster, bool(const std::string& cluster));
+  MOCK_METHOD1(removeCluster, bool(const std::string& cluster));
   MOCK_METHOD0(shutdown, void());
-  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(bindConfig, const envoy::api::v2::core::BindConfig&());
   MOCK_METHOD0(adsMux, Config::GrpcMux&());
   MOCK_METHOD0(grpcAsyncClientManager, Grpc::AsyncClientManager&());
   MOCK_CONST_METHOD0(versionInfo, const std::string());
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
+  MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
+               std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  Network::Address::InstanceConstSharedPtr source_address_;
+  envoy::api::v2::core::BindConfig bind_config_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
@@ -198,6 +204,15 @@ public:
   MOCK_CONST_METHOD0(versionInfo, const std::string());
 
   std::function<void()> initialized_callback_;
+};
+
+class MockClusterUpdateCallbacks : public ClusterUpdateCallbacks {
+public:
+  MockClusterUpdateCallbacks();
+  ~MockClusterUpdateCallbacks();
+
+  MOCK_METHOD1(onClusterAddOrUpdate, void(ThreadLocalCluster& cluster));
+  MOCK_METHOD1(onClusterRemoval, void(const std::string& cluster_name));
 };
 
 } // namespace Upstream

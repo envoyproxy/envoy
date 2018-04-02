@@ -1,5 +1,6 @@
 #include "test/integration/integration.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -70,5 +71,6 @@ TEST_P(LegacyJsonIntegrationTest, TestServerGrpcJsonTranscoder) {
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LegacyJsonIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 } // namespace Envoy

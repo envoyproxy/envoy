@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -56,7 +57,8 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
                                                         stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -155,7 +157,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   ASSERT(server_transport_socket_factories.size() >= 1);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
+                                  true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -176,7 +179,6 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                                client_session.size(), client_ssl_context);
     int rc = SSL_set_session(client_ssl_socket, client_ssl_session);
     ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
     SSL_SESSION_free(client_ssl_session);
   }
 
@@ -220,7 +222,6 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
       size_t session_len;
       int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
       ASSERT(rc == 1);
-      UNREFERENCED_PARAMETER(rc);
       new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
       OPENSSL_free(session_data);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -260,7 +261,8 @@ class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
   std::string client_ctx_json = R"EOF(
@@ -735,7 +737,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
                                                         stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -792,7 +795,8 @@ TEST_P(SslSocketTest, HalfClose) {
                                                         stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks listener_callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
@@ -874,7 +878,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
                                                         stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -954,8 +959,10 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                                          manager, stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), true);
+  Network::TcpListenSocket socket1(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
+                                   true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr,
+                                   true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener1 =
@@ -1278,8 +1285,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
                                                          manager, stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
-  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
+  Network::TcpListenSocket socket2(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                   true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -1386,7 +1395,8 @@ TEST_P(SslSocketTest, SslError) {
                                                         stats_store);
 
   Event::DispatcherImpl dispatcher;
-  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), true);
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                  true);
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false, false);
@@ -2175,7 +2185,8 @@ public:
 
   Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_{new Event::DispatcherImpl};
-  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), true};
+  Network::TcpListenSocket socket_{Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                                   true};
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
   std::string server_ctx_json_ = R"EOF(
@@ -2210,7 +2221,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);

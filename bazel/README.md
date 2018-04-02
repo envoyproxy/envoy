@@ -22,7 +22,9 @@ As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/bl
 version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
-up-to-date with the latest security patches.
+up-to-date with the latest security patches. See 
+[this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
+for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
 2. Install external dependencies libtool, cmake, and realpath libraries separately.
@@ -50,8 +52,8 @@ brew install bazel
 brew install automake
 ```
 
-Envoy compiles and passes tests with the version of clang installed by XCode 8.3.3:
-Apple LLVM version 8.1.0 (clang-802.0.42).
+Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
+Apple LLVM version 9.1.0 (clang-902.0.30).
 
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -238,12 +240,7 @@ bazel test -c dbg --config=clang-tsan //test/...
 
 ## Log Verbosity
 
-By default, log verbosity is controlled at runtime in all builds. However, it may be desirable to
-remove log statements of lower importance during compilation to enhance performance. To remove
-`trace` and `debug` log statements during compilation define `NVLOG`:
-```
-bazel build --copt=-DNVLOG //source/exe:envoy-static
-```
+Log verbosity is controlled at runtime in all builds. 
 
 ## Disabling optional features
 

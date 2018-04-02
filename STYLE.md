@@ -9,6 +9,10 @@
   The following section covers the major areas where we deviate from the Google
   guidelines.
 
+# Repository file layout
+
+* Please see [REPO_LAYOUT.md](REPO_LAYOUT.md).
+
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add

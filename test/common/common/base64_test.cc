@@ -108,4 +108,59 @@ TEST(Base64Test, BinaryBufferEncode) {
   EXPECT_EQ("AAECAwgKCQCqvA==", Base64::encode(buffer, 10));
   EXPECT_EQ("AAECAwgKCQCqvN4=", Base64::encode(buffer, 30));
 }
+
+TEST(Base64UrlTest, EncodeString) {
+  EXPECT_EQ("", Base64Url::encode("", 0));
+  EXPECT_EQ("AAA", Base64Url::encode("\0\0", 2));
+  EXPECT_EQ("Zm9v", Base64Url::encode("foo", 3));
+  EXPECT_EQ("Zm8", Base64Url::encode("fo", 2));
+}
+
+TEST(Base64UrlTest, Decode) {
+  EXPECT_EQ("", Base64Url::decode(""));
+  EXPECT_EQ("foo", Base64Url::decode("Zm9v"));
+  EXPECT_EQ("fo", Base64Url::decode("Zm8"));
+  EXPECT_EQ("f", Base64Url::decode("Zg"));
+  EXPECT_EQ("foobar", Base64Url::decode("Zm9vYmFy"));
+  EXPECT_EQ("foob", Base64Url::decode("Zm9vYg"));
+
+  {
+    const char* test_string = "\0\1\2\3\b\n\t";
+    EXPECT_FALSE(memcmp(test_string, Base64Url::decode("AAECAwgKCQ").data(), 7));
+  }
+
+  {
+    const char* test_string = "\0\0\0\0als;jkopqitu[\0opbjlcxnb35g]b[\xaa\b\n";
+    EXPECT_FALSE(
+        memcmp(test_string, Base64Url::decode(Base64Url::encode(test_string, 36)).data(), 36));
+  }
+
+  {
+    const char* test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    std::string decoded = Base64Url::decode(test_string);
+    EXPECT_EQ(test_string, Base64Url::encode(decoded.c_str(), decoded.length()));
+  }
+
+  {
+    const char* url_test_string =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const char* test_string = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    EXPECT_EQ(Base64Url::decode(url_test_string), Base64::decode(test_string));
+  }
+}
+
+TEST(Base64UrlTest, DecodeFailure) {
+  EXPECT_EQ("", Base64Url::decode("==Zg"));
+  EXPECT_EQ("", Base64Url::decode("=Zm8"));
+  EXPECT_EQ("", Base64Url::decode("Zm=8"));
+  EXPECT_EQ("", Base64Url::decode("Zg=A"));
+  EXPECT_EQ("", Base64Url::decode("Zh==")); // 011001 100001 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("Zm9=")); // 011001 100110 111101 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("Zg.."));
+  EXPECT_EQ("", Base64Url::decode("..Zg"));
+  EXPECT_EQ("", Base64Url::decode("A==="));
+  EXPECT_EQ("", Base64Url::decode("Zh"));  // 011001 100001 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("Zm9")); // 011001 100110 111101 <- unused bit at tail
+  EXPECT_EQ("", Base64Url::decode("A"));
+}
 } // namespace Envoy

@@ -28,6 +28,9 @@ MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
   ON_CALL(*this, healthyHostsPerLocality())
       .WillByDefault(
           Invoke([this]() -> const HostsPerLocality& { return *healthy_hosts_per_locality_; }));
+  ON_CALL(*this, localityWeights()).WillByDefault(Invoke([this]() -> LocalityWeightsConstSharedPtr {
+    return locality_weights_;
+  }));
 }
 
 MockPrioritySet::MockPrioritySet() {
@@ -87,7 +90,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault((ReturnRef(async_client_)));
-  ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
+  ON_CALL(*this, bindConfig()).WillByDefault(ReturnRef(bind_config_));
   ON_CALL(*this, adsMux()).WillByDefault(ReturnRef(ads_mux_));
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
@@ -112,6 +115,10 @@ MockCdsApi::MockCdsApi() {
 }
 
 MockCdsApi::~MockCdsApi() {}
+
+MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
+
+MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
 
 } // namespace Upstream
 } // namespace Envoy
