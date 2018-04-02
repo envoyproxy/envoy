@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -61,13 +62,16 @@ private:
 };
 
 // Validates that when stmt is executed, exactly one log message containing substr will be emitted.
-#define EXPECT_LOG_CONTAINS(substr, stmt)                                                          \
+#define EXPECT_LOG_CONTAINS(loglevel, substr, stmt)                                                \
   do {                                                                                             \
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     ASSERT_EQ(1, log_recorder.messages().size());                                                  \
     std::string recorded_log = log_recorder.messages()[0];                                         \
+    std::vector<absl::string_view> pieces = absl::StrSplit(recorded_log, "][");                    \
+    ASSERT_LE(3, pieces.size());                                                                   \
+    EXPECT_EQ(loglevel, std::string(pieces[2]));                                                   \
     EXPECT_TRUE(absl::string_view(recorded_log).find(substr) != absl::string_view::npos)           \
         << "\n Actual Log:         " << recorded_log << "\n Expected Substring: " << substr;       \
   } while (false)

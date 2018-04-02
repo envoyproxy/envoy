@@ -79,8 +79,7 @@ public:
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")),
-        expect_no_logs_(true) {
+               listener_scope_.createScope("listener.admin.")) {
 
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -92,7 +91,6 @@ public:
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
-  bool expect_no_logs_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
@@ -135,11 +133,12 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   std::unique_ptr<AdminImpl> admin_bad_address_out_path;
-  EXPECT_LOG_CONTAINS("cannot open admin address output file " + bad_path + " for writing.",
-                      admin_bad_address_out_path = std::make_unique<AdminImpl>(
-                          "/dev/null", cpu_profile_path_, bad_path,
-                          Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-                          listener_scope_.createScope("listener.admin.")));
+  EXPECT_LOG_CONTAINS(
+      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      admin_bad_address_out_path =
+          std::make_unique<AdminImpl>("/dev/null", cpu_profile_path_, bad_path,
+                                      Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                      server_, listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -175,7 +174,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_LOG_CONTAINS("filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
                                                      callback, true, false)));
 }
@@ -184,7 +184,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_LOG_CONTAINS("filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
                                                      callback, true, false)));
 }
