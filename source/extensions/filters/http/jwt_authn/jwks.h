@@ -6,6 +6,7 @@
 #include "envoy/json/json_object.h"
 
 #include "common/common/logger.h"
+
 #include "extensions/filters/http/jwt_authn/status.h"
 
 #include "openssl/ec.h"
