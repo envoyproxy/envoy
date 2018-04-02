@@ -194,6 +194,108 @@ TEST_F(EdsTest, EndpointMetadata) {
   EXPECT_TRUE(hosts[1]->canary());
 }
 
+// Validate that onConfigUpdate() updates endpoint health status.
+TEST_F(EdsTest, EndpointHealthStatus) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment->add_endpoints();
+
+  // First check that EDS is correctly mapping
+  // envoy::api::v2::core::HealthStatus values to the expected healthy() status.
+  const std::vector<std::pair<envoy::api::v2::core::HealthStatus, bool>> health_status_expected = {
+      {envoy::api::v2::core::HealthStatus::UNKNOWN, true},
+      {envoy::api::v2::core::HealthStatus::HEALTHY, true},
+      {envoy::api::v2::core::HealthStatus::UNHEALTHY, false},
+      {envoy::api::v2::core::HealthStatus::DRAINING, false},
+      {envoy::api::v2::core::HealthStatus::TIMEOUT, false},
+  };
+
+  int port = 80;
+  for (auto hs : health_status_expected) {
+    auto* endpoint = endpoints->add_lb_endpoints();
+    auto* socket_address =
+        endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port++);
+    endpoint->set_health_status(hs.first);
+  }
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_TRUE(initialized);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), health_status_expected.size());
+
+    for (uint32_t i = 0; i < hosts.size(); ++i) {
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+    }
+  }
+
+  // Perform an update in which we don't change the host set, but flip some host
+  // to unhealthy, check we have the expected change in status.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::UNHEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), health_status_expected.size());
+    EXPECT_FALSE(hosts[0]->healthy());
+
+    for (uint32_t i = 1; i < hosts.size(); ++i) {
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+    }
+  }
+
+  // Perform an update in which we don't change the host set, but flip some host
+  // to healthy, check we have the expected change in status.
+  endpoints->mutable_lb_endpoints(health_status_expected.size() - 1)
+      ->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), health_status_expected.size());
+    EXPECT_FALSE(hosts[0]->healthy());
+    EXPECT_TRUE(hosts[hosts.size() - 1]->healthy());
+
+    for (uint32_t i = 1; i < hosts.size() - 1; ++i) {
+      EXPECT_EQ(health_status_expected[i].second, hosts[i]->healthy());
+    }
+  }
+
+  // Mark host 0 unhealthy from active health checking as well, we should have
+  // the same situation as above.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_FALSE(hosts[0]->healthy());
+  }
+
+  // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
+  // active health check failure.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::HEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_FALSE(hosts[0]->healthy());
+  }
+
+  // Finally, mark host 0 healthy again via active health check. It should be
+  // immediately healthy again.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    EXPECT_TRUE(hosts[0]->healthy());
+  }
+}
+
 // Validate that onConfigUpdate() updates the endpoint locality.
 TEST_F(EdsTest, EndpointLocality) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
