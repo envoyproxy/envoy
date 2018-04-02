@@ -23,6 +23,9 @@ ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
+SUBDIR_SET = set(common.includeDirOrder())
+INCLUDE_ANGLE = "#include <"
+INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 
 found_error = False
 
@@ -85,17 +88,6 @@ def isBuildFile(file_path):
     return True
   return False
 
-
-def headerSubdirDict():
-  subdir_dict = {}
-  for subdir in common.includeDirOrder():
-    subdir_dict[subdir] = True
-  return subdir_dict
-
-SUBDIR_DICT = headerSubdirDict()
-INCLUDE_ANGLE = "#include <"
-INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
-
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
     return False
@@ -104,15 +96,14 @@ def hasInvalidAngleBracketDirectory(line):
   if slash == -1:
     return False
   subdir = path[0:slash]
-  return SUBDIR_DICT.has_key(subdir)
+  return subdir in SUBDIR_SET
 
 def printLineError(path, line_number, message):
-  printError("%s:%d: %s" % (path, line_number, message))
+  # line_number is zero-based, so add 1.
+  printError("%s:%d: %s" % (path, line_number + 1, message))
 
 def checkFileContents(file_path):
-  line_number = 0
-  for line in fileinput.input(file_path):
-    line_number += 1
+  for line_number, line in enumerate(fileinput.input(file_path)):
     if line.find(".  ") != -1:
       printLineError(file_path, line_number, "over-enthusiastic spaces")
     if hasInvalidAngleBracketDirectory(line):
