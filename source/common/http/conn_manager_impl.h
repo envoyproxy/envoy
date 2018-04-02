@@ -290,6 +290,12 @@ public:
   virtual bool proxy100Continue() const PURE;
 
   /**
+   * @return should IPv4 addresses be represented in IPv4 mapped IPv6 format when appended to
+   *         XFF and for logging
+   */
+  virtual bool representIpv4RemoteAddressAsIpv4MappedIpv6() const PURE;
+
+  /**
    * @return supplies the http1 settings.
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;

@@ -47,6 +47,15 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
 
+  // When this flag is true, we represent IPv4 addresses as IPv4 mapped IPv6 if
+  //   - use_remote_address is true &&
+  //   - the address was not derived from the existing XFF header &&
+  //   - the address is not a loopback address
+  const bool represent_ipv4_as_ipv6 = runtime.snapshot().featureEnabled(
+      "http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6",
+      config.representIpv4RemoteAddressAsIpv4MappedIpv6() ? 100 : 0);
+  bool should_map_final_remote_address = false;
+
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
@@ -60,16 +69,24 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // from the XFF before we append to XFF.
     if (xff_num_trusted_hops > 0) {
       final_remote_address =
-          Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops - 1).address_;
+          Utility::getLastAddressFromXff(request_headers, xff_num_trusted_hops - 1).address_;
     }
     // If there aren't any trusted proxies in front of this Envoy instance, or there
     // are but they didn't populate XFF properly, the trusted client address is the
     // source address of the immediate downstream's connection to us.
     if (final_remote_address == nullptr) {
       final_remote_address = connection.remoteAddress();
+      should_map_final_remote_address = represent_ipv4_as_ipv6;
     }
+
+    // Append to XFF.
     if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
+      should_map_final_remote_address = false;
       Utility::appendXff(request_headers, config.localAddress());
+    } else if (represent_ipv4_as_ipv6) {
+      Network::Address::InstanceConstSharedPtr mapped_address =
+          Network::Utility::mapIPv4toIPv6(connection.remoteAddress());
+      Utility::appendXff(request_headers, *mapped_address);
     } else {
       Utility::appendXff(request_headers, *connection.remoteAddress());
     }
@@ -79,8 +96,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
+    auto ret = Utility::getLastAddressFromXff(request_headers, xff_num_trusted_hops);
     final_remote_address = ret.address_;
+    should_map_final_remote_address = false;
     single_xff_address = ret.single_address_;
   }
 
@@ -107,6 +125,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   // busted XFF, etc., use the direct connection remote address for logging.
   if (final_remote_address == nullptr) {
     final_remote_address = connection.remoteAddress();
+    should_map_final_remote_address = represent_ipv4_as_ipv6;
+  }
+
+  if (should_map_final_remote_address) {
+    final_remote_address = Network::Utility::mapIPv4toIPv6(final_remote_address);
   }
 
   // Edge request is the request from external clients to front Envoy.

@@ -245,6 +245,32 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
 }
 
+TEST(NetworkUtility, MapIPv4toIPv6) {
+  {
+    const std::string ip = "8.8.8.8";
+    Address::InstanceConstSharedPtr address = Utility::parseInternetAddress(ip);
+    Address::InstanceConstSharedPtr result = Utility::mapIPv4toIPv6(address);
+    EXPECT_EQ(result->ip()->version(), Address::IpVersion::v6);
+    EXPECT_EQ(result->ip()->addressAsString(), "::ffff:" + ip);
+  }
+
+  {
+    const std::string ip = "10.0.32.111";
+    Address::InstanceConstSharedPtr address = Utility::parseInternetAddress(ip);
+    Address::InstanceConstSharedPtr result = Utility::mapIPv4toIPv6(address);
+    EXPECT_EQ(result->ip()->version(), Address::IpVersion::v6);
+    EXPECT_EQ(result->ip()->addressAsString(), "::ffff:" + ip);
+  }
+
+  {
+    const std::string ip = "2607:f8b0:400a:807::200e";
+    Address::InstanceConstSharedPtr address = Utility::parseInternetAddress(ip);
+    Address::InstanceConstSharedPtr result = Utility::mapIPv4toIPv6(address);
+    EXPECT_EQ(result->ip()->version(), Address::IpVersion::v6);
+    EXPECT_EQ(result->ip()->addressAsString(), ip);
+  }
+}
+
 TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";

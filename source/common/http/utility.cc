@@ -241,7 +241,7 @@ void Utility::sendLocalReply(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
+Utility::getLastAddressFromXff(const Http::HeaderMap& request_headers, uint32_t num_to_skip) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};

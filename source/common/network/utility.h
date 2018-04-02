@@ -212,6 +212,14 @@ public:
   static void addressToProtobufAddress(const Address::Instance& address,
                                        envoy::api::v2::core::Address& proto_address);
 
+  /**
+   * If an IPv4 address is passed it is returned in IPv4 mapped IPv6 format, e.g. 8.8.8.8 becomes
+   * ::ffff:8.8.8.8.
+   * @param address is the address to map.
+   */
+  static Address::InstanceConstSharedPtr
+  mapIPv4toIPv6(const Address::InstanceConstSharedPtr& address);
+
 private:
   static void throwWithMalformedIp(const std::string& ip_address);
 
