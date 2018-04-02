@@ -34,8 +34,8 @@ MockHistogram::MockHistogram() {
   }));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
-  ON_CALL(*this, getIntervalHistogramStatistics()).WillByDefault(Return(histogram_stats_));
-  ON_CALL(*this, getCumulativieHistogramStatistics()).WillByDefault(Return(histogram_stats_));
+  ON_CALL(*this, intervalStatistics()).WillByDefault(Return(histogram_stats_));
+  ON_CALL(*this, cumulativeStatistics()).WillByDefault(Return(histogram_stats_));
 }
 MockHistogram::~MockHistogram() {}
 

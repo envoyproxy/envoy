@@ -162,6 +162,12 @@ public:
   // translations later.
   static std::string sanitizeStatsName(const std::string& name);
 };
+/**
+ * Flags used by all stats types to figure out whether they have been used.
+ */
+struct Flags {
+  static const uint8_t Used = 0x1;
+};
 
 /**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
@@ -171,9 +177,6 @@ public:
  * RawStatData::size() instead.
  */
 struct RawStatData {
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
 
   /**
    * Due to the flexible-array-length of name_, c-style allocation
@@ -309,13 +312,13 @@ public:
   void add(uint64_t amount) override {
     data_.value_ += amount;
     data_.pending_increment_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
   void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
 private:
@@ -337,13 +340,13 @@ public:
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
     data_.value_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
@@ -351,7 +354,7 @@ public:
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
 private:
   RawStatData& data_;
@@ -395,15 +398,11 @@ public:
 
   void merge() override {}
 
-  HistogramStatistics getIntervalHistogramStatistics() const override {
-    HistogramStatistics empty_histogram_stats;
-    return empty_histogram_stats;
-  }
+  bool used() const override { return true; }
 
-  HistogramStatistics getCumulativieHistogramStatistics() const override {
-    HistogramStatistics empty_histogram_stats;
-    return empty_histogram_stats;
-  }
+  HistogramStatistics intervalStatistics() const override { return HistogramStatistics(); }
+
+  HistogramStatistics cumulativeStatistics() const override { return HistogramStatistics(); }
 
   Store& parent_;
 };
@@ -419,6 +418,7 @@ public:
     histograms_[0] = hist_alloc();
     histograms_[1] = hist_alloc();
     current_active_ = 0;
+    flags_ = 0;
   }
 
   ~ThreadLocalHistogramImpl() {
@@ -429,21 +429,18 @@ public:
   void recordValue(uint64_t value) override {
     hist_insert_intscale(histograms_[current_active_], value, 0, 1);
     parent_.deliverHistogramToSinks(*this, value);
+    flags_ |= Flags::Used;
   }
 
   void beginMerge() { current_active_ = 1 - current_active_; }
 
   void merge() override {}
 
-  HistogramStatistics getIntervalHistogramStatistics() const override {
-    HistogramStatistics empty_histogram_stats;
-    return empty_histogram_stats;
-  }
+  bool used() const override { return flags_ & Flags::Used; }
 
-  HistogramStatistics getCumulativieHistogramStatistics() const override {
-    HistogramStatistics empty_histogram_stats;
-    return empty_histogram_stats;
-  }
+  HistogramStatistics intervalStatistics() const override { return HistogramStatistics(); }
+
+  HistogramStatistics cumulativeStatistics() const override { return HistogramStatistics(); }
 
   void merge(histogram_t* target) {
     histogram_t* hist_array[1];
@@ -455,6 +452,7 @@ public:
   Store& parent_;
   int current_active_;
   histogram_t* histograms_[2];
+  std::atomic<uint16_t> flags_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
@@ -479,6 +477,17 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t) override {}
 
+  bool used() const override {
+    bool any_tls_used = false;
+    for (auto tls_histogram : tls_histograms_) {
+      if (tls_histogram->used()) {
+        any_tls_used = true;
+        break;
+      }
+    }
+    return any_tls_used;
+  }
+
   void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
 
   /**
@@ -489,20 +498,22 @@ public:
    * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
    */
   void merge() override {
-    hist_clear(interval_histogram_);
-    for (auto tls_histogram : tls_histograms_) {
-      tls_histogram->merge(interval_histogram_);
+    if (used()) {
+      hist_clear(interval_histogram_);
+      for (auto tls_histogram : tls_histograms_) {
+        tls_histogram->merge(interval_histogram_);
+      }
+      histogram_t* hist_array[1];
+      hist_array[0] = interval_histogram_;
+      hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
     }
-    histogram_t* hist_array[1];
-    hist_array[0] = interval_histogram_;
-    hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
   }
 
-  HistogramStatistics getIntervalHistogramStatistics() const override {
+  HistogramStatistics intervalStatistics() const override {
     return HistogramStatistics(interval_histogram_);
   }
 
-  HistogramStatistics getCumulativieHistogramStatistics() const override {
+  HistogramStatistics cumulativeStatistics() const override {
     return HistogramStatistics(cumulative_histogram_);
   }
 

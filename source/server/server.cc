@@ -122,8 +122,10 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
   }
 
   for (const Stats::HistogramSharedPtr& histogram : store.histograms()) {
-    for (const auto& sink : sinks) {
-      sink->flushHistogram(*histogram); // TODO(ramaraochavali): implement used also for Histogram
+    if (histogram->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushHistogram(*histogram);
+      }
     }
   }
 

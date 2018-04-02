@@ -90,7 +90,7 @@ void MetricsServiceSink::flushHistogram(const Histogram& histogram) {
   auto* metric = metrics_family->add_metric();
   metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
   auto* summary_metric = metric->mutable_summary();
-  const HistogramStatistics hist_stats = histogram.getIntervalHistogramStatistics();
+  const HistogramStatistics hist_stats = histogram.intervalStatistics();
   for (size_t i = 0; i < ARRAY_SIZE(hist_stats.quantiles_in_); i++) {
     auto* quantile = summary_metric->add_quantile();
     quantile->set_quantile(hist_stats.quantiles_in_[i]);

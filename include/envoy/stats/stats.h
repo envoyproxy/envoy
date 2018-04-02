@@ -114,6 +114,11 @@ public:
    * Returns the name of the Metric with the portions designated as tags removed.
    */
   virtual const std::string& tagExtractedName() const PURE;
+
+  /**
+   * Indicates whether a metric has been used.
+   */
+  virtual bool used() const PURE;
 };
 
 /**
@@ -128,7 +133,6 @@ public:
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
-  virtual bool used() const PURE;
   virtual uint64_t value() const PURE;
 };
 
@@ -146,7 +150,6 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
-  virtual bool used() const PURE;
   virtual uint64_t value() const PURE;
 };
 
@@ -178,12 +181,12 @@ public:
   /**
    * Returns the Histogram Summary Statistics for the flush interval.
    */
-  virtual HistogramStatistics getIntervalHistogramStatistics() const PURE;
+  virtual HistogramStatistics intervalStatistics() const PURE;
 
   /**
    * Returns the Cumulative Histogram Summary Statistics.
    */
-  virtual HistogramStatistics getCumulativieHistogramStatistics() const PURE;
+  virtual HistogramStatistics cumulativeStatistics() const PURE;
 };
 
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
