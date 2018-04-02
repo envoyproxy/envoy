@@ -14,8 +14,8 @@ envoy_cc_test(
         "extractor_test.cc",
     ],
     deps = [
-        "//source/common/jwt_authn:jwt_lib",
         "//source/exe:envoy_common_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//test/test_common:utility_lib",
     ],
 )

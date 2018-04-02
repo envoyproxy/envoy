@@ -9,6 +9,8 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
@@ -111,4 +113,6 @@ private:
 };
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

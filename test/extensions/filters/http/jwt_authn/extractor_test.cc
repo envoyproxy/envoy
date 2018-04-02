@@ -1,5 +1,6 @@
-#include "common/jwt_authn/extractor.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/jwt_authn/extractor.h"
 
 #include "test/test_common/utility.h"
 
@@ -11,6 +12,8 @@ using ::testing::NiceMock;
 using ::testing::_;
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
@@ -178,4 +181,6 @@ TEST_F(ExtractorTest, TestMultipleTokens) {
 
 } // namespace
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

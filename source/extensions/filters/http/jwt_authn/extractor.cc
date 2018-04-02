@@ -1,4 +1,4 @@
-#include "common/jwt_authn/extractor.h"
+#include "extensions/filters/http/jwt_authn/extractor.h"
 
 #include "common/common/utility.h"
 #include "common/http/headers.h"
@@ -9,6 +9,8 @@ using ::Envoy::Http::LowerCaseString;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
@@ -147,4 +149,6 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
 }
 
 } // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
