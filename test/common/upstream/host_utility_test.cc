@@ -25,7 +25,7 @@ TEST(HostUtilityTest, All) {
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 
   host->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-  EXPECT_EQ("/failed_eds_health", HostUtility::healthFlagsToString(*host));
+  EXPECT_EQ("/failed_outlier_check/failed_eds_health", HostUtility::healthFlagsToString(*host));
 
   host->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
