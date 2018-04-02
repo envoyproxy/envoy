@@ -176,21 +176,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ratelimit_lib",
-    srcs = ["ratelimit.cc"],
-    hdrs = ["ratelimit.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/http/filter:ratelimit_includes",
-        "//source/common/http/filter:ratelimit_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
@@ -228,19 +213,5 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/tracing/zipkin:zipkin_lib",
         "//source/server:configuration_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "ext_authz_lib",
-    srcs = ["ext_authz.cc"],
-    hdrs = ["ext_authz.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/http/filter:ext_authz_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )

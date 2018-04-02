@@ -48,7 +48,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -91,7 +92,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
 // a real profiler linked in (successful call to startProfiler). startProfiler
 // requies tcmalloc.
@@ -205,6 +207,28 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
+}
+
+TEST_P(AdminInstanceTest, ConfigDump) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto entry = admin_.getConfigTracker().add("foo", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": {
+  "foo": {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bar"
+  }
+ }
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  std::string output = TestUtility::bufferToString(response);
+  EXPECT_EQ(expected_json, output);
 }
 
 TEST_P(AdminInstanceTest, Runtime) {

@@ -128,7 +128,13 @@ OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
     : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.opentracing."))} {}
 
 SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_headers,
-                                     const std::string& operation_name, SystemTime start_time) {
+                                     const std::string& operation_name, SystemTime start_time,
+                                     const Tracing::Decision tracing_decision) {
+  // If tracing decision is no, and sampling decision is not communicated via tags, then
+  // return a null span to indicate that tracing is not being performed.
+  if (!tracing_decision.traced && !useTagForSamplingDecision()) {
+    return nullptr;
+  }
   const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;
@@ -164,8 +170,14 @@ SpanPtr OpenTracingDriver::startSpan(const Config&, Http::HeaderMap& request_hea
       tracerStats().span_context_extraction_error_.inc();
     }
   }
-  active_span = tracer.StartSpan(operation_name, {opentracing::ChildOf(parent_span_ctx.get()),
-                                                  opentracing::StartTimestamp(start_time)});
+  opentracing::StartSpanOptions options;
+  options.references.emplace_back(opentracing::SpanReferenceType::ChildOfRef,
+                                  parent_span_ctx.get());
+  options.start_system_timestamp = start_time;
+  if (!tracing_decision.traced) {
+    options.tags.emplace_back(opentracing::ext::sampling_priority, 0);
+  }
+  active_span = tracer.StartSpanWithOptions(operation_name, options);
   RELEASE_ASSERT(active_span != nullptr);
   return SpanPtr{new OpenTracingSpan{*this, std::move(active_span)}};
 }

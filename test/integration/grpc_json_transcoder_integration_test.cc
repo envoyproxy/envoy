@@ -6,6 +6,7 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -140,7 +141,8 @@ protected:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

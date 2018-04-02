@@ -76,7 +76,8 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMap& request_headers,
-                                   const std::string&, SystemTime start_time) {
+                                   const std::string&, SystemTime start_time,
+                                   const Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   bool sampled(true);
@@ -86,6 +87,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     // zipkin tracers may still use that value, although should be 0 or 1.
     absl::string_view xb3_sampled = request_headers.XB3Sampled()->value().getStringView();
     sampled = xb3_sampled == ZipkinCoreConstants::get().SAMPLED || xb3_sampled == "true";
+  } else {
+    sampled = tracing_decision.traced;
   }
 
   if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {

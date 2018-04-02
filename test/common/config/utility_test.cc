@@ -24,6 +24,7 @@ using testing::AtLeast;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace Config {
@@ -272,7 +273,7 @@ TEST(UtilityTest, FactoryForApiConfigSource) {
     envoy::api::v2::core::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope)));
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _));
     Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope);
   }
 
@@ -281,7 +282,7 @@ TEST(UtilityTest, FactoryForApiConfigSource) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope)));
+                factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), _));
     Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope);
   }
 }

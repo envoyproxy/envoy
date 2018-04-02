@@ -39,7 +39,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "f3c1f42601d13504c68e2bc81c60604f0de055dd",
+        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
@@ -76,7 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "e73b8264a26c909f75d38ec2c73d9f47ad1b3b57",
+        commit = "92ffa417b5d2e8ab3912ff4da4daa6aa93f8df0f",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

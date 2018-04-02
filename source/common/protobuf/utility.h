@@ -163,6 +163,12 @@ public:
     validate(message);
   }
 
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    loadFromYaml(yaml, message);
+    validate(message);
+  }
+
   /**
    * Downcast and validate protoc-gen-validate constraints on a given protobuf.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file

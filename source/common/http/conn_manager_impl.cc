@@ -607,11 +607,12 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
-  if (!tracing_decision.is_tracing) {
+  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_,
+                                                       tracing_decision);
+
+  if (!active_span_) {
     return;
   }
-
-  active_span_ = connection_manager_.tracer_.startSpan(*this, *request_headers_, request_info_);
 
   // TODO: Need to investigate the following code based on the cached route, as may
   // be broken in the case a filter changes the route.
@@ -1380,7 +1381,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
-  UNREFERENCED_PARAMETER(watermark_callbacks);
   parent_.watermark_callbacks_ = nullptr;
 }
 

@@ -70,7 +70,8 @@ TEST_F(DynamicOpenTracingDriverTest, InitializeDriver) {
 TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   setupValidDriver();
 
-  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_);
+  SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
+                                          {Reason::Sampling, true});
   first_span->finishSpan();
   driver_->tracer().Close();
 
