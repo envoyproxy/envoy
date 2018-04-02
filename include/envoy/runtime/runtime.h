@@ -56,6 +56,25 @@ public:
   };
 
   /**
+   * A provider of runtime values. One or more of these compose the snapshot's source of values,
+   * where successive layers override the previous ones.
+   */
+  class OverrideLayer {
+  public:
+    virtual ~OverrideLayer() {}
+    /**
+     * @return const std::unordered_map<std::string, Entry>& the values in this layer.
+     */
+    virtual const std::unordered_map<std::string, Entry>& values() const PURE;
+    /**
+     * @return const std::string& a user-friendly alias for this layer, e.g. "admin" or "disk".
+     */
+    virtual const std::string& name() const PURE;
+  };
+
+  typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
+
+  /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
    * a random number in the range 0-99 and seeing if this number is < the value stored in the
    * runtime key, or the default_value if the runtime key is invalid.
@@ -116,10 +135,13 @@ public:
   virtual uint64_t getInteger(const std::string& key, uint64_t default_value) const PURE;
 
   /**
-   * Fetch the raw runtime entries map. The map data is safe only for the lifetime of the Snapshot.
-   * @return const std::unordered_map<std::string, const Entry>& the raw map of loaded values.
+   * Fetch the OverrideLayers that provide values in this snapshot. Layers are ordered from bottom
+   * to top; for instance, the second layer's entries override the first layer's entries, and so on.
+   * Any layer can add a key in addition to overriding keys in layers below. The layer vector is
+   * safe only for the lifetime of the Snapshot.
+   * @return const std::vector<OverrideLayerConstPtr>& the raw map of loaded values.
    */
-  virtual const std::unordered_map<std::string, const Entry>& getAll() const PURE;
+  virtual const std::vector<OverrideLayerConstPtr>& getLayers() const PURE;
 };
 
 /**
@@ -135,6 +157,13 @@ public:
    *         fetched again when needed.
    */
   virtual Snapshot& snapshot() PURE;
+
+  /**
+   * Merge the given map of key-value pairs into the runtime's state. To remove a previous merge for
+   * a key, use an empty string as the value.
+   * @param values the values to merge
+   */
+  virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
 };
 
 typedef std::unique_ptr<Loader> LoaderPtr;

@@ -19,7 +19,7 @@ public:
     };
   }
 
-  ProtobufTypes::MessagePtr test_msg() { return std::make_unique<Protobuf::Any>(); }
+  ProtobufTypes::MessagePtr test_msg() { return std::make_unique<ProtobufWkt::Any>(); }
 
   virtual ~ConfigTrackerImplTest() = default;
 
