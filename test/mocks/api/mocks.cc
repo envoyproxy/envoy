@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include "common/common/assert.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,6 +37,35 @@ ssize_t MockOsSysCalls::write(int fd, const void* buffer, size_t num_bytes) {
   write_event_.notify_one();
 
   return result;
+}
+
+int MockOsSysCalls::setsockopt(int sockfd, int level, int optname, const void* optval,
+                               socklen_t optlen) {
+  ASSERT(optlen == sizeof(int));
+
+  // Allow mocking system call failure.
+  if (setsockopt_(sockfd, level, optname, optval, optlen) != 0) {
+    return -1;
+  }
+
+  boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
+  return 0;
+};
+
+int MockOsSysCalls::getsockopt(int sockfd, int level, int optname, void* optval,
+                               socklen_t* optlen) {
+  ASSERT(*optlen == sizeof(int));
+  int val = 0;
+  const auto& it = boolsockopts_.find(SockOptKey(sockfd, level, optname));
+  if (it != boolsockopts_.end()) {
+    val = it->second;
+  }
+  // Allow mocking system call failure.
+  if (getsockopt_(sockfd, level, optname, optval, optlen) != 0) {
+    return -1;
+  }
+  *reinterpret_cast<int*>(optval) = val;
+  return 0;
 }
 
 } // namespace Api

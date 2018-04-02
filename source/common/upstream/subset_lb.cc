@@ -463,7 +463,18 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
       original_host_set_.hostsPerLocality().filter(
           [&predicate](const Host& host) { return predicate(host) && host.healthy(); });
 
-  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
+  // We pass in an empty list of locality weights here. This effectively disables locality balancing
+  // for subset LB.
+  // TODO(htuch): We should consider adding locality awareness here, but we need to do some design
+  // work first, and this might not even be a desirable thing to do. Consider for example a
+  // situation in which you have 50/50 split across two localities X/Y which have 100 hosts each
+  // without subsetting. If the subset LB results in X having only 1 host selected but Y having 100,
+  // then a lot more load is being dumped on the single host in X than originally anticipated in the
+  // load balancing assignment delivered via EDS. It might seem you want to further weight by subset
+  // size in order for this to make sense. However, while the original X/Y weightings can be
+  // respected this way, those weightings were made by a management server that was not taking into
+  // consideration subsets (e.g. LRS only reports at locality level).
+  HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality, {},
                            filtered_added, filtered_removed);
 }
 

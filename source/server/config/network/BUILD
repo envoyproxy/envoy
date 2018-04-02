@@ -37,36 +37,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ratelimit_lib",
-    srcs = ["ratelimit.cc"],
-    hdrs = ["ratelimit.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:ratelimit_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "redis_proxy_lib",
-    srcs = ["redis_proxy.cc"],
-    hdrs = ["redis_proxy.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/redis:codec_lib",
-        "//source/common/redis:command_splitter_lib",
-        "//source/common/redis:conn_pool_lib",
-        "//source/common/redis:proxy_filter_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "raw_buffer_socket_lib",
     srcs = ["raw_buffer_socket.cc"],
     hdrs = ["raw_buffer_socket.h"],
@@ -93,19 +63,5 @@ envoy_cc_library(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:ssl_socket_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "ext_authz_lib",
-    srcs = ["ext_authz.cc"],
-    hdrs = ["ext_authz.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/filter:ext_authz_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

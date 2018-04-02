@@ -34,7 +34,6 @@ private:
              Config::SubscriptionCallbacks<envoy::api::v2::Cluster>& callbacks) override {
     // CDS subscribes to all clusters.
     ASSERT(resources.empty());
-    UNREFERENCED_PARAMETER(resources);
     callbacks_ = &callbacks;
     RestApiFetcher::initialize();
   }

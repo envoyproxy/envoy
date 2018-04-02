@@ -23,6 +23,12 @@ TEST(HostUtilityTest, All) {
 
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
+
+  host->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+  EXPECT_EQ("/failed_outlier_check/failed_eds_health", HostUtility::healthFlagsToString(*host));
+
+  host->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+  EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 }
 
 } // namespace Upstream
