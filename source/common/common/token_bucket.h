@@ -1,8 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <iostream>
-
 #include "envoy/common/time.h"
 
 #include "common/common/utility.h"
@@ -14,43 +11,31 @@ namespace Envoy {
  *
  * https://en.wikipedia.org/wiki/Token_bucket
  */
-template <typename Ratio = std::ratio<1L, 1L>> class TokenBucket {
+class TokenBucket {
 public:
   /**
    * @param max_tokens supplies the maximun number of tokens in the bucket.
-   * @param refill_rate supplies the number of tokens coming back into the bucket on each second.
+   * @param fill_rate supplies the number of tokens that will return to the bucket on each second;
+   * Default is 1 token/second.
+   * @param time_source supplies the the time source and used to facilitate testing; Default is
+   * ProdMonotonicTimeSource.
    */
-  TokenBucket(uint64_t max_tokens,
-              MonotonicTime start_time = ProdMonotonicTimeSource::instance_.currentTime())
-      : max_tokens_(max_tokens), tokens_(max_tokens), last_fill_(start_time) {}
+  TokenBucket(uint64_t max_tokens, double fill_rate = 1,
+              MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
 
   /**
-   * @param tokens supplies the number of tokens consumed from the bucket on each call. Default
-   * is 1.
-   * @return true if bucket is not empty, false otherwise.
+   * @param tokens supplies the number of tokens to be consumed. Default is 1.
+   * @return true if bucket is not empty, otherwise it returns false.
    */
-  bool consume(uint64_t tokens = 1) {
-    const auto time_now = ProdMonotonicTimeSource::instance_.currentTime();
-
-    if (tokens_ < max_tokens_) {
-      tokens_ =
-          std::min(std::chrono::duration<double, Ratio>(time_now - last_fill_).count() + tokens_,
-                   max_tokens_);
-    }
-
-    last_fill_ = time_now;
-    if (tokens_ < tokens) {
-      return false;
-    }
-
-    tokens_ -= tokens;
-    return true;
-  }
+  bool consume(uint64_t tokens = 1);
 
 private:
+  static constexpr double zero_time_ = 0.0;
   const double max_tokens_;
+  const double fill_rate_;
   double tokens_;
   MonotonicTime last_fill_;
+  MonotonicTimeSource& time_source_;
 };
 
 } // namespace Envoy

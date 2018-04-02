@@ -204,5 +204,5 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/common:utility_lib",
-    ]
+    ],
 )

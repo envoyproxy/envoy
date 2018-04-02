@@ -1,57 +1,90 @@
 #include <chrono>
-#include <thread>
 
 #include "common/common/token_bucket.h"
 
+#include "test/mocks/common.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using ::testing::Mock;
+using ::testing::Return;
+using testing::NiceMock;
 
 namespace Envoy {
 
-namespace {
-using half_token_per_sec = std::ratio<2L, 1L>;
-using token_per_sec = std::ratio<1L, 1L>;
-} // namespace
+class TokenBucketTest : public testing::Test {
+public:
+  using time_point = std::chrono::steady_clock::time_point;
 
-TEST(TokenBucketTest, ConsumeTokenPerSecond) {
-  TokenBucket<token_per_sec> token_bucket{2};
+protected:
+  NiceMock<MockMonotonicTimeSource> time_source_;
+};
+
+// Verifies TokenBucket initialization.
+TEST_F(TokenBucketTest, Initialization) {
+  TokenBucket token_bucket{1, -1.0, time_source_};
 
   EXPECT_TRUE(token_bucket.consume());
-  EXPECT_TRUE(token_bucket.consume());
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  EXPECT_FALSE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(400));
-  EXPECT_FALSE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(600));
-  EXPECT_TRUE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  EXPECT_CALL(time_source_, currentTime()).WillOnce(Return(time_point{}));
   EXPECT_FALSE(token_bucket.consume());
 }
 
-TEST(TokenBucketTest, ConsumeTokenPerSecond) {
-  TokenBucket<token_per_sec> token_bucket{2, ProdMonotonicTimeSource::instance_.currentTime() -
-                                                 std::chrono::milliseconds(3000)};
+// Verifies TokenBucket's maximum capacity.
+TEST_F(TokenBucketTest, MaxBucketSize) {
+  TokenBucket token_bucket{3, 1, time_source_};
 
-  EXPECT_TRUE(token_bucket.consume());
-  EXPECT_TRUE(token_bucket.consume());
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  EXPECT_FALSE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(400));
-  EXPECT_FALSE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(600));
-  EXPECT_TRUE(token_bucket.consume(2));
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  EXPECT_FALSE(token_bucket.consume());
+  EXPECT_TRUE(token_bucket.consume(3));
+  EXPECT_CALL(time_source_, currentTime()).WillOnce(Return(time_point(std::chrono::seconds(10))));
+
+  EXPECT_FALSE(token_bucket.consume(4));
+  EXPECT_TRUE(token_bucket.consume(3));
 }
 
-TEST(TokenBucketTest, ConsumeHalfTokenSecond) {
-  TokenBucket<half_token_per_sec> token_bucket{1};
+// Verifies that TokenBucket can consume and refill tokens.
+TEST_F(TokenBucketTest, ConsumeAndRefill) {
+  {
+    TokenBucket token_bucket{10, 1, time_source_};
 
-  EXPECT_TRUE(token_bucket.consume());
-  EXPECT_FALSE(token_bucket.consume());
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  EXPECT_FALSE(token_bucket.consume());
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  EXPECT_TRUE(token_bucket.consume());
+    EXPECT_FALSE(token_bucket.consume(20));
+    EXPECT_TRUE(token_bucket.consume(9));
+
+    EXPECT_CALL(time_source_, currentTime()).WillOnce(Return(time_point{}));
+    EXPECT_TRUE(token_bucket.consume());
+
+    EXPECT_CALL(time_source_, currentTime())
+        .WillOnce(Return(time_point(std::chrono::milliseconds(999))));
+    EXPECT_FALSE(token_bucket.consume());
+
+    EXPECT_CALL(time_source_, currentTime())
+        .WillOnce(Return(time_point(std::chrono::milliseconds(5999))));
+    EXPECT_FALSE(token_bucket.consume(6));
+
+    EXPECT_CALL(time_source_, currentTime())
+        .WillRepeatedly(Return(time_point(std::chrono::milliseconds(6000))));
+    EXPECT_TRUE(token_bucket.consume(6));
+    EXPECT_FALSE(token_bucket.consume());
+  }
+
+  ASSERT_TRUE(Mock::VerifyAndClear(&time_source_));
+
+  {
+    TokenBucket token_bucket{1, 0.5, time_source_};
+
+    EXPECT_TRUE(token_bucket.consume());
+
+    EXPECT_CALL(time_source_, currentTime())
+        .Times(3)
+        .WillOnce(Return(time_point(std::chrono::milliseconds(500))))
+        .WillOnce(Return(time_point(std::chrono::milliseconds(1500))))
+        .WillOnce(Return(time_point(std::chrono::milliseconds(2000))));
+
+    EXPECT_FALSE(token_bucket.consume());
+    EXPECT_FALSE(token_bucket.consume());
+    EXPECT_TRUE(token_bucket.consume());
+
+    ASSERT_TRUE(Mock::VerifyAndClear(&time_source_));
+  }
 }
 
 } // namespace Envoy
