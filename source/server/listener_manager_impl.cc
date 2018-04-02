@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -111,7 +112,9 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 class ListenerSocketOption : public Network::SocketOptionImpl {
 public:
   ListenerSocketOption(const envoy::api::v2::Listener& config)
-      : Network::SocketOptionImpl(config.freebind().value()) {}
+      : Network::SocketOptionImpl(
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{})) {}
 };
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
@@ -136,9 +139,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   // Add listen socket options from the config.
-  if (config.has_freebind()) {
-    addListenSocketOption(std::make_unique<ListenerSocketOption>(config));
-  }
+  addListenSocketOption(std::make_unique<ListenerSocketOption>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =

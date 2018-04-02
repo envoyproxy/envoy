@@ -201,6 +201,7 @@ envoy_cc_library(
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/network:listen_socket_lib",

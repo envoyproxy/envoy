@@ -1392,11 +1392,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
-// Validate that when freebind is set in the Listener, we see no socket option
-// set.
-TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerDisabled) {
+// Validate that when neither transparent nor freebind is not set in the
+// Listener, we see no socket option set.
+TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabled) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
-    name: "FreebindListener"
+    name: "TestListener"
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     filter_chains:
@@ -1407,11 +1407,61 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerDisabled) {
       .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
                            const Network::Socket::OptionsSharedPtr& options,
                            bool) -> Network::SocketSharedPtr {
-        EXPECT_EQ(options.get(), nullptr);
+        EXPECT_NE(options.get(), nullptr);
         return listener_factory_.socket_;
       }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
   EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+// Validate that when transparent is set in the Listener, we see the socket option
+// propagated to setsockopt(). This is as close to an end-to-end test as we have
+// for this feature, due to the complexity of creating an integration test
+// involving the network stack. We only test the IPv4 case here, as the logic
+// around IPv4/IPv6 handling is tested generically in
+// socket_option_impl_test.cc.
+TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: TransparentListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+    transparent: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  if (ENVOY_SOCKET_IP_TRANSPARENT.has_value()) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+        .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                                const Network::Socket::OptionsSharedPtr& options,
+                                bool) -> Network::SocketSharedPtr {
+          EXPECT_NE(options.get(), nullptr);
+          EXPECT_EQ(options->size(), 1);
+          EXPECT_TRUE(
+              (*options->begin())
+                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          return listener_factory_.socket_;
+        }));
+    // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
+    EXPECT_CALL(os_sys_calls,
+                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
+        .Times(2)
+        .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+    EXPECT_EQ(1U, manager_->listeners().size());
+  } else {
+    // MockListenerSocket is not a real socket, so this always fails in testing.
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true),
+                              EnvoyException,
+                              "MockListenerComponentFactory: Setting socket options failed");
+    EXPECT_EQ(0U, manager_->listeners().size());
+  }
 }
 
 // Validate that when freebind is set in the Listener, we see the socket option

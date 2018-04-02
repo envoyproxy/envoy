@@ -17,6 +17,18 @@ namespace Network {
 // on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
 typedef absl::optional<int> SocketOptionName;
 
+#ifdef IP_TRANSPARENT
+#define ENVOY_SOCKET_IP_TRANSPARENT Network::SocketOptionName(IP_TRANSPARENT)
+#else
+#define ENVOY_SOCKET_IP_TRANSPARENT Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_TRANSPARENT
+#define ENVOY_SOCKET_IPV6_TRANSPARENT Network::SocketOptionName(IPV6_TRANSPARENT)
+#else
+#define ENVOY_SOCKET_IPV6_TRANSPARENT Network::SocketOptionName()
+#endif
+
 #ifdef IP_FREEBIND
 #define ENVOY_SOCKET_IP_FREEBIND Network::SocketOptionName(IP_FREEBIND)
 #else
@@ -31,7 +43,8 @@ typedef absl::optional<int> SocketOptionName;
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(absl::optional<bool> freebind) : freebind_(freebind) {}
+  SocketOptionImpl(absl::optional<bool> transparent, absl::optional<bool> freebind)
+      : transparent_(transparent), freebind_(freebind) {}
 
   // Socket::Option
   bool setOption(Socket& socket, Socket::SocketState state) const override;
@@ -57,6 +70,7 @@ public:
                                SocketOptionName ipv6_optname, const void* optval, socklen_t optlen);
 
 private:
+  const absl::optional<bool> transparent_;
   const absl::optional<bool> freebind_;
 };
 

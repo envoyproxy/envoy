@@ -26,7 +26,7 @@ Network::FilterStatus OriginalDstFilter::onAccept(Network::ListenerFilterCallbac
     // connections that are NOT redirected using iptables. If a connection was not redirected,
     // the address returned by getOriginalDst() matches the local address of the new socket.
     // In this case the listener handles the connection directly and does not hand it off.
-    if (original_local_address && (*original_local_address != local_address)) {
+    if (original_local_address) {
       // Restore the local address to the original one.
       socket.setLocalAddress(original_local_address, true);
     }
