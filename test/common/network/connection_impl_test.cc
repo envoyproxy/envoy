@@ -254,12 +254,12 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto option = std::make_unique<MockSocketOption>();
+  auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->addOption(std::move(option));
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -302,12 +302,12 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto option = std::make_unique<MockSocketOption>();
+  auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->addOption(std::move(option));
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
