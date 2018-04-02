@@ -30,7 +30,6 @@ public:
   bool consume(uint64_t tokens = 1);
 
 private:
-  static constexpr double zero_time_ = 0.0;
   const double max_tokens_;
   const double fill_rate_;
   double tokens_;
