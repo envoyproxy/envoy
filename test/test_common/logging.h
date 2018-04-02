@@ -70,8 +70,9 @@ private:
     ASSERT_EQ(1, log_recorder.messages().size());                                                  \
     std::string recorded_log = log_recorder.messages()[0];                                         \
     std::vector<absl::string_view> pieces = absl::StrSplit(recorded_log, "][");                    \
+    /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */       \
     ASSERT_LE(3, pieces.size());                                                                   \
-    EXPECT_EQ(loglevel, std::string(pieces[2]));                                                   \
+    EXPECT_EQ(loglevel, std::string(pieces[2])); /* error message is legible if cast to string */  \
     EXPECT_TRUE(absl::string_view(recorded_log).find(substr) != absl::string_view::npos)           \
         << "\n Actual Log:         " << recorded_log << "\n Expected Substring: " << substr;       \
   } while (false)
