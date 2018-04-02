@@ -237,11 +237,13 @@ void BaseIntegrationTest::initialize() {
 }
 
 void BaseIntegrationTest::createUpstreams() {
-  if (autonomous_upstream_) {
-    fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
-  } else {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
+  for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    if (autonomous_upstream_) {
+      fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
+    } else {
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
+    }
   }
 }
 
@@ -297,6 +299,13 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
     return it->second;
   }
   RELEASE_ASSERT(false);
+}
+
+void BaseIntegrationTest::setUpstreamAddress(uint32_t upstream_index,
+                                             envoy::api::v2::endpoint::LbEndpoint& endpoint) const {
+  auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
+  socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+  socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {

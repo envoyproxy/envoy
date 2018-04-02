@@ -12,6 +12,7 @@
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 
+#include "absl/strings/string_view.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -53,10 +54,6 @@ enum class Id {
  */
 class Logger {
 public:
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
-  std::string name() const { return logger_->name(); }
-  void setLevel(spdlog::level::level_enum level) const { logger_->set_level(level); }
-
   /* This is simple mapping between Logger severity levels and spdlog severity levels.
    * The only reason for this mapping is to go around the fact that spdlog defines level as err
    * but the method to log at err level is called LOGGER.error not LOGGER.err. All other level are
@@ -72,6 +69,11 @@ public:
     off = spdlog::level::off
   } levels;
 
+  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
+  std::string name() const { return logger_->name(); }
+  void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
+  spdlog::level::level_enum level() const { return logger_->level(); }
+
   static const char* DEFAULT_LOG_FORMAT;
 
 private:
@@ -82,46 +84,99 @@ private:
   friend class Registry;
 };
 
+class DelegatingLogSink;
+typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
+
 /**
- * An optionally locking stderr or file logging sink.
- *
- * This sink outputs to either stderr or to a file. It shares both implementations (instead of
- * being two separate classes) because we can't setup file logging until after the AccessLogManager
- * is available, but by that time some loggers have cached their logger from the registry already,
- * so we need to be able switch implementations without replacing the object.
+ * Captures a logging sink that can be delegated to for a bounded amount of time.
+ * On destruction, logging is reverted to its previous state. SinkDelegates must
+ * be allocated/freed as a stack.
  */
-class LockingStderrOrFileSink : public spdlog::sinks::sink {
+class SinkDelegate {
 public:
+  explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
+  virtual ~SinkDelegate();
+
+  virtual void log(absl::string_view msg) PURE;
+  virtual void flush() PURE;
+
+protected:
+  SinkDelegate* previous_delegate() { return previous_delegate_; }
+
+private:
+  SinkDelegate* previous_delegate_;
+  DelegatingLogSinkPtr log_sink_;
+};
+
+/**
+ * SinkDelegate that writes log messages to a file.
+ */
+class FileSinkDelegate : public SinkDelegate {
+public:
+  FileSinkDelegate(const std::string& log_path, AccessLog::AccessLogManager& log_manager,
+                   DelegatingLogSinkPtr log_sink);
+
+  // SinkDelegate
+  void log(absl::string_view msg) override;
+  void flush() override;
+
+private:
+  Filesystem::FileSharedPtr log_file_;
+};
+
+/**
+ * SinkDelegate that writes log messages to stderr.
+ */
+class StderrSinkDelegate : public SinkDelegate {
+public:
+  explicit StderrSinkDelegate(DelegatingLogSinkPtr log_sink);
+
+  // SinkDelegate
+  void log(absl::string_view msg) override;
+  void flush() override;
+
+  bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
 
-  /**
-   * Configure this object to log to stderr.
-   *
-   * @note This method is not thread-safe and can only be called when no other threads
-   * are logging.
-   */
-  void logToStdErr();
+private:
+  Thread::BasicLockable* lock_{};
+};
 
-  /**
-   * Configure this object to log to a file.
-   *
-   * @note This method is not thread-safe and can only be called when no other threads
-   * are logging.
-   */
-  void logToFile(const std::string& log_path, AccessLog::AccessLogManager& log_manager);
+/**
+ * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
+ * the prevoius state when the DelegatingSink is destructed.
+ */
+class DelegatingLogSink : public spdlog::sinks::sink {
+public:
+  void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override;
+  void flush() override { sink_->flush(); }
 
   /**
    * @return bool whether a lock has been established.
    */
-  bool hasLock() const { return lock_ != nullptr; }
+  bool hasLock() const { return stderr_sink_->hasLock(); }
+
+  // Constructs a new DelegatingLogSink, sets up the default sink to stderr,
+  // and returns a shared_ptr to it. A shared_ptr is required for sinks used
+  // in spdlog::logger; it would not otherwise be required in Envoy. This method
+  // must own the construction process because StderrSinkDelegate needs access to
+  // the DelegatingLogSinkPtr, not just the DelegatingLogSink*, and that is only
+  // available after construction.
+  static DelegatingLogSinkPtr init();
 
 private:
-  Thread::BasicLockable* lock_{};
-  Filesystem::FileSharedPtr log_file_;
+  friend class SinkDelegate;
+
+  DelegatingLogSink() = default;
+
+  void setDelegate(SinkDelegate* sink) { sink_ = sink; }
+  SinkDelegate* delegate() { return sink_; }
+
+  SinkDelegate* sink_{nullptr};
+  std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
 };
 
 /**
@@ -139,21 +194,35 @@ public:
   /**
    * @return the singleton sink to use for all loggers.
    */
-  static std::shared_ptr<LockingStderrOrFileSink> getSink() {
-    static std::shared_ptr<LockingStderrOrFileSink> sink(new LockingStderrOrFileSink());
+  static DelegatingLogSinkPtr getSink() {
+    static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
     return sink;
   }
 
-  /**
-   * Initialize the logging system from server options.
+  /*
+   * Initialize the logging system with the specified lock and log level.
+   * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
+   * can be called individually as well, e.g. to set the log level without
+   * changing the lock or format.
    */
-  static void initialize(uint64_t log_level, const std::string& log_format,
+  static void initialize(spdlog::level::level_enum log_level, const std::string& log_format,
                          Thread::BasicLockable& lock);
 
   /**
-   * @return const std::vector<Logger>& the installed loggers.
+   * Sets the minimum log severity required to print messages.
+   * Messages below this loglevel will be suppressed.
    */
-  static const std::vector<Logger>& loggers() { return allLoggers(); }
+  static void setLogLevel(spdlog::level::level_enum log_level);
+
+  /**
+   * Sets the log format.
+   */
+  static void setLogFormat(const std::string& log_format);
+
+  /**
+   * @return std::vector<Logger>& the installed loggers.
+   */
+  static std::vector<Logger>& loggers() { return allLoggers(); }
 
   /**
    * @Return bool whether the registry has been initialized.
@@ -198,7 +267,9 @@ protected:
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)                                                        \
   (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL) >= LOGGER.level())
 
-// Compare levels before invoking logger
+// Compare levels before invoking logger. This is an optimization to avoid
+// executing expressions computing log contents when they would be suppressed.
+// The same filtering will also occur in spdlog::logger.
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \

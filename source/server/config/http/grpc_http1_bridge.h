@@ -6,7 +6,7 @@
 
 #include "common/config/well_known_names.h"
 
-#include "server/config/http/empty_http_filter_config.h"
+#include "extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 namespace Server {
@@ -15,7 +15,7 @@ namespace Configuration {
 /**
  * Config registration for the grpc HTTP1 bridge filter. @see NamedHttpFilterConfigFactory.
  */
-class GrpcHttp1BridgeFilterConfig : public EmptyHttpFilterConfig {
+class GrpcHttp1BridgeFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
   HttpFilterFactoryCb createFilter(const std::string&, FactoryContext& context) override;
 

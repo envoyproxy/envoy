@@ -83,6 +83,12 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       priority_state[priority].first->emplace_back(new HostImpl(
           info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()), lb_endpoint.metadata(),
           lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality()));
+      const auto& health_status = lb_endpoint.health_status();
+      if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+          health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+          health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+        priority_state[priority].first->back()->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+      }
     }
   }
 

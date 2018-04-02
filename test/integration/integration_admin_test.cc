@@ -240,7 +240,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_STREQ("application/json", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
                                                 "", downstreamProtocol(), version_);

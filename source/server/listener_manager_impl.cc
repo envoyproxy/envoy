@@ -139,7 +139,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   // Add listen socket options from the config.
-  addListenSocketOption(std::make_unique<ListenerSocketOption>(config));
+  addListenSocketOption(std::make_shared<ListenerSocketOption>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
