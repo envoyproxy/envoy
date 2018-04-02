@@ -60,7 +60,8 @@ public:
               ->mutable_routes(0)
               ->mutable_metadata()
               ->mutable_filter_metadata()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+              ->insert(
+                  Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(key, value));
         });
 
     initialize();
