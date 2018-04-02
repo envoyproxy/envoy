@@ -2,7 +2,8 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/statsd.h"
+
+#include "extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -17,7 +18,9 @@
 using testing::NiceMock;
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 namespace Statsd {
 
 class MockWriter : public Writer {
@@ -41,15 +44,15 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
 
-  NiceMock<MockHistogram> timer;
+  NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   sink.onHistogramComplete(timer, 5);
 
@@ -79,19 +82,19 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
-  std::vector<Tag> tags = {Tag{"node", "test"}};
-  NiceMock<MockCounter> counter;
+  std::vector<Stats::Tag> tags = {Stats::Tag{"node", "test"}};
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   counter.tags_ = tags;
 
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   gauge.tags_ = tags;
   sink.flushGauge(gauge, 1);
 
-  NiceMock<MockHistogram> timer;
+  NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   timer.tags_ = tags;
   sink.onHistogramComplete(timer, 5);
@@ -111,19 +114,19 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, writer_ptr, false);
 
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c"));
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g"));
   sink.flushGauge(gauge, 1);
 
-  NiceMock<MockHistogram> timer;
+  NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_timer:5|ms"));
@@ -137,22 +140,22 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, writer_ptr, true);
 
-  std::vector<Tag> tags = {Tag{"key1", "value1"}, Tag{"key2", "value2"}};
-  NiceMock<MockCounter> counter;
+  std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   counter.tags_ = tags;
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c|#key1:value1,key2:value2"));
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   gauge.tags_ = tags;
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g|#key1:value1,key2:value2"));
   sink.flushGauge(gauge, 1);
 
-  NiceMock<MockHistogram> timer;
+  NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   timer.tags_ = tags;
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
@@ -163,5 +166,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
 }
 
 } // namespace Statsd
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

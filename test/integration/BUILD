@@ -320,7 +320,6 @@ envoy_cc_test_library(
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
-        "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -347,7 +346,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/dynamo:config",
-        "//source/server/config/stats:statsd_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -401,20 +399,6 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
-    ],
-)
-
-envoy_cc_test(
-    name = "metrics_service_integration_test",
-    srcs = ["metrics_service_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//source/server/config/stats:metrics_service_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )
 

@@ -167,6 +167,8 @@ typedef ConstSingleton<HttpTracerNameValues> HttpTracerNames;
 
 /**
  * Well-known stats sink names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.stat_sinks.name.
  */
 class StatsSinkNameValues {
 public:
