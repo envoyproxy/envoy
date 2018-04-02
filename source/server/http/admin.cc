@@ -542,45 +542,62 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response) {
-  Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  const auto& entries = server_.runtime().snapshot().getAll();
-  const auto pairs = sortedRuntime(entries);
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
 
-  if (params.size() == 0) {
-    for (const auto& entry : pairs) {
-      response.add(fmt::format("{}: {}\n", entry.first, entry.second.string_value_));
+  // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
+  rapidjson::Document document;
+  document.SetObject();
+  auto& allocator = document.GetAllocator();
+  std::map<std::string, rapidjson::Value> entry_objects;
+  rapidjson::Value layer_names{rapidjson::kArrayType};
+  const auto& layers = server_.runtime().snapshot().getLayers();
+
+  for (const auto& layer : layers) {
+    rapidjson::Value layer_name;
+    layer_name.SetString(layer->name().c_str(), allocator);
+    layer_names.PushBack(std::move(layer_name), allocator);
+    for (const auto& kv : layer->values()) {
+      rapidjson::Value entry_object{rapidjson::kObjectType};
+      const auto it = entry_objects.find(kv.first);
+      if (it == entry_objects.end()) {
+        rapidjson::Value entry_object{rapidjson::kObjectType};
+        entry_object.AddMember("layer_values", rapidjson::Value{kArrayType}, allocator);
+        entry_object.AddMember("final_value", "", allocator);
+        entry_objects.emplace(kv.first, std::move(entry_object));
+      }
     }
-  } else {
-    if (params.begin()->first == "format" && params.begin()->second == "json") {
-      response_headers.insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
-      response.add(runtimeAsJson(pairs));
-      response.add("\n");
-    } else {
-      response.add("usage: /runtime?format=json\n");
-      rc = Http::Code::BadRequest;
+  }
+  document.AddMember("layers", std::move(layer_names), allocator);
+
+  for (const auto& layer : layers) {
+    for (auto& kv : entry_objects) {
+      const auto it = layer->values().find(kv.first);
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      rapidjson::Value entry_value_object;
+      entry_value_object.SetString(entry_value.c_str(), allocator);
+      if (!entry_value.empty()) {
+        kv.second["final_value"] = rapidjson::Value{entry_value_object, allocator};
+      }
+      kv.second["layer_values"].PushBack(entry_value_object, allocator);
     }
   }
 
-  return rc;
+  rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
+  for (auto& kv : entry_objects) {
+    value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
+                               allocator);
+  }
+
+  document.AddMember("entries", std::move(value_arrays_obj), allocator);
+
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  response.add(strbuf.GetString());
+  return Http::Code::OK;
 }
-
-const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
-    const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
-  std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
-                                                                      entries.end());
-
-  std::sort(pairs.begin(), pairs.end(),
-            [](const std::pair<std::string, const Runtime::Snapshot::Entry>& a,
-               const std::pair<std::string, const Runtime::Snapshot::Entry>& b) -> bool {
-              return a.first < b.first;
-            });
-
-  return pairs;
-}
-
-ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
@@ -610,6 +627,23 @@ std::string AdminImpl::runtimeAsJson(
   document.Accept(writer);
   return strbuf.GetString();
 }
+
+Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  if (params.empty()) {
+    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+    response.add("use an empty value to remove a previously added override");
+    return Http::Code::BadRequest;
+  }
+  std::unordered_map<std::string, std::string> overrides;
+  overrides.insert(params.begin(), params.end());
+  server_.runtime().mergeValues(overrides);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();
@@ -681,7 +715,10 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
+          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
+           false, true}},
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {
