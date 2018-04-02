@@ -2,11 +2,11 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/lua/lua.h"
+#include "extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
 class HeaderMapWrapper;
@@ -14,7 +14,7 @@ class HeaderMapWrapper;
 /**
  * Iterator over a header map.
  */
-class HeaderMapIterator : public Envoy::Lua::BaseLuaObject<HeaderMapIterator> {
+class HeaderMapIterator : public Filters::Common::Lua::BaseLuaObject<HeaderMapIterator> {
 public:
   HeaderMapIterator(HeaderMapWrapper& parent);
 
@@ -24,7 +24,7 @@ public:
 
 private:
   HeaderMapWrapper& parent_;
-  std::vector<const HeaderEntry*> entries_;
+  std::vector<const Http::HeaderEntry*> entries_;
   uint64_t current_{};
 };
 
@@ -32,11 +32,11 @@ private:
  * Lua wrapper for a header map. Methods that will modify the map will call a check function
  * to see if modification is allowed.
  */
-class HeaderMapWrapper : public Envoy::Lua::BaseLuaObject<HeaderMapWrapper> {
+class HeaderMapWrapper : public Filters::Common::Lua::BaseLuaObject<HeaderMapWrapper> {
 public:
   typedef std::function<bool()> CheckModifiableCb;
 
-  HeaderMapWrapper(HeaderMap& headers, CheckModifiableCb cb) : headers_(headers), cb_(cb) {}
+  HeaderMapWrapper(Http::HeaderMap& headers, CheckModifiableCb cb) : headers_(headers), cb_(cb) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"add", static_luaAdd},
@@ -91,14 +91,14 @@ private:
     iterator_.reset();
   }
 
-  HeaderMap& headers_;
+  Http::HeaderMap& headers_;
   CheckModifiableCb cb_;
-  Envoy::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
 
   friend class HeaderMapIterator;
 };
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

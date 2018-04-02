@@ -21,8 +21,8 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/config:well_known_names",
         "//source/common/http:message_lib",
-        "//source/common/lua:lua_lib",
-        "//source/common/lua:wrappers_lib",
+        "//source/extensions/filters/common/lua:lua_lib",
+        "//source/extensions/filters/common/lua:wrappers_lib",
     ],
 )
 
@@ -33,6 +33,19 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//source/common/config:well_known_names",
-        "//source/common/lua:lua_lib",
+        "//source/extensions/filters/common/lua:lua_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/common/config:well_known_names",
+        "//source/extensions/filters/http/lua:lua_filter_lib",
     ],
 )

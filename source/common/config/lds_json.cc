@@ -56,6 +56,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
   JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
+  JSON_UTIL_SET_BOOL(json_listener, listener, transparent);
 }
 
 } // namespace Config

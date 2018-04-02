@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
 
 class LuaIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
@@ -306,4 +307,5 @@ config:
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
+} // namespace
 } // namespace Envoy

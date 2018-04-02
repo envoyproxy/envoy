@@ -2,9 +2,12 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/lua/lua.h"
+#include "extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 /**
@@ -56,7 +59,7 @@ private:
 /**
  * Lua wrapper for a metadata map.
  */
-class MetadataMapWrapper : public Envoy::Lua::BaseLuaObject<MetadataMapWrapper> {
+class MetadataMapWrapper : public BaseLuaObject<MetadataMapWrapper> {
 public:
   MetadataMapWrapper(const ProtobufWkt::Struct& metadata) : metadata_{metadata} {}
 
@@ -89,10 +92,13 @@ private:
                    const ProtobufWkt::Map<std::string, ProtobufWkt::Value>& fields);
 
   const ProtobufWkt::Struct metadata_;
-  Envoy::Lua::LuaDeathRef<MetadataMapIterator> iterator_;
+  LuaDeathRef<MetadataMapIterator> iterator_;
 
   friend class MetadataMapIterator;
 };
 
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

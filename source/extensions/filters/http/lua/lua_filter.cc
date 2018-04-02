@@ -1,4 +1,4 @@
-#include "common/http/filter/lua/lua_filter.h"
+#include "extensions/filters/http/lua/lua_filter.h"
 
 #include "envoy/http/codes.h"
 
@@ -8,44 +8,44 @@
 #include "common/http/message_impl.h"
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
-StreamHandleWrapper::StreamHandleWrapper(Envoy::Lua::CoroutinePtr&& coroutine, HeaderMap& headers,
-                                         bool end_stream, Filter& filter,
+StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::CoroutinePtr&& coroutine,
+                                         Http::HeaderMap& headers, bool end_stream, Filter& filter,
                                          FilterCallbacks& callbacks)
     : coroutine_(std::move(coroutine)), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
-          throw Envoy::Lua::LuaException("script performed an unexpected yield");
+          throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
         }
       }) {}
 
-FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
+Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
   coroutine_->start(function_ref, 1, yield_callback_);
-  FilterHeadersStatus status =
+  Http::FilterHeadersStatus status =
       (state_ == State::WaitForBody || state_ == State::HttpCall || state_ == State::Responded)
-          ? FilterHeadersStatus::StopIteration
-          : FilterHeadersStatus::Continue;
+          ? Http::FilterHeadersStatus::StopIteration
+          : Http::FilterHeadersStatus::Continue;
 
-  if (status == FilterHeadersStatus::Continue) {
+  if (status == Http::FilterHeadersStatus::Continue) {
     headers_continued_ = true;
   }
 
   return status;
 }
 
-FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!end_stream_);
   end_stream_ = end_stream;
   saw_body_ = true;
 
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "resuming for next body chunk");
-    Envoy::Lua::LuaDeathRef<Envoy::Lua::BufferWrapper> wrapper(
-        Envoy::Lua::BufferWrapper::create(coroutine_->luaState(), data), true);
+    Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
+        Filters::Common::Lua::BufferWrapper::create(coroutine_->luaState(), data), true);
     state_ = State::Running;
     coroutine_->resume(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
@@ -61,16 +61,16 @@ FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool end_st
 
   if (state_ == State::HttpCall || state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
-    return FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::Responded) {
-    return FilterDataStatus::StopIterationNoBuffer;
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   } else {
     headers_continued_ = true;
-    return FilterDataStatus::Continue;
+    return Http::FilterDataStatus::Continue;
   }
 }
 
-FilterTrailersStatus StreamHandleWrapper::onTrailers(HeaderMap& trailers) {
+Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trailers) {
   ASSERT(!end_stream_);
   end_stream_ = true;
   trailers_ = &trailers;
@@ -91,11 +91,11 @@ FilterTrailersStatus StreamHandleWrapper::onTrailers(HeaderMap& trailers) {
     coroutine_->resume(luaTrailers(coroutine_->luaState()), yield_callback_);
   }
 
-  FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
-                                    ? FilterTrailersStatus::StopIteration
-                                    : FilterTrailersStatus::Continue;
+  Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
+                                          ? Http::FilterTrailersStatus::StopIteration
+                                          : Http::FilterTrailersStatus::Continue;
 
-  if (status == FilterTrailersStatus::Continue) {
+  if (status == Http::FilterTrailersStatus::Continue) {
     headers_continued_ = true;
   }
 
@@ -112,7 +112,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   luaL_checktype(state, 2, LUA_TTABLE);
   size_t body_size;
   const char* raw_body = luaL_optlstring(state, 3, nullptr, &body_size);
-  HeaderMapPtr headers = buildHeadersFromTable(state, 2);
+  Http::HeaderMapPtr headers = buildHeadersFromTable(state, 2);
 
   uint64_t status;
   if (headers->Status() == nullptr ||
@@ -134,8 +134,8 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   return lua_yield(state, 0);
 }
 
-HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, int table_index) {
-  HeaderMapPtr headers(new HeaderMapImpl());
+Http::HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, int table_index) {
+  Http::HeaderMapPtr headers(new Http::HeaderMapImpl());
 
   // Build a header map to make the request. We iterate through the provided table to do this and
   // check that we are getting strings.
@@ -144,7 +144,7 @@ HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, int ta
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
     const char* value = luaL_checkstring(state, -1);
-    headers->addCopy(LowerCaseString(key), value);
+    headers->addCopy(Http::LowerCaseString(key), value);
 
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
@@ -200,7 +200,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 }
 
-void StreamHandleWrapper::onSuccess(MessagePtr&& response) {
+void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");
   http_request_ = nullptr;
@@ -208,12 +208,12 @@ void StreamHandleWrapper::onSuccess(MessagePtr&& response) {
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_->luaState());
   response->headers().iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         lua_State* state = static_cast<lua_State*>(context);
         lua_pushstring(state, header.key().c_str());
         lua_pushstring(state, header.value().c_str());
         lua_settable(state, -3);
-        return HeaderMap::Iterate::Continue;
+        return Http::HeaderMap::Iterate::Continue;
       },
       coroutine_->luaState());
 
@@ -233,7 +233,7 @@ void StreamHandleWrapper::onSuccess(MessagePtr&& response) {
     try {
       coroutine_->resume(2, yield_callback_);
       markDead();
-    } catch (const Envoy::Lua::LuaException& e) {
+    } catch (const Filters::Common::Lua::LuaException& e) {
       filter_.scriptError(e);
     }
 
@@ -244,13 +244,14 @@ void StreamHandleWrapper::onSuccess(MessagePtr&& response) {
   }
 }
 
-void StreamHandleWrapper::onFailure(AsyncClient::FailureReason) {
+void StreamHandleWrapper::onFailure(Http::AsyncClient::FailureReason) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP failure");
 
   // Just fake a basic 503 response.
-  MessagePtr response_message(new ResponseMessageImpl(HeaderMapPtr{new HeaderMapImpl{
-      {Headers::get().Status, std::to_string(enumToInt(Code::ServiceUnavailable))}}}));
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(Http::HeaderMapPtr{
+      new Http::HeaderMapImpl{{Http::Headers::get().Status,
+                               std::to_string(enumToInt(Http::Code::ServiceUnavailable))}}}));
   response_message->body().reset(new Buffer::OwnedImpl("upstream failure"));
   onSuccess(std::move(response_message));
 }
@@ -294,8 +295,8 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
       if (body_wrapper_.get() != nullptr) {
         body_wrapper_.pushStack();
       } else {
-        body_wrapper_.reset(Envoy::Lua::BufferWrapper::create(state, *callbacks_.bufferedBody()),
-                            true);
+        body_wrapper_.reset(
+            Filters::Common::Lua::BufferWrapper::create(state, *callbacks_.bufferedBody()), true);
       }
       return 1;
     }
@@ -360,8 +361,8 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   if (metadata_wrapper_.get() != nullptr) {
     metadata_wrapper_.pushStack();
   } else {
-    metadata_wrapper_.reset(Envoy::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()),
-                            true);
+    metadata_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()), true);
   }
   return 1;
 }
@@ -405,9 +406,9 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
-  lua_state_.registerType<Envoy::Lua::BufferWrapper>();
-  lua_state_.registerType<Envoy::Lua::MetadataMapWrapper>();
-  lua_state_.registerType<Envoy::Lua::MetadataMapIterator>();
+  lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
@@ -433,36 +434,38 @@ void Filter::onDestroy() {
   }
 }
 
-FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
-                                      int function_ref, HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                            int function_ref, Http::HeaderMap& headers,
+                                            bool end_stream) {
   if (function_ref == LUA_REFNIL) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  Envoy::Lua::CoroutinePtr coroutine = config_->createCoroutine();
+  Filters::Common::Lua::CoroutinePtr coroutine = config_->createCoroutine();
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), std::move(coroutine), headers,
                                            end_stream, *this, callbacks),
                true);
 
-  FilterHeadersStatus status = FilterHeadersStatus::Continue;
+  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
   try {
     status = handle.get()->start(function_ref);
     handle.markDead();
-  } catch (const Envoy::Lua::LuaException& e) {
+  } catch (const Filters::Common::Lua::LuaException& e) {
     scriptError(e);
   }
 
   return status;
 }
 
-FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream) {
-  FilterDataStatus status = FilterDataStatus::Continue;
+Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance& data,
+                                      bool end_stream) {
+  Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
     try {
       handle.markLive();
       status = handle.get()->onData(data, end_stream);
       handle.markDead();
-    } catch (const Envoy::Lua::LuaException& e) {
+    } catch (const Filters::Common::Lua::LuaException& e) {
       scriptError(e);
     }
   }
@@ -470,14 +473,14 @@ FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance& data,
   return status;
 }
 
-FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, HeaderMap& trailers) {
-  FilterTrailersStatus status = FilterTrailersStatus::Continue;
+Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
+  Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
     try {
       handle.markLive();
       status = handle.get()->onTrailers(trailers);
       handle.markDead();
-    } catch (const Envoy::Lua::LuaException& e) {
+    } catch (const Filters::Common::Lua::LuaException& e) {
       scriptError(e);
     }
   }
@@ -485,7 +488,7 @@ FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, HeaderMap& trai
   return status;
 }
 
-void Filter::scriptError(const Envoy::Lua::LuaException& e) {
+void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   scriptLog(spdlog::level::err, e.what());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
@@ -516,20 +519,21 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
   }
 }
 
-void Filter::DecoderCallbacks::respond(HeaderMapPtr&& headers, Buffer::Instance* body, lua_State*) {
+void Filter::DecoderCallbacks::respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body,
+                                       lua_State*) {
   callbacks_->encodeHeaders(std::move(headers), body == nullptr);
   if (body && !parent_.destroyed_) {
     callbacks_->encodeData(*body, true);
   }
 }
 
-void Filter::EncoderCallbacks::respond(HeaderMapPtr&&, Buffer::Instance*, lua_State* state) {
+void Filter::EncoderCallbacks::respond(Http::HeaderMapPtr&&, Buffer::Instance*, lua_State* state) {
   // TODO(mattklein123): Support response in response path if nothing has been continued
   // yet.
   luaL_error(state, "respond not currently supported in the response path");
 }
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

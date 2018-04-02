@@ -5,6 +5,7 @@
 
 #include "common/config/resources.h"
 
+#include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -21,12 +22,7 @@ public:
 
   void addEndpoint(envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
                    uint32_t index, uint32_t& num_endpoints) {
-    auto* socket_address = locality_lb_endpoints.add_lb_endpoints()
-                               ->mutable_endpoint()
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    socket_address->set_address(Network::Test::getLoopbackAddressString(GetParam()));
-    socket_address->set_port_value(service_upstream_[index]->localAddress()->ip()->port());
+    setUpstreamAddress(index + 1, *locality_lb_endpoints.add_lb_endpoints());
     ++num_endpoints;
   }
 
@@ -92,40 +88,17 @@ public:
     for (uint32_t index : p1_dragon_upstreams.endpoints_) {
       addEndpoint(*dragon_p1, index, num_endpoints);
     }
-
-    // Write to file the DiscoveryResponse and trigger inotify watch.
-    envoy::api::v2::DiscoveryResponse eds_response;
-    eds_response.set_version_info(std::to_string(eds_version_++));
-    eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    eds_response.add_resources()->PackFrom(cluster_load_assignment);
-    // Past the initial write, need move semantics to trigger inotify move event that the
-    // FilesystemSubscriptionImpl is subscribed to.
-    if (eds_path_.empty()) {
-      eds_path_ =
-          TestEnvironment::writeStringToFileForTest("eds.pb_text", eds_response.DebugString());
-    } else {
-      std::string path = TestEnvironment::writeStringToFileForTest("eds.update.pb_text",
-                                                                   eds_response.DebugString());
-      ASSERT_EQ(0, ::rename(path.c_str(), eds_path_.c_str()));
-    }
-    // For every update wait for the update to be processed by Envoy. The nullptr check avoids a
-    // segfault on initial config, where the server is not created yet.
-    if (test_server_) {
-      // Make sure we aren't updating from N endpoints to N endpoints, or the
-      // waitForGaugeGe will be a no-op.
-      ASSERT(num_endpoints != last_num_endpoints_);
-      test_server_->waitForGaugeGe("cluster.cluster_0.membership_total", num_endpoints);
-      last_num_endpoints_ = num_endpoints;
-    }
+    eds_helper_.setEds({cluster_load_assignment}, *test_server_);
   }
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     load_report_upstream_ = fake_upstreams_.back().get();
+    HttpIntegrationTest::createUpstreams();
   }
 
   void initialize() override {
-    updateClusterLoadAssignment({}, {}, {}, {});
+    setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
@@ -147,16 +120,17 @@ public:
       cluster_0->mutable_hosts()->Clear();
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
-      eds_cluster_config->mutable_eds_config()->set_path(eds_path_);
+      eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
     });
     HttpIntegrationTest::initialize();
+    load_report_upstream_ = fake_upstreams_[0].get();
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
-      fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
-      service_upstream_[i] = fake_upstreams_.back().get();
+      service_upstream_[i] = fake_upstreams_[i + 1].get();
     }
+    updateClusterLoadAssignment({}, {}, {}, {});
   }
 
   void initiateClientConnection() {
@@ -328,14 +302,12 @@ public:
   FakeStreamPtr loadstats_stream_;
   FakeUpstream* load_report_upstream_{};
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
-  std::string eds_path_;
-  uint32_t eds_version_{};
   uint32_t load_requests_{};
+  EdsHelper eds_helper_;
   bool locality_weighted_lb_{};
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
-  uint32_t last_num_endpoints_ = 50; // Arbitrary non-zero number so the first update works.
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,

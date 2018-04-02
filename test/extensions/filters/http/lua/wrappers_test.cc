@@ -1,19 +1,19 @@
-#include "common/http/filter/lua/wrappers.h"
+#include "extensions/filters/http/lua/wrappers.h"
 
-#include "test/test_common/lua_wrappers.h"
+#include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
-class LuaHeaderMapWrapperTest : public Envoy::Lua::LuaWrappersTestBase<HeaderMapWrapper> {
+class LuaHeaderMapWrapperTest : public Filters::Common::Lua::LuaWrappersTestBase<HeaderMapWrapper> {
 public:
   virtual void setup(const std::string& script) {
-    Envoy::Lua::LuaWrappersTestBase<HeaderMapWrapper>::setup(script);
+    Filters::Common::Lua::LuaWrappersTestBase<HeaderMapWrapper>::setup(script);
     state_->registerType<HeaderMapIterator>();
   }
 };
@@ -42,7 +42,7 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers;
+  Http::TestHeaderMapImpl headers;
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_CALL(*this, testPrint("WORLD"));
   EXPECT_CALL(*this, testPrint("'hello' 'WORLD'"));
@@ -78,23 +78,23 @@ TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers;
+  Http::TestHeaderMapImpl headers;
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
   start("shouldBeOk");
 
   setup(SCRIPT);
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
-  EXPECT_THROW_WITH_MESSAGE(start("shouldFailRemove"), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(start("shouldFailRemove"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:9: header map can no longer be modified");
 
   setup(SCRIPT);
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
-  EXPECT_THROW_WITH_MESSAGE(start("shouldFailAdd"), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(start("shouldFailAdd"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:13: header map can no longer be modified");
 
   setup(SCRIPT);
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return false; });
-  EXPECT_THROW_WITH_MESSAGE(start("shouldFailReplace"), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(start("shouldFailReplace"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:17: header map can no longer be modified");
 }
 
@@ -111,13 +111,13 @@ TEST_F(LuaHeaderMapWrapperTest, Replace) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
+  Http::TestHeaderMapImpl headers{{":path", "/"}, {"other_header", "hello"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   start("callMe");
 
-  EXPECT_EQ((TestHeaderMapImpl{{":path", "/new_path"},
-                               {"other_header", "other_header_value"},
-                               {"new_header", "new_header_value"}}),
+  EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/new_path"},
+                                     {"other_header", "other_header_value"},
+                                     {"new_header", "new_header_value"}}),
             headers);
 }
 
@@ -134,9 +134,9 @@ TEST_F(LuaHeaderMapWrapperTest, ModifyDuringIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl headers{{"foo", "bar"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
-  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(start("callMe"), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:4: header map cannot be modified while iterating");
 }
 
@@ -159,7 +159,7 @@ TEST_F(LuaHeaderMapWrapperTest, ModifyAfterIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl headers{{"foo", "bar"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
   EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
@@ -180,10 +180,10 @@ TEST_F(LuaHeaderMapWrapperTest, DontFinishIteration) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  Http::TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
   HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
   EXPECT_THROW_WITH_MESSAGE(
-      start("callMe"), Envoy::Lua::LuaException,
+      start("callMe"), Filters::Common::Lua::LuaException,
       "[string \"...\"]:5: cannot create a second iterator before completing the first");
 }
 
@@ -200,17 +200,17 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
-  Envoy::Lua::LuaDeathRef<HeaderMapWrapper> wrapper(
+  Http::TestHeaderMapImpl headers{{"foo", "bar"}, {"hello", "world"}};
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> wrapper(
       HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; }), true);
   yield_callback_ = [] {};
   start("callMe");
   wrapper.reset();
-  EXPECT_THROW_WITH_MESSAGE(coroutine_->resume(0, [] {}), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(coroutine_->resume(0, [] {}), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:5: object used outside of proper scope");
 }
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

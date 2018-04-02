@@ -130,8 +130,10 @@ public:
   virtual void createUpstreams();
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
-  // sets upstream_protocol_ and alters the upstream protocol in the config_helper_
+  // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
+  // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
+  void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
@@ -140,6 +142,10 @@ public:
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
+
+  // Set the endpoint's socket address to point at upstream at given index.
+  void setUpstreamAddress(uint32_t upstream_index,
+                          envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
@@ -179,6 +185,8 @@ protected:
   std::function<void()> pre_worker_start_test_steps_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
+  // Target number of upstreams.
+  uint32_t fake_upstreams_count_{1};
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
   // A map of keys to port names. Generally the names are pulled from the v2 listener name
