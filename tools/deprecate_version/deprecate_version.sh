@@ -12,4 +12,4 @@ if [ ! -d "${VENV_DIR}" ]; then
 fi
 
 source "${VENV_DIR}"/bin/activate
-"${VENV_DIR}"/bin/python "${SCRIPT_DIR}/deprecate_version.py"
+"${VENV_DIR}"/bin/python "${SCRIPT_DIR}/deprecate_version.py" $*
