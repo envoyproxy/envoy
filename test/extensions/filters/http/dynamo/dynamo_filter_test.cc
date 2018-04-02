@@ -2,8 +2,9 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/dynamo/dynamo_filter.h"
 #include "common/http/header_map_impl.h"
+
+#include "extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -21,6 +22,8 @@ using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 class DynamoFilterTest : public testing::Test {
@@ -789,4 +792,6 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 }
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

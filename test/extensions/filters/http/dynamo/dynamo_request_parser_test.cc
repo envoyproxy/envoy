@@ -1,9 +1,10 @@
 #include <string>
 #include <vector>
 
-#include "common/dynamo/dynamo_request_parser.h"
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
+
+#include "extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -11,6 +12,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
 namespace Dynamo {
 
 TEST(DynamoRequestParser, parseOperation) {
@@ -262,4 +265,6 @@ TEST(DynamoRequestParser, parsePartitionIds) {
 }
 
 } // namespace Dynamo
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

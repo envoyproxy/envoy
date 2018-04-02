@@ -23,39 +23,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "empty_http_filter_config_lib",
-    hdrs = ["empty_http_filter_config.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "cors_lib",
     srcs = ["cors.cc"],
     hdrs = ["cors.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
         "//source/common/http/filter:cors_filter_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "dynamo_lib",
-    srcs = ["dynamo.cc"],
-    hdrs = ["dynamo.h"],
-    deps = [
-        ":empty_http_filter_config_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/dynamo:dynamo_filter_lib",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
 
@@ -77,11 +53,11 @@ envoy_cc_library(
     srcs = ["grpc_http1_bridge.cc"],
     hdrs = ["grpc_http1_bridge.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
         "//source/common/grpc:http1_bridge_filter_lib",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
 
@@ -115,11 +91,11 @@ envoy_cc_library(
     srcs = ["grpc_web.cc"],
     hdrs = ["grpc_web.h"],
     deps = [
-        ":empty_http_filter_config_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:well_known_names",
         "//source/common/grpc:grpc_web_filter_lib",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
 

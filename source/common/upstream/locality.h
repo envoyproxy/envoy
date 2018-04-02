@@ -24,7 +24,8 @@ struct LocalityEqualTo {
 struct LocalityLess {
   bool operator()(const envoy::api::v2::core::Locality& lhs,
                   const envoy::api::v2::core::Locality& rhs) const {
-    using LocalityTuple = std::tuple<const std::string&, const std::string&, const std::string&>;
+    using LocalityTuple = std::tuple<const ProtobufTypes::String&, const ProtobufTypes::String&,
+                                     const ProtobufTypes::String&>;
     const LocalityTuple lhs_tuple = LocalityTuple(lhs.region(), lhs.zone(), lhs.sub_zone());
     const LocalityTuple rhs_tuple = LocalityTuple(rhs.region(), rhs.zone(), rhs.sub_zone());
     return lhs_tuple < rhs_tuple;
