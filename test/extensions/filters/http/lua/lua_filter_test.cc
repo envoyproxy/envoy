@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/http/filter/lua/lua_filter.h"
 #include "common/http/message_impl.h"
+
+#include "extensions/filters/http/lua/lua_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -18,8 +19,8 @@ using testing::StrEq;
 using testing::_;
 
 namespace Envoy {
-namespace Http {
-namespace Filter {
+namespace Extensions {
+namespace HttpFilters {
 namespace Lua {
 
 class TestFilter : public Filter {
@@ -75,8 +76,8 @@ public:
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
   std::unique_ptr<TestFilter> filter_;
-  MockStreamDecoderFilterCallbacks decoder_callbacks_;
-  MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
@@ -165,7 +166,8 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager), Envoy::Lua::LuaException,
+  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager),
+                            Filters::Common::Lua::LuaException,
                             "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
 
@@ -174,9 +176,9 @@ TEST_F(LuaHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
   InSequence s;
   setup(HEADER_ONLY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script touching headers only, request that has body.
@@ -184,12 +186,12 @@ TEST_F(LuaHttpFilterTest, ScriptHeadersOnlyRequestBody) {
   InSequence s;
   setup(HEADER_ONLY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script touching headers only, request that has body and trailers.
@@ -197,15 +199,15 @@ TEST_F(LuaHttpFilterTest, ScriptHeadersOnlyRequestBodyTrailers) {
   InSequence s;
   setup(HEADER_ONLY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script asking for body chunks, request that is headers only.
@@ -213,10 +215,10 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestHeadersOnly) {
   InSequence s;
   setup(BODY_CHUNK_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("done")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script asking for body chunks, request that has body.
@@ -224,14 +226,14 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBody) {
   InSequence s;
   setup(BODY_CHUNK_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("done")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script asking for body chunks, request that has body and trailers.
@@ -239,17 +241,17 @@ TEST_F(LuaHttpFilterTest, ScriptBodyChunksRequestBodyTrailers) {
   InSequence s;
   setup(BODY_CHUNK_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("done")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script asking for trailers, request is headers only.
@@ -257,10 +259,10 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersRequestHeadersOnly) {
   InSequence s;
   setup(TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script asking for trailers, request that has a body.
@@ -268,14 +270,14 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersRequestBody) {
   InSequence s;
   setup(TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script asking for trailers, request that has body and trailers.
@@ -283,17 +285,17 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersRequestBodyTrailers) {
   InSequence s;
   setup(TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script asking for trailers without body, request is headers only.
@@ -301,10 +303,10 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersNoBodyRequestHeadersOnly) {
   InSequence s;
   setup(TRAILERS_NO_BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script asking for trailers without body, request that has a body.
@@ -312,13 +314,13 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersNoBodyRequestBody) {
   InSequence s;
   setup(TRAILERS_NO_BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script asking for trailers without body, request that has a body and trailers.
@@ -326,16 +328,16 @@ TEST_F(LuaHttpFilterTest, ScriptTrailersNoBodyRequestBodyTrailers) {
   InSequence s;
   setup(TRAILERS_NO_BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script asking for blocking body, request that is headers only.
@@ -343,10 +345,10 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestHeadersOnly) {
   InSequence s;
   setup(BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script asking for blocking body, request that has a body.
@@ -354,13 +356,14 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBody) {
   InSequence s;
   setup(BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script asking for blocking body, request that has a body in multiple frames.
@@ -368,17 +371,18 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFrames) {
   InSequence s;
   setup(BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
   decoder_callbacks_.addDecodedData(data, false);
 
   Buffer::OwnedImpl data2("world");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("10")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data2, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data2, true));
 }
 
 // Scripting asking for blocking body, request that has a body in multiple frames follows by
@@ -387,21 +391,22 @@ TEST_F(LuaHttpFilterTest, ScriptBodyRequestBodyTwoFramesTrailers) {
   InSequence s;
   setup(BODY_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
   decoder_callbacks_.addDecodedData(data, false);
 
   Buffer::OwnedImpl data2("world");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data2, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data2, false));
   decoder_callbacks_.addDecodedData(data2, false);
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("10")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script asking for blocking body and trailers, request that is headers only.
@@ -409,11 +414,11 @@ TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestHeadersOnly) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script asking for blocking body and trailers, request that has a body.
@@ -421,14 +426,15 @@ TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestBody) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Script asking for blocking body and trailers, request that has a body and trailers.
@@ -436,18 +442,19 @@ TEST_F(LuaHttpFilterTest, ScriptBodyTrailersRequestBodyTrailers) {
   InSequence s;
   setup(BODY_TRAILERS_SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
   decoder_callbacks_.addDecodedData(data, false);
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Store a body chunk and reference it outside the loop.
@@ -467,17 +474,17 @@ TEST_F(LuaHttpFilterTest, BodyChunkOutsideOfLoop) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data1, false));
 
   Buffer::OwnedImpl data2("world");
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:7: object used outside of proper scope")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data2, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data2, false));
 }
 
 // Script that should not be run.
@@ -491,14 +498,14 @@ TEST_F(LuaHttpFilterTest, ScriptRandomRequestBodyTrailers) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script that has an error during headers processing.
@@ -513,17 +520,17 @@ TEST_F(LuaHttpFilterTest, ScriptErrorHeadersRequestBodyTrailers) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:4: attempt to index local 'foo' (a nil value)")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Script that tries to store a local variable to a global and then use it.
@@ -541,8 +548,8 @@ TEST_F(LuaHttpFilterTest, ThreadEnvironments) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   TestFilter filter2(config_);
   EXPECT_CALL(filter2, scriptLog(spdlog::level::err,
@@ -561,10 +568,10 @@ TEST_F(LuaHttpFilterTest, UnexpectedYield) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err, StrEq("script performed an unexpected yield")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Script that has an error during a callback from C into Lua.
@@ -581,11 +588,11 @@ TEST_F(LuaHttpFilterTest, ErrorDuringCallback) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:5: attempt to index local 'foo' (a nil value)")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Use of header iterator across yield.
@@ -601,14 +608,15 @@ TEST_F(LuaHttpFilterTest, HeadersIteratorAcrossYield) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
                         StrEq("[string \"...\"]:5: object used outside of proper scope")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // Combo request and response script.
@@ -640,35 +648,36 @@ TEST_F(LuaHttpFilterTest, RequestAndResponse) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("/")));
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("5")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  TestHeaderMapImpl continue_headers{{":status", "100"}};
+  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
   // No lua hooks for 100-continue
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("100"))).Times(0);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(continue_headers));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("200")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
 
   Buffer::OwnedImpl data2("helloworld");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("10")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data2, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, false));
 
-  TestHeaderMapImpl response_trailers{{"hello", "world"}};
+  Http::TestHeaderMapImpl response_trailers{{"hello", "world"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("world")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 }
 
 // Response blocking body.
@@ -686,17 +695,18 @@ TEST_F(LuaHttpFilterTest, ResponseBlockingBody) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("200")));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers, false));
 
   Buffer::OwnedImpl data2("helloworld");
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("10")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no trailers")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data2, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data2, true));
 }
 
 // Basic HTTP request flow.
@@ -722,34 +732,35 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr& message, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            EXPECT_EQ((TestHeaderMapImpl{{":path", "/"},
-                                         {":method", "POST"},
-                                         {":authority", "foo"},
-                                         {"content-length", "11"}}),
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
+                                               {":method", "POST"},
+                                               {":authority", "foo"},
+                                               {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-  MessagePtr response_message(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}));
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   response_message->body().reset(new Buffer::OwnedImpl("response"));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
@@ -796,57 +807,58 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr& message, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            EXPECT_EQ((TestHeaderMapImpl{{":path", "/"},
-                                         {":method", "POST"},
-                                         {":authority", "foo"},
-                                         {"content-length", "11"}}),
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestHeaderMapImpl{{":path", "/"},
+                                               {":method", "POST"},
+                                               {":authority", "foo"},
+                                               {"content-length", "11"}}),
                       message->headers());
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-  MessagePtr response_message(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}));
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   response_message->body().reset(new Buffer::OwnedImpl("response"));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("response")));
   EXPECT_CALL(cluster_manager_, get("cluster2"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster2"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr& message, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            EXPECT_EQ(
-                (TestHeaderMapImpl{{":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}}),
-                message->headers());
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestHeaderMapImpl{
+                          {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}}),
+                      message->headers());
             callbacks = &cb;
             return &request;
           }));
   callbacks->onSuccess(std::move(response_message));
 
-  response_message.reset(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "403"}}}));
+  response_message.reset(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "403"}}}));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 403")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   callbacks->onSuccess(std::move(response_message));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // Basic HTTP request flow with no body.
@@ -874,32 +886,33 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr& message, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            EXPECT_EQ(
-                (TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
-                message->headers());
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestHeaderMapImpl{
+                          {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
+                      message->headers());
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
 
-  MessagePtr response_message(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}));
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 200")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("no body")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
@@ -928,27 +941,28 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr& message, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            EXPECT_EQ(
-                (TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
-                message->headers());
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestHeaderMapImpl{
+                          {":path", "/"}, {":method", "GET"}, {":authority", "foo"}}),
+                      message->headers());
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
-  MessagePtr response_message(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}));
-  TestHeaderMapImpl expected_headers{{":status", "403"}};
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  Http::TestHeaderMapImpl expected_headers{{":status", "403"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
   callbacks->onSuccess(std::move(response_message));
 }
@@ -975,23 +989,24 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr&, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
 
-  MessagePtr response_message(
-      new ResponseMessageImpl(HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}));
+  Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
 
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::err,
@@ -1024,24 +1039,25 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr&, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 503")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("upstream failure")));
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  callbacks->onFailure(AsyncClient::FailureReason::Reset);
+  callbacks->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
 // HTTP call reset.
@@ -1065,20 +1081,21 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
-  AsyncClient::Callbacks* callbacks;
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr&, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             callbacks = &cb;
             return &request;
           }));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
 
   EXPECT_CALL(request, cancel());
   filter_->onDestroy();
@@ -1108,21 +1125,21 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  MockAsyncClientRequest request(&cluster_manager_.async_client_);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.async_client_);
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(cluster_manager_, httpAsyncClientForCluster("cluster"));
   EXPECT_CALL(cluster_manager_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](MessagePtr&, AsyncClient::Callbacks& cb,
-                     const absl::optional<std::chrono::milliseconds>&) -> AsyncClient::Request* {
-            cb.onFailure(AsyncClient::FailureReason::Reset);
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            cb.onFailure(Http::AsyncClient::FailureReason::Reset);
             return nullptr;
           }));
 
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(":status 503")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("upstream failure")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Invalid HTTP call timeout.
@@ -1140,10 +1157,10 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidTimeout) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
                                   StrEq("[string \"...\"]:3: http call timeout must be >= 0")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
 // Invalid HTTP call cluster.
@@ -1161,13 +1178,13 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidCluster) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(cluster_manager_, get("cluster")).WillOnce(Return(nullptr));
   EXPECT_CALL(
       *filter_,
       scriptLog(spdlog::level::err,
                 StrEq("[string \"...\"]:3: http call cluster invalid. Must be configured")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
 // Invalid HTTP call headers.
@@ -1185,12 +1202,12 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidHeaders) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(cluster_manager_, get("cluster"));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
                                   StrEq("[string \"...\"]:3: http call headers must include "
                                         "':path', ':method', and ':authority'")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
 // Respond right away.
@@ -1210,11 +1227,12 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 // Respond with bad status.
@@ -1230,10 +1248,10 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseBadStatus) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
                                   StrEq("[string \"...\"]:3: :status must be between 200-599")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 }
 
 // Respond after headers have been continued.
@@ -1251,8 +1269,8 @@ TEST_F(LuaHttpFilterTest, RespondAfterHeadersContinued) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   EXPECT_CALL(
       *filter_,
@@ -1260,7 +1278,7 @@ TEST_F(LuaHttpFilterTest, RespondAfterHeadersContinued) {
           spdlog::level::err,
           StrEq("[string \"...\"]:4: respond() cannot be called if headers have been continued")));
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 }
 
 // Respond in response path.
@@ -1276,15 +1294,15 @@ TEST_F(LuaHttpFilterTest, RespondInResponsePath) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  TestHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(
       *filter_,
       scriptLog(spdlog::level::err,
                 StrEq("[string \"...\"]:3: respond not currently supported in the response path")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(request_headers, true));
 }
 
 // bodyChunks() after body continued.
@@ -1299,8 +1317,9 @@ TEST_F(LuaHttpFilterTest, BodyChunksAfterBodyContinued) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(
@@ -1308,7 +1327,7 @@ TEST_F(LuaHttpFilterTest, BodyChunksAfterBodyContinued) {
       scriptLog(
           spdlog::level::err,
           StrEq("[string \"...\"]:4: cannot call bodyChunks after body processing has begun")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
 }
 
 // body() after only waiting for trailers.
@@ -1323,18 +1342,18 @@ TEST_F(LuaHttpFilterTest, BodyAfterTrailers) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 
-  TestHeaderMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestHeaderMapImpl request_trailers{{"foo", "bar"}};
   EXPECT_CALL(
       *filter_,
       scriptLog(spdlog::level::err,
                 StrEq("[string \"...\"]:4: cannot call body() after body has been streamed")));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
 // body() after streaming has started.
@@ -1350,15 +1369,15 @@ TEST_F(LuaHttpFilterTest, BodyAfterStreamingHasStarted) {
   InSequence s;
   setup(SCRIPT);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
   Buffer::OwnedImpl data("hello");
   EXPECT_CALL(
       *filter_,
       scriptLog(spdlog::level::err,
                 StrEq("[string \"...\"]:4: cannot call body() after body streaming has started")));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 }
 
 // script touch metadata():get("key")
@@ -1387,15 +1406,15 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
   setup(SCRIPT);
   setupMetadata(METADATA);
 
-  TestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("baz")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bat")));
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 } // namespace Lua
-} // namespace Filter
-} // namespace Http
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -1,10 +1,13 @@
-#include "common/lua/lua.h"
+#include "extensions/filters/common/lua/lua.h"
 
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
@@ -92,4 +95,7 @@ ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code) : stat
 }
 
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy

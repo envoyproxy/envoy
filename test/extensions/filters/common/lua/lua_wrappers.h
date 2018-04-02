@@ -7,6 +7,9 @@
 using testing::NiceMock;
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
 namespace Lua {
 
 template <class T> class LuaWrappersTestBase : public testing::Test {
@@ -42,4 +45,7 @@ public:
 };
 
 } // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
