@@ -138,8 +138,7 @@ public:
                      const RequestInfo::RequestInfo&) const override;
 
 private:
-  std::string format_;
-  std::unique_ptr<Envoy::DateFormatter> date_formatter_;
+  const Envoy::DateFormatter date_formatter_;
 };
 
 } // namespace AccessLog

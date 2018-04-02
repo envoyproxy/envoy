@@ -308,15 +308,14 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
   return HeaderFormatter::format(request_headers);
 }
 
-StartTimeFormatter::StartTimeFormatter(const std::string& format)
-    : date_formatter_(std::make_unique<Envoy::DateFormatter>(format)) {}
+StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
 
 std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                        const RequestInfo::RequestInfo& request_info) const {
-  if (date_formatter_->formatString().empty()) {
+  if (date_formatter_.formatString().empty()) {
     return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
   } else {
-    return date_formatter_->fromTime(request_info.startTime());
+    return date_formatter_.fromTime(request_info.startTime());
   }
 }
 

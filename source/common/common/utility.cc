@@ -20,11 +20,11 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-std::string DateFormatter::fromTime(const SystemTime& time) {
+const std::string DateFormatter::fromTime(const SystemTime& time) const {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
 
-std::string DateFormatter::fromTimeT(time_t time) {
+const std::string DateFormatter::fromTimeT(time_t time) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
