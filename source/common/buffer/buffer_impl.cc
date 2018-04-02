@@ -44,7 +44,6 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   int rc =
       evbuffer_commit_space(buffer_.get(), reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
@@ -53,18 +52,15 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   evbuffer_ptr start_ptr;
   int rc = evbuffer_ptr_set(buffer_.get(), &start_ptr, start, EVBUFFER_PTR_SET);
   ASSERT(rc != -1);
-  UNREFERENCED_PARAMETER(rc);
 
   ev_ssize_t copied = evbuffer_copyout_from(buffer_.get(), &start_ptr, data, size);
   ASSERT(static_cast<uint64_t>(copied) == size);
-  UNREFERENCED_PARAMETER(copied);
 }
 
 void OwnedImpl::drain(uint64_t size) {
   ASSERT(size <= length());
   int rc = evbuffer_drain(buffer_.get(), size);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
@@ -86,7 +82,6 @@ void OwnedImpl::move(Instance& rhs) {
   // abstraction in case we get rid of evbuffer later.
   int rc = evbuffer_add_buffer(buffer_.get(), static_cast<LibEventInstance&>(rhs).buffer().get());
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
@@ -95,7 +90,6 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(), buffer_.get(),
                                   length);
   ASSERT(static_cast<uint64_t>(rc) == length);
-  UNREFERENCED_PARAMETER(rc);
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 

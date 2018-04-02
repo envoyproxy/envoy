@@ -49,7 +49,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -95,7 +96,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
 // a real profiler linked in (successful call to startProfiler). startProfiler
 // requies tcmalloc.

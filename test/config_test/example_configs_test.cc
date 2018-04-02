@@ -15,7 +15,7 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr);
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
 
-  EXPECT_EQ(37UL, ConfigTest::run(directory));
+  EXPECT_EQ(26UL, ConfigTest::run(directory));
   ConfigTest::testMerge();
   ConfigTest::testIncompatibleMerge();
 

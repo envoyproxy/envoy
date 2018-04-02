@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -345,7 +346,8 @@ protected:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, HeaderIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.

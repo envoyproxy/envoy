@@ -10,6 +10,7 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -76,7 +77,8 @@ void SslIntegrationTest::checkStats() {
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {

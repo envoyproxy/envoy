@@ -66,7 +66,8 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
@@ -175,7 +176,8 @@ protected:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   setUpBasicConnection();
@@ -1214,7 +1216,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
@@ -1228,7 +1231,8 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;

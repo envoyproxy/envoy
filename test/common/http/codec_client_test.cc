@@ -427,7 +427,8 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, CodecNetworkTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 } // namespace Http
 } // namespace Envoy

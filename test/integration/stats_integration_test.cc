@@ -3,6 +3,7 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -23,7 +24,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, StatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();

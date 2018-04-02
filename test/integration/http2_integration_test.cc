@@ -17,16 +17,12 @@ using ::testing::MatchesRegex;
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
-
-TEST_P(Http2IntegrationTest, RouterNotFoundBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterNotFoundWithBody();
-}
 
 TEST_P(Http2IntegrationTest, RouterClusterNotFound404) { testRouterClusterNotFound404(); }
 
@@ -48,27 +44,12 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(1024, 512, false);
-}
-
-TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
-}
-
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
 }
 
 TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
-}
-
-TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   testRouterHeaderOnlyRequestAndResponse(true);
 }
 
@@ -394,7 +375,8 @@ void Http2RingHashIntegrationTest::createUpstreams() {
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2RingHashIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
     int request_bytes, Http::TestHeaderMapImpl headers,

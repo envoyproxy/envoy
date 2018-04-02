@@ -53,7 +53,6 @@ envoy_cc_library(
         ":printers_includes",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/redis:codec_lib",
     ],
 )
 

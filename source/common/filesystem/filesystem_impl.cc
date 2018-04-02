@@ -125,7 +125,6 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
     for (Buffer::RawSlice& slice : slices) {
       ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
       ASSERT(rc == static_cast<ssize_t>(slice.len_));
-      UNREFERENCED_PARAMETER(rc);
       stats_.write_completed_.inc();
     }
   }

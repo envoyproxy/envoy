@@ -47,7 +47,8 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 
 class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
@@ -83,7 +84,8 @@ TEST(StatsdConfigTest, ValidateFail) {
 
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = Config::StatsSinkNames::get().DOG_STATSD;

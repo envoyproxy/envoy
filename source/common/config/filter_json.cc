@@ -161,7 +161,6 @@ void FilterJson::translateHttpConnectionManager(
         Protobuf::util::JsonStringToMessage(deprecated_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
   }
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, add_user_agent);

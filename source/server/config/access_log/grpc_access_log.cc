@@ -28,7 +28,7 @@ AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
           [&context, grpc_service = proto_config.common_config().grpc_service() ] {
             return std::make_shared<AccessLog::GrpcAccessLogStreamerImpl>(
                 context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-                    grpc_service, context.scope()),
+                    grpc_service, context.scope(), false),
                 context.threadLocal(), context.localInfo());
           });
 

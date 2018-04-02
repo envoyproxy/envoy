@@ -412,7 +412,6 @@ ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   server_name_indication_ = config.serverNameIndication();
@@ -424,7 +423,6 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
     RELEASE_ASSERT(rc);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   return ssl_con;
@@ -663,7 +661,6 @@ void ServerContextImpl::updateConnectionContext(SSL* ssl) {
   // TODO(PiotrSikora): add getters to BoringSSL.
   rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
   ASSERT(rc == 1);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
@@ -686,7 +683,6 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
     int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
     ASSERT(rc);
-    UNREFERENCED_PARAMETER(rc);
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
     // EVP_CIPHER_key_length(cipher) at compile-time
