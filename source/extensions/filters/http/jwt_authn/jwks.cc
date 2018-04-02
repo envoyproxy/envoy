@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/json/json_loader.h"
+
 #include "extensions/filters/http/jwt_authn/utils.h"
 
 #include "openssl/bn.h"
