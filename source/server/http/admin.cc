@@ -546,10 +546,11 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
 
+  // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
   rapidjson::Document document;
   document.SetObject();
   auto& allocator = document.GetAllocator();
-  std::map<std::string, rapidjson::Value> value_arrays;
+  std::map<std::string, rapidjson::Value> entry_objects;
   rapidjson::Value layer_names{rapidjson::kArrayType};
   const auto& layers = server_.runtime().snapshot().getLayers();
 
@@ -557,25 +558,34 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
     rapidjson::Value layer_name;
     layer_name.SetString(layer->name().c_str(), allocator);
     layer_names.PushBack(std::move(layer_name), allocator);
-
     for (const auto& kv : layer->values()) {
-      value_arrays.emplace(kv.first, rapidjson::Value{rapidjson::kArrayType});
+      rapidjson::Value entry_object{rapidjson::kObjectType};
+      const auto it = entry_objects.find(kv.first);
+      if (it == entry_objects.end()) {
+        rapidjson::Value entry_object{rapidjson::kObjectType};
+        entry_object.AddMember("layer_values", rapidjson::Value{kArrayType}, allocator);
+        entry_object.AddMember("final_value", "", allocator);
+        entry_objects.emplace(kv.first, std::move(entry_object));
+      }
     }
   }
   document.AddMember("layers", std::move(layer_names), allocator);
 
   for (const auto& layer : layers) {
-    for (auto& kv : value_arrays) {
+    for (auto& kv : entry_objects) {
       const auto it = layer->values().find(kv.first);
-      const auto& value = it == layer->values().end() ? "" : it->second.string_value_;
-      rapidjson::Value value_obj;
-      value_obj.SetString(value.c_str(), allocator);
-      kv.second.PushBack(std::move(value_obj), allocator);
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      rapidjson::Value entry_value_object;
+      entry_value_object.SetString(entry_value.c_str(), allocator);
+      if (!entry_value.empty()) {
+        kv.second["final_value"] = rapidjson::Value{entry_value_object, allocator};
+      }
+      kv.second["layer_values"].PushBack(entry_value_object, allocator);
     }
   }
 
   rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
-  for (auto& kv : value_arrays) {
+  for (auto& kv : entry_objects) {
     value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
                                allocator);
   }

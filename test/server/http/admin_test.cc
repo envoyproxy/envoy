@@ -261,22 +261,34 @@ TEST_P(AdminInstanceTest, Runtime) {
         "layer2"
     ],
     "entries": {
-        "extra_key": [
-            "",
-            "bar"
-        ],
-        "int_key": [
-            "1",
-            ""
-        ],
-        "other_key": [
-            "bar",
-            ""
-        ],
-        "string_key": [
-            "foo",
-            "override"
-        ]
+        "extra_key": {
+            "layer_values": [
+                "",
+                "bar"
+            ],
+            "final_value": "bar"
+        },
+        "int_key": {
+            "layer_values": [
+                "1",
+                ""
+            ],
+            "final_value": "1"
+        },
+        "other_key": {
+            "layer_values": [
+                "bar",
+                ""
+            ],
+            "final_value": "bar"
+        },
+        "string_key": {
+            "layer_values": [
+                "foo",
+                "override"
+            ],
+            "final_value": "override"
+        }
     }
 })EOF";
 

@@ -108,7 +108,9 @@ public:
   /**
    * Copy-constructible so that it can snapshotted.
    */
-  AdminLayer(const AdminLayer& o) : AdminLayer{o.stats_} { values_ = o.values(); }
+  AdminLayer(const AdminLayer& admin_layer) : AdminLayer{admin_layer.stats_} {
+    values_ = admin_layer.values();
+  }
 
   /**
    * Merge the provided values into our entry map. An empty value indicates that a key should be
@@ -180,6 +182,7 @@ protected:
 
 private:
   RuntimeStats generateStats(Stats::Store& store);
+
   ThreadLocal::SlotPtr tls_;
 };
 
