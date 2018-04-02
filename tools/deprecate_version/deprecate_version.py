@@ -80,9 +80,9 @@ def CreateIssues(deprecate_for_version, deprecate_by_version, access_token,
     #print '%d %s [%s]' % (pr, pr_info.user, pr_info.title)
     title = '[v%s deprecation] Remove features marked deprecated in #%d' % (
         deprecate_for_version, pr)
-    body = ('#%d (%s) introduced a deprecation notice for v%s. This issue will '
-            'track source code cleanup.') % (pr, pr_info.title,
-                                             deprecate_for_version)
+    body = ('#%d (%s) introduced a deprecation notice for v%s. This issue '
+            'tracks source code cleanup.') % (pr, pr_info.title,
+                                              deprecate_for_version)
     print title
     print body
     print '  >> Assigning to %s' % pr_info.user.login
