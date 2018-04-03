@@ -124,15 +124,15 @@ public:
       histogram_t* hist_array[1];
       hist_array[0] = interval_histogram_;
       hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
+      cumulative_statistics_.reset(new HistogramStatisticsImpl(cumulative_histogram_));
+      interval_statistics_.reset(new HistogramStatisticsImpl(interval_histogram_));
     }
   }
 
-  const HistogramStatistics& intervalStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>(interval_histogram_);
-  }
+  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>(cumulative_histogram_);
+    return *cumulative_statistics_;
   }
 
   Store& parent_;
@@ -141,6 +141,8 @@ public:
 private:
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
+  std::shared_ptr<HistogramStatisticsImpl> interval_statistics_;
+  std::shared_ptr<HistogramStatisticsImpl> cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 
