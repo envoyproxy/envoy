@@ -103,6 +103,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
 std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterPtr> formatters;
+  const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
@@ -111,8 +112,6 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         current_token = "";
       }
 
-      static const std::regex command_w_args_regex(
-          R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
       std::smatch m;
       std::string search_space = format.substr(pos);
       if (!(std::regex_search(search_space, m, command_w_args_regex) || m.position() == 0)) {
