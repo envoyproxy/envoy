@@ -23,6 +23,25 @@ ENVOY_BUILD_FIXER_PATH = os.path.join(
 HEADER_ORDER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
 
+PROTOBUF_TYPE_ERRORS = {
+    # Well-known types should be referenced from the ProtobufWkt namespace.
+    "Protobuf::Any":                    "ProtobufWkt::Any",
+    "Protobuf::Empty":                  "ProtobufWkt::Empty",
+    "Protobuf::ListValue":              "ProtobufWkt:ListValue",
+    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
+    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
+    "Protobuf::Struct":                 "ProtobufWkt::Struct",
+    "Protobuf::Value":                  "ProtobufWkt::Value",
+
+    # Maps including strings should use the protobuf string types.
+    "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
+
+    # Other common mis-namespacing of protobuf types.
+    "ProtobufWkt::Map":                 "Protobuf::Map",
+    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
+    "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
+}
+
 found_error = False
 
 
@@ -68,25 +87,6 @@ def checkProtobufExternalDepsBuild(file_path):
 def checkProtobufExternalDeps(file_path):
   if whitelistedForProtobufDeps(file_path):
     return True
-  protobuf_type_errors = {
-      # Well-known types should be referenced from the ProtobufWkt namespace.
-      "Protobuf::Any":                    "ProtobufWkt::Any",
-      "Protobuf::Empty":                  "ProtobufWkt::Empty",
-      "Protobuf::ListValue":              "ProtobufWkt:ListValue",
-      "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
-      "Protobuf::StringValue":            "ProtobufWkt::StringValue",
-      "Protobuf::Struct":                 "ProtobufWkt::Struct",
-      "Protobuf::Value":                  "ProtobufWkt::Value",
-
-      # Maps including strings should use the protobuf string types.
-      "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
-
-      # Other common mis-namespacing of protobuf types.
-      "ProtobufWkt::Map":                 "Protobuf::Map",
-      "ProtobufWkt::MapPair":             "Protobuf::MapPair",
-      "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
-  }
-
   with open(file_path) as f:
     text = f.read()
     if '"google/protobuf' in text or "google::protobuf" in text:
@@ -94,10 +94,6 @@ def checkProtobufExternalDeps(file_path):
           "%s has unexpected direct dependency on google.protobuf, use "
           "the definitions in common/protobuf/protobuf.h instead." % file_path)
       return False
-    for error, replacement in protobuf_type_errors.items():
-      if error in text:
-        printError("%s uses an unexpected protobuf namespace reference; instead of %s, use %s"
-                   % (file_path, error, replacement))
     return True
 
 
@@ -117,7 +113,13 @@ def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
-    sys.stdout.write("%s" % (line.replace('.  ', '. ')))
+    line = line.replace('.  ', '. ')
+
+    # Fix incorrect protobuf namespace references.
+    for error, replacement in PROTOBUF_TYPE_ERRORS.items():
+      line = line.replace(error, replacement)
+
+    sys.stdout.write(str(line))
 
 
 def checkFilePath(file_path):
