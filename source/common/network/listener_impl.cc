@@ -67,11 +67,14 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
           fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
     }
 
-    for (auto& option : *socket.options()) {
-      if (!option->setOption(socket, Socket::SocketState::Listening)) {
-        throw CreateListenerException(
-            fmt::format("cannot set post-listen socket option on socket: {}",
-                        socket.localAddress()->asString()));
+    Socket::OptionsSharedPtr options = socket.options();
+    if (options != nullptr) {
+      for (auto& option : *options) {
+        if (!option->setOption(socket, Socket::SocketState::Listening)) {
+          throw CreateListenerException(
+              fmt::format("cannot set post-listen socket option on socket: {}",
+                          socket.localAddress()->asString()));
+        }
       }
     }
 
