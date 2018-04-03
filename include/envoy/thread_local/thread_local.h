@@ -47,7 +47,8 @@ public:
   virtual void runOnAllThreads(Event::PostCb cb) PURE;
 
   /**
-   * Run a callback on all registered threads with a barrier.
+   * Run a callback on all registered threads with a barrier. There is no guarantee that this will
+   * be fired during shutdown.
    * @param cb supplies the callback to run on each thread.
    * @param main_callback supplies the callback to run on main thread after threads are done.
    */

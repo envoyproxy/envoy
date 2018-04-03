@@ -155,7 +155,21 @@ public:
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
-struct HistogramStatistics;
+/**
+ * Holds the computed statistics for a histogram.
+ */
+class HistogramStatistics {
+public:
+  virtual ~HistogramStatistics() {}
+
+  /**
+   * Returns summary representation of the histogram.
+   */
+  virtual std::string summary() const PURE;
+
+  double quantiles_in_[9] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  double quantiles_out_[9];
+};
 
 /**
  * A histogram that records values one at a time.
@@ -179,14 +193,14 @@ public:
   virtual void merge() PURE;
 
   /**
-   * Returns the Histogram Summary Statistics for the flush interval.
+   * Returns the interval histogram summary statistics for the flush interval.
    */
-  virtual HistogramStatistics intervalStatistics() const PURE;
+  virtual const HistogramStatistics& intervalStatistics() const PURE;
 
   /**
-   * Returns the Cumulative Histogram Summary Statistics.
+   * Returns the cumulative histogram summary statistics.
    */
-  virtual HistogramStatistics cumulativeStatistics() const PURE;
+  virtual const HistogramStatistics& cumulativeStatistics() const PURE;
 };
 
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
@@ -217,7 +231,7 @@ public:
   /**
    * Flush a histogram.
    */
-  virtual void flushHistogram(const Histogram&) PURE;
+  virtual void flushHistogram(const Histogram& histogram) PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of

@@ -359,26 +359,23 @@ private:
 };
 
 /**
- * Structure to hold statistical data of histogram.
+ * Implementation of HistogramStatistics for circllhist.
  */
-struct HistogramStatistics {
+class HistogramStatisticsImpl : public HistogramStatistics {
 public:
-  HistogramStatistics() {}
+  HistogramStatisticsImpl() {}
 
-  HistogramStatistics(histogram_t* histogram_ptr) {
+  HistogramStatisticsImpl(histogram_t* histogram_ptr) {
     hist_approx_quantile(histogram_ptr, const_cast<double*>(quantiles_in_),
                          ARRAY_SIZE(quantiles_in_), quantiles_out_);
   }
 
-  std::string summary() const {
+  virtual std::string summary() const override {
     return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
                        quantiles_out_[0], quantiles_out_[1], quantiles_out_[2], quantiles_out_[3],
                        quantiles_out_[4], quantiles_out_[5], quantiles_out_[6], quantiles_out_[7],
                        quantiles_out_[8]);
   }
-
-  double quantiles_in_[9] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
-  double quantiles_out_[ARRAY_SIZE(quantiles_in_)];
 };
 
 /**
@@ -397,9 +394,13 @@ public:
 
   bool used() const override { return true; }
 
-  HistogramStatistics intervalStatistics() const override { return HistogramStatistics(); }
+  const HistogramStatistics& intervalStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
 
-  HistogramStatistics cumulativeStatistics() const override { return HistogramStatistics(); }
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
 
   Store& parent_;
 };
@@ -435,9 +436,13 @@ public:
 
   bool used() const override { return flags_ & Flags::Used; }
 
-  HistogramStatistics intervalStatistics() const override { return HistogramStatistics(); }
+  const HistogramStatistics& intervalStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
 
-  HistogramStatistics cumulativeStatistics() const override { return HistogramStatistics(); }
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
 
   void merge(histogram_t* target) {
     histogram_t* hist_array[1];
@@ -506,12 +511,12 @@ public:
     }
   }
 
-  HistogramStatistics intervalStatistics() const override {
-    return HistogramStatistics(interval_histogram_);
+  const HistogramStatistics& intervalStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>(interval_histogram_);
   }
 
-  HistogramStatistics cumulativeStatistics() const override {
-    return HistogramStatistics(cumulative_histogram_);
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>(cumulative_histogram_);
   }
 
   Store& parent_;
