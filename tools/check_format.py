@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import common
 import fileinput
 import os
 import os.path
@@ -22,6 +23,9 @@ ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
+SUBDIR_SET = set(common.includeDirOrder())
+INCLUDE_ANGLE = "#include <"
+INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 
 PROTOBUF_TYPE_ERRORS = {
     # Well-known types should be referenced from the ProtobufWkt namespace.
@@ -69,7 +73,7 @@ def findSubstringAndPrintError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
     if pattern in text:
-      printError(error_message)
+      printError(file_path + ': ' + error_message)
       for i, line in enumerate(text.splitlines()):
         if pattern in line:
           printError("  %s:%s" % (file_path, i + 1))
@@ -79,8 +83,8 @@ def findSubstringAndPrintError(pattern, file_path, error_message):
 def checkProtobufExternalDepsBuild(file_path):
   if whitelistedForProtobufDeps(file_path):
     return True
-  message = ("%s has unexpected direct external dependency on protobuf, use "
-    "//source/common/protobuf instead." % file_path)
+  message = ("unexpected direct external dependency on protobuf, use "
+    "//source/common/protobuf instead.")
   return findSubstringAndPrintError('"protobuf"', file_path, message)
 
 
@@ -103,11 +107,25 @@ def isBuildFile(file_path):
     return True
   return False
 
+def hasInvalidAngleBracketDirectory(line):
+  if not line.startswith(INCLUDE_ANGLE):
+    return False
+  path = line[INCLUDE_ANGLE_LEN:]
+  slash = path.find("/")
+  if slash == -1:
+    return False
+  subdir = path[0:slash]
+  return subdir in SUBDIR_SET
+
+def printLineError(path, zero_based_line_number, message):
+  printError("%s:%d: %s" % (path, zero_based_line_number + 1, message))
 
 def checkFileContents(file_path):
-  message = "%s has over-enthusiastic spaces:" % file_path
-  findSubstringAndPrintError('.  ', file_path, message)
-
+  for line_number, line in enumerate(fileinput.input(file_path)):
+    if line.find(".  ") != -1:
+      printLineError(file_path, line_number, "over-enthusiastic spaces")
+    if hasInvalidAngleBracketDirectory(line):
+      printLineError(file_path, line_number, "envoy includes should not have angle brackets")
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
@@ -115,12 +133,14 @@ def fixFileContents(file_path):
     # be restricted to comments and metadata files but works for now.
     line = line.replace('.  ', '. ')
 
+    if hasInvalidAngleBracketDirectory(line):
+      line = line.replace('<', '"').replace(">", '"')
+
     # Fix incorrect protobuf namespace references.
     for error, replacement in PROTOBUF_TYPE_ERRORS.items():
       line = line.replace(error, replacement)
 
     sys.stdout.write(str(line))
-
 
 def checkFilePath(file_path):
   if isBuildFile(file_path):
