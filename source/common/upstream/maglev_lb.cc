@@ -19,7 +19,9 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
   for (const auto& host : hosts) {
     max_host_weight = std::max(host->weight(), max_host_weight);
   }
-  // Integer range to normalize and scale backend weights to.
+  // Integer range to normalize and scale backend weights to. This doesn't need
+  // to match table size, it reflects instead the granularity of weights we map
+  // the normalized endpoint weight to.
   const uint32_t backend_weight_scale = 65535;
 
   // Implementation of pseudocode listing 1 in the paper (see header file for more info).
@@ -27,6 +29,9 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
   table_build_entries.reserve(hosts.size());
   for (const auto& host : hosts) {
     const std::string& address = host->address()->asString();
+    // Normalize and scale weights to have them all fit in
+    // [0,backend_weight_scale]. This is used in the assignment loop below to
+    // ensure we pick with period backwend_weight_scale / weight.
     const uint32_t weight =
         max_host_weight > 0 ? (host->weight() * backend_weight_scale) / max_host_weight : 0;
     table_build_entries.emplace_back(HashUtil::xxHash64(address) % table_size_,
@@ -41,8 +46,12 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
     for (uint64_t i = 0; i < hosts.size(); i++) {
       TableBuildEntry& entry = table_build_entries[i];
       // Only consider weight if we are doing weighted Maglev.
-      if (max_host_weight) {
-        // Counts are in units of backend_weight_scale;
+      if (max_host_weight > 0) {
+        // Counts are in units of backend_weight_scale. To understand how
+        // counts_ and weight_ are used below, consider a host with weight equal
+        // to backend_weight_scale. This would be picked on every single
+        // iteration. If it had weight equal to backend_weight_scale / 3, then
+        // this would only happen every 3 iterations, etc.
         if (iteration * entry.weight_ < entry.counts_) {
           continue;
         }
