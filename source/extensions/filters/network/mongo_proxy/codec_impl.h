@@ -187,64 +187,64 @@ private:
   std::list<Bson::DocumentSharedPtr> documents_;
 };
 
-// OP_COMMAND message
+// OP_COMMAND message.
 class CommandMessageImpl : public MessageImpl,
                            public CommandMessage,
                            Logger::Loggable<Logger::Id::mongo> {
 public:
   using MessageImpl::MessageImpl;
 
-  // MessageImpl
+  // MessageImpl.
   void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
   std::string toString(bool full) const override;
 
-  // CommandMessageImpl accessors
+  // CommandMessageImpl accessors.
   bool operator==(const CommandMessage& rhs) const override;
   std::string database() const override { return database_; }
   void database(std::string database) override { database_ = database; }
-  std::string commandName() const override { return commandName_; }
-  void commandName(std::string commandName) override { commandName_ = commandName; }
+  std::string commandName() const override { return command_name_; }
+  void commandName(std::string command_name) override { command_name_ = command_name; }
   const Bson::Document* metadata() const override { return metadata_.get(); }
   void metadata(Bson::DocumentSharedPtr&& metadata) override { metadata_ = std::move(metadata); }
-  const Bson::Document* commandArgs() const override { return commandArgs_.get(); }
-  void commandArgs(Bson::DocumentSharedPtr&& commandArgs) override {
-    commandArgs_ = std::move(commandArgs);
+  const Bson::Document* commandArgs() const override { return command_args_.get(); }
+  void commandArgs(Bson::DocumentSharedPtr&& command_args) override {
+    command_args_ = std::move(command_args);
   }
-  const std::list<Bson::DocumentSharedPtr>& inputDocs() const override { return inputDocs_; }
+  const std::list<Bson::DocumentSharedPtr>& inputDocs() const override { return input_docs_; }
 
 private:
   std::string database_;
-  std::string commandName_;
+  std::string command_name_;
   Bson::DocumentSharedPtr metadata_;
-  Bson::DocumentSharedPtr commandArgs_;
-  std::list<Bson::DocumentSharedPtr> inputDocs_;
+  Bson::DocumentSharedPtr command_args_;
+  std::list<Bson::DocumentSharedPtr> input_docs_;
 };
 
-// OP_COMMANDREPLY
+// OP_COMMANDREPLY message.
 class CommandReplyMessageImpl : public MessageImpl,
                                 public CommandReplyMessage,
                                 Logger::Loggable<Logger::Id::mongo> {
 public:
   using MessageImpl::MessageImpl;
 
-  // MessageImpl
+  // MessageImpl.
   void fromBuffer(uint32_t message_length, Buffer::Instance& data) override;
   std::string toString(bool full) const override;
 
-  // CommandMessageImpl accessors
+  // CommandMessageReplyImpl accessors.
   bool operator==(const CommandReplyMessage& rhs) const override;
   const Bson::Document* metadata() const override { return metadata_.get(); }
   void metadata(Bson::DocumentSharedPtr&& metadata) override { metadata_ = std::move(metadata); }
-  const Bson::Document* commandReply() const override { return commandReply_.get(); }
-  void commandReply(Bson::DocumentSharedPtr&& commandReply) override {
-    commandReply_ = std::move(commandReply);
+  const Bson::Document* commandReply() const override { return command_reply_.get(); }
+  void commandReply(Bson::DocumentSharedPtr&& command_reply) override {
+    command_reply_ = std::move(command_reply);
   }
-  const std::list<Bson::DocumentSharedPtr>& outputDocs() const override { return outputDocs_; }
+  const std::list<Bson::DocumentSharedPtr>& outputDocs() const override { return output_docs_; }
 
 private:
   Bson::DocumentSharedPtr metadata_;
-  Bson::DocumentSharedPtr commandReply_;
-  std::list<Bson::DocumentSharedPtr> outputDocs_;
+  Bson::DocumentSharedPtr command_reply_;
+  std::list<Bson::DocumentSharedPtr> output_docs_;
 };
 
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::mongo> {

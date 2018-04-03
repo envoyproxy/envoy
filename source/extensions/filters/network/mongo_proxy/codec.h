@@ -152,7 +152,7 @@ typedef std::unique_ptr<ReplyMessage> ReplyMessagePtr;
 
 class CommandMessage : public virtual Message {
 public:
-  // CommandMessage accessors
+  // CommandMessage accessors.
   virtual bool operator==(const CommandMessage& rhs) const PURE;
   virtual std::string database() const PURE;
   virtual void database(std::string database) PURE;
