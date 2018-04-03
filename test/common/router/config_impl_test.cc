@@ -3863,6 +3863,106 @@ void checkPathMatchCriterion(const Route* route, const std::string& expected_mat
   EXPECT_EQ(expected_type, match_criterion.matchType());
 }
 
+TEST(RouteConfigurationV2, RetrievesClusterMetadata) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: www
+          cluster_metadata: { filter_metadata: { com.bar.foo: { baz: test_value } } }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+  const auto route = config.route(genHeaders("www.lyft.com", "/", "GET"), 0);
+
+  auto* route_entry = route->routeEntry();
+  EXPECT_EQ("www", route_entry->clusterName());
+  const auto& cluster_metadata = route_entry->clusterMetadata();
+
+  const auto& outer_value =
+      Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo", "baz");
+  EXPECT_EQ(outer_value.string_value(), "test_value");
+}
+
+TEST(RouteConfigurationV2, RetrievesClusterMetadataFromWeightedClusters) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          cluster_metadata: { filter_metadata: { com.bar.foo1: { baz: test_value1 } } }
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 30
+                cluster_metadata: { filter_metadata: { com.bar.foo2: { baz: test_value2 } } }
+              - name: cluster1
+                weight: 30
+                cluster_metadata: { filter_metadata: { com.bar.foo3: { baz: test_value3 } } }
+              - name: cluster2
+                weight: 40
+                cluster_metadata: { filter_metadata: { com.bar.foo4: { baz: test_value4 } } }
+  )EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+  {
+    const auto route = config.route(genHeaders("www.lyft.com", "/", "GET"), 0);
+
+    auto* route_entry = route->routeEntry();
+    EXPECT_EQ("cluster1", route_entry->clusterName());
+    const auto& cluster_metadata = route_entry->clusterMetadata();
+
+    const auto& outer_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo1", "baz");
+    EXPECT_EQ(outer_value.string_value(), "test_value1");
+    const auto& inner_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo2", "baz");
+    EXPECT_EQ(inner_value.string_value(), "test_value2");
+  }
+
+  {
+    const auto route = config.route(genHeaders("www.lyft.com", "/", "GET"), 45);
+
+    auto* route_entry = route->routeEntry();
+    EXPECT_EQ("cluster1", route_entry->clusterName());
+    const auto& cluster_metadata = route_entry->clusterMetadata();
+
+    const auto& outer_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo1", "baz");
+    EXPECT_EQ(outer_value.string_value(), "test_value1");
+    const auto& inner_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo3", "baz");
+    EXPECT_EQ(inner_value.string_value(), "test_value3");
+  }
+
+  {
+    const auto route = config.route(genHeaders("www.lyft.com", "/", "GET"), 75);
+
+    auto* route_entry = route->routeEntry();
+    EXPECT_EQ("cluster2", route_entry->clusterName());
+    const auto& cluster_metadata = route_entry->clusterMetadata();
+
+    const auto& outer_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo1", "baz");
+    EXPECT_EQ(outer_value.string_value(), "test_value1");
+
+    const auto& inner_value =
+        Envoy::Config::Metadata::metadataValue(cluster_metadata, "com.bar.foo4", "baz");
+    EXPECT_EQ(inner_value.string_value(), "test_value4");
+  }
+}
+
 TEST(RouteConfigurationV2, RouteConfigGetters) {
   std::string yaml = R"EOF(
 name: foo

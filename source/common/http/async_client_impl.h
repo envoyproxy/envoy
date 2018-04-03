@@ -198,6 +198,7 @@ private:
     bool useWebSocket() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+    const envoy::api::v2::core::Metadata& clusterMetadata() const override { return metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
     }
