@@ -10,14 +10,16 @@ namespace Envoy {
 namespace Network {
 
 bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
-  if (transparent_.has_value()) {
-    const int should_transparent = transparent_.value() ? 1 : 0;
-    const int error =
-        setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
-                          &should_transparent, sizeof(should_transparent));
-    if (error != 0) {
-      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
-      return false;
+  if (state == Socket::SocketState::PreBind || state == Socket::SocketState::PostBind) {
+    if (transparent_.has_value()) {
+      const int should_transparent = transparent_.value() ? 1 : 0;
+      const int error =
+          setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
+                            &should_transparent, sizeof(should_transparent));
+      if (error != 0) {
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
+        return false;
+      }
     }
   }
 
@@ -32,7 +34,9 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
         return false;
       }
     }
-  } else if (state == Socket::SocketState::Listening) {
+  }
+
+  if (state == Socket::SocketState::Listening) {
     if (accept_tcp_fast_open_.has_value()) {
       const int tfo_value = accept_tcp_fast_open_.value() ? ENVOY_TCP_FASTOPEN_BACKLOG : 0;
       const SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
@@ -51,6 +55,7 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
       }
     }
   }
+
   return true;
 }
 
