@@ -22,7 +22,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/ratelimit:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/server/config/access_log:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:server_mocks",

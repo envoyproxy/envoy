@@ -38,6 +38,8 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "extensions/access_loggers/file/file_access_log_impl.h"
+
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 
@@ -284,7 +286,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message);
-    Protobuf::Any any_message;
+    ProtobufWkt::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;
   }
@@ -730,7 +732,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     }
   }
 
-  access_logs_.emplace_back(new AccessLog::FileAccessLog(
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
 }
