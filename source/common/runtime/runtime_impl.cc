@@ -146,26 +146,26 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
-SnapshotImpl::SnapshotImpl(const std::string& root_path, const std::string& override_path,
-                           RuntimeStats& stats, RandomGenerator& generator,
-                           Api::OsSysCalls& os_sys_calls)
-    : generator_(generator), os_sys_calls_(os_sys_calls) {
-  try {
-    walkDirectory(root_path, "");
-    if (Filesystem::directoryExists(override_path)) {
-      walkDirectory(override_path, "");
-      stats.override_dir_exists_.inc();
-    } else {
-      stats.override_dir_not_exists_.inc();
-    }
+bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+                                  uint64_t random_value, uint64_t num_buckets) const {
+  return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
+}
 
-    stats.load_success_.inc();
-  } catch (EnvoyException& e) {
-    stats.load_error_.inc();
-    ENVOY_LOG(debug, "error creating runtime snapshot: {}", e.what());
+bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value) const {
+  // Avoid PNRG if we know we don't need it.
+  uint64_t cutoff = std::min(getInteger(key, default_value), static_cast<uint64_t>(100));
+  if (cutoff == 0) {
+    return false;
+  } else if (cutoff == 100) {
+    return true;
+  } else {
+    return generator_.random() % 100 < cutoff;
   }
+}
 
-  stats.num_keys_.set(values_.size());
+bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+                                  uint64_t random_value) const {
+  return featureEnabled(key, default_value, random_value, 100);
 }
 
 const std::string& SnapshotImpl::get(const std::string& key) const {
@@ -186,11 +186,50 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-const std::unordered_map<std::string, const Snapshot::Entry>& SnapshotImpl::getAll() const {
-  return values_;
+const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
+  return layers_;
 }
 
-void SnapshotImpl::walkDirectory(const std::string& path, const std::string& prefix) {
+SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
+                           std::vector<OverrideLayerConstPtr>&& layers)
+    : layers_{std::move(layers)}, generator_{generator} {
+  for (const auto& layer : layers_) {
+    for (const auto& kv : layer->values()) {
+      values_.erase(kv.first);
+      values_.emplace(kv.first, kv.second);
+    }
+  }
+  stats.num_keys_.set(values_.size());
+}
+
+Snapshot::Entry SnapshotImpl::createEntry(const std::string& value) {
+  Entry entry{value, absl::nullopt};
+  // As a perf optimization, attempt to convert the entry's string into an integer. If we don't
+  // succeed that's fine.
+  uint64_t converted;
+  if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
+    entry.uint_value_ = converted;
+  }
+  return entry;
+}
+
+void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+  for (const auto& kv : values) {
+    values_.erase(kv.first);
+    if (!kv.second.empty()) {
+      values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
+    }
+  }
+  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
+}
+
+DiskLayer::DiskLayer(const std::string& name, const std::string& path,
+                     Api::OsSysCalls& os_sys_calls)
+    : OverrideLayerImpl{name}, os_sys_calls_(os_sys_calls) {
+  walkDirectory(path, "");
+}
+
+void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   Directory current_dir(path);
   while (true) {
@@ -226,7 +265,7 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could
       // theoretically lead to issues.
       ENVOY_LOG(debug, "reading file: {}", full_path);
-      Entry entry;
+      std::string value;
 
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
@@ -238,39 +277,65 @@ void SnapshotImpl::walkDirectory(const std::string& path, const std::string& pre
         }
         if (line == lines.back()) {
           const absl::string_view trimmed = StringUtil::rtrim(line);
-          entry.string_value_.append(trimmed.data(), trimmed.size());
+          value.append(trimmed.data(), trimmed.size());
         } else {
-          entry.string_value_.append(std::string{line} + "\n");
+          value.append(std::string{line} + "\n");
         }
       }
-
-      // As a perf optimization, attempt to convert the string into an integer. If we don't
-      // succeed that's fine.
-      uint64_t converted;
-      if (StringUtil::atoul(entry.string_value_.c_str(), converted)) {
-        entry.uint_value_ = converted;
-      }
-
       // Separate erase/insert calls required due to the value type being constant; this prevents
       // the use of the [] operator. Can leverage insert_or_assign in C++17 in the future.
       values_.erase(full_prefix);
-      values_.insert({full_prefix, entry});
+      values_.insert({full_prefix, SnapshotImpl::createEntry(value)});
     }
   }
 }
 
-LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const std::string& root_symlink_path, const std::string& subdir,
-                       const std::string& override_dir, Stats::Store& store,
-                       RandomGenerator& generator, Api::OsSysCallsPtr os_sys_calls)
-    : watcher_(dispatcher.createFilesystemWatcher()), tls_(tls.allocateSlot()),
-      generator_(generator), root_path_(root_symlink_path + "/" + subdir),
-      override_path_(root_symlink_path + "/" + override_dir), stats_(generateStats(store)),
+LoaderImpl::LoaderImpl(RandomGenerator& generator, Stats::Store& store,
+                       ThreadLocal::SlotAllocator& tls)
+    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls) {
+  loadNewSnapshot();
+}
+
+LoaderImpl::LoaderImpl(DoNotLoadSnapshot /* unused */, RandomGenerator& generator,
+                       Stats::Store& store, ThreadLocal::SlotAllocator& tls)
+    : generator_(generator), stats_(generateStats(store)), admin_layer_(stats_),
+      tls_(tls.allocateSlot()) {}
+
+std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
+  std::vector<Snapshot::OverrideLayerConstPtr> layers;
+  layers.emplace_back(std::make_unique<const AdminLayer>(admin_layer_));
+  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
+}
+
+void LoaderImpl::loadNewSnapshot() {
+  ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
+  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&)->ThreadLocal::ThreadLocalObjectSharedPtr {
+    return ptr;
+  });
+}
+
+Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
+
+void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>& values) {
+  admin_layer_.mergeValues(values);
+  loadNewSnapshot();
+}
+
+DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
+                                           ThreadLocal::SlotAllocator& tls,
+                                           const std::string& root_symlink_path,
+                                           const std::string& subdir,
+                                           const std::string& override_dir, Stats::Store& store,
+                                           RandomGenerator& generator,
+                                           Api::OsSysCallsPtr os_sys_calls)
+    : LoaderImpl(DoNotLoadSnapshot{}, generator, store, tls),
+      watcher_(dispatcher.createFilesystemWatcher()), root_path_(root_symlink_path + "/" + subdir),
+      override_path_(root_symlink_path + "/" + override_dir),
       os_sys_calls_(std::move(os_sys_calls)) {
   watcher_->addWatch(root_symlink_path, Filesystem::Watcher::Events::MovedTo,
-                     [this](uint32_t) -> void { onSymlinkSwap(); });
+                     [this](uint32_t) -> void { loadNewSnapshot(); });
 
-  onSymlinkSwap();
+  loadNewSnapshot();
 }
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
@@ -280,16 +345,24 @@ RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   return stats;
 }
 
-void LoaderImpl::onSymlinkSwap() {
-  current_snapshot_.reset(
-      new SnapshotImpl(root_path_, override_path_, stats_, generator_, *os_sys_calls_));
-  ThreadLocal::ThreadLocalObjectSharedPtr ptr_copy = current_snapshot_;
-  tls_->set([ptr_copy](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return ptr_copy;
-  });
+std::unique_ptr<SnapshotImpl> DiskBackedLoaderImpl::createNewSnapshot() {
+  std::vector<Snapshot::OverrideLayerConstPtr> layers;
+  try {
+    layers.push_back(std::make_unique<DiskLayer>("root", root_path_, *os_sys_calls_));
+    if (Filesystem::directoryExists(override_path_)) {
+      layers.push_back(std::make_unique<DiskLayer>("override", override_path_, *os_sys_calls_));
+      stats_.override_dir_exists_.inc();
+    } else {
+      stats_.override_dir_not_exists_.inc();
+    }
+  } catch (EnvoyException& e) {
+    layers.clear();
+    stats_.load_error_.inc();
+    ENVOY_LOG(debug, "error loading runtime values from disk: {}", e.what());
+  }
+  layers.push_back(std::make_unique<AdminLayer>(admin_layer_));
+  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
 }
-
-Snapshot& LoaderImpl::snapshot() { return tls_->getTyped<Snapshot>(); }
 
 } // namespace Runtime
 } // namespace Envoy
