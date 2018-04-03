@@ -126,6 +126,9 @@ def checkFileContents(file_path):
       printLineError(file_path, line_number, "over-enthusiastic spaces")
     if hasInvalidAngleBracketDirectory(line):
       printLineError(file_path, line_number, "envoy includes should not have angle brackets")
+    for error in PROTOBUF_TYPE_ERRORS:
+      if error in line:
+        printLineError(file_path, line_number, "incorrect protobuf type reference %s" % error)
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
