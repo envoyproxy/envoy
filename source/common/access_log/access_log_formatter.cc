@@ -99,7 +99,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
-// TODO(derekargueta): Rewrite AccessLogformatter with parser library & formal grammar
+// TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
 std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterPtr> formatters;
@@ -129,7 +129,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
-        parseCommand(token, REQ_PARAM_START, main_header, alternative_header, max_length);
+        parseCommand(token, ReqParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
@@ -137,16 +137,16 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
-        parseCommand(token, RESP_PARAM_START, main_header, alternative_header, max_length);
+        parseCommand(token, RespParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
       } else if (token.find("START_TIME") == 0) {
-        size_t parameters_length = pos + START_TIME_PARAM_START + 1;
-        size_t parameters_end = command_end_position - parameters_length;
+        const size_t parameters_length = pos + StartTimeParamStart + 1;
+        const size_t parameters_end = command_end_position - parameters_length;
 
-        const std::string args = token[START_TIME_PARAM_START - 1] == '('
-                                     ? token.substr(START_TIME_PARAM_START, parameters_end)
+        const std::string args = token[StartTimeParamStart - 1] == '('
+                                     ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
         formatters.emplace_back(FormatterPtr(new StartTimeFormatter(args)));
       } else {

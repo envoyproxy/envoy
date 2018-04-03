@@ -28,9 +28,9 @@ private:
 
   // the indexes of where the parameters for each directive is expected to begin - generally the
   // length of the directive + 1 for the opening '('
-  static const size_t REQ_PARAM_START{4};
-  static const size_t RESP_PARAM_START{5};
-  static const size_t START_TIME_PARAM_START{11};
+  static const size_t ReqParamStart{4};
+  static const size_t RespParamStart{5};
+  static const size_t StartTimeParamStart{11};
 };
 
 /**
