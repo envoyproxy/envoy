@@ -126,6 +126,10 @@ def checkFileContents(file_path):
       printLineError(file_path, line_number, "over-enthusiastic spaces")
     if hasInvalidAngleBracketDirectory(line):
       printLineError(file_path, line_number, "envoy includes should not have angle brackets")
+    for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+      if invalid_construct in line:
+        printLineError(file_path, line_number, "incorrect protobuf type reference %s; "
+                       "should be %s" % (invalid_construct, valid_construct))
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
@@ -137,8 +141,8 @@ def fixFileContents(file_path):
       line = line.replace('<', '"').replace(">", '"')
 
     # Fix incorrect protobuf namespace references.
-    for error, replacement in PROTOBUF_TYPE_ERRORS.items():
-      line = line.replace(error, replacement)
+    for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+      line = line.replace(invalid_construct, valid_construct)
 
     sys.stdout.write(str(line))
 
