@@ -25,5 +25,7 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/tracers/dynamic_ot:config",
     repository + "//source/extensions/tracers/lightstep:config",
     repository + "//source/extensions/tracers/zipkin:config",
+    repository + "//source/extensions/transport_sockets/raw_buffer:config",
+    repository + "//source/extensions/transport_sockets/ssl:config",
   ]
 
