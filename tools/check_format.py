@@ -98,9 +98,8 @@ def hasInvalidAngleBracketDirectory(line):
   subdir = path[0:slash]
   return subdir in SUBDIR_SET
 
-def printLineError(path, line_number, message):
-  # line_number is zero-based, so add 1.
-  printError("%s:%d: %s" % (path, line_number + 1, message))
+def printLineError(path, zero_based_line_number, message):
+  printError("%s:%d: %s" % (path, zero_based_line_number + 1, message))
 
 def checkFileContents(file_path):
   for line_number, line in enumerate(fileinput.input(file_path)):
