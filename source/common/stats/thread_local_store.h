@@ -84,6 +84,8 @@ public:
       : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
+    cumulative_statistics_.reset(new HistogramStatisticsImpl(cumulative_histogram_));
+    interval_statistics_.reset(new HistogramStatisticsImpl(interval_histogram_));
   }
 
   ~HistogramParentImpl() {
@@ -141,8 +143,8 @@ public:
 private:
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
-  std::shared_ptr<HistogramStatisticsImpl> interval_statistics_;
-  std::shared_ptr<HistogramStatisticsImpl> cumulative_statistics_;
+  std::shared_ptr<HistogramStatistics> interval_statistics_;
+  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 
