@@ -1,3 +1,26 @@
 FROM ubuntu:16.04
 
+ARG dumbinit_version=1.2.1
+ENV loglevel=info
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y wget ca-certificates \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN wget https://github.com/Yelp/dumb-init/releases/download/v${dumbinit_version}/dumb-init_${dumbinit_version}_amd64.deb \
+    && dpkg -i dumb-init_${dumbinit_version}_amd64.deb
+
+RUN mkdir -p /etc/envoy
+
 ADD build_release_stripped/envoy /usr/local/bin/envoy
+ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
+
+EXPOSE 10000
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD /usr/local/bin/envoy --v2-config-only -l $loglevel -c /etc/envoy/envoy.yaml
