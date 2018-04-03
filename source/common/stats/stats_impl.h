@@ -371,7 +371,7 @@ public:
                          ARRAY_SIZE(quantiles_in_), quantiles_out_);
   }
 
-  virtual std::string summary() const override {
+  std::string summary() const override {
     return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
                        quantiles_out_[0], quantiles_out_[1], quantiles_out_[2], quantiles_out_[3],
                        quantiles_out_[4], quantiles_out_[5], quantiles_out_[6], quantiles_out_[7],
