@@ -1,6 +1,4 @@
-#include "server/config/stats/metrics_service.h"
-
-#include <string>
+#include "extensions/stat_sinks/metrics_service/config.h"
 
 #include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/config/metrics/v2/metrics_service.pb.validate.h"
@@ -9,11 +7,13 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
-#include "common/stats/grpc_metrics_service_impl.h"
+
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
+namespace Extensions {
+namespace StatSinks {
+namespace MetricsService {
 
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
@@ -23,14 +23,13 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
   const auto& grpc_service = sink_config.grpc_service();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
-  std::shared_ptr<Stats::Metrics::GrpcMetricsStreamer> grpc_metrics_streamer =
-      std::make_shared<Stats::Metrics::GrpcMetricsStreamerImpl>(
+  std::shared_ptr<GrpcMetricsStreamer> grpc_metrics_streamer =
+      std::make_shared<GrpcMetricsStreamerImpl>(
           server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
               grpc_service, server.stats(), false),
           server.threadLocal(), server.localInfo());
 
-  return Stats::SinkPtr(
-      std::make_unique<Stats::Metrics::MetricsServiceSink>(grpc_metrics_streamer));
+  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer);
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
@@ -45,8 +44,10 @@ std::string MetricsServiceSinkFactory::name() {
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<MetricsServiceSinkFactory, StatsSinkFactory> register_;
+static Registry::RegisterFactory<MetricsServiceSinkFactory, Server::Configuration::StatsSinkFactory>
+    register_;
 
-} // namespace Configuration
-} // namespace Server
+} // namespace MetricsService
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

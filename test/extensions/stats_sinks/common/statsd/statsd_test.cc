@@ -2,8 +2,9 @@
 #include <memory>
 
 #include "common/network/utility.h"
-#include "common/stats/statsd.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -23,7 +24,9 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 namespace Statsd {
 
 class TcpStatsdSinkTest : public testing::Test {
@@ -65,10 +68,10 @@ TEST_F(TcpStatsdSinkTest, EmptyFlush) {
 
 TEST_F(TcpStatsdSinkTest, BasicFlow) {
   InSequence s;
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
 
   sink_->beginFlush();
@@ -88,7 +91,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 
   expectCreateConnection();
 
-  NiceMock<MockHistogram> timer;
+  NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_timer:5|ms\n"), _));
   sink_->onHistogramComplete(timer, 5);
@@ -100,7 +103,7 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   InSequence s;
 
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
 
   sink_->beginFlush();
@@ -123,7 +126,7 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
 TEST_F(TcpStatsdSinkTest, Overflow) {
   InSequence s;
 
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
@@ -157,5 +160,7 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
 }
 
 } // namespace Statsd
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

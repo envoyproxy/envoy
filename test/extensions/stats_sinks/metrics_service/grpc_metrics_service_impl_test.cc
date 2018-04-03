@@ -1,4 +1,4 @@
-#include "common/stats/grpc_metrics_service_impl.h"
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -13,8 +13,9 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Stats {
-namespace Metrics {
+namespace Extensions {
+namespace StatSinks {
+namespace MetricsService {
 
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
@@ -102,11 +103,11 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
   sink.beginFlush();
 
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
   EXPECT_CALL(*streamer_, send(_));
@@ -121,11 +122,11 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
 
   sink.beginFlush();
 
-  NiceMock<MockCounter> counter;
+  NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
   sink.flushCounter(counter, 1);
 
-  NiceMock<MockGauge> gauge;
+  NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
 
@@ -135,7 +136,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   // Verify only newly added metrics come after endFlush call.
   sink.beginFlush();
 
-  NiceMock<MockCounter> counter1;
+  NiceMock<Stats::MockCounter> counter1;
   counter1.name_ = "test_counter";
   sink.flushCounter(counter1, 1);
 
@@ -143,6 +144,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
-} // namespace Metrics
-} // namespace Stats
+} // namespace MetricsService
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

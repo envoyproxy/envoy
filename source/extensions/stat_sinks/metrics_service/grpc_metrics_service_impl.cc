@@ -1,8 +1,4 @@
-#include "common/stats/grpc_metrics_service_impl.h"
-
-#include <chrono>
-#include <cstdint>
-#include <string>
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
@@ -13,8 +9,9 @@
 #include "common/config/utility.h"
 
 namespace Envoy {
-namespace Stats {
-namespace Metrics {
+namespace Extensions {
+namespace StatSinks {
+namespace MetricsService {
 
 GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& factory,
                                                  ThreadLocal::SlotAllocator& tls,
@@ -63,6 +60,8 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer)
     : grpc_metrics_streamer_(grpc_metrics_streamer) {}
-} // namespace Metrics
-} // namespace Stats
+
+} // namespace MetricsService
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

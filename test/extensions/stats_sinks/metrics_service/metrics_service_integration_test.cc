@@ -11,8 +11,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Stats {
-namespace Metrics {
+namespace {
 
 class MetricsServiceIntegrationTest : public HttpIntegrationTest,
                                       public Grpc::GrpcClientIntegrationParamTest {
@@ -128,6 +127,5 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   cleanup();
 }
 
-} // namespace Metrics
-} // namespace Stats
+} // namespace
 } // namespace Envoy

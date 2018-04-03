@@ -1,6 +1,4 @@
-#include "server/config/stats/statsd.h"
-
-#include <string>
+#include "extensions/stat_sinks/statsd/config.h"
 
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
@@ -8,11 +6,13 @@
 
 #include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
-#include "common/stats/statsd.h"
+
+#include "extensions/stat_sinks/common/statsd/statsd.h"
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
+namespace Extensions {
+namespace StatSinks {
+namespace Statsd {
 
 Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                   Server::Instance& server) {
@@ -24,16 +24,14 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
     Network::Address::InstanceConstSharedPtr address =
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
-    return Stats::SinkPtr(
-        new Stats::Statsd::UdpStatsdSink(server.threadLocal(), std::move(address), false));
-    break;
+    return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
+                                                           false);
   }
   case envoy::config::metrics::v2::StatsdSink::kTcpClusterName:
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
-    return Stats::SinkPtr(new Stats::Statsd::TcpStatsdSink(
+    return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
-        server.clusterManager(), server.stats()));
-    break;
+        server.clusterManager(), server.stats());
   default:
     // Verified by schema.
     NOT_REACHED;
@@ -50,8 +48,10 @@ std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STA
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<StatsdSinkFactory, StatsSinkFactory> register_;
+static Registry::RegisterFactory<StatsdSinkFactory, Server::Configuration::StatsSinkFactory>
+    register_;
 
-} // namespace Configuration
-} // namespace Server
+} // namespace Statsd
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

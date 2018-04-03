@@ -1,4 +1,4 @@
-#include "common/stats/statsd.h"
+#include "extensions/stat_sinks/common/statsd/statsd.h"
 
 #include <chrono>
 #include <cstdint>
@@ -14,7 +14,9 @@
 #include "common/config/utility.h"
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 namespace Statsd {
 
 Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
@@ -43,19 +45,19 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flushCounter(const Counter& counter, uint64_t delta) {
+void UdpStatsdSink::flushCounter(const Stats::Counter& counter, uint64_t delta) {
   const std::string message(
       fmt::format("envoy.{}:{}|c{}", getName(counter), delta, buildTagStr(counter.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-void UdpStatsdSink::flushGauge(const Gauge& gauge, uint64_t value) {
+void UdpStatsdSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
   const std::string message(
       fmt::format("envoy.{}:{}|g{}", getName(gauge), value, buildTagStr(gauge.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t value) {
+void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
   const std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
                                         std::chrono::milliseconds(value).count(),
@@ -63,7 +65,7 @@ void UdpStatsdSink::onHistogramComplete(const Histogram& histogram, uint64_t val
   tls_->getTyped<Writer>().write(message);
 }
 
-const std::string UdpStatsdSink::getName(const Metric& metric) {
+const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
@@ -71,14 +73,14 @@ const std::string UdpStatsdSink::getName(const Metric& metric) {
   }
 }
 
-const std::string UdpStatsdSink::buildTagStr(const std::vector<Tag>& tags) {
+const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) {
   if (!use_tag_ || tags.empty()) {
     return "";
   }
 
   std::vector<std::string> tag_strings;
   tag_strings.reserve(tags.size());
-  for (const Tag& tag : tags) {
+  for (const Stats::Tag& tag : tags) {
     tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
   }
   return "|#" + StringUtil::join(tag_strings, ",");
@@ -227,5 +229,7 @@ uint64_t TcpStatsdSink::TlsSink::usedBuffer() {
 }
 
 } // namespace Statsd
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

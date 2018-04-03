@@ -1,9 +1,5 @@
 #pragma once
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
@@ -13,7 +9,9 @@
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 namespace Statsd {
 
 /**
@@ -37,7 +35,7 @@ private:
 /**
  * Implementation of Sink that writes to a UDP statsd address.
  */
-class UdpStatsdSink : public Sink {
+class UdpStatsdSink : public Stats::Sink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag);
@@ -51,18 +49,18 @@ public:
 
   // Stats::Sink
   void beginFlush() override {}
-  void flushCounter(const Counter& counter, uint64_t delta) override;
-  void flushGauge(const Gauge& gauge, uint64_t value) override;
+  void flushCounter(const Stats::Counter& counter, uint64_t delta) override;
+  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
   void endFlush() override {}
-  void onHistogramComplete(const Histogram& histogram, uint64_t value) override;
+  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
 
 private:
-  const std::string getName(const Metric& metric);
-  const std::string buildTagStr(const std::vector<Tag>& tags);
+  const std::string getName(const Stats::Metric& metric);
+  const std::string buildTagStr(const std::vector<Stats::Tag>& tags);
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
@@ -72,7 +70,7 @@ private:
 /**
  * Per thread implementation of a TCP stats flusher for statsd.
  */
-class TcpStatsdSink : public Sink {
+class TcpStatsdSink : public Stats::Sink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
@@ -81,17 +79,17 @@ public:
   // Stats::Sink
   void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
 
-  void flushCounter(const Counter& counter, uint64_t delta) override {
+  void flushCounter(const Stats::Counter& counter, uint64_t delta) override {
     tls_->getTyped<TlsSink>().flushCounter(counter.name(), delta);
   }
 
-  void flushGauge(const Gauge& gauge, uint64_t value) override {
+  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override {
     tls_->getTyped<TlsSink>().flushGauge(gauge.name(), value);
   }
 
   void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 
-  void onHistogramComplete(const Histogram& histogram, uint64_t value) override {
+  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers.
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
                                                  std::chrono::milliseconds(value));
@@ -141,5 +139,7 @@ private:
 };
 
 } // namespace Statsd
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy
