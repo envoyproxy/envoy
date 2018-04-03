@@ -5,12 +5,12 @@
 #include "common/access_log/access_log_impl.h"
 #include "common/config/filter_json.h"
 #include "common/config/well_known_names.h"
-#include "common/dynamo/dynamo_filter.h"
 #include "common/protobuf/utility.h"
 
 #include "server/config/access_log/file_access_log.h"
 #include "server/config/network/http_connection_manager.h"
 
+#include "extensions/filters/http/dynamo/dynamo_filter.h"
 #include "extensions/filters/network/client_ssl_auth/config.h"
 #include "extensions/filters/network/ext_authz/config.h"
 #include "extensions/filters/network/mongo_proxy/config.h"

@@ -11,19 +11,18 @@
 #include "common/router/router.h"
 
 #include "server/config/http/buffer.h"
-#include "server/config/http/dynamo.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_json_transcoder.h"
 #include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
-#include "server/config/http/lua.h"
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
 #include "server/config/http/zipkin_http_tracer.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
 
+#include "extensions/filters/http/lua/config.h"
 #include "extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -53,7 +52,7 @@ TEST(HttpFilterConfigTest, ValidateFail) {
   fault_proto.mutable_abort();
   GrpcJsonTranscoderFilterConfig grpc_json_transcoder_factory;
   envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder grpc_json_transcoder_proto;
-  LuaFilterConfig lua_factory;
+  Extensions::HttpFilters::Lua::LuaFilterConfig lua_factory;
   envoy::config::filter::http::lua::v2::Lua lua_proto;
   Extensions::HttpFilters::RateLimitFilter::RateLimitFilterConfig rate_limit_factory;
   envoy::config::filter::http::rate_limit::v2::RateLimit rate_limit_proto;
@@ -129,21 +128,6 @@ TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
   HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, DynamoFilter) {
-  std::string json_string = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  DynamoFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -255,22 +239,6 @@ TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
   NiceMock<MockFactoryContext> context;
   HealthCheckFilterConfig factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
-}
-
-TEST(HttpFilterConfigTest, LuaFilterInJson) {
-  std::string json_string = R"EOF(
-  {
-    "inline_code" : "print(5)"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  LuaFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, RouterFilterInJson) {

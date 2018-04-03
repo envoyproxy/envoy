@@ -55,6 +55,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "eds_integration_test",
+    srcs = ["eds_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/config:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
 # TODO(mattklein123): This test uses extensions mixed in, so we just register all extensions.
 # This will go away when we delete v1 configuration.
 envoy_cc_test(
@@ -140,19 +151,9 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/dynamo:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "lua_integration_test",
-    srcs = [
-        "lua_integration_test.cc",
-    ],
-    deps = [
-        ":http_integration_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -266,6 +267,7 @@ envoy_cc_test_library(
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
     deps = [
+        ":server_stats_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -307,14 +309,12 @@ envoy_cc_test_library(
         "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
-        "//source/server/config/http:dynamo_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
         "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:lightstep_lib",
-        "//source/server/config/http:lua_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/http:zipkin_lib",
         "//source/server/config/network:http_connection_manager_lib",
@@ -346,6 +346,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/server/config/stats:statsd_lib",
         "//test/test_common:utility_lib",
     ],
@@ -396,6 +397,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/config:resources_lib",
+        "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
@@ -444,6 +446,12 @@ envoy_cc_test(
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "server_stats_interface",
+    hdrs = ["server_stats.h"],
+    deps = ["//include/envoy/stats:stats_interface"],
 )
 
 envoy_cc_test(

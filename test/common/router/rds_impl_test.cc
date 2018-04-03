@@ -408,7 +408,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
       MessageUtil::downcastAndValidate<const envoy::admin::v2::RouteConfigDump&>(*message_ptr);
   EXPECT_EQ(0, route_config_dump.static_route_configs_size());
   EXPECT_EQ(1, route_config_dump.dynamic_route_configs_size());
-  EXPECT_TRUE(ProtobufUtil::MessageDifferencer::Equivalent(
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(
       provider_->configAsProto(), route_config_dump.dynamic_route_configs(0)));
 }
 
