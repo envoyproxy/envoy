@@ -258,7 +258,6 @@ public:
    * the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
-
 };
 
 } // namespace RequestInfo
