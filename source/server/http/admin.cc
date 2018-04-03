@@ -285,7 +285,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message);
-    Protobuf::Any any_message;
+    ProtobufWkt::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;
   }

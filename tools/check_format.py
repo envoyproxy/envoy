@@ -27,6 +27,25 @@ SUBDIR_SET = set(common.includeDirOrder())
 INCLUDE_ANGLE = "#include <"
 INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
 
+PROTOBUF_TYPE_ERRORS = {
+    # Well-known types should be referenced from the ProtobufWkt namespace.
+    "Protobuf::Any":                    "ProtobufWkt::Any",
+    "Protobuf::Empty":                  "ProtobufWkt::Empty",
+    "Protobuf::ListValue":              "ProtobufWkt:ListValue",
+    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
+    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
+    "Protobuf::Struct":                 "ProtobufWkt::Struct",
+    "Protobuf::Value":                  "ProtobufWkt::Value",
+
+    # Maps including strings should use the protobuf string types.
+    "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
+
+    # Other common mis-namespacing of protobuf types.
+    "ProtobufWkt::Map":                 "Protobuf::Map",
+    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
+    "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
+}
+
 found_error = False
 
 
@@ -113,10 +132,15 @@ def fixFileContents(file_path):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
     line = line.replace('.  ', '. ')
+
     if hasInvalidAngleBracketDirectory(line):
       line = line.replace('<', '"').replace(">", '"')
-    sys.stdout.write("%s" % line)
 
+    # Fix incorrect protobuf namespace references.
+    for error, replacement in PROTOBUF_TYPE_ERRORS.items():
+      line = line.replace(error, replacement)
+
+    sys.stdout.write(str(line))
 
 def checkFilePath(file_path):
   if isBuildFile(file_path):
