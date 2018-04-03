@@ -205,7 +205,7 @@ public:
 typedef ConstSingleton<MetadataFilterValues> MetadataFilters;
 
 /**
- * Keys for MetadataFilterConstants::ENVOY_LB metadata.
+ * Keys for MetadataFilterValues::ENVOY_LB metadata.
  */
 class MetadataEnvoyLbKeyValues {
 public:
