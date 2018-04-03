@@ -106,12 +106,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
 
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<HttpTracerFactory>(type);
-  if (factory.requiresClusterName() && server.localInfo().clusterName().empty()) {
-    throw EnvoyException(fmt::format("cluster name must be defined for the tracing driver {}. See "
-                                     "--service-cluster option.",
-                                     type));
-  }
-  http_tracer_ = factory.createHttpTracer(*driver_config, server, *cluster_manager_);
+  http_tracer_ = factory.createHttpTracer(*driver_config, server);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
