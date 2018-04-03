@@ -250,10 +250,29 @@ std::string StringUtil::escape(const std::string& source) {
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
 
-  return fmt::format(
-      "{}.{:03d}Z", date_format.fromTime(time),
+  struct CachedTime {
+    CachedTime() : initialized(false) {}
+    std::chrono::time_point<std::chrono::system_clock> time_in_seconds;
+    std::string formatted_time;
+    bool initialized;
+  };
+  static thread_local CachedTime cached_time;
+
+  auto millis = fmt::format(
+      ".{:03d}Z",
       std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count() %
           1000);
+
+  std::chrono::time_point<std::chrono::system_clock> time_in_seconds =
+      std::chrono::time_point_cast<std::chrono::seconds>(time);
+  if (cached_time.initialized && cached_time.time_in_seconds == time_in_seconds) {
+    return cached_time.formatted_time + millis;
+  }
+  auto formatted_time = date_format.fromTime(time);
+  cached_time.time_in_seconds = time_in_seconds;
+  cached_time.formatted_time = formatted_time;
+  cached_time.initialized = true;
+  return formatted_time + millis;
 }
 
 bool StringUtil::endsWith(const std::string& source, const std::string& end) {
