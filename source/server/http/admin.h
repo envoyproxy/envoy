@@ -46,7 +46,7 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(absl::string_view path_and_query, AdminFilter* admin_filter,
+  Http::Code runCallback(absl::string_view path_and_query, AdminFilter& admin_filter,
                          Http::HeaderMap& response_headers, Buffer::Instance& response);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
