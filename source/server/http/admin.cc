@@ -403,12 +403,12 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   }
 
   for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
-    const HistogramStatistics& hist_interval_stats = histogram->intervalStatistics();
-    const HistogramStatistics& hist_cumulative_stats =
-        histogram->intervalStatistics() all_histograms.emplace(
-            histogram->name(),
-            fmt::format("\n \t Interval:   {} \n \t Cumulative: {}", hist_interval_stats.summary(),
-                        hist_cumulative_stats.summary()));
+    const Stats::HistogramStatistics& hist_interval_stats = histogram->intervalStatistics();
+    const Stats::HistogramStatistics& hist_cumulative_stats = histogram->cumulativeStatistics();
+    all_histograms.emplace(histogram->name(),
+                           fmt::format("\n \t Interval:   {} \n \t Cumulative: {}",
+                                       hist_interval_stats.summary(),
+                                       hist_cumulative_stats.summary()));
   }
 
   if (params.size() == 0) {
