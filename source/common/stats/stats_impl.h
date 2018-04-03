@@ -386,7 +386,10 @@ class HistogramImpl : public Histogram, public MetricImpl {
 public:
   HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                 std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+    cumulative_statistics_.reset(new HistogramStatisticsImpl());
+    interval_statistics_.reset(new HistogramStatisticsImpl());
+  }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -395,15 +398,17 @@ public:
 
   bool used() const override { return true; }
 
-  const HistogramStatistics& intervalStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
-  }
+  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
+    return *cumulative_statistics_;
   }
 
   Store& parent_;
+
+private:
+  std::shared_ptr<HistogramStatistics> interval_statistics_;
+  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
 };
 
 /**

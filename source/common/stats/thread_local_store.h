@@ -27,6 +27,8 @@ public:
         current_active_(0), flags_(0) {
     histograms_[0] = hist_alloc();
     histograms_[1] = hist_alloc();
+    cumulative_statistics_.reset(new HistogramStatisticsImpl());
+    interval_statistics_.reset(new HistogramStatisticsImpl());
   }
 
   ~ThreadLocalHistogramImpl() {
@@ -47,12 +49,10 @@ public:
 
   bool used() const override { return flags_ & Flags::Used; }
 
-  const HistogramStatistics& intervalStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
-  }
+  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
+    return *cumulative_statistics_;
   }
 
   void merge(histogram_t* target) {
@@ -69,6 +69,8 @@ private:
   int current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
+  std::shared_ptr<HistogramStatistics> interval_statistics_;
+  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 
