@@ -23,7 +23,9 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
                                                   onInotifyEvent();
                                                 },
                                                 Event::FileTriggerType::Edge,
-                                                Event::FileReadyType::Read)) {}
+                                                Event::FileReadyType::Read)) {
+  RELEASE_ASSERT(inotify_fd_ >= 0);
+}
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 

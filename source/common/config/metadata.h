@@ -5,7 +5,6 @@
 #include "envoy/api/v2/core/base.pb.h"
 
 #include "common/protobuf/protobuf.h"
-#include "common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Config {
