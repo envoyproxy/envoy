@@ -22,10 +22,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-
-extern "C" {
 #include "circllhist.h"
-}
 
 namespace Envoy {
 namespace Stats {
