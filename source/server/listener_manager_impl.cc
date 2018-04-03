@@ -115,8 +115,8 @@ public:
       : Network::SocketOptionImpl(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{}),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, accept_tcp_fast_open, absl::optional<bool>{})) {
-  }
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_fast_open_queue_length,
+                                            absl::optional<uint32_t>{})) {}
 };
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,

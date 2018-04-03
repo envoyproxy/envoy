@@ -37,8 +37,8 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
   }
 
   if (state == Socket::SocketState::Listening) {
-    if (accept_tcp_fast_open_.has_value()) {
-      const int tfo_value = accept_tcp_fast_open_.value() ? ENVOY_TCP_FASTOPEN_BACKLOG : 0;
+    if (tcp_fast_open_queue_length_.has_value()) {
+      const int tfo_value = tcp_fast_open_queue_length_.value();
       const SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
       int error = -1;
       if (option_name) {

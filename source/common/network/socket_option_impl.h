@@ -47,22 +47,12 @@ typedef absl::optional<int> SocketOptionName;
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
-// On macOS the socket MUST be listening already for TCP_FASTOPEN to be set and backlog MUST be 1
-// (the actual value is set via the net.inet.tcp.fastopen_backlog kernel parameter.
-// For Linux we default to 128, which libevent is using in
-// https://github.com/libevent/libevent/blob/release-2.1.8-stable/listener.c#L176
-#if defined(__APPLE__)
-#define ENVOY_TCP_FASTOPEN_BACKLOG 1
-#else
-#define ENVOY_TCP_FASTOPEN_BACKLOG 128
-#endif
-
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(absl::optional<bool> transparent, absl::optional<bool> freebind,
-                   absl::optional<bool> accept_tcp_fast_open)
+                   absl::optional<uint32_t> tcp_fast_open_queue_length)
       : transparent_(transparent), freebind_(freebind),
-        accept_tcp_fast_open_(accept_tcp_fast_open) {}
+        tcp_fast_open_queue_length_(tcp_fast_open_queue_length) {}
 
   // Socket::Option
   bool setOption(Socket& socket, Socket::SocketState state) const override;
@@ -90,7 +80,7 @@ public:
 private:
   const absl::optional<bool> transparent_;
   const absl::optional<bool> freebind_;
-  const absl::optional<bool> accept_tcp_fast_open_;
+  const absl::optional<uint32_t> tcp_fast_open_queue_length_;
 };
 
 } // namespace Network

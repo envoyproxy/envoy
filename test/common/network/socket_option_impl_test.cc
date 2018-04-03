@@ -89,7 +89,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
 
 // We fail to set the tcp-fastopen option when the underlying setsockopt syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionTcpFastopenFailure) {
-  SocketOptionImpl socket_option{{}, {}, true};
+  SocketOptionImpl socket_option{{}, {}, 1};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::Listening));
 }
 
@@ -109,8 +109,8 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessTrue) {
 
 // The happy path for setOption(); TCP_FASTOPEN is set to true.
 TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessTrue) {
-  SocketOptionImpl socket_option{{}, {}, true};
-  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 1,
+  SocketOptionImpl socket_option{{}, {}, 42};
+  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 42,
                              {Socket::SocketState::Listening});
 }
 
@@ -130,7 +130,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
 
 // The happy path for setOpion(); TCP_FASTOPEN is set to false.
 TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessFalse) {
-  SocketOptionImpl socket_option{{}, {}, false};
+  SocketOptionImpl socket_option{{}, {}, 0};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_TCP_FASTOPEN, 0,
                              {Socket::SocketState::Listening});
 }
