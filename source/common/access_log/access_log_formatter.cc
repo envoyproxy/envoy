@@ -7,8 +7,11 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/http/utility.h"
 #include "common/request_info/utility.h"
+
+using Envoy::Config::Metadata;
 
 namespace Envoy {
 namespace AccessLog {
@@ -109,12 +112,15 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   size_t separator_pos = name_data.find(separator);
 
   if (separator_pos == std::string::npos) {
+    // no separator -> main value is simply the whole data
     main = name_data;
   } else {
+    // seperator found -> extract main value and then sub values
     main = name_data.substr(0, separator_pos);
     do {
-      size_t next_separator_pos = name_data.find(separator, separator_pos + 1);
-      size_t end = next_separator_pos == std::string::npos ? name_data.size() : next_separator_pos;
+      const size_t next_separator_pos = name_data.find(separator, separator_pos + 1);
+      const size_t end =
+          next_separator_pos == std::string::npos ? name_data.size() : next_separator_pos;
       subs.push_back(name_data.substr(separator_pos + 1, end - separator_pos - 1));
       separator_pos = next_separator_pos;
     } while (separator_pos != std::string::npos);
@@ -129,7 +135,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
       if (!current_token.empty()) {
-        formatters.emplace_back(FormatterPtr{new PlainStringFormatter(current_token)});
+        formatters.emplace_back(new PlainStringFormatter(current_token));
         current_token = "";
       }
 
@@ -149,7 +155,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommandHeader(token, start, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
+            new RequestHeaderFormatter(main_header, alternative_header, max_length));
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
@@ -158,7 +164,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         parseCommandHeader(token, start, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length));
       } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -166,10 +172,9 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         const size_t start = DYNAMIC_META_TOKEN.size();
 
         parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(
-            FormatterPtr(new DynamicMetadataFormatter(filter_namespace, path, max_length)));
+        formatters.emplace_back(new DynamicMetadataFormatter(filter_namespace, path, max_length));
       } else {
-        formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
+        formatters.emplace_back(new RequestInfoFormatter(token));
       }
 
       pos = command_end_position;
@@ -179,7 +184,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   }
 
   if (!current_token.empty()) {
-    formatters.emplace_back(FormatterPtr{new PlainStringFormatter(current_token)});
+    formatters.emplace_back(new PlainStringFormatter(current_token));
   }
 
   return formatters;
@@ -285,7 +290,7 @@ std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::Hea
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
-                                 const absl::optional<size_t>& max_length)
+                                 absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
@@ -311,7 +316,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
-                                                 const absl::optional<size_t>& max_length)
+                                                 absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
@@ -322,7 +327,7 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
-                                               const absl::optional<size_t>& max_length)
+                                               absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
@@ -333,32 +338,23 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
-                                     const absl::optional<size_t>& max_length)
+                                     absl::optional<size_t> max_length)
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
 
 std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& metadata) const {
-  const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
-  if (filter_it == metadata.filter_metadata().end()) {
-    return UnspecifiedValueString;
-  }
-  const ProtobufWkt::Struct* dataStruct = &(filter_it->second);
-  const Protobuf::Message* data = dataStruct;
-  // go through path to select sub entries
-  for (const auto p : path_) {
-    if (nullptr == dataStruct) { // sub entry not found
+  const Protobuf::Message* data;
+  if (path_.empty()) {
+    const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
+    if (filter_it == metadata.filter_metadata().end()) {
       return UnspecifiedValueString;
     }
-    const auto entry_it = dataStruct->fields().find(p);
-    if (entry_it == dataStruct->fields().end()) {
+    data = &(filter_it->second);
+  } else {
+    const ProtobufWkt::Value& val = Metadata::metadataValue(metadata, filter_namespace_, path_);
+    if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
       return UnspecifiedValueString;
     }
-    const Protobuf::Value& val = entry_it->second;
     data = &val;
-    if (val.has_struct_value()) {
-      dataStruct = &(val.struct_value());
-    } else {
-      dataStruct = nullptr;
-    }
   }
   std::string json;
   Protobuf::util::MessageToJsonString(*data, &json);
@@ -368,9 +364,11 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
   return json;
 }
 
+// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
+// See: https://github.com/envoyproxy/envoy/pull/2895#pullrequestreview-108668292
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
-                                                   const absl::optional<size_t>& max_length)
+                                                   absl::optional<size_t> max_length)
     : MetadataFormatter(filter_namespace, path, max_length) {}
 
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,

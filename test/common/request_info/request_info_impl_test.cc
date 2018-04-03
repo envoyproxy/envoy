@@ -5,6 +5,7 @@
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
+#include "common/protobuf/utility.h"
 #include "common/request_info/request_info_impl.h"
 
 #include "test/mocks/router/mocks.h"
@@ -137,7 +138,8 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
 TEST(RequestInfoImplTest, DynamicMetadataTest) {
   RequestInfoImpl request_info(Http::Protocol::Http2);
   EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
-  request_info.setDynamicMetadata("com.test", "test_key", "test_value");
+  request_info.setDynamicMetadata("com.test",
+                                  MessageUtil::keyValueStruct("test_key", "test_value"));
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());

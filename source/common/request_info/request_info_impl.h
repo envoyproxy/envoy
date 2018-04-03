@@ -153,15 +153,6 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  void setDynamicMetadata(const std::string& name, const std::string& key,
-                          const std::string& value) override {
-    ProtobufWkt::Struct structObj;
-    ProtobufWkt::Value val;
-    val.set_string_value(value);
-    (*structObj.mutable_fields())[key] = val;
-    setDynamicMetadata(name, structObj);
-  };
-
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
 

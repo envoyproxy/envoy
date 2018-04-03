@@ -114,6 +114,14 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   MessageUtil::loadFromJson(json, dest);
 }
 
+ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
+  ProtobufWkt::Struct structObj;
+  ProtobufWkt::Value val;
+  val.set_string_value(value);
+  (*structObj.mutable_fields())[key] = val;
+  return structObj;
+}
+
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
   ProtobufWkt::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
