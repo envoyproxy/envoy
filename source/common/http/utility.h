@@ -14,6 +14,17 @@ namespace Envoy {
 namespace Http {
 
 /**
+ * Wrapper of an envoy::api::v2::core::HeaderValueOption's value and its append flag.
+ */
+struct HeaderValueWrapper {
+  HeaderValueWrapper(const std::string& value, bool append) : value_(value), append_(append) {}
+
+  const std::string value_;
+  const bool append_;
+};
+typedef std::unique_ptr<HeaderValueWrapper> HeaderValueWrapperPtr;
+
+/**
  * General HTTP utilities.
  */
 class Utility {
@@ -162,6 +173,25 @@ public:
    * @param data to append to the header.
    */
   static void appendToHeader(HeaderString& header, const std::string& data);
+
+  /**
+   * Configures list of header value options into a vector. The resulting configuration helps
+   * adding additional entries to an existing headers by honoring the append flag.
+   * @param headers_to_add the list of header value options to be added.
+   * @param headers destination vector of configured headers.
+   */
+  static void configureHeadersToAdd(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
+      std::vector<std::pair<LowerCaseString, HeaderValueWrapperPtr>>& headers);
+
+  /**
+   * Add additional header entries to a destination header map.
+   * @param headers_to_add the configured header value options to be added.
+   * @param headers destination headers.
+   */
+  static void addAdditionalHeaders(
+      std::vector<std::pair<LowerCaseString, HeaderValueWrapperPtr>>& headers_to_add,
+      HeaderMap& headers);
 };
 
 } // namespace Http

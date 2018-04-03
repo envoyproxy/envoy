@@ -20,6 +20,7 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
+#include "common/http/utility.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -226,14 +227,6 @@ private:
 
   typedef std::unique_ptr<HttpActiveHealthCheckSession> HttpActiveHealthCheckSessionPtr;
 
-  struct HeaderValueWrapper {
-    HeaderValueWrapper(const std::string& value, bool append) : value_(value), append_(append) {}
-
-    const std::string value_;
-    bool append_;
-  };
-  typedef std::unique_ptr<HeaderValueWrapper> HeaderValueWrapperPtr;
-
   virtual Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
 
   // HealthCheckerImplBase
@@ -244,7 +237,7 @@ private:
   const std::string path_;
   const std::string host_value_;
   absl::optional<std::string> service_name_;
-  std::vector<std::pair<Http::LowerCaseString, HeaderValueWrapperPtr>> headers_to_add_;
+  std::vector<std::pair<Http::LowerCaseString, Http::HeaderValueWrapperPtr>> headers_to_add_;
 };
 
 /**

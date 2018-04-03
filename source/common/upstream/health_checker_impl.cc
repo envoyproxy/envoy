@@ -21,7 +21,6 @@
 #include "common/http/codec_client.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
@@ -288,13 +287,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     service_name_ = config.http_health_check().service_name();
   }
 
-  for (const auto& header_entry_option : config.http_health_check().request_headers_to_add()) {
-    HeaderValueWrapperPtr header_value(
-        new HeaderValueWrapper(header_entry_option.header().value(),
-                               PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry_option, append, true)));
-    headers_to_add_.emplace_back(Http::LowerCaseString(header_entry_option.header().key()),
-                                 std::move(header_value));
-  }
+  Http::Utility::configureHeadersToAdd(config.http_health_check().request_headers_to_add(),
+                                       headers_to_add_);
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -347,13 +341,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
-  for (const auto& header_entry : parent_.headers_to_add_) {
-    if (header_entry.second->append_) {
-      request_headers.addReferenceKey(header_entry.first, header_entry.second->value_);
-    } else {
-      request_headers.setReferenceKey(header_entry.first, header_entry.second->value_);
-    }
-  }
+  Http::Utility::addAdditionalHeaders(parent_.headers_to_add_, request_headers);
 
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
