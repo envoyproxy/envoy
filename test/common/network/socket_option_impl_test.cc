@@ -26,19 +26,37 @@ public:
 
   void testSetSocketOptionSuccess(SocketOptionImpl& socket_option, int socket_level,
                                   Network::SocketOptionName option_name, int option_val,
-                                  Socket::SocketState when) {
-    if (option_name.has_value()) {
-      Address::Ipv4Instance address("1.2.3.4", 5678);
-      const int fd = address.socket(Address::SocketType::Stream);
-      EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
-      EXPECT_CALL(os_sys_calls_, setsockopt_(_, socket_level, option_name.value(), _, sizeof(int)))
-          .WillOnce(Invoke([option_val](int, int, int, const void* optval, socklen_t) -> int {
-            EXPECT_EQ(option_val, *static_cast<const int*>(optval));
-            return 0;
-          }));
-      EXPECT_TRUE(socket_option.setOption(socket_, when));
-    } else {
-      EXPECT_FALSE(socket_option.setOption(socket_, when));
+                                  const std::set<Socket::SocketState>& when) {
+    Address::Ipv4Instance address("1.2.3.4", 5678);
+    const int fd = address.socket(Address::SocketType::Stream);
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+
+    for (Socket::SocketState state : when) {
+      if (option_name.has_value()) {
+        EXPECT_CALL(os_sys_calls_,
+                    setsockopt_(_, socket_level, option_name.value(), _, sizeof(int)))
+            .WillOnce(Invoke([option_val](int, int, int, const void* optval, socklen_t) -> int {
+              EXPECT_EQ(option_val, *static_cast<const int*>(optval));
+              return 0;
+            }));
+        EXPECT_TRUE(socket_option.setOption(socket_, state));
+      } else {
+        EXPECT_FALSE(socket_option.setOption(socket_, state));
+      }
+    }
+
+    // The set of SocketState for which this option should not be set. Initialize to all
+    // the states, and remove states that are passed in.
+    std::list<Socket::SocketState> unset_socketstates{
+        Socket::SocketState::PreBind,
+        Socket::SocketState::PostBind,
+        Socket::SocketState::Listening,
+    };
+    unset_socketstates.remove_if(
+        [&](Socket::SocketState state) -> bool { return when.find(state) != when.end(); });
+    for (Socket::SocketState state : unset_socketstates) {
+      EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(0);
+      EXPECT_TRUE(socket_option.setOption(socket_, state));
     }
   }
 };
@@ -79,36 +97,42 @@ TEST_F(SocketOptionImplTest, SetOptionTcpFastopenFailure) {
 TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessTrue) {
   SocketOptionImpl socket_option{true, {}, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 1,
-                             Socket::SocketState::PreBind);
+                             {Socket::SocketState::PreBind, Socket::SocketState::PostBind});
 }
 
 // The happy path for setOption(); IP_FREEBIND is set to true.
 TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessTrue) {
   SocketOptionImpl socket_option{{}, true, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND, 1,
-                             Socket::SocketState::PreBind);
+                             {Socket::SocketState::PreBind});
+}
+
+// The happy path for setOption(); TCP_FASTOPEN is set to true.
+TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessTrue) {
+  SocketOptionImpl socket_option{{}, {}, true};
+  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 1,
+                             {Socket::SocketState::Listening});
 }
 
 // The happy path for setOpion(); IP_TRANSPARENT is set to false.
 TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessFalse) {
   SocketOptionImpl socket_option{false, {}, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                             Socket::SocketState::PreBind);
-  testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 0,
-                             Socket::SocketState::PostBind);
+                             {Socket::SocketState::PreBind, Socket::SocketState::PostBind});
 }
 
 // The happy path for setOpion(); IP_FREEBIND is set to false.
 TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
   SocketOptionImpl socket_option{{}, false, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND, 0,
-                             Socket::SocketState::PreBind);
+                             {Socket::SocketState::PreBind});
 }
 
-// Freebind settings have no effect on post-bind behavior.
-TEST_F(SocketOptionImplTest, SetOptionFreebindPostBind) {
-  SocketOptionImpl socket_option{{}, true, {}};
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
+// The happy path for setOpion(); TCP_FASTOPEN is set to false.
+TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessFalse) {
+  SocketOptionImpl socket_option{{}, {}, false};
+  testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_TCP_FASTOPEN, 0,
+                             {Socket::SocketState::Listening});
 }
 
 // If a platform doesn't suppport IPv4 socket option variant for an IPv4 address, we fail
