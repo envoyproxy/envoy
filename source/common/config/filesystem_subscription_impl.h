@@ -33,10 +33,17 @@ public:
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
     callbacks_ = &callbacks;
-    watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
-      UNREFERENCED_PARAMETER(events);
-      refresh();
-    });
+    try {
+      watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
+        UNREFERENCED_PARAMETER(events);
+        refresh();
+      });
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn,
+                "Unable to set filesystem watch on {}. This path will not be watched for updates.",
+                path_);
+      return;
+    }
     // Attempt to read in case there is a file there already.
     refresh();
   }

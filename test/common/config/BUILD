@@ -14,6 +14,7 @@ envoy_cc_test(
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [
         ":filesystem_subscription_test_harness",
+        "//test/test_common:logging_lib",
     ],
 )
 
