@@ -304,6 +304,10 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       } else {
         ENVOY_LOG(debug, "{}", message);
       }
+
+      // Add the options to the socket_ so that SocketState::Listening options can be
+      // set in the worker after listen()/evconnlistener_new() is called.
+      socket_->addOption(option);
     }
   }
 }

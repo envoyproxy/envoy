@@ -40,18 +40,18 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
     if (tcp_fast_open_queue_length_.has_value()) {
       const int tfo_value = tcp_fast_open_queue_length_.value();
       const SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
-      int error = -1;
       if (option_name) {
-        error = Api::OsSysCallsSingleton::get().setsockopt(
+        const int error = Api::OsSysCallsSingleton::get().setsockopt(
             socket.fd(), IPPROTO_TCP, option_name.value(),
             reinterpret_cast<const void*>(&tfo_value), sizeof(tfo_value));
+        if (error != 0) {
+          ENVOY_LOG(warn, "Setting TCP_FASTOPEN on listener socket failed: {}", strerror(errno));
+          return false;
+        } else {
+          ENVOY_LOG(debug, "Successfully set socket option TCP_FASTOPEN to {}", tfo_value);
+        }
       } else {
-        error = ENOTSUP;
-      }
-
-      if (error != 0) {
-        ENVOY_LOG(warn, "Setting IP_TCP_FASTOPEN on listener socket failed: {}", strerror(error));
-        return false;
+        ENVOY_LOG(warn, "Unsupported socket option TCP_FASTOPEN");
       }
     }
   }

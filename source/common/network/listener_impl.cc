@@ -1,6 +1,5 @@
 #include "common/network/listener_impl.h"
 
-#include <netinet/tcp.h>
 #include <sys/un.h>
 
 #include "envoy/common/exception.h"

@@ -89,8 +89,12 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
 
 // We fail to set the tcp-fastopen option when the underlying setsockopt syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionTcpFastopenFailure) {
-  SocketOptionImpl socket_option{{}, {}, 1};
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::Listening));
+  if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
+    SocketOptionImpl socket_option{{}, {}, 1};
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN.value(), _, _))
+        .WillOnce(Return(-1));
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::Listening));
+  }
 }
 
 // The happy path for setOption(); IP_TRANSPARENT is set to true.
