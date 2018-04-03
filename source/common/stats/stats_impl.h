@@ -159,12 +159,6 @@ public:
   // translations later.
   static std::string sanitizeStatsName(const std::string& name);
 };
-/**
- * Flags used by all stats types to figure out whether they have been used.
- */
-struct Flags {
-  static const uint8_t Used = 0x1;
-};
 
 /**
  * This structure is the backing memory for both CounterImpl and GaugeImpl. It is designed so that
@@ -281,6 +275,13 @@ private:
  */
 class MetricImpl : public virtual Metric {
 public:
+  /**
+   * Flags used by all stats types to figure out whether they have been used.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x1;
+  };
+
   MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
@@ -404,128 +405,6 @@ public:
 
   Store& parent_;
 };
-
-/**
- * Log Linear Histogram implementation per thread.
- */
-class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
-public:
-  ThreadLocalHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
-    histograms_[0] = hist_alloc();
-    histograms_[1] = hist_alloc();
-    current_active_ = 0;
-    flags_ = 0;
-  }
-
-  ~ThreadLocalHistogramImpl() {
-    hist_free(histograms_[0]);
-    hist_free(histograms_[1]);
-  }
-  // Stats::Histogram
-  void recordValue(uint64_t value) override {
-    hist_insert_intscale(histograms_[current_active_], value, 0, 1);
-    parent_.deliverHistogramToSinks(*this, value);
-    flags_ |= Flags::Used;
-  }
-
-  void beginMerge() { current_active_ = 1 - current_active_; }
-
-  void merge() override {}
-
-  bool used() const override { return flags_ & Flags::Used; }
-
-  const HistogramStatistics& intervalStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
-  }
-
-  const HistogramStatistics& cumulativeStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>();
-  }
-
-  void merge(histogram_t* target) {
-    histogram_t* hist_array[1];
-    hist_array[0] = histograms_[1 - current_active_];
-    hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
-    hist_clear(hist_array[0]);
-  }
-
-  Store& parent_;
-  int current_active_;
-  histogram_t* histograms_[2];
-  std::atomic<uint16_t> flags_;
-};
-
-typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
-
-/**
- * Log Linear Histogram implementation that is stored in the main thread.
- */
-class HistogramParentImpl : public Histogram, public MetricImpl {
-public:
-  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                      std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
-    interval_histogram_ = hist_alloc();
-    cumulative_histogram_ = hist_alloc();
-  }
-
-  ~HistogramParentImpl() {
-    hist_free(interval_histogram_);
-    hist_free(cumulative_histogram_);
-  }
-
-  // Stats::Histogram
-  void recordValue(uint64_t) override {}
-
-  bool used() const override {
-    bool any_tls_used = false;
-    for (auto tls_histogram : tls_histograms_) {
-      if (tls_histogram->used()) {
-        any_tls_used = true;
-        break;
-      }
-    }
-    return any_tls_used;
-  }
-
-  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
-
-  /**
-   * This method is called during the main stats flush process for each of the histogram. This
-   * method iterates through the Tls histograms and collects the histogram data of all of them
-   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
-   * "cumulative_histogram". More details about threading model at
-   * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
-   */
-  void merge() override {
-    if (used()) {
-      hist_clear(interval_histogram_);
-      for (auto tls_histogram : tls_histograms_) {
-        tls_histogram->merge(interval_histogram_);
-      }
-      histogram_t* hist_array[1];
-      hist_array[0] = interval_histogram_;
-      hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
-    }
-  }
-
-  const HistogramStatistics& intervalStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>(interval_histogram_);
-  }
-
-  const HistogramStatistics& cumulativeStatistics() const override {
-    return *std::make_shared<HistogramStatisticsImpl>(cumulative_histogram_);
-  }
-
-  Store& parent_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_;
-  histogram_t* interval_histogram_;
-  histogram_t* cumulative_histogram_;
-};
-
-typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;
 
 /**
  * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns

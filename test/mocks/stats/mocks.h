@@ -71,13 +71,14 @@ public:
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(used, bool());
-  MOCK_CONST_METHOD0(cumulativeStatistics, HistogramStatistics());
-  MOCK_CONST_METHOD0(intervalStatistics, HistogramStatistics());
+  MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
+  MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
 
   std::string name_;
   std::vector<Tag> tags_;
   Store* store_;
-  HistogramStatistics histogram_stats_;
+  std::shared_ptr<HistogramStatistics> histogram_stats_ =
+      std::make_shared<HistogramStatisticsImpl>();
 };
 
 class MockSink : public Sink {

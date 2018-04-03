@@ -17,6 +17,136 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Log Linear Histogram implementation per thread.
+ */
+class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+public:
+  ThreadLocalHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+        current_active_(0), flags_(0) {
+    histograms_[0] = hist_alloc();
+    histograms_[1] = hist_alloc();
+  }
+
+  ~ThreadLocalHistogramImpl() {
+    hist_free(histograms_[0]);
+    hist_free(histograms_[1]);
+  }
+  // Stats::Histogram
+  void recordValue(uint64_t value) override {
+    std::unique_lock<std::mutex> lock(merge_lock_);
+    hist_insert_intscale(histograms_[current_active_], value, 0, 1);
+    parent_.deliverHistogramToSinks(*this, value);
+    flags_ |= Flags::Used;
+  }
+
+  void beginMerge() { current_active_ = 1 - current_active_; }
+
+  void merge() override {}
+
+  bool used() const override { return flags_ & Flags::Used; }
+
+  const HistogramStatistics& intervalStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
+
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>();
+  }
+
+  void merge(histogram_t* target) {
+    std::unique_lock<std::mutex> lock(merge_lock_);
+    histogram_t* hist_array[1];
+    hist_array[0] = histograms_[1 - current_active_];
+    hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
+    hist_clear(hist_array[0]);
+  }
+
+  Store& parent_;
+
+private:
+  int current_active_;
+  histogram_t* histograms_[2];
+  std::atomic<uint16_t> flags_;
+  mutable std::mutex merge_lock_;
+};
+
+typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
+
+/**
+ * Log Linear Histogram implementation that is stored in the main thread.
+ */
+class HistogramParentImpl : public Histogram, public MetricImpl {
+public:
+  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                      std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+    interval_histogram_ = hist_alloc();
+    cumulative_histogram_ = hist_alloc();
+  }
+
+  ~HistogramParentImpl() {
+    hist_free(interval_histogram_);
+    hist_free(cumulative_histogram_);
+  }
+
+  // Stats::Histogram
+  void recordValue(uint64_t) override {}
+
+  bool used() const override {
+    bool any_tls_used = false;
+    for (auto tls_histogram : tls_histograms_) {
+      if (tls_histogram->used()) {
+        any_tls_used = true;
+        break;
+      }
+    }
+    return any_tls_used;
+  }
+
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
+
+  /**
+   * This method is called during the main stats flush process for each of the histogram. This
+   * method iterates through the Tls histograms and collects the histogram data of all of them
+   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
+   * "cumulative_histogram". More details about threading model at
+   * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
+   */
+  void merge() override {
+    if (used()) {
+      std::unique_lock<std::mutex> lock(merge_lock_);
+      hist_clear(interval_histogram_);
+      for (auto tls_histogram : tls_histograms_) {
+        tls_histogram->merge(interval_histogram_);
+      }
+      histogram_t* hist_array[1];
+      hist_array[0] = interval_histogram_;
+      hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
+    }
+  }
+
+  const HistogramStatistics& intervalStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>(interval_histogram_);
+  }
+
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return *std::make_shared<HistogramStatisticsImpl>(cumulative_histogram_);
+  }
+
+  Store& parent_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_;
+
+private:
+  histogram_t* interval_histogram_;
+  histogram_t* cumulative_histogram_;
+  mutable std::mutex merge_lock_;
+};
+
+typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;
+
+/**
  * Store implementation with thread local caching. This implementation supports the following
  * features:
  * - Thread local per scope stat caching.
@@ -128,7 +258,6 @@ private:
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable std::mutex lock_;
-  mutable std::mutex merge_lock_;
   std::unordered_set<ScopeImpl*> scopes_;
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
@@ -137,6 +266,5 @@ private:
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
 };
-
 } // namespace Stats
 } // namespace Envoy

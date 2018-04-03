@@ -93,7 +93,6 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 
 void ThreadLocalStoreImpl::mergeHistograms() {
   if (!shutting_down_) {
-    std::unique_lock<std::mutex> lock(merge_lock_);
     tls_->runOnAllThreadsWithBarrier(
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
@@ -107,7 +106,6 @@ void ThreadLocalStoreImpl::mergeHistograms() {
 }
 
 void ThreadLocalStoreImpl::mergeInternal() {
-  std::unique_lock<std::mutex> lock(merge_lock_);
   if (!shutting_down_) {
     for (auto histogram : histograms()) {
       histogram->merge();
