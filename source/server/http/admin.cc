@@ -38,6 +38,8 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "extensions/access_loggers/file/file_access_log_impl.h"
+
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 
@@ -731,7 +733,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     }
   }
 
-  access_logs_.emplace_back(new AccessLog::FileAccessLog(
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
 }
