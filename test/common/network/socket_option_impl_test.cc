@@ -118,14 +118,14 @@ TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessTrue) {
                              {Socket::SocketState::Listening});
 }
 
-// The happy path for setOpion(); IP_TRANSPARENT is set to false.
+// The happy path for setOption(); IP_TRANSPARENT is set to false.
 TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessFalse) {
   SocketOptionImpl socket_option{false, {}, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 0,
                              {Socket::SocketState::PreBind, Socket::SocketState::PostBind});
 }
 
-// The happy path for setOpion(); IP_FREEBIND is set to false.
+// The happy path for setOption(); IP_FREEBIND is set to false.
 TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
   SocketOptionImpl socket_option{{}, false, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND, 0,
