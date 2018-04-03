@@ -215,9 +215,11 @@ def fixFilePath(file_path):
   if file_path.endswith(DOCS_SUFFIX):
     return []
 
-  error_messages = (checkNamespace(file_path) or
-                    checkProtobufExternalDepsBuild(file_path) or
-                    checkProtobufExternalDeps(file_path))
+  error_messages = checkNamespace(file_path)
+  if error_messages == []:
+    error_messages = checkProtobufExternalDepsBuild(file_path)
+  if error_messages == []:
+    error_messages = checkProtobufExternalDeps(file_path)
   if error_messages:
     return error_messages + ["This cannot be automatically corrected. Please fix by hand."]
 
@@ -252,6 +254,18 @@ def checkFormatReturnTraceOnError(file_path):
     return traceback.format_exc().split("\n")
 
 def checkFormatVisitor(arg, dir_name, names):
+  """Run checkFormat in parallel for the given files.
+
+  Args:
+    arg: a tuple (pool, result_list) for starting tasks asynchronously.
+    dir_name: the parent directory of the given files.
+    names: a list of file names.
+  """
+
+  # Unpack the multiprocessing.Pool process pool and list of results. Since
+  # python lists are passed as references, this is used to collect the list of
+  # async results (futures) from running checkFormat and passing them back to
+  # the caller.
   pool, result_list = arg
   for file_name in names:
     result = pool.apply_async(checkFormatReturnTraceOnError, args=(dir_name + "/" + file_name,))
@@ -264,6 +278,8 @@ if __name__ == "__main__":
   parser.add_argument('target_path', type=str, nargs="?", default=".", help="specify the root directory"
                                                                             " for the script to recurse over. Default '.'.")
   parser.add_argument('--add-excluded-prefixes', type=str, nargs="+", help="exclude additional prefixes.")
+  parser.add_argument('-j', '--num-workers', type=int, default=multiprocessing.cpu_count(),
+                      help="number of worker processes to use; defaults to one per core.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
@@ -274,9 +290,14 @@ if __name__ == "__main__":
   if os.path.isfile(target_path):
     error_messages = checkFormat("./" + target_path)
   else:
-    pool = multiprocessing.Pool()
+    pool = multiprocessing.Pool(processes=args.num_workers)
     results = []
-    os.path.walk(target_path, checkFormatVisitor, [pool, results])
+    # For each file in target_path, start a new task in the pool and collect the
+    # results (results is passed by reference, and is used as an output).
+    os.path.walk(target_path, checkFormatVisitor, (pool, results))
+
+    # Close the pool to new tasks, wait for all of the running tasks to finish,
+    # then collect the error messages.
     pool.close()
     pool.join()
     error_messages = sum((r.get() for r in results), [])
