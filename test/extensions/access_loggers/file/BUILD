@@ -12,8 +12,7 @@ envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     deps = [
-        "//source/common/access_log:grpc_access_log_lib",
-        "//source/server/config/access_log:grpc_access_log_lib",
+        "//source/extensions/access_loggers/file:config",
         "//test/mocks/server:server_mocks",
     ],
 )

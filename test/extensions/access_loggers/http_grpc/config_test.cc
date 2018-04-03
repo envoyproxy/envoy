@@ -1,8 +1,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/access_log/grpc_access_log_impl.h"
 #include "common/config/well_known_names.h"
+
+#include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -14,14 +15,16 @@ using testing::Return;
 using testing::_;
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
+namespace Extensions {
+namespace AccessLoggers {
+namespace HttpGrpc {
 
 class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
   void SetUp() override {
-    factory_ = Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(
-        Config::AccessLogNames::get().HTTP_GRPC);
+    factory_ =
+        Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
+            Config::AccessLogNames::get().HTTP_GRPC);
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();
@@ -42,7 +45,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::config::accesslog::v2::HttpGrpcAccessLogConfig http_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
-  AccessLogInstanceFactory* factory_{};
+  Server::Configuration::AccessLogInstanceFactory* factory_{};
 };
 
 // Normal OK configuration.
@@ -50,9 +53,10 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   AccessLog::InstanceSharedPtr instance =
       factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
   EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<AccessLog::HttpGrpcAccessLog*>(instance.get()));
+  EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
 }
 
-} // namespace Configuration
-} // namespace Server
+} // namespace HttpGrpc
+} // namespace AccessLoggers
+} // namespace Extensions
 } // namespace Envoy

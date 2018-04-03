@@ -13,7 +13,9 @@
 #include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
-namespace AccessLog {
+namespace Extensions {
+namespace AccessLoggers {
+namespace HttpGrpc {
 
 // TODO(mattklein123): Stats
 
@@ -108,9 +110,9 @@ private:
 /**
  * Access log Instance that streams HTTP logs over gRPC.
  */
-class HttpGrpcAccessLog : public Instance {
+class HttpGrpcAccessLog : public AccessLog::Instance {
 public:
-  HttpGrpcAccessLog(FilterPtr&& filter,
+  HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
                     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer);
 
@@ -123,10 +125,12 @@ public:
            const RequestInfo::RequestInfo& request_info) override;
 
 private:
-  FilterPtr filter_;
+  AccessLog::FilterPtr filter_;
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
 };
 
-} // namespace AccessLog
+} // namespace HttpGrpc
+} // namespace AccessLoggers
+} // namespace Extensions
 } // namespace Envoy

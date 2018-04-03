@@ -16,18 +16,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "access_log_integration_test",
-    srcs = ["access_log_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "ads_integration_test",
     srcs = ["ads_integration_test.cc"],
     data = [
@@ -305,8 +293,6 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/access_log:file_access_log_lib",
-        "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
@@ -473,6 +459,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",

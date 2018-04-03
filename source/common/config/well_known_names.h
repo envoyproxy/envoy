@@ -48,6 +48,8 @@ private:
 
 /**
  * Well-known listener filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.listener.name.
  */
 class ListenerFilterNameValues {
 public:
@@ -62,6 +64,7 @@ typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
 /**
  * Well-known network filter names.
  * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.network.name.
  */
 class NetworkFilterNameValues {
 public:
@@ -105,6 +108,8 @@ typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
 
 /**
  * Well-known http filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.http.name.
  */
 class HttpFilterNameValues {
 public:
@@ -151,7 +156,7 @@ public:
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
 
 /**
- * Well-known access log names.
+ * Well-known HTTP tracer names.
  */
 class HttpTracerNameValues {
 public:
@@ -184,6 +189,8 @@ typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
 
 /**
  * Well-known access log names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.access_loggers.name.
  */
 class AccessLogNameValues {
 public:
