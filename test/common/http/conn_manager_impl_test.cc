@@ -22,6 +22,8 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/access_loggers/file/file_access_log_impl.h"
+
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
@@ -69,9 +71,10 @@ public:
 
   HttpConnectionManagerImplTest()
       : access_log_path_("dummy_path"),
-        access_logs_{AccessLog::InstanceSharedPtr{new AccessLog::FileAccessLog(
-            access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
-            log_manager_)}},
+        access_logs_{
+            AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
+                access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
+                log_manager_)}},
         codec_(new NiceMock<MockServerConnection>()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},

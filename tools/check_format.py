@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import common
 import fileinput
 import multiprocessing
 import os
@@ -24,6 +25,28 @@ ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
+SUBDIR_SET = set(common.includeDirOrder())
+INCLUDE_ANGLE = "#include <"
+INCLUDE_ANGLE_LEN = len(INCLUDE_ANGLE)
+
+PROTOBUF_TYPE_ERRORS = {
+    # Well-known types should be referenced from the ProtobufWkt namespace.
+    "Protobuf::Any":                    "ProtobufWkt::Any",
+    "Protobuf::Empty":                  "ProtobufWkt::Empty",
+    "Protobuf::ListValue":              "ProtobufWkt:ListValue",
+    "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
+    "Protobuf::StringValue":            "ProtobufWkt::StringValue",
+    "Protobuf::Struct":                 "ProtobufWkt::Struct",
+    "Protobuf::Value":                  "ProtobufWkt::Value",
+
+    # Maps including strings should use the protobuf string types.
+    "Protobuf::MapPair<std::string":    "Protobuf::MapPair<Envoy::ProtobufTypes::String",
+
+    # Other common mis-namespacing of protobuf types.
+    "ProtobufWkt::Map":                 "Protobuf::Map",
+    "ProtobufWkt::MapPair":             "Protobuf::MapPair",
+    "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
+}
 
 
 def checkNamespace(file_path):
@@ -43,7 +66,7 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
     if pattern in text:
-      error_messages = [error_message]
+      error_messages = [file_path + ': ' + error_message]
       for i, line in enumerate(text.splitlines()):
         if pattern in line:
           error_messages.append("  %s:%s" % (file_path, i + 1))
@@ -53,8 +76,8 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
 def checkProtobufExternalDepsBuild(file_path):
   if whitelistedForProtobufDeps(file_path):
     return []
-  message = ("%s has unexpected direct external dependency on protobuf, use "
-    "//source/common/protobuf instead." % file_path)
+  message = ("unexpected direct external dependency on protobuf, use "
+    "//source/common/protobuf instead.")
   return findSubstringAndReturnError('"protobuf"', file_path, message)
 
 
@@ -76,18 +99,43 @@ def isBuildFile(file_path):
     return True
   return False
 
+def hasInvalidAngleBracketDirectory(line):
+  if not line.startswith(INCLUDE_ANGLE):
+    return False
+  path = line[INCLUDE_ANGLE_LEN:]
+  slash = path.find("/")
+  if slash == -1:
+    return False
+  subdir = path[0:slash]
+  return subdir in SUBDIR_SET
+
+def formatLineError(path, zero_based_line_number, message):
+  return "%s:%d: %s" % (path, zero_based_line_number + 1, message)
 
 def checkFileContents(file_path):
-  message = "%s has over-enthusiastic spaces:" % file_path
-  return findSubstringAndReturnError('.  ', file_path, message)
-
+  error_messages = []
+  for line_number, line in enumerate(fileinput.input(file_path)):
+    if line.find(".  ") != -1:
+      error_messages.append(formatLineError(file_path, line_number, "over-enthusiastic spaces"))
+    if hasInvalidAngleBracketDirectory(line):
+      error_messages.append(formatLineError(file_path, line_number,
+                                            "envoy includes should not have angle brackets"))
+  return error_messages
 
 def fixFileContents(file_path):
   for line in fileinput.input(file_path, inplace=True):
     # Strip double space after '.'  This may prove overenthusiastic and need to
     # be restricted to comments and metadata files but works for now.
-    sys.stdout.write("%s" % (line.replace('.  ', '. ')))
+    line = line.replace('.  ', '. ')
 
+    if hasInvalidAngleBracketDirectory(line):
+      line = line.replace('<', '"').replace(">", '"')
+
+    # Fix incorrect protobuf namespace references.
+    for error, replacement in PROTOBUF_TYPE_ERRORS.items():
+      line = line.replace(error, replacement)
+
+    sys.stdout.write(str(line))
 
 def checkFilePath(file_path):
   error_messages = []

@@ -16,18 +16,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "access_log_integration_test",
-    srcs = ["access_log_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "ads_integration_test",
     srcs = ["ads_integration_test.cc"],
     data = [
@@ -305,8 +293,6 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/access_log:file_access_log_lib",
-        "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
@@ -320,7 +306,6 @@ envoy_cc_test_library(
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
-        "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -347,7 +332,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/dynamo:config",
-        "//source/server/config/stats:statsd_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -401,20 +385,6 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
-    ],
-)
-
-envoy_cc_test(
-    name = "metrics_service_integration_test",
-    srcs = ["metrics_service_integration_test.cc"],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
-        "//source/server/config/stats:metrics_service_lib",
-        "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )
 
@@ -489,6 +459,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",

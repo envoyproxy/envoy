@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
+        "//source/extensions/access_loggers/file:file_access_log_lib",
         "//source/server/config/network:http_connection_manager_lib",
         "@envoy_api//envoy/admin/v2:config_dump_cc",
     ],

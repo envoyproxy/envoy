@@ -37,8 +37,6 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/access_log:file_access_log_lib",
-        "//source/server/config/access_log:grpc_access_log_lib",
         "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
@@ -51,9 +49,6 @@ envoy_cc_library(
         "//source/server/config/network:http_connection_manager_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//source/server/config/network:ssl_socket_lib",
-        "//source/server/config/stats:dog_statsd_lib",
-        "//source/server/config/stats:metrics_service_lib",
-        "//source/server/config/stats:statsd_lib",
         "//source/server/http:health_check_lib",
     ] + envoy_all_extensions(),
 )
