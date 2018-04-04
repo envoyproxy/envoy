@@ -16,20 +16,24 @@
 #include "common/json/json_loader.h"
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
+namespace Extensions {
+namespace NetworkFilters {
+namespace HttpConnectionManager {
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
  */
-class HttpConnectionManagerFilterConfigFactory : Logger::Loggable<Logger::Id::config>,
-                                                 public NamedNetworkFilterConfigFactory {
+class HttpConnectionManagerFilterConfigFactory
+    : Logger::Loggable<Logger::Id::config>,
+      public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  NetworkFilterFactoryCb createFilterFactory(const Json::Object& json_config,
-                                             FactoryContext& context) override;
-  NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                      FactoryContext& context) override;
+  Server::Configuration::NetworkFilterFactoryCb
+  createFilterFactory(const Json::Object& json_config,
+                      Server::Configuration::FactoryContext& context) override;
+  Server::Configuration::NetworkFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::unique_ptr<
@@ -39,10 +43,10 @@ public:
   std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
-  NetworkFilterFactoryCb createFilter(
+  Server::Configuration::NetworkFilterFactoryCb createFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
-      FactoryContext& context);
+      Server::Configuration::FactoryContext& context);
 };
 
 /**
@@ -69,7 +73,7 @@ public:
   HttpConnectionManagerConfig(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           config,
-      FactoryContext& context, Http::DateProvider& date_provider,
+      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // Http::FilterChainFactory
@@ -104,13 +108,11 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
-  static const std::string DEFAULT_SERVER_STRING;
-
 private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
 
-  FactoryContext& context_;
-  std::list<HttpFilterFactoryCb> filter_factories_;
+  Server::Configuration::FactoryContext& context_;
+  std::list<Server::Configuration::HttpFilterFactoryCb> filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
@@ -135,6 +137,7 @@ private:
   const bool proxy_100_continue_;
 };
 
-} // namespace Configuration
-} // namespace Server
+} // namespace HttpConnectionManager
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

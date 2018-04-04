@@ -27,7 +27,6 @@ envoy_extension_cc_test(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
-        "//source/common/http:conn_manager_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",

@@ -1,4 +1,4 @@
-#include "server/config/network/http_connection_manager.h"
+#include "extensions/filters/network/hcm/config.h"
 
 #include <chrono>
 #include <memory>
@@ -18,6 +18,7 @@
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
 #include "common/http/utility.h"
@@ -26,19 +27,19 @@
 #include "common/router/rds_impl.h"
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
-
-const std::string HttpConnectionManagerConfig::DEFAULT_SERVER_STRING = "envoy";
+namespace Extensions {
+namespace NetworkFilters {
+namespace HttpConnectionManager {
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
+Server::Configuration::NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
-    FactoryContext& context) {
+    Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -68,16 +69,17 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
   };
 }
 
-NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                                              FactoryContext& context) {
+Server::Configuration::NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+    const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
   Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
   return createFilter(proto_config, context);
 }
 
-NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, FactoryContext& context) {
+Server::Configuration::NetworkFilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+    const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<const envoy::config::filter::network::
                                            http_connection_manager::v2::HttpConnectionManager&>(
@@ -89,7 +91,7 @@ NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFac
  * Static registration for the HTTP connection manager filter.
  */
 static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 NamedNetworkFilterConfigFactory>
+                                 Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 
 std::string
@@ -113,7 +115,7 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
-    FactoryContext& context, Http::DateProvider& date_provider,
+    Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
@@ -214,7 +216,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
   } else {
-    server_name_ = DEFAULT_SERVER_STRING;
+    server_name_ = Http::DefaultServerString::get();
   }
 
   switch (config.codec_type()) {
@@ -244,8 +246,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
 
     // Now see if there is a factory that will accept the config.
-    auto& factory = Config::Utility::getAndCheckFactory<NamedHttpFilterConfigFactory>(string_name);
-    HttpFilterFactoryCb callback;
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+            string_name);
+    Server::Configuration::HttpFilterFactoryCb callback;
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true),
                                              stats_prefix_, context);
@@ -284,7 +288,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  for (const HttpFilterFactoryCb& factory : filter_factories_) {
+  for (const Server::Configuration::HttpFilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
 }
@@ -293,6 +297,7 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }
 
-} // namespace Configuration
-} // namespace Server
+} // namespace HttpConnectionManager
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy
