@@ -81,7 +81,7 @@ public:
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
-        filter_(admin_), request_headers_{{":path", "/"}} {
+        request_headers_{{":path", "/"}} {
 
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -91,8 +91,7 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
-    filter_.decodeHeaders(request_headers_, false);
-    return admin_.runCallback(path_and_query, filter_, response_headers, response);
+    return admin_.runCallback(path_and_query, request_headers_, response_headers, response);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -112,7 +111,6 @@ public:
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
-  AdminFilter filter_;
   Http::TestHeaderMapImpl request_headers_;
 };
 
@@ -155,10 +153,9 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
-  filter_.decodeHeaders(request_headers_, false);
-  EXPECT_NO_LOGS(EXPECT_EQ(
-      Http::Code::InternalServerError,
-      admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", filter_, header_map, data)));
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
+                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y",
+                                                              request_headers_, header_map, data)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
