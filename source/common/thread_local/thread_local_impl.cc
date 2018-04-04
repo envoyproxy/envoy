@@ -94,8 +94,8 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
 void InstanceImpl::runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   ASSERT(!shutdown_);
-  std::shared_ptr<std::atomic<int>> worker_count =
-      std::make_shared<std::atomic<int>>(registered_threads_.size());
+  std::shared_ptr<std::atomic<uint64_t>> worker_count =
+      std::make_shared<std::atomic<uint64_t>>(registered_threads_.size());
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post([this, worker_count, cb, main_callback]() -> void {
       cb();

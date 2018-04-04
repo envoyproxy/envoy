@@ -27,8 +27,6 @@ public:
         current_active_(0), flags_(0) {
     histograms_[0] = hist_alloc();
     histograms_[1] = hist_alloc();
-    cumulative_statistics_.reset(new HistogramStatisticsImpl());
-    interval_statistics_.reset(new HistogramStatisticsImpl());
   }
 
   ~ThreadLocalHistogramImpl() {
@@ -37,7 +35,6 @@ public:
   }
   // Stats::Histogram
   void recordValue(uint64_t value) override {
-    std::unique_lock<std::mutex> lock(merge_lock_);
     hist_insert_intscale(histograms_[current_active_], value, 0, 1);
     parent_.deliverHistogramToSinks(*this, value);
     flags_ |= Flags::Used;
@@ -49,14 +46,13 @@ public:
 
   bool used() const override { return flags_ & Flags::Used; }
 
-  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *cumulative_statistics_;
+    return cumulative_statistics_;
   }
 
   void merge(histogram_t* target) {
-    std::unique_lock<std::mutex> lock(merge_lock_);
     histogram_t* hist_array[1];
     hist_array[0] = histograms_[1 - current_active_];
     hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
@@ -69,9 +65,8 @@ private:
   int current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
-  std::shared_ptr<HistogramStatistics> interval_statistics_;
-  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
-  mutable std::mutex merge_lock_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
@@ -86,8 +81,6 @@ public:
       : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
-    cumulative_statistics_.reset(new HistogramStatisticsImpl(cumulative_histogram_));
-    interval_statistics_.reset(new HistogramStatisticsImpl(interval_histogram_));
   }
 
   ~HistogramParentImpl() {
@@ -99,6 +92,7 @@ public:
   void recordValue(uint64_t) override {}
 
   bool used() const override {
+    std::unique_lock<std::mutex> lock(merge_lock_);
     bool any_tls_used = false;
     for (auto tls_histogram : tls_histograms_) {
       if (tls_histogram->used()) {
@@ -109,7 +103,10 @@ public:
     return any_tls_used;
   }
 
-  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) { tls_histograms_.emplace_back(hist_ptr); }
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
+    std::unique_lock<std::mutex> lock(merge_lock_);
+    tls_histograms_.emplace_back(hist_ptr);
+  }
 
   /**
    * This method is called during the main stats flush process for each of the histogram. This
@@ -128,15 +125,15 @@ public:
       histogram_t* hist_array[1];
       hist_array[0] = interval_histogram_;
       hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
-      cumulative_statistics_.reset(new HistogramStatisticsImpl(cumulative_histogram_));
-      interval_statistics_.reset(new HistogramStatisticsImpl(interval_histogram_));
+      cumulative_statistics_ = HistogramStatisticsImpl(cumulative_histogram_);
+      interval_statistics_ = HistogramStatisticsImpl(interval_histogram_);
     }
   }
 
-  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *cumulative_statistics_;
+    return cumulative_statistics_;
   }
 
   Store& parent_;
@@ -145,8 +142,8 @@ public:
 private:
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
-  std::shared_ptr<HistogramStatistics> interval_statistics_;
-  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 

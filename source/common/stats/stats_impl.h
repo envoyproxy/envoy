@@ -275,19 +275,20 @@ private:
  */
 class MetricImpl : public virtual Metric {
 public:
-  /**
-   * Flags used by all stats types to figure out whether they have been used.
-   */
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
-
   MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
   const std::string& name() const override { return name_; }
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
+
+protected:
+  /**
+   * Flags used by all stats types to figure out whether they have been used.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x1;
+  };
 
 private:
   const std::string name_;
@@ -364,7 +365,11 @@ private:
  */
 class HistogramStatisticsImpl : public HistogramStatistics {
 public:
-  HistogramStatisticsImpl() {}
+  HistogramStatisticsImpl() {
+    for (size_t i = 0; i < ARRAY_SIZE(quantiles_out_); i++) {
+      quantiles_out_[i] = 0;
+    }
+  }
 
   HistogramStatisticsImpl(histogram_t* histogram_ptr) {
     hist_approx_quantile(histogram_ptr, const_cast<double*>(quantiles_in_),
@@ -386,10 +391,7 @@ class HistogramImpl : public Histogram, public MetricImpl {
 public:
   HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                 std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
-    cumulative_statistics_.reset(new HistogramStatisticsImpl());
-    interval_statistics_.reset(new HistogramStatisticsImpl());
-  }
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -398,17 +400,17 @@ public:
 
   bool used() const override { return true; }
 
-  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *cumulative_statistics_;
+    return cumulative_statistics_;
   }
 
   Store& parent_;
 
 private:
-  std::shared_ptr<HistogramStatistics> interval_statistics_;
-  std::shared_ptr<HistogramStatistics> cumulative_statistics_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
 };
 
 /**
