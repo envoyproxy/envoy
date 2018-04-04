@@ -128,9 +128,8 @@ const char AdminHtmlEnd[] = R"(
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& response_headers,
-                                                     bool end_stream) {
-  request_headers_ = &response_headers;
+Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  request_headers_ = &headers;
   if (end_stream) {
     onComplete();
   }
@@ -653,7 +652,8 @@ void AdminFilter::onComplete() {
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-  Http::Code code = parent_.runCallback(path, *header_map, response);
+  RELEASE_ASSERT(request_headers_);
+  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response);
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -759,6 +759,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
+                                  const Http::HeaderMap& request_headers,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
@@ -770,6 +771,13 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+      if (handler.mutates_server_state_) {
+        const absl::string_view method = request_headers.Method()->value().getStringView();
+        if (method != Http::Headers::get().MethodValues.Post) {
+          ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
+                    handler.prefix_, method);
+        }
+      }
       code = handler.handler_(path_and_query, response_headers, response);
       found_handler = true;
       break;
