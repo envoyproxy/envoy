@@ -71,7 +71,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
   client_.onSuccess(std::move(response), span_);
 }
 
-TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
+TEST_F(ExtAuthzGrpcClientTest, DISABLED_BasicDenied) {
   envoy::service::auth::v2alpha::CheckRequest request;
   std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> response;
   Http::HeaderMapImpl headers;
