@@ -132,7 +132,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
                              {Socket::SocketState::PreBind});
 }
 
-// The happy path for setOpion(); TCP_FASTOPEN is set to false.
+// The happy path for setOption(); TCP_FASTOPEN is set to false.
 TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessFalse) {
   SocketOptionImpl socket_option{{}, {}, 0};
   testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 0,
