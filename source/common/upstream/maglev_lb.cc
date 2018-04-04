@@ -25,10 +25,9 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
   table_build_entries.reserve(hosts.size());
   for (const auto& host : hosts) {
     const std::string& address = host->address()->asString();
-    const uint32_t weight = max_host_weight > 0 ? host->weight() : 0;
     table_build_entries.emplace_back(HashUtil::xxHash64(address) % table_size_,
                                      (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
-                                     weight);
+                                     max_host_weight > 0 ? host->weight() : 0);
   }
 
   table_.resize(table_size_);
@@ -39,11 +38,11 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
       TableBuildEntry& entry = table_build_entries[i];
       // Only consider weight if we are doing weighted Maglev.
       if (max_host_weight > 0) {
-        // Counts are in units of backend_weight_scale. To understand how
-        // counts_ and weight_ are used below, consider a host with weight equal
-        // to backend_weight_scale. This would be picked on every single
-        // iteration. If it had weight equal to backend_weight_scale / 3, then
-        // this would only happen every 3 iterations, etc.
+        // Counts are in units of max_host_weight. To understand how counts_ and
+        // weight_ are used below, consider a host with weight equal to
+        // max_host_weight. This would be picked on every single iteration. If
+        // it had weight equal to backend_weight_scale / 3, then this would only
+        // happen every 3 iterations, etc.
         if (iteration * entry.weight_ < entry.counts_) {
           continue;
         }
