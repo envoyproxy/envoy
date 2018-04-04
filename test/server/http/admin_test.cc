@@ -14,10 +14,12 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -48,7 +50,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -78,6 +81,7 @@ public:
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")) {
+
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
@@ -91,7 +95,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
 // a real profiler linked in (successful call to startProfiler). startProfiler
 // requies tcmalloc.
@@ -128,9 +133,13 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, bad_path,
-                                       Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                       server_, listener_scope_.createScope("listener.admin."));
+  std::unique_ptr<AdminImpl> admin_bad_address_out_path;
+  EXPECT_LOG_CONTAINS(
+      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      admin_bad_address_out_path =
+          std::make_unique<AdminImpl>("/dev/null", cpu_profile_path_, bad_path,
+                                      Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                                      server_, listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -140,7 +149,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   };
 
   // Test removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false));
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
@@ -166,15 +175,20 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(
-      admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
+                      EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
     return Http::Code::Accepted;
   };
-  EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
+  EXPECT_LOG_CONTAINS("error",
+                      "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
+                      EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
+                                                     callback, true, false)));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
@@ -233,69 +247,91 @@ TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
+  auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
+  auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
+      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
+      {"string_key", {"override", {}}}, {"extra_key", {"bar", {}}}};
 
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
+  ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
+  ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
+  ON_CALL(*layer2, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer2"}));
+  ON_CALL(*layer2, values()).WillByDefault(testing::ReturnRef(entries2));
+
+  std::vector<Runtime::Snapshot::OverrideLayerConstPtr> layers;
+  layers.push_back(std::move(layer1));
+  layers.push_back(std::move(layer2));
+  EXPECT_CALL(snapshot, getLayers()).WillRepeatedly(testing::ReturnRef(layers));
+
+  const std::string expected_json = R"EOF({
+    "layers": [
+        "layer1",
+        "layer2"
+    ],
+    "entries": {
+        "extra_key": {
+            "layer_values": [
+                "",
+                "bar"
+            ],
+            "final_value": "bar"
+        },
+        "int_key": {
+            "layer_values": [
+                "1",
+                ""
+            ],
+            "final_value": "1"
+        },
+        "other_key": {
+            "layer_values": [
+                "bar",
+                ""
+            ],
+            "final_value": "bar"
+        },
+        "string_key": {
+            "layer_values": [
+                "foo",
+                "override"
+            ],
+            "final_value": "override"
+        }
+    }
+})EOF";
+
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
   EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
-  EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
+  EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
 }
 
-TEST_P(AdminInstanceTest, RuntimeJSON) {
+TEST_P(AdminInstanceTest, RuntimeModify) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
-  Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime?format=json", header_map, response));
-
-  std::string output = TestUtility::bufferToString(response);
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(output);
-
-  EXPECT_TRUE(json->hasObject("runtime"));
-  std::vector<Json::ObjectSharedPtr> pairs = json->getObjectArray("runtime");
-  EXPECT_EQ(3, pairs.size());
-
-  Json::ObjectSharedPtr pair = pairs[0];
-  EXPECT_EQ("int_key", pair->getString("name", ""));
-  EXPECT_EQ(1, pair->getInteger("value", -1));
-
-  pair = pairs[1];
-  EXPECT_EQ("other_key", pair->getString("name", ""));
-  EXPECT_EQ("bar", pair->getString("value", ""));
-
-  pair = pairs[2];
-  EXPECT_EQ("string_key", pair->getString("name", ""));
-  EXPECT_EQ("foo", pair->getString("value", ""));
+  std::unordered_map<std::string, std::string> overrides;
+  overrides["foo"] = "bar";
+  overrides["x"] = "42";
+  overrides["nothing"] = "";
+  EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
+  EXPECT_EQ(Http::Code::OK,
+            admin_.runCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
+  EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
 }
 
-TEST_P(AdminInstanceTest, RuntimeBadFormat) {
+TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
-  Runtime::MockSnapshot snapshot;
-  Runtime::MockLoader loader;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
-  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
-  EXPECT_EQ(Http::Code::BadRequest,
-            admin_.runCallback("/runtime?format=foo", header_map, response));
-  EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
+  EXPECT_EQ(Http::Code::BadRequest, admin_.runCallback("/runtime_modify", header_map, response));
+  EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {

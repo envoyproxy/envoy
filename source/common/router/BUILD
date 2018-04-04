@@ -175,7 +175,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:rds_json_lib",
-        "//source/common/http/filter:ratelimit_includes",
         "//source/common/protobuf:utility_lib",
     ],
 )

@@ -1,6 +1,7 @@
 #include "common/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -80,7 +81,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, GzipIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 /**
  * Exercises gzip compression with default configuration.

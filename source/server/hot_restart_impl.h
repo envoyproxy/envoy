@@ -104,7 +104,6 @@ public:
   void unlock() override {
     int rc = pthread_mutex_unlock(&mutex_);
     ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
   }
 
 private:

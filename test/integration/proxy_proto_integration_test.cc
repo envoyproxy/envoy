@@ -4,6 +4,7 @@
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "fmt/format.h"
 #include "gtest/gtest.h"
@@ -11,7 +12,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtoIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {

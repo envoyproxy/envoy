@@ -8,12 +8,15 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"
+
+#include "test/integration/server_stats.h"
 
 namespace Envoy {
 
@@ -122,6 +125,22 @@ private:
 
   // A sanity check guard to make sure config is not modified after handing it to Envoy.
   bool finalized_{false};
+};
+
+// Common code for tests that deliver EDS update via the filesystem.
+class EdsHelper {
+public:
+  EdsHelper();
+
+  // Set EDS contents on filesystem and wait for Envoy to pick this up.
+  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
+              IntegrationTestServerStats& server_stats);
+  const std::string& eds_path() const { return eds_path_; }
+
+private:
+  const std::string eds_path_;
+  uint32_t eds_version_{};
+  uint32_t update_successes_{};
 };
 
 } // namespace Envoy
