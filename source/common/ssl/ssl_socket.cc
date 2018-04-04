@@ -136,7 +136,6 @@ void SslSocket::drainErrorQueue() {
     ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_->connection(), err,
                    ERR_lib_error_string(err), ERR_func_error_string(err),
                    ERR_reason_error_string(err));
-    UNREFERENCED_PARAMETER(err);
   }
   if (saw_error && !saw_counted_error) {
     ctx_.stats().connection_error_.inc();
@@ -207,7 +206,6 @@ void SslSocket::shutdownSsl() {
   if (!shutdown_sent_ && callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(ssl_.get());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);
-    UNREFERENCED_PARAMETER(rc);
     drainErrorQueue();
     shutdown_sent_ = true;
   }
@@ -334,7 +332,6 @@ std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
   size_t data_len;
   int rc = BIO_mem_contents(buf.get(), &data, &data_len);
   ASSERT(rc == 1);
-  UNREFERENCED_PARAMETER(rc);
   return std::string(reinterpret_cast<const char*>(data), data_len);
 }
 

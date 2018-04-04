@@ -34,6 +34,7 @@ On Ubuntu, run the following commands:
  apt-get install cmake
  apt-get install realpath
  apt-get install clang-format-5.0
+ apt-get install automake
 ```
 
 On Fedora (maybe also other red hat distros), run the following:

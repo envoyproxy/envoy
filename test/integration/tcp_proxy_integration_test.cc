@@ -20,7 +20,8 @@ namespace Envoy {
 namespace {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 void TcpProxyIntegrationTest::initialize() {
   config_helper_.renameListener("tcp_proxy");

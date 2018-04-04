@@ -2,7 +2,7 @@ REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
         commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
-        remote = "https://boringssl.googlesource.com/boringssl",
+        remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
@@ -39,7 +39,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "f3c1f42601d13504c68e2bc81c60604f0de055dd",
+        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
@@ -76,7 +76,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
     envoy_api = dict(
-        commit = "e73b8264a26c909f75d38ec2c73d9f47ad1b3b57",
+        commit = "2dcc435e8ae1d35f8c3a4fa9f132778482fb1a78",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(

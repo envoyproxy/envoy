@@ -22,6 +22,7 @@ envoy_cc_library(
     name = "admin_interface",
     hdrs = ["admin.h"],
     deps = [
+        ":config_tracker_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/network:listen_socket_interface",
@@ -36,6 +37,15 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_tracker_interface",
+    hdrs = ["config_tracker.h"],
+    deps = [
+        "//source/common/common:non_copyable",
+        "//source/common/protobuf",
     ],
 )
 

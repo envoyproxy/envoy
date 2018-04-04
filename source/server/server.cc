@@ -56,7 +56,8 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   try {
     if (!options.logPath().empty()) {
       try {
-        Logger::Registry::getSink()->logToFile(options.logPath(), access_log_manager_);
+        file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
+            options.logPath(), access_log_manager_, Logger::Registry::getSink());
       } catch (const EnvoyException& e) {
         throw EnvoyException(
             fmt::format("Failed to open log-file '{}'. e.what(): {}", options.logPath(), e.what()));
@@ -80,7 +81,7 @@ InstanceImpl::~InstanceImpl() {
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
-  Logger::Registry::getSink()->logToStdErr();
+  file_logger_.reset();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clusterManager(); }
@@ -150,25 +151,34 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
-void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                       const std::string& config_path, bool v2_only) {
-  bool v2_config_loaded = false;
+InstanceUtil::BootstrapVersion
+InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                  Options& options) {
   try {
-    MessageUtil::loadFromFileAndValidate(config_path, bootstrap);
-    v2_config_loaded = true;
-  } catch (const EnvoyException& e) {
-    if (v2_only) {
-      throw;
-    } else {
-      // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
-      ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
+    if (!options.configPath().empty()) {
+      MessageUtil::loadFromFile(options.configPath(), bootstrap);
     }
-  }
-  if (!v2_config_loaded) {
-    Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(config_path);
-    Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+    if (!options.configYaml().empty()) {
+      envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
+      bootstrap.MergeFrom(bootstrap_override);
+    }
     MessageUtil::validate(bootstrap);
+    return BootstrapVersion::V2;
+  } catch (const EnvoyException& e) {
+    if (options.v2ConfigOnly()) {
+      throw;
+    }
+    // TODO(htuch): When v1 is deprecated, make this a warning encouraging config upgrade.
+    ENVOY_LOG(debug, "Unable to initialize config as v2, will retry as v1: {}", e.what());
   }
+  if (!options.configYaml().empty()) {
+    throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
+  }
+  Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
+  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  MessageUtil::validate(bootstrap);
+  return BootstrapVersion::V1;
 }
 
 void InstanceImpl::initialize(Options& options,
@@ -179,7 +189,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
+  InstanceUtil::loadBootstrapConfig(bootstrap, options);
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -280,12 +290,13 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
     ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
 
     Api::OsSysCallsPtr os_sys_calls(new Api::OsSysCallsImpl);
-    return Runtime::LoaderPtr{new Runtime::LoaderImpl(
+    return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.runtime()->symlinkRoot(),
         config.runtime()->subdirectory(), override_subdirectory, server.stats(), server.random(),
-        std::move(os_sys_calls))};
+        std::move(os_sys_calls));
   } else {
-    return Runtime::LoaderPtr{new Runtime::NullLoaderImpl(server.random())};
+    return std::make_unique<Runtime::LoaderImpl>(server.random(), server.stats(),
+                                                 server.threadLocal());
   }
 }
 

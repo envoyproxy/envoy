@@ -6,6 +6,7 @@
 #include "common/json/json_loader.h"
 
 #include "test/integration/utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -13,7 +14,8 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationAdminTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
@@ -238,7 +240,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_STREQ("application/json", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/runtime?format=json",
                                                 "", downstreamProtocol(), version_);

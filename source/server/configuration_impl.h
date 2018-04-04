@@ -44,21 +44,15 @@ public:
    * pointer should always be valid.
    * @param json_config supplies the general json configuration for the HttpTracer
    * @param server supplies the server instance
-   * @param cluster_manager supplies the cluster_manager instance
    */
-  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config, Instance& server,
-                                                  Upstream::ClusterManager& cluster_manager) PURE;
+  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                                  Instance& server) PURE;
 
   /**
    * Returns the identifying name for a particular implementation of HttpTracer produced by the
    * factory.
    */
   virtual std::string name() PURE;
-
-  /**
-   * Returns true if the tracing driver requires cluster name to be defined.
-   */
-  virtual bool requiresClusterName() const { return true; }
 };
 
 /**

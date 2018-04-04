@@ -21,8 +21,18 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "config_tracker_impl_test",
+    srcs = ["config_tracker_impl_test.cc"],
+    deps = [
+        "//source/server/http:config_tracker_lib",
+        "//test/mocks:common_lib",
     ],
 )
 

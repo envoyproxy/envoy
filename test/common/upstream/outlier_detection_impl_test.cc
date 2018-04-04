@@ -762,23 +762,25 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_source, monotonic_time_source);
 
-  std::string log1;
+  StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"-1\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0, "
-                           "\"enforced\": \"true\"}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"-1\", \"cluster\": "
+                         "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+                         "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0, "
+                         "\"enforced\": \"true\"}\n")))
       .WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
   Json::Factory::loadFromString(log1);
 
-  std::string log2;
+  StringViewSaver log2;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"-1\", \"cluster\": \"fake_cluster\", "
-                           "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"-1\", \"cluster\": \"fake_cluster\", "
+                         "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
+                         "\"num_ejections\": 0}\n")))
       .WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log2);
@@ -787,29 +789,31 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   time = (time_source.currentTime() - std::chrono::seconds(30));
   monotonic_time = (monotonic_time_source.currentTime() - std::chrono::seconds(30));
 
-  std::string log3;
+  StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateEjectionThreshold()).WillOnce(Return(-1));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"30\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0, "
-                           "\"enforced\": \"false\", "
-                           "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
-                           "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
-                           "}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"30\", \"cluster\": "
+                         "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+                         "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0, "
+                         "\"enforced\": \"false\", "
+                         "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
+                         "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
+                         "}\n")))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
   Json::Factory::loadFromString(log3);
 
-  std::string log4;
+  StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"30\", \"cluster\": \"fake_cluster\", "
-                           "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"30\", \"cluster\": \"fake_cluster\", "
+                         "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
+                         "\"num_ejections\": 0}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);

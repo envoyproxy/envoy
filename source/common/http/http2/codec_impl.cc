@@ -191,7 +191,6 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   int rc =
       nghttp2_submit_trailer(parent_.session_, stream_id_, &final_headers[0], final_headers.size());
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
@@ -241,7 +240,6 @@ void ConnectionImpl::ServerStreamImpl::submitHeaders(const std::vector<nghttp2_n
   int rc = nghttp2_submit_response(parent_.session_, stream_id_, &final_headers.data()[0],
                                    final_headers.size(), provider);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -251,7 +249,6 @@ void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_str
   if (data_deferred_) {
     int rc = nghttp2_session_resume_data(parent_.session_, stream_id_);
     ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
 
     data_deferred_ = false;
   }
@@ -286,7 +283,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
                                          ? NGHTTP2_REFUSED_STREAM
                                          : NGHTTP2_NO_ERROR);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 }
 
 ConnectionImpl::~ConnectionImpl() { nghttp2_session_del(session_); }
@@ -338,7 +334,6 @@ void ConnectionImpl::goAway() {
                                  nghttp2_session_get_last_proc_stream_id(session_),
                                  NGHTTP2_NO_ERROR, nullptr, 0);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 
   sendPendingFrames();
 }
@@ -346,7 +341,6 @@ void ConnectionImpl::goAway() {
 void ConnectionImpl::shutdownNotice() {
   int rc = nghttp2_submit_shutdown_notice(session_);
   ASSERT(rc == 0);
-  UNREFERENCED_PARAMETER(rc);
 
   sendPendingFrames();
 }
@@ -510,7 +504,6 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
 }
 
 int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-  UNREFERENCED_PARAMETER(error_code);
 
   StreamImpl* stream = getStream(stream_id);
   if (stream) {
@@ -634,12 +627,10 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
   if (!iv.empty()) {
     int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &iv[0], iv.size());
     ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
   } else {
     // nghttp2_submit_settings need to be called at least once
     int rc = nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, 0, 0);
     ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
   }
 
   // Increase connection window size up to our default size.
@@ -650,7 +641,6 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
                                           http2_settings.initial_connection_window_size_ -
                                               NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE);
     ASSERT(rc == 0);
-    UNREFERENCED_PARAMETER(rc);
   }
 }
 
@@ -667,7 +657,6 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
          nghttp2_data_source* source, void*) -> int {
         ASSERT(frame->data.padlen == 0);
-        UNREFERENCED_PARAMETER(frame);
         return static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
       });
 

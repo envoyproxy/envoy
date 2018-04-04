@@ -170,8 +170,9 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
-  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(ProtoEq(expected_grpc_service), _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+  EXPECT_CALL(cm_.async_client_manager_,
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
         EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();

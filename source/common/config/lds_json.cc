@@ -43,7 +43,6 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
   }
 
   const std::string drain_type = json_listener.getString("drain_type", "default");
@@ -57,6 +56,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
   JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
+  JSON_UTIL_SET_BOOL(json_listener, listener, transparent);
 }
 
 } // namespace Config
