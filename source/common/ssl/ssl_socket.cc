@@ -308,7 +308,7 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
   return "";
 }
 
-std::vector<std::string> getDnsSansFromCertificate(X509* cert) {
+std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
   STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
       X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
 
