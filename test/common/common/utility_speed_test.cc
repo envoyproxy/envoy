@@ -1,6 +1,8 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include <random>
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 
@@ -17,6 +19,32 @@ static const char CacheControl[] = "private, max-age=300, no-transform";
 static size_t CacheControlLength = sizeof(CacheControl) - 1;
 
 // NOLINT(namespace-envoy)
+
+static void BM_AccessLogDateTimeFormatter(benchmark::State& state) {
+  int outputBytes = 0;
+
+  // Generate a sequence of times for which the delta between each successive
+  // pair of times is uniformly distributed in the range (-10ms, 20ms).
+  // This is meant to simulate the situation where requests handled at
+  // approximately the same time may get logged out of order.
+  static const int ITERATIONS = 1000;
+  std::vector<Envoy::SystemTime> times;
+  times.reserve(ITERATIONS);
+  Envoy::SystemTime time(std::chrono::seconds(1522796769));
+  std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  std::uniform_int_distribution<long> distribution(-10, 20);
+  for (int i = 0; i < ITERATIONS; i++) {
+    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    times.emplace_back(time);
+  }
+  for (auto _ : state) {
+    for (const auto& time : times) {
+      outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time).length();
+    }
+  }
+  benchmark::DoNotOptimize(outputBytes);
+}
+BENCHMARK(BM_AccessLogDateTimeFormatter);
 
 static void BM_RTrimStringView(benchmark::State& state) {
   int accum = 0;
