@@ -21,7 +21,7 @@ public:
   // ExtAuthz::Client
   MOCK_METHOD0(cancel, void());
   MOCK_METHOD3(check, void(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2::CheckRequest& request,
+                           const envoy::service::auth::v2alpha::CheckRequest& request,
                            Tracing::Span& parent_span));
 };
 

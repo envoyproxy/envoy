@@ -54,8 +54,8 @@ public:
 };
 
 TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
-  envoy::service::auth::v2::CheckRequest request;
-  std::unique_ptr<envoy::service::auth::v2::CheckResponse> response;
+  envoy::service::auth::v2alpha::CheckRequest request;
+  std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> response;
   Http::HeaderMapImpl headers;
   EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _)).WillOnce(Return(&async_request_));
 
@@ -63,7 +63,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
 
   client_.onCreateInitialMetadata(headers);
 
-  response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
+  response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::Ok);
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
@@ -72,15 +72,18 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
 }
 
 TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
-  envoy::service::auth::v2::CheckRequest request;
-  std::unique_ptr<envoy::service::auth::v2::CheckResponse> response;
+  envoy::service::auth::v2alpha::CheckRequest request;
+  std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> response;
   Http::HeaderMapImpl headers;
+
   EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
       .WillOnce(
           Invoke([this](const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
                         Grpc::AsyncRequestCallbacks&, Tracing::Span&,
                         const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
-            EXPECT_EQ("envoy.service.auth.v2.Authorization", service_method.service()->full_name());
+            // TODO(dio): Use a defined constant value.
+            EXPECT_EQ("envoy.service.auth.v2alpha.Authorization",
+                      service_method.service()->full_name());
             EXPECT_EQ("Check", service_method.name());
             return &async_request_;
           }));
@@ -90,7 +93,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
   client_.onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
 
-  response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
+  response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
@@ -99,7 +102,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
 }
 
 TEST_F(ExtAuthzGrpcClientTest, BasicError) {
-  envoy::service::auth::v2::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request;
   EXPECT_CALL(*async_client_, send(_, ProtoEq(request), _, _, _)).WillOnce(Return(&async_request_));
 
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
@@ -109,7 +112,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicError) {
 }
 
 TEST_F(ExtAuthzGrpcClientTest, Cancel) {
-  envoy::service::auth::v2::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request;
 
   EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));
 
@@ -138,7 +141,7 @@ public:
 
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
 
-  envoy::service::auth::v2::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request;
 
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -151,7 +154,7 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
 
   Http::HeaderMapImpl headers;
-  envoy::service::auth::v2::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request;
 
   EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
@@ -167,7 +170,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
-  envoy::service::auth::v2::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request;
 
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
