@@ -5,6 +5,7 @@
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 
+#include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -138,8 +139,10 @@ public:
                   eds_cluster_config:
                     eds_config:
                       api_config_source:
-                        cluster_names: "eds-cluster"
                         api_type: GRPC
+                        grpc_services:
+                          envoy_grpc:
+                            cluster_name: "eds-cluster"
               )EOF"));
 
       // TODO(zuercher): Make ConfigHelper EDS-aware and get rid of this hack:
