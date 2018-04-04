@@ -278,6 +278,9 @@ public:
   MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
+  MetricImpl(const std::string& name, std::string& tag_extracted_name, std::vector<Tag>& tags)
+      : name_(name), tag_extracted_name_(tag_extracted_name), tags_(tags) {}
+
   const std::string& name() const override { return name_; }
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }

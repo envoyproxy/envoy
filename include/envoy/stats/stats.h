@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -312,6 +313,11 @@ public:
 typedef std::unique_ptr<Store> StorePtr;
 
 /**
+ * Callback invoked when a store's mergeHistogram() runs.
+ */
+typedef std::function<void()> PostMergeCb;
+
+/**
  * The root of the stat store.
  */
 class StoreRoot : public Store {
@@ -340,9 +346,10 @@ public:
   virtual void shutdownThreading() PURE;
 
   /**
-   * Called during the flush process to merge all the thread local histograms.
+   * Called during the flush process to merge all the thread local histograms. The passed in
+   * callback will be invoked after the merge process is complete.
    */
-  virtual void mergeHistograms() PURE;
+  virtual void mergeHistograms(PostMergeCb mergeCb) PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

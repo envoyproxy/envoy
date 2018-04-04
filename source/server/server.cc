@@ -149,9 +149,10 @@ void InstanceImpl::flushStats() {
       sslContextManager().daysUntilFirstCertExpires());
 
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
-  stats_store_.mergeHistograms();
-  InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  stats_store_.mergeHistograms([this]() -> void {
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
+    stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  });
 }
 
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {

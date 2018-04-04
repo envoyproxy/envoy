@@ -91,7 +91,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 }
 
-void ThreadLocalStoreImpl::mergeHistograms() {
+void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb mergeCb) {
   if (!shutting_down_) {
     tls_->runOnAllThreadsWithBarrier(
         [this]() -> void {
@@ -102,6 +102,7 @@ void ThreadLocalStoreImpl::mergeHistograms() {
           }
         },
         [this]() -> void { mergeInternal(); });
+    mergeCb();
   }
 }
 
@@ -257,8 +258,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
   if (!central_ref) {
-    central_ref.reset(new HistogramParentImpl(final_name, parent_, std::move(tag_extracted_name),
-                                              std::move(tags)));
+    central_ref.reset(new HistogramParentImpl(final_name, parent_, tag_extracted_name, tags));
   }
   TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
       final_name, parent_, std::move(tag_extracted_name), std::move(tags)));

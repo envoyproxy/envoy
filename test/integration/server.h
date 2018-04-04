@@ -186,7 +186,7 @@ public:
   void setTagProducer(TagProducerPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
-  void mergeHistograms() override {}
+  void mergeHistograms(PostMergeCb) override {}
 
 private:
   mutable std::mutex lock_;

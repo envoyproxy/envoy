@@ -76,9 +76,9 @@ typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
  */
 class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
-  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                      std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+  HistogramParentImpl(const std::string& name, Store& parent, std::string& tag_extracted_name,
+                      std::vector<Tag>& tags)
+      : MetricImpl(name, tag_extracted_name, tags), parent_(parent) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
   }
@@ -208,7 +208,7 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
 
-  void mergeHistograms() override;
+  void mergeHistograms(PostMergeCb mergeCb) override;
 
 private:
   struct TlsCacheEntry {
