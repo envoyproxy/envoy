@@ -21,6 +21,12 @@ public:
   static std::vector<FormatterPtr> parse(const std::string& format);
 
 private:
+  /**
+   * Parse a header format rule of the form: %REQ(X?Y):Z% .
+   * Will populate a main_header and an optional alternative header if specified.
+   * See doc:
+   * https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
+   */
   static void parseCommandHeader(const std::string& token, const size_t start,
                                  std::string& main_header, std::string& alternative_header,
                                  absl::optional<size_t>& max_length);
@@ -28,22 +34,26 @@ private:
    * General parse command utility. Will parse token from start position. Token is expected to end
    * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
    * contain multiple values separated by "seperator" string. First value will be populated in
-   * "main" and any additional sub values will be set in the vector "subs". For example token of:
-   * "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the following:
+   * "main" and any additional sub values will be set in the vector "subitems". For example token
+   * of: "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the
+   * following:
    * - main: com.test.my_filter
-   * - subs: {test_object, inner_key}
+   * - subitems: {test_object, inner_key}
    * - max_length: 100
    *
    * @param token the token to parse
    * @param start the index to start parsing from
    * @param seperator seperator between values
    * @param main the first value
-   * @param subs any additional values
+   * @param subitems any additional values
    * @param max_length optional max_length will be populated if specified
+   *
+   * TODO(glicht) Rewrite with a parser library. See:
+   * https://github.com/envoyproxy/envoy/issues/2967
    */
   static void parseCommand(const std::string& token, const size_t start,
                            const std::string& separator, std::string& main,
-                           std::vector<std::string>& subs, absl::optional<size_t>& max_length);
+                           std::vector<std::string>& subitems, absl::optional<size_t>& max_length);
 };
 
 /**

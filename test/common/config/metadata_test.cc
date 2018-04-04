@@ -34,6 +34,13 @@ TEST(MetadataTest, MetadataValuePath) {
   *val.mutable_struct_value() = obj;
   (*filter_struct.mutable_fields())["test_obj"] = val;
   EXPECT_EQ(Metadata::metadataValue(metadata, filter, path).string_value(), "inner_value");
+  // not found with longer path
+  path.push_back("bad_key");
+  EXPECT_EQ(Metadata::metadataValue(metadata, filter, path).kind_case(),
+            ProtobufWkt::Value::KindCase::KIND_NOT_SET);
+  // empty path returns not found
+  EXPECT_EQ(Metadata::metadataValue(metadata, filter, std::vector<std::string>{}).kind_case(),
+            ProtobufWkt::Value::KindCase::KIND_NOT_SET);
 }
 
 } // namespace

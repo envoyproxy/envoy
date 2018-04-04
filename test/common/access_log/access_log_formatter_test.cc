@@ -359,7 +359,8 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(TEST):10",
       "REQ(:TEST):10%",
       "%REQ(TEST:10%",
-      "%REQ("
+      "%REQ(",
+      "%REQ(X?Y?Z)%",
       "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {

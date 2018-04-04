@@ -72,6 +72,8 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   parseCommand(token, start, "?", main_header, subs, max_length);
   if (subs.size() > 1) {
     throw EnvoyException(
+        // Header format rules support only one alternative header.
+        // https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
         fmt::format("More than 1 alternative header specified in token: {}", token));
   }
   if (subs.size() == 1) {
@@ -83,10 +85,10 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
 
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
                                          const std::string& separator, std::string& main,
-                                         std::vector<std::string>& subs,
+                                         std::vector<std::string>& subitems,
                                          absl::optional<size_t>& max_length) {
   size_t end_request = token.find(')', start);
-  subs.clear();
+  subitems.clear();
   if (end_request != token.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
@@ -121,7 +123,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
       const size_t next_separator_pos = name_data.find(separator, separator_pos + 1);
       const size_t end =
           next_separator_pos == std::string::npos ? name_data.size() : next_separator_pos;
-      subs.push_back(name_data.substr(separator_pos + 1, end - separator_pos - 1));
+      subitems.push_back(name_data.substr(separator_pos + 1, end - separator_pos - 1));
       separator_pos = next_separator_pos;
     } while (separator_pos != std::string::npos);
   }

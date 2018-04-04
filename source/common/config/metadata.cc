@@ -10,22 +10,22 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Me
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Value::default_instance();
   }
-  const ProtobufWkt::Struct* dataStruct = &(filter_it->second);
+  const ProtobufWkt::Struct* data_struct = &(filter_it->second);
   const Protobuf::Value* val = nullptr;
   // go through path to select sub entries
   for (const auto p : path) {
-    if (nullptr == dataStruct) { // sub entry not found
+    if (nullptr == data_struct) { // sub entry not found
       return ProtobufWkt::Value::default_instance();
     }
-    const auto entry_it = dataStruct->fields().find(p);
-    if (entry_it == dataStruct->fields().end()) {
+    const auto entry_it = data_struct->fields().find(p);
+    if (entry_it == data_struct->fields().end()) {
       return ProtobufWkt::Value::default_instance();
     }
     val = &(entry_it->second);
     if (val->has_struct_value()) {
-      dataStruct = &(val->struct_value());
+      data_struct = &(val->struct_value());
     } else {
-      dataStruct = nullptr;
+      data_struct = nullptr;
     }
   }
   if (nullptr == val) {
