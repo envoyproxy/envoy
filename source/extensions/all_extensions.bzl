@@ -22,5 +22,8 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/stat_sinks/dog_statsd:config",
     repository + "//source/extensions/stat_sinks/metrics_service:config",
     repository + "//source/extensions/stat_sinks/statsd:config",
+    repository + "//source/extensions/tracers/dynamic_ot:config",
+    repository + "//source/extensions/tracers/lightstep:config",
+    repository + "//source/extensions/tracers/zipkin:config",
   ]
 

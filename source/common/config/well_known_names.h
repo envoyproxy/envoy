@@ -156,9 +156,11 @@ public:
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
 
 /**
- * Well-known HTTP tracer names.
+ * Well-known tracer names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New tracers should use the well known name: envoy.tracers.name.
  */
-class HttpTracerNameValues {
+class TracerNameValues {
 public:
   // Lightstep tracer
   const std::string LIGHTSTEP = "envoy.lightstep";
@@ -168,12 +170,12 @@ public:
   const std::string DYNAMIC_OT = "envoy.dynamic.ot";
 };
 
-typedef ConstSingleton<HttpTracerNameValues> HttpTracerNames;
+typedef ConstSingleton<TracerNameValues> TracerNames;
 
 /**
  * Well-known stats sink names.
  * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New filters should use the well known name: envoy.stat_sinks.name.
+ * TODO(mattklein123): New sinks should use the well known name: envoy.stat_sinks.name.
  */
 class StatsSinkNameValues {
 public:
@@ -190,7 +192,8 @@ typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
 /**
  * Well-known access log names.
  * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New filters should use the well known name: envoy.access_loggers.name.
+ * TODO(mattklein123): New access loggers should use the well known name:
+ * envoy.access_loggers.name.
  */
 class AccessLogNameValues {
 public:

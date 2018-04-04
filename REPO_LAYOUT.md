@@ -71,8 +71,6 @@ currently implemented but that is the plan moving forward.)
 * These are the top level extension directories and associated namespaces:
   * [access_loggers/](/source/extensions/access_loggers): Access log implementations which use
     the `Envoy::Extensions::AccessLoggers` namespace.
-  * [http_tracers/](/source/extensions/http_tracers): HTTP tracers which use the
-    `Envoy::Extensions::HttpTracers` namespace.
   * [filters/http/](/source/extensions/filters/http): HTTP L7 filters which use the
     `Envoy::Extensions::HttpFilters` namespace.
   * [filters/listener/](/source/extensions/filters/listener): Listener filters which use the
@@ -83,6 +81,8 @@ currently implemented but that is the plan moving forward.)
     `Envoy::Extensions::Resolvers` namespace.
   * [stat_sinks/](/source/extensions/stat_sinks): Stat sink implementations which use the
     `Envoy::Extensions::StatSinks` namespace.
+  * [tracers/](/source/extensions/tracers): Tracers which use the
+    `Envoy::Extensions::Tracers` namespace.
   * [transport_sockets/](/source/extensions/transport_sockets): Transport socket implementations
     which use the `Envoy::Extensions::TransportSockets` namespace.
 * Each extension is contained wholly in its own namespace. E.g.,
