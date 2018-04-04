@@ -49,9 +49,9 @@ public:
 
   // Stats::Sink
   void beginFlush() override {}
-  void flushCounter(const Counter& counter, uint64_t delta) override;
-  void flushGauge(const Gauge& gauge, uint64_t value) override;
-  void flushHistogram(const Histogram&) override {}
+  void flushCounter(const Stats::Counter& counter, uint64_t delta) override;
+  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
+  void flushHistogram(const Stats::Histogram&) override {}
   void endFlush() override {}
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
@@ -88,7 +88,7 @@ public:
     tls_->getTyped<TlsSink>().flushGauge(gauge.name(), value);
   }
 
-  void flushHistogram(const Histogram&) override {}
+  void flushHistogram(const Stats::Histogram&) override {}
 
   void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
 

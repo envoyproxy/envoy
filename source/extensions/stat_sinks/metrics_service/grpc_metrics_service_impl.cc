@@ -61,7 +61,7 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer)
     : grpc_metrics_streamer_(grpc_metrics_streamer) {}
 
-void MetricsServiceSink::flushCounter(const Counter& counter, uint64_t) {
+void MetricsServiceSink::flushCounter(const Stats::Counter& counter, uint64_t) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter.name());
@@ -71,7 +71,7 @@ void MetricsServiceSink::flushCounter(const Counter& counter, uint64_t) {
   counter_metric->set_value(counter.value());
 }
 
-void MetricsServiceSink::flushGauge(const Gauge& gauge, uint64_t value) {
+void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
@@ -80,14 +80,14 @@ void MetricsServiceSink::flushGauge(const Gauge& gauge, uint64_t value) {
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(value);
 }
-void MetricsServiceSink::flushHistogram(const Histogram& histogram) {
+void MetricsServiceSink::flushHistogram(const Stats::Histogram& histogram) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   metrics_family->set_name(histogram.name());
   auto* metric = metrics_family->add_metric();
   metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
   auto* summary_metric = metric->mutable_summary();
-  const HistogramStatistics& hist_stats = histogram.intervalStatistics();
+  const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
   for (size_t i = 0; i < ARRAY_SIZE(hist_stats.quantiles_in_); i++) {
     auto* quantile = summary_metric->add_quantile();
     quantile->set_quantile(hist_stats.quantiles_in_[i]);
@@ -95,6 +95,7 @@ void MetricsServiceSink::flushHistogram(const Histogram& histogram) {
   }
 }
 
-} // namespace Metrics
-} // namespace Stats
+} // namespace MetricsService
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

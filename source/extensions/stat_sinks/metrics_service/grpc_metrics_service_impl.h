@@ -112,9 +112,9 @@ public:
 
   void beginFlush() override { message_.clear_envoy_metrics(); }
 
-  void flushCounter(const Counter& counter, uint64_t) override;
-  void flushGauge(const Gauge& gauge, uint64_t value) override;
-  void flushHistogram(const Histogram& histogram) override;
+  void flushCounter(const Stats::Counter& counter, uint64_t) override;
+  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
+  void flushHistogram(const Stats::Histogram& histogram) override;
 
   void endFlush() override {
     grpc_metrics_streamer_->send(message_);
@@ -124,7 +124,7 @@ public:
     }
   }
 
-  void onHistogramComplete(const Histogram&, uint64_t) override {}
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
