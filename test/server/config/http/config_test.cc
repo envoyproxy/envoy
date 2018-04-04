@@ -1,5 +1,3 @@
-#include <string>
-
 #include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/registry/registry.h"
 
@@ -18,7 +16,6 @@
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
-#include "server/config/http/zipkin_http_tracer.h"
 #include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
 
@@ -319,29 +316,6 @@ TEST(HttpFilterConfigTest, SquashFilterCorrectJson) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
-}
-
-TEST(HttpTracerConfigTest, ZipkinHttpTracer) {
-  NiceMock<Upstream::MockClusterManager> cm;
-  EXPECT_CALL(cm, get("fake_cluster")).WillRepeatedly(Return(&cm.thread_local_cluster_));
-
-  std::string valid_config = R"EOF(
-  {
-    "collector_cluster": "fake_cluster",
-    "collector_endpoint": "/api/v1/spans"
-  }
-  )EOF";
-  Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
-  NiceMock<MockInstance> server;
-  ZipkinHttpTracerFactory factory;
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*valid_json, server, cm);
-  EXPECT_NE(nullptr, zipkin_tracer);
-}
-
-TEST(HttpTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<ZipkinHttpTracerFactory, HttpTracerFactory>()), EnvoyException,
-      "Double registration for name: 'envoy.zipkin'");
 }
 
 } // namespace Configuration

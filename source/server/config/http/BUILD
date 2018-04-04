@@ -115,30 +115,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "lightstep_lib",
-    srcs = ["lightstep_http_tracer.cc"],
-    hdrs = ["lightstep_http_tracer.h"],
-    deps = [
-        "//source/common/config:well_known_names",
-        "//source/common/tracing:http_tracer_lib",
-        "//source/common/tracing:lightstep_tracer_lib",
-        "//source/server:configuration_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "dynamic_opentracing_lib",
-    srcs = ["dynamic_opentracing_http_tracer.cc"],
-    hdrs = ["dynamic_opentracing_http_tracer.h"],
-    deps = [
-        "//source/common/config:well_known_names",
-        "//source/common/tracing:dynamic_opentracing_driver_lib",
-        "//source/common/tracing:http_tracer_lib",
-        "//source/server:configuration_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
@@ -165,16 +141,5 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http/filter:squash_filter_lib",
         "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "zipkin_lib",
-    srcs = ["zipkin_http_tracer.cc"],
-    hdrs = ["zipkin_http_tracer.h"],
-    deps = [
-        "//source/common/config:well_known_names",
-        "//source/common/tracing/zipkin:zipkin_lib",
-        "//source/server:configuration_lib",
     ],
 )

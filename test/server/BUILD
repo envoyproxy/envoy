@@ -29,7 +29,6 @@ envoy_cc_test(
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/server:configuration_lib",
-        "//source/server/config/http:dynamic_opentracing_lib",
         "//source/server/config/network:raw_buffer_socket_lib",
         "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",

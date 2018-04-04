@@ -58,9 +58,6 @@ envoy_cc_library(
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
-        "//source/server/config/http:dynamic_opentracing_lib",
-        "//source/server/config/http:lightstep_lib",
-        "//source/server/config/http:zipkin_lib",
     ],
 )
 
