@@ -251,10 +251,9 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
 
   struct CachedTime {
-    CachedTime() : initialized(false) {}
     std::chrono::time_point<std::chrono::system_clock> time_in_seconds;
     std::string formatted_time;
-    bool initialized;
+    bool initialized_{false};
   };
   static thread_local CachedTime cached_time;
 
@@ -265,13 +264,13 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
 
   std::chrono::time_point<std::chrono::system_clock> time_in_seconds =
       std::chrono::time_point_cast<std::chrono::seconds>(time);
-  if (cached_time.initialized && cached_time.time_in_seconds == time_in_seconds) {
+  if (cached_time.initialized_ && cached_time.time_in_seconds == time_in_seconds) {
     return cached_time.formatted_time + millis;
   }
   auto formatted_time = date_format.fromTime(time);
   cached_time.time_in_seconds = time_in_seconds;
   cached_time.formatted_time = formatted_time;
-  cached_time.initialized = true;
+  cached_time.initialized_ = true;
   return formatted_time + millis;
 }
 
