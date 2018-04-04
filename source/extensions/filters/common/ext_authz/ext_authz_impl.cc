@@ -24,7 +24,8 @@ namespace ExtAuthz {
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.auth.v2.Authorization.Check")),
+          // TODO(dio): Define the following service method name as a constant value.
+          "envoy.service.auth.v2alpha.Authorization.Check")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }

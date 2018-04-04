@@ -71,16 +71,19 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
   client_.onSuccess(std::move(response), span_);
 }
 
-TEST_F(ExtAuthzGrpcClientTest, DISABLED_BasicDenied) {
+TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
   envoy::service::auth::v2alpha::CheckRequest request;
   std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> response;
   Http::HeaderMapImpl headers;
+
   EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
       .WillOnce(
           Invoke([this](const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
                         Grpc::AsyncRequestCallbacks&, Tracing::Span&,
                         const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
-            EXPECT_EQ("envoy.service.auth.v2.Authorization", service_method.service()->full_name());
+            // TODO(dio): Use a defined constant value.
+            EXPECT_EQ("envoy.service.auth.v2alpha.Authorization",
+                      service_method.service()->full_name());
             EXPECT_EQ("Check", service_method.name());
             return &async_request_;
           }));
