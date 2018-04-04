@@ -19,6 +19,11 @@ The following features have been DEPRECATED and will be removed in the specified
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
 
+
+* Admin mutations should be sent as POSTs rather than GETs. Starting in 1.7, these will result
+  in an error status code, and no effect. Prior to 1.7, GETs can be used for admin mutations
+  but will result in a warning.
+
 ## Version 1.5.0
 
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
