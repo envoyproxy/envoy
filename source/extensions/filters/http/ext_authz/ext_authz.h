@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -32,7 +32,7 @@ enum class FilterRequestType { Internal, External, Both };
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
+  FilterConfig(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
@@ -89,7 +89,7 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  envoy::service::auth::v2::CheckRequest check_request_{};
+  envoy::service::auth::v2alpha::CheckRequest check_request_{};
 };
 
 } // namespace ExtAuthz

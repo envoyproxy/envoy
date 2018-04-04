@@ -22,7 +22,7 @@ TEST(HttpExtAuthzConfigTest, ExtAuthzCorrectProto) {
   failure_mode_allow: false
 )EOF";
 
-  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+  envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
   MessageUtil::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
