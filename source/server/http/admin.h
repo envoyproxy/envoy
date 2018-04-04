@@ -31,8 +31,6 @@
 namespace Envoy {
 namespace Server {
 
-class AdminFilter;
-
 /**
  * Implementation of Server::admin.
  */
