@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/ext_authz/v2v2alpha/ext_authz.pb.validate.h"
+#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
