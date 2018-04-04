@@ -26,11 +26,10 @@ private:
   static void parseCommand(const std::string& token, const size_t start, std::string& main_header,
                            std::string& alternative_header, absl::optional<size_t>& max_length);
 
-  // the indexes of where the parameters for each directive is expected to begin - generally the
-  // length of the directive + 1 for the opening '('
-  static const size_t ReqParamStart{4};
-  static const size_t RespParamStart{5};
-  static const size_t StartTimeParamStart{11};
+  // the indexes of where the parameters for each directive is expected to begin
+  static const size_t ReqParamStart{std::strlen("REQ(")};
+  static const size_t RespParamStart{std::strlen("RESP(")};
+  static const size_t StartTimeParamStart{std::strlen("START_TIME(")};
 };
 
 /**
