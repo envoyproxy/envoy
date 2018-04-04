@@ -1,14 +1,16 @@
+load("@envoy_build_config//:extensions_build_config.bzl", "ENVOY_BUILD_CONFIG")
+
 # Return all extensions to be compiled into Envoy.
-# TODO(mattklein123): Every extension should have an independent Bazel select option that will
-# allow us to compile in and out different extensions. We may also consider in the future other
-# selection options such as maturity.
+# TODO(mattklein123): Figure out a way to output in the build and possibly even the binary which
+#                     extensions are statically registered.
 def envoy_all_extensions(repository = ""):
-  return [
+  # These extensions are registered using the extension system but are required for the core
+  # Envoy build.
+  all_extensions = [
     repository + "//source/extensions/access_loggers/file:config",
     repository + "//source/extensions/access_loggers/http_grpc:config",
     repository + "//source/extensions/filters/http/dynamo:config",
     repository + "//source/extensions/filters/http/ext_authz:config",
-    repository + "//source/extensions/filters/http/lua:config",
     repository + "//source/extensions/filters/http/ratelimit:config",
     repository + "//source/extensions/filters/listener/proxy_protocol:config",
     repository + "//source/extensions/filters/listener/original_dst:config",
@@ -28,4 +30,13 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/transport_sockets/raw_buffer:config",
     repository + "//source/extensions/transport_sockets/ssl:config",
   ]
+
+  # These extensions can be removed on a site specific basis.
+  for name, config in ENVOY_BUILD_CONFIG.items():
+    if config["enabled"]:
+      all_extensions.append(repository + config["path"])
+
+  return all_extensions
+
+
 
