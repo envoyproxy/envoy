@@ -243,9 +243,9 @@ public:
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
-  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                            const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                            Stats::Scope& scope);
+  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                                Stats::Scope& scope);
 };
 
 } // namespace Config
