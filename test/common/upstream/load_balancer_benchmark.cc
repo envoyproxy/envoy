@@ -1,3 +1,5 @@
+// Usage: bazel run //test/common/upstream:load_balancer_benchmark
+
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/ring_hash_lb.h"
@@ -14,13 +16,18 @@ namespace {
 
 class BaseTester {
 public:
-  BaseTester(uint64_t num_hosts) {
+  BaseTester(uint64_t num_hosts) : BaseTester(num_hosts, 0, 0) {}
+
+  // We weight the first weighted_subset_percent of hosts with weight.
+  BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight) {
     HostSet& host_set = priority_set_.getOrCreateHostSet(0);
 
     HostVector hosts;
     ASSERT(num_hosts < 65536);
     for (uint64_t i = 0; i < num_hosts; i++) {
-      hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256)));
+      const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
+      hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
+                                   should_weight ? weight : 1));
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
     host_set.updateHosts(updated_hosts, updated_hosts, nullptr, nullptr, {}, hosts, {});
@@ -272,6 +279,60 @@ BENCHMARK(BM_MaglevLoadBalancerHostLoss)
     ->Args({500, 1, 10000})
     ->Args({500, 2, 10000})
     ->Args({500, 3, 10000})
+    ->Unit(benchmark::kMillisecond);
+
+void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
+  for (auto _ : state) {
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t weighted_subset_percent = state.range(1);
+    const uint64_t before_weight = state.range(2);
+    const uint64_t after_weight = state.range(3);
+    const uint64_t keys_to_simulate = state.range(4);
+
+    BaseTester tester(num_hosts, weighted_subset_percent, before_weight);
+    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      hosts.push_back(table.chooseHost(hashInt(i)));
+    }
+
+    BaseTester tester2(num_hosts, weighted_subset_percent, after_weight);
+    MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
+    std::vector<HostConstSharedPtr> hosts2;
+    for (uint64_t i = 0; i < keys_to_simulate; i++) {
+      hosts2.push_back(table2.chooseHost(hashInt(i)));
+    }
+
+    ASSERT(hosts.size() == hosts2.size());
+    uint64_t num_different_hosts = 0;
+    for (uint64_t i = 0; i < hosts.size(); i++) {
+      if (hosts[i]->address()->asString() != hosts2[i]->address()->asString()) {
+        num_different_hosts++;
+      }
+    }
+
+    state.counters["percent_different"] =
+        (static_cast<double>(num_different_hosts) / hosts.size()) * 100;
+    const auto weighted_hosts_percent = [weighted_subset_percent](uint32_t weight) -> double {
+      const double weighted_hosts = weighted_subset_percent;
+      const double unweighted_hosts = 100.0 - weighted_hosts;
+      const double total_weight = weighted_hosts * weight + unweighted_hosts;
+      return 100.0 * (weighted_hosts * weight) / total_weight;
+    };
+    state.counters["optimal_percent_different"] =
+        std::abs(weighted_hosts_percent(before_weight) - weighted_hosts_percent(after_weight));
+  }
+}
+BENCHMARK(BM_MaglevLoadBalancerWeighted)
+    ->Args({500, 5, 1, 1, 10000})
+    ->Args({500, 5, 1, 127, 1000})
+    ->Args({500, 5, 127, 1, 10000})
+    ->Args({500, 50, 1, 127, 1000})
+    ->Args({500, 50, 127, 1, 10000})
+    ->Args({500, 95, 1, 127, 1000})
+    ->Args({500, 95, 127, 1, 10000})
+    ->Args({500, 95, 25, 75, 1000})
+    ->Args({500, 95, 75, 25, 10000})
     ->Unit(benchmark::kMillisecond);
 
 } // namespace
