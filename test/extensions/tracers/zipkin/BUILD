@@ -2,13 +2,16 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "zipkin_test",
     srcs = [
         "span_buffer_test.cc",
@@ -17,6 +20,7 @@ envoy_cc_test(
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
+    extension_name = "envoy.tracers.zipkin",
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/common:time_interface",
@@ -40,9 +44,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.tracers.zipkin",
     deps = [
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:server_mocks",

@@ -29,8 +29,8 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
   )EOF";
   Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
 
-  LightstepHttpTracerFactory factory;
-  Tracing::HttpTracerPtr lightstep_tracer = factory.createHttpTracer(*valid_json, server);
+  LightstepTracerFactory factory;
+  Tracing::HttpTracerPtr lightstep_tracer = factory.createTracer(*valid_json, server);
   EXPECT_NE(nullptr, lightstep_tracer);
 }
 

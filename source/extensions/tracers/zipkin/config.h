@@ -10,13 +10,13 @@ namespace Tracers {
 namespace Zipkin {
 
 /**
- * Config registration for the zipkin http tracer. @see HttpTracerFactory.
+ * Config registration for the zipkin http tracer. @see TracerFactory.
  */
-class ZipkinHttpTracerFactory : public Server::Configuration::HttpTracerFactory {
+class ZipkinTracerFactory : public Server::Configuration::TracerFactory {
 public:
-  // HttpTracerFactory
-  Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
-                                          Server::Instance& server) override;
+  // TracerFactory
+  Tracing::HttpTracerPtr createTracer(const Json::Object& json_config,
+                                      Server::Instance& server) override;
   std::string name() override;
 };
 
