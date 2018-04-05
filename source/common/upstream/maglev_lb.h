@@ -24,10 +24,13 @@ public:
 
 private:
   struct TableBuildEntry {
-    TableBuildEntry(uint64_t offset, uint64_t skip) : offset_(offset), skip_(skip) {}
+    TableBuildEntry(uint64_t offset, uint64_t skip, uint64_t weight)
+        : offset_(offset), skip_(skip), weight_(weight) {}
 
     const uint64_t offset_;
     const uint64_t skip_;
+    const uint64_t weight_;
+    uint64_t counts_{};
     uint64_t next_{};
   };
 
