@@ -180,8 +180,20 @@ public:
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
+  /**
+   * @return the flush interval of stats sinks.
+   */
+  virtual std::chrono::milliseconds statsFlushInterval() PURE;
+
+  // TODO (@trabetti) :  too specific?
+  /**
+   * @ Registers a callbacks connection to Hystrix sink.
+   */
   virtual void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
 
+  /**
+   * @ Unregisters a callbacks connection to Hystrix sink.
+   */
   virtual void unregisterHystrixSink() PURE;
 };
 

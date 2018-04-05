@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/http/filter.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -269,6 +270,9 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
+  MOCK_METHOD1(registerToHystrixSink, void(Http::StreamDecoderFilterCallbacks* callbacks));
+  MOCK_METHOD0(unregisterHystrixSink, void());
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;

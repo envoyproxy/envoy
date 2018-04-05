@@ -87,6 +87,8 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+
+  std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
   void registerToHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
   void unregisterHystrixSink() override { NOT_IMPLEMENTED; }
 

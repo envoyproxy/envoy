@@ -10,9 +10,8 @@ namespace Envoy {
 namespace Stats {
 
 typedef std::vector<uint64_t> RollingStats;
-typedef std::map<std::string, RollingStats> RollingStatsMap;
+typedef std::map<const std::string, RollingStats> RollingStatsMap;
 
-// Consider implement the HystrixStats as a sink to have access to histograms data
 class Hystrix {
 
 public:
@@ -22,87 +21,85 @@ public:
       : current_index_(num_of_buckets), num_of_buckets_(num_of_buckets + 1){};
 
   /**
-   * Add new value to top of rolling window, pushing out the oldest value
+   * Add new value to top of rolling window, pushing out the oldest value.
    */
-  void pushNewValue(std::string key, uint64_t value);
+  void pushNewValue(const std::string& key, uint64_t value);
 
   /**
-   * increment pointer of next value to add to rolling window
+   * Increment pointer of next value to add to rolling window.
    */
   void incCounter() { current_index_ = (current_index_ + 1) % num_of_buckets_; }
 
   /**
-   * Generate the streams to be sent to hystrix dashboard
+   * Generate the streams to be sent to hystrix dashboard.
    */
-  void getClusterStats(std::stringstream& ss, std::string cluster_name,
-                       uint64_t max_concurrent_requests, uint64_t reporting_hosts);
+  void getClusterStats(std::stringstream& ss, absl::string_view cluster_name,
+                       uint64_t max_concurrent_requests, uint64_t reporting_hosts,
+                       uint64_t rolling_window);
 
   /**
-   * Get value of the sampling buckets
+   * Calculate values needed to create the stream and write into the map.
    */
-  static uint64_t GetRollingWindowIntervalInMs() {
-    return static_cast<const uint64_t>(ROLLING_WINDOW_IN_MS / DEFAULT_NUM_OF_BUCKETS);
-  }
-
-  /**
-   * Get value of the keep alive ping interval
-   */
-  static uint64_t GetPingIntervalInMs() { return PING_INTERVAL_IN_MS; }
-
   void updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
-                              std::string cluster_name);
+                              const std::string cluster_name);
 
   /**
-   * clear map
+   * Clear map.
    */
   void resetRollingWindow();
 
   /**
-   * return string represnting current state of the map. for DEBUG.
+   * Return string represnting current state of the map. for DEBUG.
    */
-  std::string printRollingWindow();
+  absl::string_view printRollingWindow() const;
+
+  /**
+   * Get the statistic's value change over the rolling window time frame.
+   */
+  uint64_t getRollingValue(absl::string_view cluster_name, absl::string_view stats);
 
 private:
   /**
-   * Get the statistic's value change over the rolling window time frame
+   * Format the given key and absl::string_view value to "key"="value", and adding to the
+   * stringstream.
    */
-  uint64_t getRollingValue(std::string cluster_name, std::string stats);
-
-  /**
-   * Format the given key and std::string value to "key"="value", and adding to the stringstream
-   */
-  void addStringToStream(std::string key, std::string value, std::stringstream& info);
+  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
 
   /**
    * Format the given key and uint64_t value to "key"=<string of uint64_t>, and adding to the
-   * stringstream
+   * stringstream.
    */
-  void addIntToStream(std::string key, uint64_t value, std::stringstream& info);
+  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info);
 
   /**
-   * Format the given key and value to "key"=value, and adding to the stringstream
+   * Format the given key and value to "key"=value, and adding to the stringstream.
    */
-  void addInfoToStream(std::string key, std::string value, std::stringstream& info);
+  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
 
   /**
-   * generate HystrixCommand event stream
+   * Generate HystrixCommand event stream.
    */
-  void addHystrixCommand(std::stringstream& ss, std::string cluster_name,
-                         uint64_t max_concurrent_requests, uint64_t reporting_hosts);
+  void addHystrixCommand(std::stringstream& ss, absl::string_view cluster_name,
+                         uint64_t max_concurrent_requests, uint64_t reporting_hosts,
+                         uint64_t rolling_window);
 
   /**
-   * generate HystrixThreadPool event stream
+   * Generate HystrixThreadPool event stream.
    */
-  void addHystrixThreadPool(std::stringstream& ss, std::string cluster_name, uint64_t queue_size,
-                            uint64_t reporting_hosts);
+  void addHystrixThreadPool(std::stringstream& ss, absl::string_view cluster_name,
+                            uint64_t queue_size, uint64_t reporting_hosts, uint64_t rolling_window);
+
+  /**
+   * Building lookup name map for all specific cluster values.
+   */
+  void CreateCounterNameLookupForCluster(const std::string& cluster_name);
 
   RollingStatsMap rolling_stats_map_;
   uint64_t current_index_;
   uint64_t num_of_buckets_;
-  // TODO(trabetti): May want to make this configurable via config file
+  // TODO(trabetti): do we want this to be configurable through the HystrixSink in config file?
   static const uint64_t DEFAULT_NUM_OF_BUCKETS = 10;
-  static const uint64_t ROLLING_WINDOW_IN_MS = 10000;
-  static const uint64_t PING_INTERVAL_IN_MS = 3000;
+  std::map<std::string, std::map<std::string, std::string>> counter_name_lookup;
 };
 
 typedef std::unique_ptr<Hystrix> HystrixPtr;
@@ -141,6 +138,7 @@ public:
    * remove registered connection
    */
   void unregisterConnection();
+  Hystrix& getStats() { return *stats_; }
 
 private:
   Stats::HystrixPtr stats_;

@@ -239,6 +239,7 @@ public:
   AdminFilter(AdminImpl& parent);
 
   // Http::StreamFilterBase
+  // TODO (@trabetti) : make more generic (how?)
   void onDestroy() override { parent_.unregisterHystrixConnection(); }
 
   // Http::StreamDecoderFilter
