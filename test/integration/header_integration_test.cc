@@ -5,6 +5,7 @@
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 
+#include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
