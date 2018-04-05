@@ -5,8 +5,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
 #include "common/request_info/request_info_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
