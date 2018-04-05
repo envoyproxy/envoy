@@ -23,10 +23,24 @@ then
 fi
 
 # The code below presents an implementation that works for git repository
-git_rev=$(git rev-parse HEAD)
+git_rev=$(git rev-parse HEAD 2>&1)
 if [[ $? != 0 ]];
 then
-    exit 1
+    # However, if this is in fact a non-git and the SOURCE_VERSION does not
+    # exist: grab ${version} from DEPRECATED.md.
+    version=`cat DEPRECATED.md | grep "## Version" | head -n 1 | cut -d' ' -f3`
+
+    # The revision should be in SHA format. If not, git_sha_rewriter.py will be
+    # unhappy. Hence, the following tries to get it from Github API.
+    commits="https://api.github.com/repos/envoyproxy/envoy/commits"
+    git_rev=`curl -s ${commits}/v${version} 2>&1 \
+        | grep sha \
+        | sed -n 's/.*"sha": "\(.*\)",/\1/p' \
+        | head -n 1`
+
+    echo "BUILD_SCM_REVISION ${git_rev}"
+    echo "BUILD_SCM_STATUS Distribution"
+    exit 0
 fi
 echo "BUILD_SCM_REVISION ${git_rev}"
 
