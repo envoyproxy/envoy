@@ -7,6 +7,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
+#include "common/request_info/request_info_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
@@ -48,13 +49,12 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      request_headers_parser_(
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
-
-  Http::Utility::configureHeadersToAdd(config.http_health_check().request_headers_to_add(),
-                                       headers_to_add_);
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
@@ -107,8 +107,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
-  Http::Utility::addAdditionalHeaders(parent_.headers_to_add_, request_headers);
-
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, RequestInfo::RequestInfoImpl());
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }

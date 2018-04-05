@@ -5,7 +5,7 @@
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
-#include "common/http/utility.h"
+#include "common/router/header_parser.h"
 #include "common/upstream/health_checker_base_impl.h"
 
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -107,7 +107,7 @@ private:
   const std::string path_;
   const std::string host_value_;
   absl::optional<std::string> service_name_;
-  std::vector<std::pair<Http::LowerCaseString, Http::HeaderValueWrapperPtr>> headers_to_add_;
+  Router::HeaderParserPtr request_headers_parser_;
 };
 
 /**

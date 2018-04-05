@@ -299,31 +299,5 @@ void Utility::appendToHeader(HeaderString& header, const std::string& data) {
   }
   header.append(data.c_str(), data.size());
 }
-
-void Utility::configureHeadersToAdd(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
-    std::vector<std::pair<LowerCaseString, HeaderValueWrapperPtr>>& headers) {
-  headers.reserve(headers_to_add.size());
-  for (const auto& header_entry_option : headers_to_add) {
-    HeaderValueWrapperPtr header_value(
-        new HeaderValueWrapper(header_entry_option.header().value(),
-                               PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_entry_option, append, true)));
-    headers.emplace_back(LowerCaseString(header_entry_option.header().key()),
-                         std::move(header_value));
-  }
-}
-
-void Utility::addAdditionalHeaders(
-    std::vector<std::pair<LowerCaseString, HeaderValueWrapperPtr>>& headers_to_add,
-    HeaderMap& headers) {
-  for (const auto& header_entry : headers_to_add) {
-    if (header_entry.second->append_) {
-      headers.addReferenceKey(header_entry.first, header_entry.second->value_);
-    } else {
-      headers.setReferenceKey(header_entry.first, header_entry.second->value_);
-    }
-  }
-}
-
 } // namespace Http
 } // namespace Envoy
