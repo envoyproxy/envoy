@@ -299,5 +299,6 @@ void Utility::appendToHeader(HeaderString& header, const std::string& data) {
   }
   header.append(data.c_str(), data.size());
 }
+
 } // namespace Http
 } // namespace Envoy
