@@ -1415,7 +1415,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
 }
 
 // No available metadata on route.
-TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoMetadata) {
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoRoute) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       if request_handle:metadata():get("foo.bar") == nil then
@@ -1425,6 +1425,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoMetadata) {
   )EOF"};
 
   InSequence s;
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
   setup(SCRIPT);
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
