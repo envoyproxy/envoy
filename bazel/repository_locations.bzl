@@ -77,7 +77,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     envoy_api = dict(
         commit = "f9f5c41a02c3003d76c4a6f14fe77cecb6fc7b56",
-        remote = "https://github.com/envoyproxy/data-plane-api.git",
+        remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
