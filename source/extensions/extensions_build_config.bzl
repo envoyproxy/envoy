@@ -1,8 +1,5 @@
 # FIXFIX comments/docs
-ENVOY_BUILD_CONFIG = {
+EXTENSIONS = {
     # FIXFIX comments
-    "envoy.filters.http.lua": {
-        "enabled": True,
-        "path": "//source/extensions/filters/http/lua:config",
-    }
+    "envoy.filters.http.lua": "@envoy//source/extensions/filters/http/lua:config",
 }
