@@ -5,7 +5,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
-#include "common/request_info/request_info_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
@@ -86,6 +85,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
+const RequestInfo::RequestInfoImpl
+    HttpHealthCheckerImpl::HttpActiveHealthCheckSession::REQUEST_INFO;
+
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -105,7 +107,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
-  parent_.request_headers_parser_->evaluateHeaders(request_headers, RequestInfo::RequestInfoImpl());
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }
