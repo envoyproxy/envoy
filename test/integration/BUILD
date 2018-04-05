@@ -19,7 +19,6 @@ envoy_cc_test(
     name = "ads_integration_test",
     srcs = ["ads_integration_test.cc"],
     data = [
-        "//test/config/integration:server_ads.yaml",
         "//test/config/integration/certs",
     ],
     deps = [
@@ -30,6 +29,7 @@ envoy_cc_test(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:network_utility_lib",
@@ -289,6 +289,7 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
@@ -302,8 +303,6 @@ envoy_cc_test_library(
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "//source/server/config/network:raw_buffer_socket_lib",
-        "//source/server/config/network:ssl_socket_lib",
         "//source/server/http:health_check_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -429,7 +428,6 @@ envoy_cc_test(
         "ssl_integration_test.h",
     ],
     data = [
-        "//test/config/integration:server_ssl.json",
         "//test/config/integration/certs",
     ],
     deps = [
@@ -439,6 +437,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
+        "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -499,12 +498,12 @@ envoy_cc_test(
         "xfcc_integration_test.h",
     ],
     data = [
-        "//test/config/integration:server_xfcc.json",
         "//test/config/integration/certs",
     ],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/transport_sockets/ssl:config",
         "//test/test_common:utility_lib",
     ],
 )

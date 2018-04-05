@@ -46,14 +46,6 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
-    RequestInfoFormatter start_time_format("START_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
-  }
-
-  {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
     EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
@@ -230,6 +222,27 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   }
 }
 
+TEST(AccessLogFormatterTest, startTimeFormatter) {
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
+  Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+
+  {
+    StartTimeFormatter start_time_format("%Y/%m/%d");
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ("2018/03/28", start_time_format.format(header, header, request_info));
+  }
+
+  {
+    StartTimeFormatter start_time_format("");
+    SystemTime time;
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
+  }
+}
+
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
@@ -257,9 +270,23 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   {
     const std::string format =
         "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%";
+
     FormatterImpl formatter(format);
 
     EXPECT_EQ("GET|G|PU|GET", formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
+                               "%START_TIME%";
+
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("2018/03/28|1522280158|bad_format|2018-03-28T23:35:58.000Z",
+              formatter.format(request_header, response_header, request_info));
   }
 }
 

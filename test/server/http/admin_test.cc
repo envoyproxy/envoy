@@ -80,11 +80,30 @@ public:
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")) {
+               listener_scope_.createScope("listener.admin.")),
+        request_headers_{{":path", "/"}} {
 
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
+  }
+
+  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response, absl::string_view method) {
+    request_headers_.insertMethod().value(method.data(), method.size());
+    return admin_.runCallback(path_and_query, request_headers_, response_headers, response);
+  }
+
+  Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response) {
+    return runCallback(path_and_query, response_headers, response,
+                       Http::Headers::get().MethodValues.Get);
+  }
+
+  Http::Code postCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                          Buffer::Instance& response) {
+    return runCallback(path_and_query, response_headers, response,
+                       Http::Headers::get().MethodValues.Post);
   }
 
   std::string address_out_path_;
@@ -92,6 +111,7 @@ public:
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
+  Http::TestHeaderMapImpl request_headers_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
@@ -105,13 +125,24 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/cpuprofiler?enable=n", header_map, data));
+  EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
 #endif
+
+TEST_P(AdminInstanceTest, MutatesWarnWithGet) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  const std::string path("/healthcheck/fail");
+  // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
+  // just issue a warning, so that scripts using curl GET comamnds to mutate state can be fixed.
+  EXPECT_LOG_CONTAINS("warning",
+                      "admin path \"" + path + "\" mutates state, method=GET rather than POST",
+                      EXPECT_EQ(Http::Code::OK, getCallback(path, header_map, data)));
+}
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
@@ -120,7 +151,11 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                    server_, listener_scope_.createScope("listener.admin."));
   Http::HeaderMapImpl header_map;
-  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data);
+  const absl::string_view post = Http::Headers::get().MethodValues.Post;
+  request_headers_.insertMethod().value(post.data(), post.size());
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
+                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y",
+                                                              request_headers_, header_map, data)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -152,23 +187,23 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
   // Test that removable handler gets removed.
   EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::NotFound, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::NotFound, getCallback("/foo/bar", header_map, response));
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
   EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::Accepted, admin_.runCallback("/foo/bar", header_map, response));
+  EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
@@ -203,7 +238,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_TRUE(content_type.find("text/html")) << content_type.c_str();
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
@@ -214,7 +249,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   const std::string logging_action = "<form action='/logging' method='post'";
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
@@ -238,7 +273,7 @@ TEST_P(AdminInstanceTest, ConfigDump) {
  }
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/config_dump", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   std::string output = TestUtility::bufferToString(response);
   EXPECT_EQ(expected_json, output);
 }
@@ -305,7 +340,7 @@ TEST_P(AdminInstanceTest, Runtime) {
 
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response));
+  EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
   EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
 }
 
@@ -322,7 +357,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   overrides["nothing"] = "";
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
   EXPECT_EQ(Http::Code::OK,
-            admin_.runCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
+            getCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
   EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
 }
 
@@ -330,7 +365,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-  EXPECT_EQ(Http::Code::BadRequest, admin_.runCallback("/runtime_modify", header_map, response));
+  EXPECT_EQ(Http::Code::BadRequest, getCallback("/runtime_modify", header_map, response));
   EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
 }
 
