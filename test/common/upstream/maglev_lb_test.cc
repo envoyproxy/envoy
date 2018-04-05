@@ -24,8 +24,9 @@ class MaglevLoadBalancerTest : public ::testing::Test {
 public:
   MaglevLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
 
-  void init() {
-    lb_.reset(new MaglevLoadBalancer(priority_set_, stats_, runtime_, random_, common_config_, 7));
+  void init(uint32_t table_size) {
+    lb_.reset(new MaglevLoadBalancer(priority_set_, stats_, runtime_, random_, common_config_,
+                                     table_size));
     lb_->initialize();
   }
 
@@ -42,7 +43,7 @@ public:
 
 // Works correctly without any hosts.
 TEST_F(MaglevLoadBalancerTest, NoHost) {
-  init();
+  init(7);
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 };
 
@@ -54,7 +55,7 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
       makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
-  init();
+  init(7);
 
   // maglev: i=0 host=127.0.0.1:92
   // maglev: i=1 host=127.0.0.1:94
@@ -64,13 +65,45 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   // maglev: i=5 host=127.0.0.1:90
   // maglev: i=6 host=127.0.0.1:93
   LoadBalancerPtr lb = lb_->factory()->create();
-  {
-    TestLoadBalancerContext context(0);
-    EXPECT_EQ(host_set_.hosts_[2], lb->chooseHost(&context));
+  const std::vector<uint32_t> expected_assignments{2, 4, 0, 1, 5, 0, 3};
+  for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
+              lb->chooseHost(&context));
   }
-  {
-    TestLoadBalancerContext context(15);
-    EXPECT_EQ(host_set_.hosts_[4], lb->chooseHost(&context));
+}
+
+// Weighted sanity test.
+TEST_F(MaglevLoadBalancerTest, Weighted) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2)};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  init(17);
+  // maglev: i=0 host=127.0.0.1:91
+  // maglev: i=1 host=127.0.0.1:90
+  // maglev: i=2 host=127.0.0.1:90
+  // maglev: i=3 host=127.0.0.1:91
+  // maglev: i=4 host=127.0.0.1:90
+  // maglev: i=5 host=127.0.0.1:91
+  // maglev: i=6 host=127.0.0.1:91
+  // maglev: i=7 host=127.0.0.1:90
+  // maglev: i=8 host=127.0.0.1:91
+  // maglev: i=9 host=127.0.0.1:91
+  // maglev: i=10 host=127.0.0.1:91
+  // maglev: i=11 host=127.0.0.1:91
+  // maglev: i=12 host=127.0.0.1:91
+  // maglev: i=13 host=127.0.0.1:90
+  // maglev: i=14 host=127.0.0.1:91
+  // maglev: i=15 host=127.0.0.1:90
+  // maglev: i=16 host=127.0.0.1:91
+  LoadBalancerPtr lb = lb_->factory()->create();
+  const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 1,
+                                                   1, 1, 1, 1, 0, 1, 0, 1};
+  for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
+              lb->chooseHost(&context));
   }
 }
 

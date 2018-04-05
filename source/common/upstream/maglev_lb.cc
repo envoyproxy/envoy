@@ -14,27 +14,48 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
     return;
   }
 
+  // Compute maximum host weight. If this is zero, we are doing unweighted Maglev.
+  uint32_t max_host_weight = 0;
+  for (const auto& host : hosts) {
+    max_host_weight = std::max(host->weight(), max_host_weight);
+  }
+
   // Implementation of pseudocode listing 1 in the paper (see header file for more info).
   std::vector<TableBuildEntry> table_build_entries;
   table_build_entries.reserve(hosts.size());
   for (const auto& host : hosts) {
     const std::string& address = host->address()->asString();
     table_build_entries.emplace_back(HashUtil::xxHash64(address) % table_size_,
-                                     (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1);
+                                     (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
+                                     max_host_weight > 0 ? host->weight() : 0);
   }
 
   table_.resize(table_size_);
   uint64_t table_index = 0;
+  uint32_t iteration = 1;
   while (true) {
     for (uint64_t i = 0; i < hosts.size(); i++) {
-      uint64_t c = permutation(table_build_entries[i]);
+      TableBuildEntry& entry = table_build_entries[i];
+      // Only consider weight if we are doing weighted Maglev.
+      if (max_host_weight > 0) {
+        // Counts are in units of max_host_weight. To understand how counts_ and
+        // weight_ are used below, consider a host with weight equal to
+        // max_host_weight. This would be picked on every single iteration. If
+        // it had weight equal to backend_weight_scale / 3, then this would only
+        // happen every 3 iterations, etc.
+        if (iteration * entry.weight_ < entry.counts_) {
+          continue;
+        }
+        entry.counts_ += max_host_weight;
+      }
+      uint64_t c = permutation(entry);
       while (table_[c] != nullptr) {
-        table_build_entries[i].next_++;
-        c = permutation(table_build_entries[i]);
+        entry.next_++;
+        c = permutation(entry);
       }
 
       table_[c] = hosts[i];
-      table_build_entries[i].next_++;
+      entry.next_++;
       table_index++;
       if (table_index == table_size_) {
         if (ENVOY_LOG_CHECK_LEVEL(trace)) {
@@ -45,6 +66,7 @@ MaglevTable::MaglevTable(const HostVector& hosts, uint64_t table_size) : table_s
         return;
       }
     }
+    ++iteration;
   }
 }
 

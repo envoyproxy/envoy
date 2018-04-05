@@ -47,8 +47,6 @@ envoy_cc_library(
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
         "//source/server/config/network:http_connection_manager_lib",
-        "//source/server/config/network:raw_buffer_socket_lib",
-        "//source/server/config/network:ssl_socket_lib",
         "//source/server/http:health_check_lib",
     ] + envoy_all_extensions(),
 )
@@ -58,9 +56,6 @@ envoy_cc_library(
     srcs = ["main.cc"],
     deps = [
         ":envoy_main_common_lib",
-        "//source/server/config/http:dynamic_opentracing_lib",
-        "//source/server/config/http:lightstep_lib",
-        "//source/server/config/http:zipkin_lib",
     ],
 )
 

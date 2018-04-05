@@ -24,7 +24,8 @@ namespace ExtAuthz {
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.auth.v2.Authorization.Check")),
+          // TODO(dio): Define the following service method name as a constant value.
+          "envoy.service.auth.v2alpha.Authorization.Check")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -36,7 +37,7 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2::CheckRequest& request,
+                           const envoy::service::auth::v2alpha::CheckRequest& request,
                            Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -44,8 +45,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
-                               Tracing::Span& span) {
+void GrpcClientImpl::onSuccess(
+    std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response, Tracing::Span& span) {
   CheckStatus status = CheckStatus::OK;
   ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
   if (response->status().code() != Grpc::Status::GrpcStatus::Ok) {
@@ -66,9 +67,9 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
-                                           const Network::Connection& connection,
-                                           const std::string& service, const bool local) {
+void CheckRequestUtils::setAttrContextPeer(
+    envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
+    const Network::Connection& connection, const std::string& service, const bool local) {
 
   // Set the address
   auto addr = peer.mutable_address();
@@ -113,7 +114,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 }
 
 void CheckRequestUtils::setHttpRequest(
-    ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
+    ::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
 
@@ -158,7 +159,7 @@ void CheckRequestUtils::setHttpRequest(
 }
 
 void CheckRequestUtils::setAttrContextRequest(
-    ::envoy::service::auth::v2::AttributeContext_Request& req,
+    ::envoy::service::auth::v2alpha::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
   setHttpRequest(*req.mutable_http(), callbacks, headers);
@@ -166,7 +167,7 @@ void CheckRequestUtils::setAttrContextRequest(
 
 void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                                         const Envoy::Http::HeaderMap& headers,
-                                        envoy::service::auth::v2::CheckRequest& request) {
+                                        envoy::service::auth::v2alpha::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 
@@ -181,7 +182,7 @@ void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCa
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v2::CheckRequest& request) {
+                                       envoy::service::auth::v2alpha::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 
