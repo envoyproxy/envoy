@@ -30,6 +30,7 @@ private:
   static void parseCommandHeader(const std::string& token, const size_t start,
                                  std::string& main_header, std::string& alternative_header,
                                  absl::optional<size_t>& max_length);
+
   /**
    * General parse command utility. Will parse token from start position. Token is expected to end
    * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
@@ -45,7 +46,7 @@ private:
    * @param start the index to start parsing from
    * @param seperator seperator between values
    * @param main the first value
-   * @param subitems any additional values
+   * @param sub_items any additional values
    * @param max_length optional max_length will be populated if specified
    *
    * TODO(glicht) Rewrite with a parser library. See:
@@ -53,7 +54,7 @@ private:
    */
   static void parseCommand(const std::string& token, const size_t start,
                            const std::string& separator, std::string& main,
-                           std::vector<std::string>& subitems, absl::optional<size_t>& max_length);
+                           std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
 };
 
 /**

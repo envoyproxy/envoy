@@ -11,6 +11,8 @@
 #include "common/http/utility.h"
 #include "common/request_info/utility.h"
 
+#include "absl/strings/str_split.h"
+
 using Envoy::Config::Metadata;
 
 namespace Envoy {
@@ -85,10 +87,10 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
 
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
                                          const std::string& separator, std::string& main,
-                                         std::vector<std::string>& subitems,
+                                         std::vector<std::string>& sub_items,
                                          absl::optional<size_t>& max_length) {
   size_t end_request = token.find(')', start);
-  subitems.clear();
+  sub_items.clear();
   if (end_request != token.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
@@ -110,22 +112,15 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     max_length = length_value;
   }
 
-  std::string name_data = token.substr(start, end_request - start);
-  size_t separator_pos = name_data.find(separator);
-
-  if (separator_pos == std::string::npos) {
-    // no separator -> main value is simply the whole data
-    main = name_data;
-  } else {
-    // seperator found -> extract main value and then sub values
-    main = name_data.substr(0, separator_pos);
-    do {
-      const size_t next_separator_pos = name_data.find(separator, separator_pos + 1);
-      const size_t end =
-          next_separator_pos == std::string::npos ? name_data.size() : next_separator_pos;
-      subitems.push_back(name_data.substr(separator_pos + 1, end - separator_pos - 1));
-      separator_pos = next_separator_pos;
-    } while (separator_pos != std::string::npos);
+  const std::string name_data = token.substr(start, end_request - start);
+  const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
+  if (!keys.empty()) {
+    // The main value is the first key
+    main = keys.at(0);
+    if (keys.size() > 1) {
+      // Sub items contain additional keys
+      sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+    }
   }
 }
 
@@ -367,7 +362,7 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
 }
 
 // TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
-// See: https://github.com/envoyproxy/envoy/pull/2895#pullrequestreview-108668292
+// See: https://github.com/envoyproxy/envoy/issues/3006
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
                                                    absl::optional<size_t> max_length)
