@@ -659,30 +659,6 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   }
 }
 
-TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
-
-  envoy::config::filter::accesslog::v2::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
-  config.set_name(Config::AccessLogNames::get().FILE);
-
-  InstanceSharedPtr log = AccessLogFactory::fromProto(config, context_);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
-}
-
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   std::string filter_json = R"EOF(
     {

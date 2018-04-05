@@ -2,6 +2,8 @@
 
 #include "envoy/common/time.h"
 
+#include "common/common/logger.h"
+
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 

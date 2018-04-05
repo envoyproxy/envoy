@@ -7,7 +7,6 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
-#include "server/config/access_log/file_access_log.h"
 #include "server/config/network/http_connection_manager.h"
 
 #include "extensions/filters/http/dynamo/dynamo_filter.h"
@@ -67,10 +66,6 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
     EXPECT_THROW(filter_case.first.createFilterFactoryFromProto(filter_case.second, context),
                  ProtoValidationException);
   }
-
-  EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
-                   envoy::config::filter::accesslog::v2::FileAccessLog(), nullptr, context),
-               ProtoValidationException);
 }
 
 TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
@@ -247,28 +242,6 @@ TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
       EnvoyException,
       fmt::format("Double registration for name: '{}'",
                   Config::NetworkFilterNames::get().CLIENT_SSL_AUTH));
-}
-
-TEST(AccessLogConfigTest, FileAccessLogTest) {
-  auto factory = Registry::FactoryRegistry<AccessLogInstanceFactory>::getFactory(
-      Config::AccessLogNames::get().FILE);
-  ASSERT_NE(nullptr, factory);
-
-  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  ASSERT_NE(nullptr, message);
-
-  envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
-  file_access_log.set_path("/dev/null");
-  file_access_log.set_format("%START_TIME%");
-  MessageUtil::jsonConvert(file_access_log, *message);
-
-  AccessLog::FilterPtr filter;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-
-  AccessLog::InstanceSharedPtr instance =
-      factory->createAccessLogInstance(*message, std::move(filter), context);
-  EXPECT_NE(nullptr, instance);
-  EXPECT_NE(nullptr, dynamic_cast<AccessLog::FileAccessLog*>(instance.get()));
 }
 
 } // namespace Configuration

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <envoy/server/config_tracker.h>
+#include "envoy/server/config_tracker.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"

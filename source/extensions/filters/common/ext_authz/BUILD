@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     deps = [
         "//include/envoy/tracing:http_tracer_interface",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc",
+        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
     ],
 )
 
