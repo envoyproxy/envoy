@@ -14,6 +14,3 @@ def envoy_all_extensions():
     all_extensions.append(path)
 
   return all_extensions
-
-
-

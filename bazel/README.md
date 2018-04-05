@@ -269,7 +269,7 @@ Extensions that can be removed are contained in
 procedure to customize the extensions for your build:
 
 * The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
-  contains the file `@envoy_build_config//extensions_build_config.bzl:`. In the default build,
+  contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
   a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
   Thus, the default build has all extensions.
 * Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
