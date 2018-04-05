@@ -14,7 +14,7 @@ namespace Envoy {
 
 /**
  * Provides a mechanism to temporarily set the logging level on
- * construction, restoring its previous state on dstruction.
+ * construction, restoring its previous state on deconstruction.
  *
  * The log_level is the minimum log severity required to print messages.
  * Messages below this loglevel will be suppressed.
@@ -51,7 +51,7 @@ public:
   explicit LogRecordingSink(Logger::DelegatingLogSinkPtr log_sink);
   virtual ~LogRecordingSink();
 
-  // Logger::SinkDelgate
+  // Logger::SinkDelegate
   void log(absl::string_view msg) override;
   void flush() override;
 
@@ -60,6 +60,30 @@ public:
 private:
   std::vector<std::string> messages_;
 };
+
+typedef std::vector<std::pair<std::string, std::string>> ExpectedLoggingPairs;
+
+// Validates that when the stmt is executed, a sequence of emmitted logs matches a sequence of
+// expected log messages and log level pairs (ExpectedLoggingPairs). Note that both sequences must
+// respect the same order.
+#define EXPECT_LOG_SEQ(expected_logging_pairs, stmt)                                               \
+  do {                                                                                             \
+    LogLevelSetter save_levels(spdlog::level::trace);                                              \
+    LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
+    stmt;                                                                                          \
+    ASSERT_EQ(expected_logging_pairs.size(), log_recorder.messages().size());                      \
+    auto it1 = expected_logging_pairs.begin();                                                     \
+    auto it2 = log_recorder.messages().begin();                                                    \
+    for (; it1 != expected_logging_pairs.end() && it2 != log_recorder.messages().end();            \
+         ++it1, ++it2) {                                                                           \
+      std::vector<absl::string_view> pieces = absl::StrSplit(*it2, "][");                          \
+      const auto expected_log_level = it1->first;                                                  \
+      const auto actual_log_level = std::string(pieces[2]);                                        \
+      const auto actual_log_message = absl::string_view(pieces[3]).find(it1->second);              \
+      EXPECT_EQ(expected_log_level, actual_log_level);                                             \
+      EXPECT_NE(actual_log_message, absl::string_view::npos);                                      \
+    }                                                                                              \
+  } while (false)
 
 // Validates that when stmt is executed, exactly one log message containing substr will be emitted.
 #define EXPECT_LOG_CONTAINS(loglevel, substr, stmt)                                                \

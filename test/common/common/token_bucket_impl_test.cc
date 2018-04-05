@@ -1,6 +1,6 @@
 #include <chrono>
 
-#include "common/common/token_bucket.h"
+#include "common/common/token_bucket_impl.h"
 
 #include "test/mocks/common.h"
 
@@ -13,7 +13,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 
-class TokenBucketTest : public testing::Test {
+class TokenBucketImplTest : public testing::Test {
 public:
   using time_point = std::chrono::steady_clock::time_point;
 
@@ -22,8 +22,8 @@ protected:
 };
 
 // Verifies TokenBucket initialization.
-TEST_F(TokenBucketTest, Initialization) {
-  TokenBucket token_bucket{1, -1.0, time_source_};
+TEST_F(TokenBucketImplTest, Initialization) {
+  TokenBucketImpl token_bucket{1, -1.0, time_source_};
 
   EXPECT_TRUE(token_bucket.consume());
   EXPECT_CALL(time_source_, currentTime()).WillOnce(Return(time_point{}));
@@ -31,8 +31,8 @@ TEST_F(TokenBucketTest, Initialization) {
 }
 
 // Verifies TokenBucket's maximum capacity.
-TEST_F(TokenBucketTest, MaxBucketSize) {
-  TokenBucket token_bucket{3, 1, time_source_};
+TEST_F(TokenBucketImplTest, MaxBucketSize) {
+  TokenBucketImpl token_bucket{3, 1, time_source_};
 
   EXPECT_TRUE(token_bucket.consume(3));
   EXPECT_CALL(time_source_, currentTime()).WillOnce(Return(time_point(std::chrono::seconds(10))));
@@ -42,9 +42,9 @@ TEST_F(TokenBucketTest, MaxBucketSize) {
 }
 
 // Verifies that TokenBucket can consume and refill tokens.
-TEST_F(TokenBucketTest, ConsumeAndRefill) {
+TEST_F(TokenBucketImplTest, ConsumeAndRefill) {
   {
-    TokenBucket token_bucket{10, 1, time_source_};
+    TokenBucketImpl token_bucket{10, 1, time_source_};
 
     EXPECT_FALSE(token_bucket.consume(20));
     EXPECT_TRUE(token_bucket.consume(9));
@@ -69,7 +69,7 @@ TEST_F(TokenBucketTest, ConsumeAndRefill) {
   ASSERT_TRUE(Mock::VerifyAndClear(&time_source_));
 
   {
-    TokenBucket token_bucket{1, 0.5, time_source_};
+    TokenBucketImpl token_bucket{1, 0.5, time_source_};
 
     EXPECT_TRUE(token_bucket.consume());
 

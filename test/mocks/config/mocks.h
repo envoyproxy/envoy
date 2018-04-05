@@ -76,13 +76,5 @@ public:
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
-class MockGrpcMuxLogger : public GrpcMuxLogger {
-public:
-  MockGrpcMuxLogger(){};
-  virtual ~MockGrpcMuxLogger(){};
-
-  MOCK_CONST_METHOD1(warn, void(const std::string& message));
-};
-
 } // namespace Config
 } // namespace Envoy

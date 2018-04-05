@@ -99,10 +99,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "token_bucket_test",
-    srcs = ["token_bucket_test.cc"],
+    name = "token_bucket_impl_test",
+    srcs = ["token_bucket_impl_test.cc"],
     deps = [
-        "//source/common/common:token_bucket_lib",
+        "//source/common/common:token_bucket_impl_lib",
         "//test/mocks:common_lib",
         "//test/test_common:utility_lib",
     ],

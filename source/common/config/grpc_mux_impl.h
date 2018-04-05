@@ -2,6 +2,8 @@
 
 #include <unordered_map>
 
+#include "envoy/common/time.h"
+#include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
@@ -10,20 +12,9 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
-#include "common/common/token_bucket.h"
 
 namespace Envoy {
 namespace Config {
-
-namespace {
-
-// Wrapper class for ENVOY_LOG. This is passed in GrpcMuxImpl so that critical warnings can be
-// tested.
-struct GrpcMuxLoggerImpl : public GrpcMuxLogger, Logger::Loggable<Logger::Id::upstream> {
-  void warn(const std::string& msg) const override { ENVOY_LOG(warn, "{}", msg); }
-};
-
-} // namespace
 
 /**
  * ADS API implementation that fetches via gRPC.
@@ -34,7 +25,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              const GrpcMuxLogger& logger = GrpcMuxLoggerImpl{});
+              MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -96,22 +87,20 @@ private:
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
     // Detects when Envoy is making too many requests.
-    // Bucket contains 90 tokens max and refills at 5 tokens/sec.
-    TokenBucket limit_request{90, 5};
+    TokenBucketPtr limit_request_;
     // Limits warning messages when too many requests is detected.
-    // Bucket contains 1 token max and refills 1 token on every ~5 seconds.
-    TokenBucket limit_log{1, 0.2};
+    TokenBucketPtr limit_log_;
   };
 
   envoy::api::v2::core::Node node_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
-  const GrpcMuxLogger& grpc_mux_logger_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
+  MonotonicTimeSource& time_source_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

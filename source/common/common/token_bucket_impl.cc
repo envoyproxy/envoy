@@ -1,14 +1,15 @@
-#include "common/common/token_bucket.h"
+#include "common/common/token_bucket_impl.h"
 
 #include <chrono>
 
 namespace Envoy {
 
-TokenBucket::TokenBucket(uint64_t max_tokens, double fill_rate, MonotonicTimeSource& time_source)
+TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, double fill_rate,
+                                 MonotonicTimeSource& time_source)
     : max_tokens_(max_tokens), fill_rate_(std::abs(fill_rate)), tokens_(max_tokens),
       last_fill_(time_source.currentTime()), time_source_(time_source) {}
 
-bool TokenBucket::consume(uint64_t tokens) {
+bool TokenBucketImpl::consume(uint64_t tokens) {
   if (tokens_ < max_tokens_) {
     const auto time_now = time_source_.currentTime();
     tokens_ = std::min((std::chrono::duration<double>(time_now - last_fill_).count() * fill_rate_) +
@@ -23,6 +24,6 @@ bool TokenBucket::consume(uint64_t tokens) {
 
   tokens_ -= tokens;
   return true;
-} // namespace Envoy
+}
 
 } // namespace Envoy
