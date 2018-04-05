@@ -2305,7 +2305,7 @@ virtual_hosts:
     }
     {
       Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
-      EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
+      EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
     }
     {
       Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
