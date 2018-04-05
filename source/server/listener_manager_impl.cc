@@ -1,4 +1,5 @@
 #include "server/listener_manager_impl.h"
+#include "server/listener_socket_option_impl.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
@@ -107,46 +108,6 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-// Socket::Option implementation for API-defined listener socket options.
-// This same object can be extended to handle additional listener socket options.
-class ListenerSocketOption : public Network::SocketOptionImpl {
-public:
-  ListenerSocketOption(const envoy::api::v2::Listener& config)
-      : Network::SocketOptionImpl(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{})),
-        tcp_fast_open_queue_length_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            config, tcp_fast_open_queue_length, absl::optional<uint32_t>{})) {}
-
-  // Socket::Option
-  bool setOption(Network::Socket& socket, Network::Socket::SocketState state) const override {
-    if (state == Network::Socket::SocketState::Listening) {
-      if (tcp_fast_open_queue_length_.has_value()) {
-        const int tfo_value = tcp_fast_open_queue_length_.value();
-        const Network::SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
-        if (option_name) {
-          const int error = Api::OsSysCallsSingleton::get().setsockopt(
-              socket.fd(), IPPROTO_TCP, option_name.value(),
-              reinterpret_cast<const void*>(&tfo_value), sizeof(tfo_value));
-          if (error != 0) {
-            ENVOY_LOG(warn, "Setting TCP_FASTOPEN on listener socket failed: {}", strerror(errno));
-            return false;
-          } else {
-            ENVOY_LOG(debug, "Successfully set socket option TCP_FASTOPEN to {}", tfo_value);
-          }
-        } else {
-          ENVOY_LOG(warn, "Unsupported socket option TCP_FASTOPEN");
-        }
-      }
-    }
-
-    return true;
-  }
-
-private:
-  const absl::optional<uint32_t> tcp_fast_open_queue_length_;
-};
-
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
@@ -169,7 +130,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   // Add listen socket options from the config.
-  addListenSocketOption(std::make_shared<ListenerSocketOption>(config));
+  addListenSocketOption(std::make_shared<ListenerSocketOptionImpl>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =

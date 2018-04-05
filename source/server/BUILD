@@ -197,6 +197,7 @@ envoy_cc_library(
         ":configuration_lib",
         ":drain_manager_lib",
         ":init_manager_lib",
+        ":listener_socket_option_lib",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -210,6 +211,18 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_socket_option_lib",
+    srcs = ["listener_socket_option_impl.cc"],
+    hdrs = ["listener_socket_option_impl.h"],
+    deps = [
+        ":configuration_lib",
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 
