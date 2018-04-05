@@ -231,6 +231,7 @@ public:
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(clusterMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
 
   std::string cluster_name_{"fake_cluster"};
@@ -245,6 +246,7 @@ public:
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
+  envoy::api::v2::core::Metadata cluster_metadata_;
 };
 
 class MockDecorator : public Decorator {

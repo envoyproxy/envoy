@@ -362,6 +362,12 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
+   * @return const envoy::api::v2::core::Metadata& metadata related to the cluster referenced by
+   * clusterName.
+   */
+  virtual const envoy::api::v2::core::Metadata& clusterMetadata() const PURE;
+
+  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */

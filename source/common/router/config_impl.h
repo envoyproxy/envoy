@@ -345,6 +345,9 @@ public:
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const envoy::api::v2::core::Metadata& clusterMetadata() const override {
+    return cluster_metadata_;
+  }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
 
   // Router::DirectResponseEntry
@@ -421,6 +424,9 @@ private:
       return parent_->includeVirtualHostRateLimits();
     }
     const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
+    const envoy::api::v2::core::Metadata& clusterMetadata() const override {
+      return parent_->clusterMetadata();
+    }
     const PathMatchCriterion& pathMatchCriterion() const override {
       return parent_->pathMatchCriterion();
     }
@@ -458,6 +464,10 @@ private:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
+    const envoy::api::v2::core::Metadata& clusterMetadata() const override {
+      return cluster_metadata_;
+    }
+
     void finalizeRequestHeaders(Http::HeaderMap& headers,
                                 const RequestInfo::RequestInfo& request_info) const override {
       request_headers_parser_->evaluateHeaders(headers, request_info);
@@ -476,6 +486,7 @@ private:
     MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
+    envoy::api::v2::core::Metadata cluster_metadata_;
   };
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
@@ -520,6 +531,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
+  envoy::api::v2::core::Metadata cluster_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;

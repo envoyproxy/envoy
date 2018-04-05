@@ -256,6 +256,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     metadata_ = route.metadata();
   }
 
+  if (route.route().has_cluster_metadata()) {
+    cluster_metadata_ = route.route().cluster_metadata();
+  }
+
   // If this is a weighted_cluster, we create N internal route entries
   // (called WeightedClusterEntry), such that each object is a simple
   // single cluster, pointing back to the parent. Metadata criteria
@@ -526,7 +530,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
-                                                       cluster.response_headers_to_remove())) {
+                                                       cluster.response_headers_to_remove())),
+      cluster_metadata_(parent->clusterMetadata()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -538,6 +543,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
         cluster_metadata_match_criteria_.reset(new MetadataMatchCriteriaImpl(filter_it->second));
       }
     }
+  }
+
+  if (cluster.has_cluster_metadata()) {
+    cluster_metadata_.MergeFrom(cluster.cluster_metadata());
   }
 }
 
