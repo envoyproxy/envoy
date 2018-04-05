@@ -72,14 +72,16 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLoggingPairs;
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     ASSERT_EQ(expected_logging_pairs.size(), log_recorder.messages().size());                      \
-    auto it1 = expected_logging_pairs.begin();                                                     \
-    auto it2 = log_recorder.messages().begin();                                                    \
-    for (; it1 != expected_logging_pairs.end() && it2 != log_recorder.messages().end();            \
-         ++it1, ++it2) {                                                                           \
-      std::vector<absl::string_view> pieces = absl::StrSplit(*it2, "][");                          \
-      const auto expected_log_level = it1->first;                                                  \
+    auto expected_it = expected_logging_pairs.begin();                                             \
+    auto actual_it = log_recorder.messages().begin();                                              \
+    for (; expected_it != expected_logging_pairs.end() &&                                          \
+           actual_it != log_recorder.messages().end();                                             \
+         expected_it++, actual_it++) {                                                             \
+      /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */     \
+      std::vector<absl::string_view> pieces = absl::StrSplit(*actual_it, "][");                    \
+      const auto expected_log_level = expected_it->first;                                          \
       const auto actual_log_level = std::string(pieces[2]);                                        \
-      const auto actual_log_message = absl::string_view(pieces[3]).find(it1->second);              \
+      const auto actual_log_message = absl::string_view(pieces[3]).find(expected_it->second);      \
       EXPECT_EQ(expected_log_level, actual_log_level);                                             \
       EXPECT_NE(actual_log_message, absl::string_view::npos);                                      \
     }                                                                                              \
