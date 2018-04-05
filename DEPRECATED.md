@@ -5,6 +5,12 @@ As of release 1.3.0, Envoy will follow a
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 
+## Version 1.7.0...
+
+* Admin mutations should be sent as POSTs rather than GETs. These will result in an error
+  status code, and will not have their intended effect. Prior to 1.7, GETs can be used for
+  admin mutations, but a warning is logged.
+
 ## Version 1.6.0
 
 * DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
@@ -18,11 +24,6 @@ The following features have been DEPRECATED and will be removed in the specified
   matching instead.
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
-
-
-* Admin mutations should be sent as POSTs rather than GETs. Starting in 1.7, these will result
-  in an error status code, and no effect. Prior to 1.7, GETs can be used for admin mutations
-  but will result in a warning.
 
 ## Version 1.5.0
 
