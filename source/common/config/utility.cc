@@ -108,20 +108,12 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
       is_grpc ? api_config_source.grpc_services()[0].envoy_grpc().cluster_name()
               : api_config_source.cluster_names()[0];
   const auto& it = clusters.find(cluster_name);
-  if (it == clusters.end()) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
-                                     "defined non-EDS cluster: '{}' does not exist",
-                                     cluster_name));
-  }
-  if (it->second.get().info()->addedViaApi()) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
-                                     "defined non-EDS cluster: '{}' was added via api",
-                                     cluster_name));
-  }
-  if (it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
-                                     "defined non-EDS cluster: '{}' is an EDS cluster",
-                                     cluster_name));
+  if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+    throw EnvoyException(fmt::format(
+        "envoy::api::v2::core::ConfigSource must have a statically "
+        "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+        cluster_name));
   }
 }
 
