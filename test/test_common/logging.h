@@ -61,21 +61,21 @@ private:
   std::vector<std::string> messages_;
 };
 
-typedef std::vector<std::pair<std::string, std::string>> ExpectedLoggingPairs;
+typedef std::vector<std::pair<std::string, std::string>> ExpectedLogSequence;
 
-// Validates that when the stmt is executed, a sequence of emmitted logs matches a sequence of
-// expected log messages and log level pairs (ExpectedLoggingPairs). Note that both sequences must
+// Validates that when the stmt is executed, a sequence of emmitted log messages matches the
+// sequence of expected logs/log level pair (ExpectedLogSequence). Note that both sequences must
 // respect the same order.
-#define EXPECT_LOG_SEQ(expected_logging_pairs, stmt)                                               \
+#define EXPECT_LOG_SEQ(expected_log_sequence, stmt)                                                \
   do {                                                                                             \
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
-    ASSERT_EQ(expected_logging_pairs.size(), log_recorder.messages().size());                      \
-    auto expected_it = expected_logging_pairs.begin();                                             \
+    ASSERT_EQ(expected_log_sequence.size(), log_recorder.messages().size());                       \
+    auto expected_it = expected_log_sequence.begin();                                              \
     auto actual_it = log_recorder.messages().begin();                                              \
-    for (; expected_it != expected_logging_pairs.end() &&                                          \
-           actual_it != log_recorder.messages().end();                                             \
+    for (;                                                                                         \
+         expected_it != expected_log_sequence.end() && actual_it != log_recorder.messages().end(); \
          expected_it++, actual_it++) {                                                             \
       /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */     \
       std::vector<absl::string_view> pieces = absl::StrSplit(*actual_it, "][");                    \

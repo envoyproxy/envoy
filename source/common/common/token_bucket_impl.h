@@ -8,7 +8,7 @@
 namespace Envoy {
 
 /**
- * This class implements the token bucket interface (not thread-safe).
+ * A class that implements token bucket interface (not thread-safe).
  */
 class TokenBucketImpl : public TokenBucket {
 public:
@@ -16,10 +16,9 @@ public:
    * @param max_tokens supplies the maximun number of tokens in the bucket.
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
-   * @param time_source supplies the the time source and used to facilitate testing. The default is
-   * ProdMonotonicTimeSource.
+   * @param time_source supplies the time source. The default is ProdMonotonicTimeSource.
    */
-  explicit TokenBucketImpl(uint64_t max_tokens, double fill_rate,
+  explicit TokenBucketImpl(uint64_t max_tokens, double fill_rate = 1,
                            MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
 
   bool consume(uint64_t tokens = 1) override;

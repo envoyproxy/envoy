@@ -1,8 +1,3 @@
-#include <chrono>
-#include <iterator>
-#include <thread>
-#include <vector>
-
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
@@ -92,7 +87,6 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
   auto bar_sub = grpc_mux_->subscribe("bar", {}, callbacks_);
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
@@ -299,7 +293,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 
 //  Verifies that warning messages get logged when Envoy detects too many requests.
 TEST_F(GrpcMuxImplTest, TooManyRequests) {
-  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(99));
+  EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(time_source_, currentTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
@@ -319,7 +313,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   expectSendMessage("foo", {"x"}, "");
   grpc_mux_->start();
 
-  const ExpectedLoggingPairs expected_logs = {
+  const ExpectedLogSequence expected_logs = {
       {"debug", "Received gRPC message for foo at version baz"},
       {"warning", "Too many sendDiscoveryRequest calls for foo"},
       {"trace", "Sending DiscoveryRequest for foo: version_info"}};
@@ -327,17 +321,17 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   // Exhausts the limit.
   onReceiveMessage(99);
 
-  // API calls gets over the limit for the first time.
+  // API calls go over the limit for the first time.
   EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
 
-  // Only logging limmiter waits for 5s, so a second warning message is expected.
+  // Logging limmiter waits for 5s, so a second warning message is expected.
   EXPECT_CALL(time_source_, currentTime())
       .Times(4)
       .WillOnce(Return(std::chrono::steady_clock::time_point{}))
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
-  // API calls gets over the limit for the second time.
+  // API calls go over the limit for the second time.
   EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
 }
 
