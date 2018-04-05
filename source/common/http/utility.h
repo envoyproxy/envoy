@@ -14,17 +14,6 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Wrapper of an envoy::api::v2::core::HeaderValueOption's value and its append flag.
- */
-struct HeaderValueWrapper {
-  HeaderValueWrapper(const std::string& value, bool append) : value_(value), append_(append) {}
-
-  const std::string value_;
-  const bool append_;
-};
-typedef std::unique_ptr<HeaderValueWrapper> HeaderValueWrapperPtr;
-
-/**
  * General HTTP utilities.
  */
 class Utility {
