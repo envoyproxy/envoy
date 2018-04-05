@@ -269,8 +269,6 @@ TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
                                           "P95: 2.095, P99: 2.099, P99.9: 2.0999, P100: 2.1";
   std::string not_used_summary =
       "P0: 0, P25: 0, P50: 0, P75: 0, P90: 0, P95: 0, P99: 0, P99.9: 0, P100: 0";
-  std::string not_used_in_interval_summary =
-      "P0: 1, P25: 1, P50: 1, P75: 1, P90: 1, P95: 1, P99: 1, P99.9: 1, P100: 1";
 
   std::string summary_with_two_values =
       "P0: 1, P25: 1.05, P50: 1.1, P75: 2.05, P90: 2.08, P95: 2.09, P99: "
@@ -302,7 +300,7 @@ TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
     if (histogram->name().find("h1") != std::string::npos) {
       EXPECT_NE(histogram->cumulativeStatistics().summary(),
                 histogram->intervalStatistics().summary());
-      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_summary);
       EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
     } else {
       EXPECT_EQ(histogram->cumulativeStatistics().summary(),
@@ -327,7 +325,7 @@ TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
     if (histogram->name().find("h1") != std::string::npos) {
       EXPECT_NE(histogram->cumulativeStatistics().summary(),
                 histogram->intervalStatistics().summary());
-      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_summary);
       EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
     } else {
       EXPECT_NE(histogram->cumulativeStatistics().summary(),
@@ -350,16 +348,69 @@ TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
     if (histogram->name().find("h1") != std::string::npos) {
       EXPECT_NE(histogram->cumulativeStatistics().summary(),
                 histogram->intervalStatistics().summary());
-      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_summary);
       EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
     } else {
       EXPECT_NE(histogram->cumulativeStatistics().summary(),
                 histogram->intervalStatistics().summary());
-      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_summary);
       EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_two_values);
     }
   }
   store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, BasicScopeHistogramMerge) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopePtr scope1 = store_->createScope("scope1.");
+
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
+  h2.recordValue(2);
+
+  std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
+
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  EXPECT_TRUE(*merge_called);
+
+  std::list<HistogramSharedPtr> histogram_list = store_->histograms();
+
+  EXPECT_EQ(histogram_list.size(), 2);
+
+  std::string summary_with_one_as_value =
+      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, P99: "
+      "1.099, P99.9: 1.0999, P100: 1.1";
+  std::string summary_with_two_as_value = "P0: 2, P25: 2.025, P50: 2.05, P75: 2.075, P90: 2.09, "
+                                          "P95: 2.095, P99: 2.099, P99.9: 2.0999, P100: 2.1";
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    } else {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_two_as_value);
+    }
+  }
+
+  store_->shutdownThreading();
+
   tls_.shutdownThread();
 
   // Includes overflow stat.

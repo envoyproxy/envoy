@@ -29,7 +29,7 @@ public:
     histograms_[1] = hist_alloc();
   }
 
-  ~ThreadLocalHistogramImpl() {
+  virtual ~ThreadLocalHistogramImpl() {
     hist_free(histograms_[0]);
     hist_free(histograms_[1]);
   }
@@ -39,8 +39,6 @@ public:
     parent_.deliverHistogramToSinks(*this, value);
     flags_ |= Flags::Used;
   }
-
-  void beginMerge() { current_active_ = 1 - current_active_; }
 
   // TODO: split the Histogram interface in to two - parent and tls.
   void merge() override { NOT_IMPLEMENTED; }
@@ -52,6 +50,8 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
+
+  void beginMerge() { current_active_ = 1 - current_active_; }
 
   void merge(histogram_t* target) {
     histogram_t* hist_array[1];
@@ -79,12 +79,14 @@ class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
   HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                       std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+        interval_statistics_(std::make_unique<HistogramStatisticsImpl>()),
+        cumulative_statistics_(std::make_unique<HistogramStatisticsImpl>()) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
   }
 
-  ~HistogramParentImpl() {
+  virtual ~HistogramParentImpl() {
     hist_free(interval_histogram_);
     hist_free(cumulative_histogram_);
   }
@@ -96,11 +98,6 @@ public:
   bool used() const override {
     std::unique_lock<std::mutex> lock(merge_lock_);
     return usedWorker();
-  }
-
-  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
-    std::unique_lock<std::mutex> lock(merge_lock_);
-    tls_histograms_.emplace_back(hist_ptr);
   }
 
   /**
@@ -120,15 +117,20 @@ public:
       histogram_t* hist_array[1];
       hist_array[0] = interval_histogram_;
       hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
-      cumulative_statistics_ = HistogramStatisticsImpl(cumulative_histogram_);
-      interval_statistics_ = HistogramStatisticsImpl(interval_histogram_);
+      cumulative_statistics_ = std::make_unique<HistogramStatisticsImpl>(cumulative_histogram_);
+      interval_statistics_ = std::make_unique<HistogramStatisticsImpl>(interval_histogram_);
     }
   }
 
-  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
+  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return cumulative_statistics_;
+    return *cumulative_statistics_;
+  }
+
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
+    std::unique_lock<std::mutex> lock(merge_lock_);
+    tls_histograms_.emplace_back(hist_ptr);
   }
 
   Store& parent_;
@@ -137,7 +139,7 @@ public:
 private:
   bool usedWorker() const {
     bool any_tls_used = false;
-    for (TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
+    for (const TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
       if (tls_histogram->used()) {
         any_tls_used = true;
         break;
@@ -148,8 +150,8 @@ private:
 
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
-  HistogramStatisticsImpl interval_statistics_;
-  HistogramStatisticsImpl cumulative_statistics_;
+  std::unique_ptr<HistogramStatisticsImpl> interval_statistics_;
+  std::unique_ptr<HistogramStatisticsImpl> cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 

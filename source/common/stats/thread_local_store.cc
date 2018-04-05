@@ -91,7 +91,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
 }
 
-void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb mergeCb) {
+void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
     tls_->runOnAllThreadsWithBarrier(
         [this]() -> void {
@@ -101,16 +101,16 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb mergeCb) {
             }
           }
         },
-        [this, mergeCb]() -> void { mergeInternal(mergeCb); });
+        [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
   }
 }
 
-void ThreadLocalStoreImpl::mergeInternal(PostMergeCb mergeCb) {
+void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    for (auto histogram : histograms()) {
+    for (HistogramSharedPtr histogram : histograms()) {
       histogram->merge();
     }
-    mergeCb();
+    merge_complete_cb();
   }
 }
 

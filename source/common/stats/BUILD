@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
     external_deps = [
+        "abseil_optional",
         "libcircllhist",
     ],
     deps = [

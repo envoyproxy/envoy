@@ -21,6 +21,7 @@
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "circllhist.h"
 
@@ -373,17 +374,17 @@ public:
                          computed_quantiles_.data());
   }
 
+  HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
+  HistogramStatisticsImpl& operator=(HistogramStatisticsImpl const&) = delete;
+
   std::string summary() const override {
-    std::stringstream summary_stream;
-    size_t index = 0;
-    for (double quantile : supported_quantiles_) {
-      summary_stream << "P" << quantile * 100 << ": " << computed_quantiles_[index];
-      if (index < supported_quantiles_.size() - 1) {
-        summary_stream << ", ";
-      }
-      index++;
+    std::vector<std::string> summary;
+    for (size_t i = 0; i < supported_quantiles_.size(); ++i) {
+      summary.push_back(
+          fmt::format("P{}: {}", 100 * supported_quantiles_[i],
+                      std::isnan(computed_quantiles_[i]) ? 0 : computed_quantiles_[i]));
     }
-    return summary_stream.str();
+    return absl::StrJoin(summary, ", ");
   }
 
   const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
@@ -391,7 +392,7 @@ public:
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
 
 private:
-  std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
   std::vector<double> computed_quantiles_;
 };
 
