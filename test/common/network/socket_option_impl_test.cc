@@ -69,7 +69,7 @@ TEST_F(SocketOptionImplTest, BadFd) {
 
 // Nop when there are no socket options set.
 TEST_F(SocketOptionImplTest, SetOptionEmptyNop) {
-  SocketOptionImpl socket_option{{}, {}, {}};
+  SocketOptionImpl socket_option{{}, {}};
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PostBind));
   EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::Listening));
@@ -77,66 +77,42 @@ TEST_F(SocketOptionImplTest, SetOptionEmptyNop) {
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionTransparentFailure) {
-  SocketOptionImpl socket_option{true, {}, {}};
+  SocketOptionImpl socket_option{true, {}};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
 }
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
-  SocketOptionImpl socket_option{{}, true, {}};
+  SocketOptionImpl socket_option{{}, true};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-}
-
-// We fail to set the tcp-fastopen option when the underlying setsockopt syscall fails.
-TEST_F(SocketOptionImplTest, SetOptionTcpFastopenFailure) {
-  if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
-    SocketOptionImpl socket_option{{}, {}, 1};
-    EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN.value(), _, _))
-        .WillOnce(Return(-1));
-    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::Listening));
-  }
 }
 
 // The happy path for setOption(); IP_TRANSPARENT is set to true.
 TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessTrue) {
-  SocketOptionImpl socket_option{true, {}, {}};
+  SocketOptionImpl socket_option{true, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 1,
                              {Socket::SocketState::PreBind, Socket::SocketState::PostBind});
 }
 
 // The happy path for setOption(); IP_FREEBIND is set to true.
 TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessTrue) {
-  SocketOptionImpl socket_option{{}, true, {}};
+  SocketOptionImpl socket_option{{}, true};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND, 1,
                              {Socket::SocketState::PreBind});
 }
 
-// The happy path for setOption(); TCP_FASTOPEN is set to true.
-TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessTrue) {
-  SocketOptionImpl socket_option{{}, {}, 42};
-  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 42,
-                             {Socket::SocketState::Listening});
-}
-
 // The happy path for setOption(); IP_TRANSPARENT is set to false.
 TEST_F(SocketOptionImplTest, SetOptionTransparentSuccessFalse) {
-  SocketOptionImpl socket_option{false, {}, {}};
+  SocketOptionImpl socket_option{false, {}};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT, 0,
                              {Socket::SocketState::PreBind, Socket::SocketState::PostBind});
 }
 
 // The happy path for setOption(); IP_FREEBIND is set to false.
 TEST_F(SocketOptionImplTest, SetOptionFreebindSuccessFalse) {
-  SocketOptionImpl socket_option{{}, false, {}};
+  SocketOptionImpl socket_option{{}, false};
   testSetSocketOptionSuccess(socket_option, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND, 0,
                              {Socket::SocketState::PreBind});
-}
-
-// The happy path for setOption(); TCP_FASTOPEN is set to false.
-TEST_F(SocketOptionImplTest, SetOptionTcpFastopenSuccessFalse) {
-  SocketOptionImpl socket_option{{}, {}, 0};
-  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 0,
-                             {Socket::SocketState::Listening});
 }
 
 // If a platform doesn't suppport IPv4 socket option variant for an IPv4 address, we fail
