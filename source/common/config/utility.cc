@@ -81,7 +81,8 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterInfoMap& clusters,
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
-  bool is_grpc = (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
+  const bool is_grpc =
+      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
   if (is_grpc) {
     if (api_config_source.cluster_names().size() != 0) {
@@ -221,9 +222,9 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
                                      "envoy::api::v2::core::ApiConfigSource: {}",
                                      api_config_source.DebugString()));
   }
-  grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
-  return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+  return async_client_manager.factoryForGrpcService(api_config_source.grpc_services(0), scope,
+                                                    false);
 }
 
 } // namespace Config
