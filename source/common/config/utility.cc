@@ -81,27 +81,47 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterInfoMap& clusters,
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
-  if (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
+  bool is_grpc = (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
+
+  if (is_grpc) {
     if (api_config_source.cluster_names().size() != 0) {
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified");
     }
+    if (api_config_source.grpc_services().size() != 1) {
+      throw EnvoyException(
+          "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
+    }
   } else {
+    if (api_config_source.grpc_services().size() != 0) {
+      throw EnvoyException(
+          "envoy::api::v2::core::ConfigSource must not have a grpc service specified");
+    }
     if (api_config_source.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
     }
+  }
 
-    const auto& cluster_name = api_config_source.cluster_names()[0];
-    const auto& it = clusters.find(cluster_name);
-    if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-        it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource must have a statically "
-          "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
-          cluster_name));
-    }
+  const std::string& cluster_name =
+      is_grpc ? api_config_source.grpc_services()[0].envoy_grpc().cluster_name()
+              : api_config_source.cluster_names()[0];
+  const auto& it = clusters.find(cluster_name);
+  if (it == clusters.end()) {
+    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
+                                     "defined non-EDS cluster: '{}' does not exist",
+                                     cluster_name));
+  }
+  if (it->second.get().info()->addedViaApi()) {
+    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
+                                     "defined non-EDS cluster: '{}' was added via api",
+                                     cluster_name));
+  }
+  if (it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource must have a statically "
+                                     "defined non-EDS cluster: '{}' is an EDS cluster",
+                                     cluster_name));
   }
 }
 
