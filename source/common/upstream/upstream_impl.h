@@ -30,6 +30,7 @@
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/locality.h"
@@ -60,13 +61,16 @@ public:
       const envoy::api::v2::core::Locality& locality,
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
+        health_check_address_(health_check_config.port_value() == 0
+                                  ? dest_address
+                                  : Network::Utility::getAddressWithPort(
+                                        *dest_address, health_check_config.port_value())),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(metadata), locality_(locality),
-        health_check_config_(health_check_config), stats_{
-                                                       ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                                      POOL_GAUGE(stats_store_))} {}
+        metadata_(metadata), locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
+                                                                        POOL_GAUGE(stats_store_))} {
+  }
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -93,17 +97,19 @@ public:
   const HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    return health_check_address_;
+  }
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
+  Network::Address::InstanceConstSharedPtr health_check_address_;
   const bool canary_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::core::Locality locality_;
-  const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;

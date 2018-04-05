@@ -25,7 +25,6 @@
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/eds.h"
@@ -853,14 +852,5 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
 }
-
-Network::Address::InstanceConstSharedPtr HostDescriptionImpl::healthCheckAddress() const {
-  if (health_check_config_.port_value() == 0) {
-    return address_;
-  }
-
-  return Network::Utility::getAddressWithPort(*address_, health_check_config_.port_value());
-}
-
 } // namespace Upstream
 } // namespace Envoy
