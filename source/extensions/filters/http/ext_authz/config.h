@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
@@ -27,14 +27,15 @@ public:
                                Server::Configuration::FactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::ext_authz::v2::ExtAuthz()};
+    return ProtobufTypes::MessagePtr{
+        new envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz()};
   }
 
   std::string name() override { return Config::HttpFilterNames::get().EXT_AUTHORIZATION; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config,
+  createFilter(const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
                const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
 };
 
