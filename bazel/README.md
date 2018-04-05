@@ -290,12 +290,14 @@ workspace(name = "envoy")
 
 local_repository(
     name = "envoy_build_config",
-    path = "envoy-build-config",
+    # Relative paths are also supported.
+    path = "/somewhere/on/filesystem/envoy_build_config",
 )
 
 local_repository(
     name = "envoy",
-    path = "envoy",
+    # Relative paths are also supported.
+    path = "/somewhere/on/filesystem/envoy",
 )
 
 ...
