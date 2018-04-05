@@ -164,9 +164,10 @@ public:
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
                                                         dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupNoServiceValidationNoReuseConnectionHC() {
@@ -185,9 +186,34 @@ public:
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
                                                         dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
+  void setupHealthCheckIntervalOverridesHC() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_interval: 2s
+    unhealthy_edge_interval: 3s
+    healthy_edge_interval: 4s
+    no_traffic_interval: 5s
+    interval_jitter: 0s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+    )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupServiceValidationHC() {
@@ -206,9 +232,10 @@ public:
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
                                                         dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupServiceValidationWithCustomHostValueHC(const std::string& host) {
@@ -227,9 +254,10 @@ public:
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
                                                         dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig
@@ -277,9 +305,10 @@ public:
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
                                                         dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
@@ -364,7 +393,7 @@ public:
   void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
   void expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, bool changed_state));
+  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -379,7 +408,7 @@ public:
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -400,7 +429,7 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -428,7 +457,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
 // Test host check success with multiple hosts.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80"),
@@ -460,7 +489,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHosts) {
 // Test host check success with multiple hosts across multiple priorities.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -497,7 +526,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -534,7 +563,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -579,7 +608,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -620,7 +649,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, true)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -647,7 +676,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, true)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -673,7 +702,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceCheckRuntimeOff) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(false));
 
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -708,7 +737,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
 
   // Test that failing first disables fast success.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "503", false, false, false, health_checked_cluster);
@@ -720,7 +749,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, false, health_checked_cluster);
@@ -732,7 +761,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false, false, false, health_checked_cluster);
@@ -741,7 +770,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstServiceCheck) {
 
 TEST_F(HttpHealthCheckerImplTest, SuccessNoTraffic) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -768,7 +797,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   health_checker_->start();
 
   // Test fast success immediately moves us to healthy.
-  EXPECT_CALL(*this, onHostStatus(_, true)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _)).WillOnce(Return(500));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(500)));
@@ -789,7 +818,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   health_checker_->start();
 
   // Test that failing first disables fast success.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "503", false);
@@ -801,7 +830,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -813,7 +842,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -829,7 +858,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "503", false);
@@ -841,7 +870,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -853,7 +882,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   respond(0, "200", false);
@@ -862,7 +891,7 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
 
 TEST_F(HttpHealthCheckerImplTest, Disconnect) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -881,7 +910,8 @@ TEST_F(HttpHealthCheckerImplTest, Disconnect) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0], true));
+  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
+                                  HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -899,7 +929,7 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   health_checker_->start();
 
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -911,7 +941,7 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   test_sessions_[0]->interval_timer_->callback_();
 
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -940,7 +970,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
 
 TEST_F(HttpHealthCheckerImplTest, ConnectionClose) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -960,9 +990,104 @@ TEST_F(HttpHealthCheckerImplTest, ConnectionClose) {
   test_sessions_[0]->interval_timer_->callback_();
 }
 
+TEST_F(HttpHealthCheckerImplTest, HealthCheckIntervals) {
+  setupHealthCheckIntervalOverridesHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://128.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // First check should respect no_traffic_interval setting
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Follow up successful check should respect interval setting
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // First check transitioning to failed state should respect unhealthy_edge_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(3000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "503", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Second failing check should respect unhealthy_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(2000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "503", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // All subsequent failing checks should respect unhealthy_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(2000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "503", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // When transitioning to a successful state, checks should respect healthy_edge_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Any subsequent successful checks should also respect interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false);
+}
+
 TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -992,7 +1117,7 @@ TEST_F(HttpHealthCheckerImplTest, RemoteCloseBetweenChecks) {
 // Test that we close connections on a healthy check when reuse_connection is false.
 TEST_F(HttpHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   setupNoServiceValidationNoReuseConnectionHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -1022,7 +1147,7 @@ TEST_F(HttpHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
 
 TEST_F(HttpHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -1043,7 +1168,7 @@ TEST_F(HttpHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
 
 TEST_F(HttpHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
@@ -1069,7 +1194,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
       .WillOnce(Return(true));
 
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
 
   // Prepares a host with its designated health check port.
   const HostWithHealthCheckMap hosts{{"127.0.0.1:80", makeHealthCheckConfig(8000)}};
@@ -1102,7 +1227,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
 // Test host check success with multiple hosts by checking each host defined health check port.
 TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   setupNoServiceValidationHC();
-  EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(2);
 
   // Prepares a set of hosts along with its designated health check ports.
   const HostWithHealthCheckMap hosts = {{"127.0.0.1:80", makeHealthCheckConfig(8000)},
@@ -1943,9 +2068,10 @@ public:
     const auto config = createGrpcHealthCheckConfig();
     health_checker_.reset(
         new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupHCWithUnhealthyThreshold(int value) {
@@ -1953,9 +2079,10 @@ public:
     config.mutable_unhealthy_threshold()->set_value(value);
     health_checker_.reset(
         new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupServiceNameHC() {
@@ -1963,9 +2090,10 @@ public:
     config.mutable_grpc_health_check()->set_service_name("service");
     health_checker_.reset(
         new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void setupNoReuseConnectionHC() {
@@ -1973,9 +2101,28 @@ public:
     config.mutable_reuse_connection()->set_value(false);
     health_checker_.reset(
         new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
-      onHostStatus(host, changed_state);
-    });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
+  void setupHealthCheckIntervalOverridesHC() {
+    auto config = createGrpcHealthCheckConfig();
+    config.mutable_interval()->set_seconds(1);
+    config.mutable_unhealthy_interval()->set_seconds(2);
+    config.mutable_unhealthy_edge_interval()->set_seconds(3);
+    config.mutable_healthy_edge_interval()->set_seconds(4);
+    config.mutable_no_traffic_interval()->set_seconds(5);
+    config.mutable_interval_jitter()->set_seconds(0);
+    config.mutable_unhealthy_threshold()->set_value(1);
+    config.mutable_healthy_threshold()->set_value(1);
+    health_checker_.reset(
+        new TestGrpcHealthCheckerImpl(*cluster_, config, dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
   }
 
   void expectSessionCreate() {
@@ -2030,7 +2177,7 @@ public:
   // Starts healthchecker and sets up timer expectations, leaving up future specification of
   // healthcheck response for the caller. Useful when there is only one healthcheck attempt
   // performed during test case (but possibly on many hosts).
-  void expectHealthchecks(bool host_state_changed, size_t num_healthchecks) {
+  void expectHealthchecks(HealthTransition host_changed_state, size_t num_healthchecks) {
     for (size_t i = 0; i < num_healthchecks; i++) {
       cluster_->info_->stats().upstream_cx_total_.inc();
       expectSessionCreate();
@@ -2046,13 +2193,13 @@ public:
     for (size_t i = 0; i < num_healthchecks; i++) {
       expectHealthcheckStop(i, 45000);
     }
-    EXPECT_CALL(*this, onHostStatus(_, host_state_changed)).Times(num_healthchecks);
+    EXPECT_CALL(*this, onHostStatus(_, host_changed_state)).Times(num_healthchecks);
   }
 
-  void expectSingleHealthcheck(bool host_state_changed) {
+  void expectSingleHealthcheck(HealthTransition host_changed_state) {
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
         makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-    expectHealthchecks(host_state_changed, 1);
+    expectHealthchecks(host_changed_state, 1);
   }
 
   // Hides timer/stream-related boilerplate of healthcheck start.
@@ -2120,7 +2267,7 @@ public:
     }
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, bool changed_state));
+  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockCluster> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -2174,7 +2321,8 @@ TEST_F(GrpcHealthCheckerImplTest, Success) {
   expectHealthcheckStop(0, 45000);
 
   // Host state should not be changed (remains healty).
-  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0], false));
+  EXPECT_CALL(*this, onHostStatus(cluster_->prioritySet().getMockHostSet(0)->hosts_[0],
+                                  HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2182,7 +2330,7 @@ TEST_F(GrpcHealthCheckerImplTest, Success) {
 // Test host check success when gRPC response payload is split between several incoming data chunks.
 TEST_F(GrpcHealthCheckerImplTest, SuccessResponseSplitBetweenChunks) {
   setupServiceNameHC();
-  expectSingleHealthcheck(false);
+  expectSingleHealthcheck(HealthTransition::Unchanged);
 
   auto response_headers = std::make_unique<Http::TestHeaderMapImpl>(
       std::initializer_list<std::pair<std::string, std::string>>{
@@ -2218,7 +2366,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHosts) {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80"),
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
 
-  expectHealthchecks(false, 2);
+  expectHealthchecks(HealthTransition::Unchanged, 2);
 
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   respondServiceStatus(1, grpc::health::v1::HealthCheckResponse::SERVING);
@@ -2235,7 +2383,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHostSets) {
   cluster_->prioritySet().getMockHostSet(1)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:81")};
 
-  expectHealthchecks(false, 2);
+  expectHealthchecks(HealthTransition::Unchanged, 2);
 
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   respondServiceStatus(1, grpc::health::v1::HealthCheckResponse::SERVING);
@@ -2246,7 +2394,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHostSets) {
 // Test stream-level watermarks does not interfere with health check.
 TEST_F(GrpcHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
   setupHC();
-  expectSingleHealthcheck(false);
+  expectSingleHealthcheck(HealthTransition::Unchanged);
 
   test_sessions_[0]->request_encoder_.stream_.runHighWatermarkCallbacks();
   test_sessions_[0]->request_encoder_.stream_.runLowWatermarkCallbacks();
@@ -2258,7 +2406,7 @@ TEST_F(GrpcHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
 // Test connection-level watermarks does not interfere with health check.
 TEST_F(GrpcHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
   setupHC();
-  expectSingleHealthcheck(false);
+  expectSingleHealthcheck(HealthTransition::Unchanged);
 
   test_sessions_[0]->client_connection_->runHighWatermarkCallbacks();
   test_sessions_[0]->client_connection_->runLowWatermarkCallbacks();
@@ -2280,7 +2428,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessNoTraffic) {
   // Default healthcheck interval for hosts without traffic is 60 seconds.
   expectHealthcheckStop(0, 60000);
   // Host state should not be changed (remains healty).
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2301,7 +2449,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedSuccessFirst) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _));
   expectHealthcheckStop(0, 500);
   // Fast success immediately moves us to healthy.
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2321,7 +2469,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   // Failing first disables fast success.
   expectHealthcheckStop(0);
   // Host was unhealthy from the start, no state change.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
   expectHostHealthy(false);
 
@@ -2332,7 +2480,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 
   expectHealthcheckStop(0);
   // Host still unhealthy, need yet another healthcheck.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(false);
 
@@ -2341,7 +2489,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessStartFailedFailFirst) {
   test_sessions_[0]->interval_timer_->callback_();
 
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2358,7 +2506,7 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
 
   // Explicit healthcheck failure immediately renders host unhealthy.
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
   expectHostHealthy(false);
 
@@ -2368,7 +2516,7 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
 
   expectHealthcheckStop(0);
   // Host still considered unhealthy.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(false);
 
@@ -2377,7 +2525,7 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFail) {
 
   expectHealthcheckStop(0);
   // Host should has become healthy.
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2394,7 +2542,7 @@ TEST_F(GrpcHealthCheckerImplTest, Disconnect) {
 
   expectHealthcheckStop(0);
   // Network-type healthcheck failure should make host unhealthy only after 2nd event in a row.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   expectHostHealthy(true);
 
@@ -2404,7 +2552,7 @@ TEST_F(GrpcHealthCheckerImplTest, Disconnect) {
 
   expectHealthcheckStop(0);
   // Now, host should be unhealthy.
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   expectHostHealthy(false);
 }
@@ -2421,7 +2569,7 @@ TEST_F(GrpcHealthCheckerImplTest, Timeout) {
 
   expectHealthcheckStop(0);
   // Timeouts are considered network failures and make host unhealthy also after 2nd event.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   test_sessions_[0]->timeout_timer_->callback_();
   expectHostHealthy(true);
 
@@ -2429,7 +2577,7 @@ TEST_F(GrpcHealthCheckerImplTest, Timeout) {
   test_sessions_[0]->interval_timer_->callback_();
 
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, true));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
   // Close connection. Timeouts and connection closes counts together.
   test_sessions_[0]->client_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   expectHostHealthy(false);
@@ -2454,6 +2602,101 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
+TEST_F(GrpcHealthCheckerImplTest, HealthCheckIntervals) {
+  setupHealthCheckIntervalOverridesHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://128.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // First check should respect no_traffic_interval setting
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+  cluster_->info_->stats().upstream_cx_total_.inc();
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Follow up successful check should respect interval setting
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // First check transitioning to failed state should respect unhealthy_edge_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(3000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Second failing check should respect unhealthy_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(2000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // All subsequent failing checks should respect unhealthy_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(2000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // When transitioning to a successful state, checks should respect healthy_edge_interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  // Any subsequent successful checks should also respect interval
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
+}
+
 // Test connection close between checks affects nothing.
 TEST_F(GrpcHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   setupHC();
@@ -2465,7 +2708,7 @@ TEST_F(GrpcHealthCheckerImplTest, RemoteCloseBetweenChecks) {
   health_checker_->start();
 
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 
@@ -2478,7 +2721,7 @@ TEST_F(GrpcHealthCheckerImplTest, RemoteCloseBetweenChecks) {
 
   expectHealthcheckStop(0);
   // Test host state haven't changed.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2494,7 +2737,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
   health_checker_->start();
 
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 
@@ -2507,7 +2750,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
 
   expectHealthcheckStop(0);
   // Test host state haven't changed.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2515,7 +2758,7 @@ TEST_F(GrpcHealthCheckerImplTest, DontReuseConnectionBetweenChecks) {
 // Test UNKNOWN health status is considered unhealthy.
 TEST_F(GrpcHealthCheckerImplTest, GrpcFailUnknown) {
   setupHC();
-  expectSingleHealthcheck(true);
+  expectSingleHealthcheck(HealthTransition::Changed);
 
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::UNKNOWN);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
@@ -2528,7 +2771,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayProbeInProgress) {
   // FailureType::Network will be issued, it will render host unhealthy only if unhealthy_threshold
   // is reached.
   setupHCWithUnhealthyThreshold(1);
-  expectSingleHealthcheck(true);
+  expectSingleHealthcheck(HealthTransition::Changed);
 
   test_sessions_[0]->codec_client_->raiseGoAway();
 
@@ -2548,7 +2791,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
   health_checker_->start();
 
   expectHealthcheckStop(0);
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 
@@ -2561,7 +2804,7 @@ TEST_F(GrpcHealthCheckerImplTest, GoAwayBetweenChecks) {
 
   expectHealthcheckStop(0);
   // Test host state haven't changed.
-  EXPECT_CALL(*this, onHostStatus(_, false));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::SERVING);
   expectHostHealthy(true);
 }
@@ -2664,11 +2907,31 @@ INSTANTIATE_TEST_CASE_P(
 // Test different cases of invalid gRPC response makes host unhealthy.
 TEST_P(BadResponseGrpcHealthCheckerImplTest, GrpcBadResponse) {
   setupHC();
-  expectSingleHealthcheck(true);
+  expectSingleHealthcheck(HealthTransition::Changed);
 
   ResponseSpec spec = GetParam();
   respondResponseSpec(0, std::move(spec));
   expectHostHealthy(false);
+}
+
+TEST(Printer, HealthStatePrinter) {
+  std::ostringstream healthy;
+  healthy << HealthState::Healthy;
+  EXPECT_EQ("Healthy", healthy.str());
+
+  std::ostringstream unhealthy;
+  unhealthy << HealthState::Unhealthy;
+  EXPECT_EQ("Unhealthy", unhealthy.str());
+}
+
+TEST(Printer, HealthTransitionPrinter) {
+  std::ostringstream changed;
+  changed << HealthTransition::Changed;
+  EXPECT_EQ("Changed", changed.str());
+
+  std::ostringstream unchanged;
+  unchanged << HealthTransition::Unchanged;
+  EXPECT_EQ("Unchanged", unchanged.str());
 }
 
 } // namespace
