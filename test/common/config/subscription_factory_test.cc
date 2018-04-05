@@ -60,19 +60,129 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
       "Missing config source specifier in envoy::api::v2::core::ConfigSource");
 }
 
-TEST_F(SubscriptionFactoryTest, WrongClusterNameLength) {
+TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+
   EXPECT_CALL(cm_, clusters());
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
+  envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
+  config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+
+  EXPECT_CALL(cm_, clusters());
+  EXPECT_THROW_WITH_MESSAGE(
+      subscriptionFromConfigSource(config), EnvoyException,
+      "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
+}
+
+TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
+  envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
+  config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_cluster_names("foo");
+  cluster_map.emplace("foo", cluster);
+
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(false));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::STATIC));
+  subscriptionFromConfigSource(config);
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
+  envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
+  config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+  config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "foo");
+  cluster_map.emplace("foo", cluster);
+
+  envoy::api::v2::core::GrpcService expected_grpc_service;
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+  EXPECT_CALL(cm_.async_client_manager_,
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+        auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+          return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+        }));
+        return async_client_factory;
+      }));
+  EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(false));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::STATIC));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+
+  subscriptionFromConfigSource(config);
+}
+
+TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
+  envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
+  config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+
+  config.mutable_api_config_source()->add_cluster_names("foo");
+  cluster_map.emplace("foo", cluster);
+
   config.mutable_api_config_source()->add_cluster_names("bar");
-  EXPECT_CALL(cm_, clusters());
+  cluster_map.emplace("bar", cluster);
+
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
+  envoy::api::v2::core::ConfigSource config;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  NiceMock<Upstream::MockCluster> cluster;
+
+  config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "foo");
+  cluster_map.emplace("foo", cluster);
+  envoy::api::v2::core::GrpcService expected_grpc_service_foo;
+  expected_grpc_service_foo.mutable_envoy_grpc()->set_cluster_name("foo");
+
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "bar");
+  cluster_map.emplace("bar", cluster);
+  envoy::api::v2::core::GrpcService expected_grpc_service_bar;
+  expected_grpc_service_bar.mutable_envoy_grpc()->set_cluster_name("bar");
+
+  EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
+  EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
+  EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
+
+  EXPECT_THROW_WITH_MESSAGE(
+      subscriptionFromConfigSource(config), EnvoyException,
+      "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
@@ -99,10 +209,10 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -114,23 +224,23 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("foo"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                               const absl::optional<std::chrono::milliseconds>& timeout) {
         UNREFERENCED_PARAMETER(callbacks);
         UNREFERENCED_PARAMETER(timeout);
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
-        EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
+        EXPECT_EQ("foo", std::string(request->headers().Host()->value().c_str()));
         EXPECT_EQ("/v2/discovery:endpoints",
                   std::string(request->headers().Path()->value().c_str()));
         return &http_request_;
@@ -144,10 +254,10 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -160,12 +270,12 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("eds_cluster");
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
   envoy::api::v2::core::GrpcService expected_grpc_service;
-  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("eds_cluster");
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  NiceMock<Upstream::MockCluster> cluster;
+  cluster_map.emplace("foo_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
@@ -194,7 +304,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
@@ -202,11 +312,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
         subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
         "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified");
   } else {
-    EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
-                              EnvoyException,
-                              "envoy::api::v2::core::ConfigSource must have a statically defined "
-                              "non-EDS cluster: 'eds_cluster' "
-                              "does not exist, was added via api, or is an EDS cluster");
+    EXPECT_THROW_WITH_MESSAGE(
+        subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+        "envoy::api::v2::core::ConfigSource must have a statically defined "
+        "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
   }
 }
 
@@ -214,10 +323,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
     EXPECT_THROW_WITH_MESSAGE(
@@ -226,11 +335,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   } else {
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
-    EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
-                              EnvoyException,
-                              "envoy::api::v2::core::ConfigSource must have a statically defined "
-                              "non-EDS cluster: 'eds_cluster' "
-                              "does not exist, was added via api, or is an EDS cluster");
+    EXPECT_THROW_WITH_MESSAGE(
+        subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+        "envoy::api::v2::core::ConfigSource must have a statically defined "
+        "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
   }
 }
 
@@ -238,10 +346,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
-  api_config_source->add_cluster_names("eds_cluster");
+  api_config_source->add_cluster_names("foo");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("eds_cluster", cluster);
+  cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
     EXPECT_THROW_WITH_MESSAGE(
@@ -251,11 +359,10 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
-    EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
-                              EnvoyException,
-                              "envoy::api::v2::core::ConfigSource must have a statically defined "
-                              "non-EDS cluster: 'eds_cluster' "
-                              "does not exist, was added via api, or is an EDS cluster");
+    EXPECT_THROW_WITH_MESSAGE(
+        subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+        "envoy::api::v2::core::ConfigSource must have a statically defined "
+        "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
   }
 }
 
