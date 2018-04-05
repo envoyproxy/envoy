@@ -137,19 +137,18 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
 
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
-  HotRestart::GetParentStatsInfo info;
-  restarter_.getParentStats(info);
-  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
-  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                       info.memory_allocated_);
-  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-  server_stats_->parent_connections_.set(info.num_connections_);
-  server_stats_->total_connections_.set(numConnections() + info.num_connections_);
-  server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires());
-
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   stats_store_.mergeHistograms([this]() -> void {
+    HotRestart::GetParentStatsInfo info;
+    restarter_.getParentStats(info);
+    server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+    server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                         info.memory_allocated_);
+    server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+    server_stats_->parent_connections_.set(info.num_connections_);
+    server_stats_->total_connections_.set(numConnections() + info.num_connections_);
+    server_stats_->days_until_first_cert_expiring_.set(
+        sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
   });

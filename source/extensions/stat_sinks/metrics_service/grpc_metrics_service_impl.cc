@@ -88,10 +88,12 @@ void MetricsServiceSink::flushHistogram(const Stats::Histogram& histogram) {
   metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
   auto* summary_metric = metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
-  for (size_t i = 0; i < ARRAY_SIZE(hist_stats.quantiles_in_); i++) {
+  size_t index = 0;
+  for (double supported_quantile : hist_stats.supportedQuantiles()) {
     auto* quantile = summary_metric->add_quantile();
-    quantile->set_quantile(hist_stats.quantiles_in_[i]);
-    quantile->set_value(hist_stats.quantiles_out_[i]);
+    quantile->set_quantile(supported_quantile);
+    quantile->set_value(hist_stats.computedQuantiles()[index]);
+    index++;
   }
 }
 

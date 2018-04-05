@@ -42,7 +42,8 @@ public:
 
   void beginMerge() { current_active_ = 1 - current_active_; }
 
-  void merge() override {}
+  // TODO: split the Histogram interface in to two - parent and tls.
+  void merge() override { NOT_IMPLEMENTED; }
 
   bool used() const override { return flags_ & Flags::Used; }
 
@@ -62,7 +63,7 @@ public:
   Store& parent_;
 
 private:
-  int current_active_;
+  uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
   HistogramStatisticsImpl interval_statistics_;
@@ -76,9 +77,9 @@ typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
  */
 class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
-  HistogramParentImpl(const std::string& name, Store& parent, std::string& tag_extracted_name,
-                      std::vector<Tag>& tags)
-      : MetricImpl(name, tag_extracted_name, tags), parent_(parent) {
+  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                      std::vector<Tag>&& tags)
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
   }
@@ -89,18 +90,12 @@ public:
   }
 
   // Stats::Histogram
-  void recordValue(uint64_t) override {}
+  // TODO: split the Histogram interface in to two - parent and tls.
+  void recordValue(uint64_t) override { NOT_IMPLEMENTED; }
 
   bool used() const override {
     std::unique_lock<std::mutex> lock(merge_lock_);
-    bool any_tls_used = false;
-    for (auto tls_histogram : tls_histograms_) {
-      if (tls_histogram->used()) {
-        any_tls_used = true;
-        break;
-      }
-    }
-    return any_tls_used;
+    return usedWorker();
   }
 
   void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
@@ -116,10 +111,10 @@ public:
    * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
    */
   void merge() override {
-    if (used()) {
-      std::unique_lock<std::mutex> lock(merge_lock_);
+    std::unique_lock<std::mutex> lock(merge_lock_);
+    if (usedWorker()) {
       hist_clear(interval_histogram_);
-      for (auto tls_histogram : tls_histograms_) {
+      for (TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
         tls_histogram->merge(interval_histogram_);
       }
       histogram_t* hist_array[1];
@@ -140,6 +135,17 @@ public:
   std::list<TlsHistogramSharedPtr> tls_histograms_;
 
 private:
+  bool usedWorker() const {
+    bool any_tls_used = false;
+    for (TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
+      if (tls_histogram->used()) {
+        any_tls_used = true;
+        break;
+      }
+    }
+    return any_tls_used;
+  }
+
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
@@ -255,7 +261,7 @@ private:
   void clearScopeFromCaches(ScopeImpl* scope);
   void releaseScopeCrossThread(ScopeImpl* scope);
   SafeAllocData safeAlloc(const std::string& name);
-  void mergeInternal();
+  void mergeInternal(PostMergeCb mergeCb);
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
@@ -269,5 +275,6 @@ private:
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
 };
+
 } // namespace Stats
 } // namespace Envoy

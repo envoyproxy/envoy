@@ -190,6 +190,53 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
+TEST_F(StatsThreadLocalStoreTest, BasicHistogramMerge) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = store_->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 1));
+  h2.recordValue(1);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
+  h2.recordValue(2);
+
+  std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  EXPECT_TRUE(*merge_called);
+
+  std::list<HistogramSharedPtr> histogram_list = store_->histograms();
+
+  EXPECT_EQ(histogram_list.size(), 2);
+  std::string h1_summary = "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, P99: "
+                           "1.099, P99.9: 1.0999, P100: 1.1";
+  std::string h2_summary = "P0: 1, P25: 1.05, P50: 1.1, P75: 2.05, P90: 2.08, P95: 2.09, P99: "
+                           "2.098, P99.9: 2.0998, P100: 2.1";
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    EXPECT_EQ(histogram->cumulativeStatistics().summary(),
+              histogram->intervalStatistics().summary());
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), h1_summary);
+    } else {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), h2_summary);
+    }
+  }
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_));
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

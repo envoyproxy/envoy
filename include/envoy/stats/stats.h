@@ -168,8 +168,15 @@ public:
    */
   virtual std::string summary() const PURE;
 
-  double quantiles_in_[9] = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
-  double quantiles_out_[9];
+  /**
+   * Returns supported quantiles.
+   */
+  virtual const std::vector<double>& supportedQuantiles() const PURE;
+
+  /**
+   * Returns computed quantile values during the period.
+   */
+  virtual const std::vector<double>& computedQuantiles() const PURE;
 };
 
 /**
@@ -347,9 +354,9 @@ public:
 
   /**
    * Called during the flush process to merge all the thread local histograms. The passed in
-   * callback will be invoked after the merge process is complete.
+   * callback will be called on the main thread, but it will happen after the method returns.
    */
-  virtual void mergeHistograms(PostMergeCb mergeCb) PURE;
+  virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

@@ -28,7 +28,10 @@ public:
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb) { cb(); }
+  void runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) {
+    cb();
+    main_callback();
+  }
 
   void shutdownThread_() {
     shutdown_ = true;

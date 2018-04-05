@@ -101,16 +101,16 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb mergeCb) {
             }
           }
         },
-        [this]() -> void { mergeInternal(); });
-    mergeCb();
+        [this, mergeCb]() -> void { mergeInternal(mergeCb); });
   }
 }
 
-void ThreadLocalStoreImpl::mergeInternal() {
+void ThreadLocalStoreImpl::mergeInternal(PostMergeCb mergeCb) {
   if (!shutting_down_) {
     for (auto histogram : histograms()) {
       histogram->merge();
     }
+    mergeCb();
   }
 }
 
@@ -258,7 +258,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
   if (!central_ref) {
-    central_ref.reset(new HistogramParentImpl(final_name, parent_, tag_extracted_name, tags));
+    // Since MetricImpl only has move constructor, we are explicitly copying here.
+    std::string central_tag_extracted_name(tag_extracted_name);
+    std::vector<Tag> central_tags(tags);
+    central_ref.reset(new HistogramParentImpl(
+        final_name, parent_, std::move(central_tag_extracted_name), std::move(central_tags)));
   }
   TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
       final_name, parent_, std::move(tag_extracted_name), std::move(tags)));

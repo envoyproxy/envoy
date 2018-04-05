@@ -278,9 +278,6 @@ public:
   MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
-  MetricImpl(const std::string& name, std::string& tag_extracted_name, std::vector<Tag>& tags)
-      : name_(name), tag_extracted_name_(tag_extracted_name), tags_(tags) {}
-
   const std::string& name() const override { return name_; }
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
@@ -368,23 +365,34 @@ private:
  */
 class HistogramStatisticsImpl : public HistogramStatistics {
 public:
-  HistogramStatisticsImpl() {
-    for (size_t i = 0; i < ARRAY_SIZE(quantiles_out_); i++) {
-      quantiles_out_[i] = 0;
-    }
-  }
+  HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
 
-  HistogramStatisticsImpl(histogram_t* histogram_ptr) {
-    hist_approx_quantile(histogram_ptr, const_cast<double*>(quantiles_in_),
-                         ARRAY_SIZE(quantiles_in_), quantiles_out_);
+  HistogramStatisticsImpl(histogram_t* histogram_ptr)
+      : computed_quantiles_(supported_quantiles_.size(), 0.0) {
+    hist_approx_quantile(histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
+                         computed_quantiles_.data());
   }
 
   std::string summary() const override {
-    return fmt::format("P0: {} , P25: {}, P50: {}, P75: {}, P90: {}, P95: {}, P99: {}, P100: {}",
-                       quantiles_out_[0], quantiles_out_[1], quantiles_out_[2], quantiles_out_[3],
-                       quantiles_out_[4], quantiles_out_[5], quantiles_out_[6], quantiles_out_[7],
-                       quantiles_out_[8]);
+    std::stringstream summary_stream;
+    size_t index = 0;
+    for (double quantile : supported_quantiles_) {
+      summary_stream << "P" << quantile * 100 << ": " << computed_quantiles_[index];
+      if (index < supported_quantiles_.size() - 1) {
+        summary_stream << ", ";
+      }
+      index++;
+    }
+    return summary_stream.str();
   }
+
+  const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
+
+  const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+
+private:
+  std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  std::vector<double> computed_quantiles_;
 };
 
 /**
