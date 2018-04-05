@@ -7,6 +7,12 @@
 
 #include "server/configuration_impl.h"
 
+#ifdef TCP_FASTOPEN
+#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName(TCP_FASTOPEN)
+#else
+#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
+#endif
+
 namespace Envoy {
 namespace Server {
 
