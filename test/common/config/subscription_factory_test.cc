@@ -298,8 +298,6 @@ INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource,
                                           envoy::api::v2::core::ApiConfigSource::REST,
                                           envoy::api::v2::core::ApiConfigSource::GRPC));
 
-// TODO(jbuckland) add test case for ApiConfigSource::GRPC
-
 TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
