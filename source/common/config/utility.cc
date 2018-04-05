@@ -104,16 +104,33 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     }
   }
 
-  const std::string& cluster_name =
-      is_grpc ? api_config_source.grpc_services()[0].envoy_grpc().cluster_name()
-              : api_config_source.cluster_names()[0];
-  const auto& it = clusters.find(cluster_name);
-  if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
-      it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
-    throw EnvoyException(fmt::format(
-        "envoy::api::v2::core::ConfigSource must have a statically "
-        "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
-        cluster_name));
+  // we ought to validate the cluster name if and only if there is a cluster name.
+  if (is_grpc) {
+    // some ApiConfigSources of type GRPC won't have a cluster name,
+    // such as if they've been configured with google_grpc.
+    if (api_config_source.grpc_services()[0].has_envoy_grpc()) {
+      const std::string& cluster_name =
+          api_config_source.grpc_services()[0].envoy_grpc().cluster_name();
+      const auto& it = clusters.find(cluster_name);
+      if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+          it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+        throw EnvoyException(fmt::format(
+            "envoy::api::v2::core::ConfigSource must have a statically "
+            "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+            cluster_name));
+      }
+    }
+  } else {
+    // all ApiConfigSources of type REST and REST_LEGACY should have cluster_names.
+    const std::string& cluster_name = api_config_source.cluster_names()[0];
+    const auto& it = clusters.find(cluster_name);
+    if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
+        it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
+      throw EnvoyException(fmt::format(
+          "envoy::api::v2::core::ConfigSource must have a statically "
+          "defined non-EDS cluster: '{}' does not exist, was added via api, or is an EDS cluster",
+          cluster_name));
+    }
   }
 }
 
