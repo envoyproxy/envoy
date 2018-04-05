@@ -90,12 +90,12 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     }
     if (api_config_source.grpc_services().size() != 1) {
       throw EnvoyException(
-          "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
+          "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
     }
   } else {
     if (api_config_source.grpc_services().size() != 0) {
       throw EnvoyException(
-          "envoy::api::v2::core::ConfigSource must not have a grpc service specified");
+          "envoy::api::v2::core::ConfigSource must not have a gRPC service specified");
     }
     if (api_config_source.cluster_names().size() != 1) {
       // TODO(htuch): Add support for multiple clusters, #1170.

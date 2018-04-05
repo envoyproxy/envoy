@@ -83,7 +83,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
   EXPECT_CALL(cm_, clusters());
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
+      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
 }
 
 TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
@@ -182,7 +182,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
 
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a singleton grpc service specified");
+      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
