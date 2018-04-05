@@ -14,12 +14,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Stats {
@@ -233,6 +233,135 @@ TEST_F(StatsThreadLocalStoreTest, BasicHistogramMerge) {
 
   store_->shutdownThreading();
   tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = store_->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  // Test Merge with inserting one value in to histogram and validate that summary returns correct
+  // values.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
+
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  EXPECT_TRUE(*merge_called);
+
+  std::list<HistogramSharedPtr> histogram_list = store_->histograms();
+
+  EXPECT_EQ(histogram_list.size(), 2);
+
+  std::string summary_with_one_as_value =
+      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, P99: "
+      "1.099, P99.9: 1.0999, P100: 1.1";
+  std::string summary_with_two_as_value = "P0: 1, P25: 2.025, P50: 2.05, P75: 2.075, P90: 2.09, "
+                                          "P95: 2.095, P99: 2.099, P99.9: 2.0999, P100: 2.1";
+  std::string not_used_summary =
+      "P0: 0, P25: 0, P50: 0, P75: 0, P90: 0, P95: 0, P99: 0, P99.9: 0, P100: 0";
+  std::string not_used_in_interval_summary =
+      "P0: 1, P25: 1, P50: 1, P75: 1, P90: 1, P95: 1, P99: 1, P99.9: 1, P100: 1";
+
+  std::string summary_with_two_values =
+      "P0: 1, P25: 1.05, P50: 1.1, P75: 2.05, P90: 2.08, P95: 2.09, P99: "
+      "2.098, P99.9: 2.0998, P100: 2.1";
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    EXPECT_EQ(histogram->cumulativeStatistics().summary(),
+              histogram->intervalStatistics().summary());
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    } else {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), not_used_summary);
+    }
+  }
+
+  merge_called = std::make_shared<std::atomic<bool>>(false);
+
+  // Insert value into second histogram and validate that it is merged properly.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 1));
+  h2.recordValue(1);
+
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  histogram_list = store_->histograms();
+  EXPECT_EQ(histogram_list.size(), 2);
+  EXPECT_TRUE(*merge_called);
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_NE(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    } else {
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    }
+  }
+
+  merge_called = std::make_shared<std::atomic<bool>>(false);
+
+  // Insert second value into second histogram and validate that it is merged properly.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
+  h2.recordValue(2);
+
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  histogram_list = store_->histograms();
+  EXPECT_EQ(histogram_list.size(), 2);
+  EXPECT_TRUE(*merge_called);
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_NE(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    } else {
+      EXPECT_NE(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->intervalStatistics().summary(), summary_with_two_as_value);
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_two_values);
+    }
+  }
+
+  // Do not insert any value and validate that intervalSummary is empty for both the histograms and
+  // cumulativeSummary has right values.
+  merge_called = std::make_shared<std::atomic<bool>>(false);
+  store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+
+  histogram_list = store_->histograms();
+  EXPECT_EQ(histogram_list.size(), 2);
+  EXPECT_TRUE(*merge_called);
+
+  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name().find("h1") != std::string::npos) {
+      EXPECT_NE(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_one_as_value);
+    } else {
+      EXPECT_NE(histogram->cumulativeStatistics().summary(),
+                histogram->intervalStatistics().summary());
+      EXPECT_EQ(histogram->intervalStatistics().summary(), not_used_in_interval_summary);
+      EXPECT_EQ(histogram->cumulativeStatistics().summary(), summary_with_two_values);
+    }
+  }
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_));
 }
