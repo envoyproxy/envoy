@@ -76,6 +76,7 @@ public:
   ~MockHostDescription();
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
+  MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
@@ -111,6 +112,13 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
+  CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      const Network::ConnectionSocket::OptionsSharedPtr& options) const override {
+    MockCreateConnectionData data = createConnection_(dispatcher, options);
+    return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
+  }
+
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     setHealthChecker_(health_checker);
   }
@@ -120,6 +128,7 @@ public:
   }
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
+  MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());

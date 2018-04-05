@@ -88,6 +88,13 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher,
   return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
 }
 
+Host::CreateConnectionData HostImpl::createHealthCheckConnection(
+    Event::Dispatcher& dispatcher,
+    const Network::ConnectionSocket::OptionsSharedPtr& options) const {
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), options),
+          shared_from_this()};
+}
+
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
@@ -599,7 +606,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance())});
+        envoy::api::v2::core::Locality().default_instance(),
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
   }
 }
 
@@ -823,10 +831,11 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
           ASSERT(address != nullptr);
-          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
-                                              Network::Utility::getAddressWithPort(*address, port_),
-                                              envoy::api::v2::core::Metadata::default_instance(), 1,
-                                              envoy::api::v2::core::Locality().default_instance()));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
+              envoy::api::v2::core::Metadata::default_instance(), 1,
+              envoy::api::v2::core::Locality().default_instance(),
+              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
         }
 
         HostVector hosts_added;
@@ -843,6 +852,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
+}
+
+Network::Address::InstanceConstSharedPtr HostDescriptionImpl::healthCheckAddress() const {
+  if (health_check_config_.port_value() == 0) {
+    return address_;
+  }
+
+  return Network::Utility::getAddressWithPort(*address_, health_check_config_.port_value());
 }
 
 } // namespace Upstream

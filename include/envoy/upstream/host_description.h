@@ -93,6 +93,11 @@ public:
    *         unknown.
    */
   virtual const envoy::api::v2::core::Locality& locality() const PURE;
+
+  /**
+   * @return the address used to health check the host.
+   */
+  virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;

@@ -229,17 +229,17 @@ public:
     });
   }
 
-  void expectSessionCreate() {
+  void expectSessionCreate(const std::string& health_check_address = "") {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
     test_sessions_.emplace_back(std::move(new_test_session));
     TestSession& test_session = *test_sessions_.back();
     test_session.timeout_timer_ = new Event::MockTimer(&dispatcher_);
     test_session.interval_timer_ = new Event::MockTimer(&dispatcher_);
-    expectClientCreate(test_sessions_.size() - 1);
+    expectClientCreate(test_sessions_.size() - 1, health_check_address);
   }
 
-  void expectClientCreate(size_t index) {
+  void expectClientCreate(size_t index, const std::string& health_check_address = "") {
     TestSession& test_session = *test_sessions_[index];
     test_session.codec_ = new NiceMock<Http::MockClientConnection>();
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
@@ -256,6 +256,10 @@ public:
     EXPECT_CALL(*health_checker_, createCodecClient_(_))
         .WillRepeatedly(
             Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+              if (!health_check_address.empty()) {
+                EXPECT_EQ(conn_data.host_description_->healthCheckAddress()->asString(),
+                          health_check_address);
+              }
               uint32_t index = codec_index_.front();
               codec_index_.pop_front();
               TestSession& test_session = *test_sessions_[index];
@@ -943,6 +947,46 @@ TEST_F(HttpHealthCheckerImplTest, ConnectionReachesWatermarkDuringCheck) {
   test_sessions_[0]->client_connection_->runLowWatermarkCallbacks();
 
   respond(0, "200", true);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
+  setupServiceValidationHC();
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config;
+  health_check_config.set_port_value(8000);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      // This creates a host with alt_hc_port value is 8000.
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", health_check_config)};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate("127.0.0.1:8000");
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+        EXPECT_TRUE(headers.Host());
+        EXPECT_TRUE(headers.Path());
+        EXPECT_NE(nullptr, headers.Host());
+        EXPECT_NE(nullptr, headers.Path());
+        EXPECT_EQ(headers.Host()->value().c_str(), host);
+        EXPECT_EQ(headers.Path()->value().c_str(), path);
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, true, false, health_checked_cluster);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 }
 

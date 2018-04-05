@@ -63,6 +63,16 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 
   /**
+   * Create a health check connection for this host.
+   * @param dispatcher supplies the owning dispatcher.
+   * @param options supplies the socket options that will be set on the new connection.
+   * @return the connection data.
+   */
+  virtual CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::list<Stats::GaugeSharedPtr> gauges() const PURE;
