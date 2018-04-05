@@ -5,7 +5,7 @@ As of release 1.3.0, Envoy will follow a
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 
-## Version 1.7.0...
+## Version 1.7.0
 
 * Admin mutations should be sent as POSTs rather than GETs. These will result in an error
   status code, and will not have their intended effect. Prior to 1.7, GETs can be used for
