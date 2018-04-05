@@ -31,11 +31,9 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 // Validate that if we fail to set a watch, we get a sensible warning.
 TEST_F(FilesystemSubscriptionImplTest, BadWatch) {
   updateFile("", true);
-  FilesystemEdsSubscriptionImpl subscription_(dispatcher_, "@/dev/null", stats_);
-  EXPECT_LOG_CONTAINS(
-      "warning",
-      "Unable to set filesystem watch on @/dev/null. This path will not be watched for updates.",
-      subscription_.start({}, callbacks_));
+  EXPECT_THROW_WITH_MESSAGE(
+      FilesystemEdsSubscriptionImpl(dispatcher_, "@/dev/null", stats_), EnvoyException,
+      "unable to add filesystem watch for file @/dev/null: No such file or directory");
 }
 
 } // namespace
