@@ -48,12 +48,10 @@ typedef absl::optional<int> SocketOptionName;
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
 
-class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
+class SocketOptionImpl : public Socket::Option, protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(absl::optional<bool> transparent, absl::optional<bool> freebind,
-                   absl::optional<uint32_t> tcp_fast_open_queue_length)
-      : transparent_(transparent), freebind_(freebind),
-        tcp_fast_open_queue_length_(tcp_fast_open_queue_length) {}
+  SocketOptionImpl(absl::optional<bool> transparent, absl::optional<bool> freebind)
+      : transparent_(transparent), freebind_(freebind) {}
 
   // Socket::Option
   bool setOption(Socket& socket, Socket::SocketState state) const override;
@@ -81,7 +79,6 @@ public:
 private:
   const absl::optional<bool> transparent_;
   const absl::optional<bool> freebind_;
-  const absl::optional<uint32_t> tcp_fast_open_queue_length_;
 };
 
 } // namespace Network
