@@ -166,14 +166,9 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "foo");
   cluster_map.emplace("foo", cluster);
-  envoy::api::v2::core::GrpcService expected_grpc_service_foo;
-  expected_grpc_service_foo.mutable_envoy_grpc()->set_cluster_name("foo");
-
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "bar");
   cluster_map.emplace("bar", cluster);
-  envoy::api::v2::core::GrpcService expected_grpc_service_bar;
-  expected_grpc_service_bar.mutable_envoy_grpc()->set_cluster_name("bar");
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
