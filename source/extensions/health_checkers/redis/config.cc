@@ -6,6 +6,8 @@
 
 #include "common/config/utility.h"
 
+#include "extensions/health_checkers/redis/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
@@ -20,9 +22,12 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
 
   return std::make_shared<RedisHealthChecker>(
       cluster, hc_config,
-      // TODO(dio): need to make the following cast mechanism simpler.
-      MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
-          *Config::Utility::translateToFactoryConfig(hc_config.custom_health_check(), *this)),
+      hc_config.has_redis_health_check()
+          ? translateFromRedisHealthCheck(hc_config.redis_health_check())
+          // TODO(dio): Need to make the following cast mechanism simpler.
+          : MessageUtil::downcastAndValidate<
+                const envoy::config::health_checker::redis::v2::Redis&>(
+                *Config::Utility::translateToFactoryConfig(hc_config.custom_health_check(), *this)),
       dispatcher, runtime, random,
       Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
 };

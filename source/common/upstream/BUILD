@@ -116,9 +116,6 @@ envoy_cc_library(
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
-        # TODO(mattklein123): The following should not be required once we allow pluggable health
-        # checkers.
-        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
     ],
 )
 

@@ -66,6 +66,32 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
                     .get()));
 }
 
+TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedConfig) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    # Using the deprecated redis_health_check should work.
+    redis_health_check:
+      key: foo
+    )EOF";
+
+  NiceMock<Upstream::MockCluster> cluster;
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+  EXPECT_NE(nullptr,
+            dynamic_cast<CustomRedisHealthChecker*>(
+                // Always use Upstream's HealthCheckerFactory when creating instance using
+                // deprecated config.
+                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
+                                                       cluster, runtime, random, dispatcher)
+                    .get()));
+}
+
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

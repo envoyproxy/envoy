@@ -19,6 +19,7 @@ def envoy_all_extensions(repository = ""):
     repository + "//source/extensions/filters/network/ratelimit:config",
     repository + "//source/extensions/filters/network/redis_proxy:config",
     repository + "//source/extensions/filters/network/tcp_proxy:config",
+    repository + "//source/extensions/health_checkers/redis:config",
     repository + "//source/extensions/stat_sinks/dog_statsd:config",
     repository + "//source/extensions/stat_sinks/metrics_service:config",
     repository + "//source/extensions/stat_sinks/statsd:config",

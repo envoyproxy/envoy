@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["redis_test.cc"],
     deps = [
         "//source/extensions/health_checkers/redis",
+        "//source/extensions/health_checkers/redis:utility",
         "//test/common/upstream:utility_lib",
         "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",

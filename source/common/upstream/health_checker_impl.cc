@@ -6,12 +6,11 @@
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
-
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -26,10 +25,6 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                                                        random);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random);
-  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
-    return std::make_shared<RedisHealthCheckerImpl>(
-        cluster, hc_config, dispatcher, runtime, random,
-        Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
@@ -37,10 +32,14 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
+  // Deprecates redis_health_check.
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            hc_config.custom_health_check().name());
+            hc_config.has_redis_health_check()
+                ? Config::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
+                : hc_config.custom_health_check().name());
     return factory.createCustomHealthChecker(hc_config, cluster, runtime, random, dispatcher);
   }
   default:
@@ -291,123 +290,6 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   client_->close(Network::ConnectionCloseType::NoFlush);
-}
-
-RedisHealthCheckerImpl::RedisHealthCheckerImpl(
-    const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
-    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      client_factory_(client_factory), key_(config.redis_health_check().key()) {
-  if (!key_.empty()) {
-    type_ = Type::Exists;
-  } else {
-    type_ = Type::Ping;
-  }
-}
-
-RedisHealthCheckerImpl::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
-    RedisHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
-
-RedisHealthCheckerImpl::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
-  if (current_request_) {
-    current_request_->cancel();
-    current_request_ = nullptr;
-  }
-
-  if (client_) {
-    client_->close();
-  }
-}
-
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onEvent(
-    Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    // This should only happen after any active requests have been failed/cancelled.
-    ASSERT(!current_request_);
-    parent_.dispatcher_.deferredDelete(std::move(client_));
-  }
-}
-
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
-  if (!client_) {
-    client_ = parent_.client_factory_.create(host_, parent_.dispatcher_, *this);
-    client_->addConnectionCallbacks(*this);
-  }
-
-  ASSERT(!current_request_);
-
-  switch (parent_.type_) {
-  case Type::Exists:
-    current_request_ = client_->makeRequest(existsHealthCheckRequest(parent_.key_), *this);
-    break;
-  case Type::Ping:
-    current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
-    break;
-  default:
-    NOT_REACHED;
-  }
-}
-
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
-    Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) {
-  current_request_ = nullptr;
-
-  switch (parent_.type_) {
-  case Type::Exists:
-    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::Integer &&
-        value->asInteger() == 0) {
-      handleSuccess();
-    } else {
-      handleFailure(FailureType::Active);
-    }
-    break;
-  case Type::Ping:
-    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::SimpleString &&
-        value->asString() == "PONG") {
-      handleSuccess();
-    } else {
-      handleFailure(FailureType::Active);
-    }
-    break;
-  default:
-    NOT_REACHED;
-  }
-
-  if (!parent_.reuse_connection_) {
-    client_->close();
-  }
-}
-
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onFailure() {
-  current_request_ = nullptr;
-  handleFailure(FailureType::Network);
-}
-
-void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
-  current_request_->cancel();
-  current_request_ = nullptr;
-  client_->close();
-}
-
-RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
-  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(2);
-  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
-  values[0].asString() = "EXISTS";
-  values[1].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
-  values[1].asString() = key;
-  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
-  request_.asArray().swap(values);
-}
-
-RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
-  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(1);
-  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
-  values[0].asString() = "PING";
-  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
-  request_.asArray().swap(values);
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
