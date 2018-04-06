@@ -93,8 +93,8 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
-  config.mutable_api_config_source()->add_cluster_names("foo");
-  cluster_map.emplace("foo", cluster);
+  config.mutable_api_config_source()->add_cluster_names("static_cluster");
+  cluster_map.emplace("static_cluster", cluster);
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
@@ -111,11 +111,11 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-      "foo");
-  cluster_map.emplace("foo", cluster);
+      "static_cluster");
+  cluster_map.emplace("static_cluster", cluster);
 
   envoy::api::v2::core::GrpcService expected_grpc_service;
-  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
@@ -142,11 +142,11 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
 
-  config.mutable_api_config_source()->add_cluster_names("foo");
-  cluster_map.emplace("foo", cluster);
+  config.mutable_api_config_source()->add_cluster_names("static_cluster_foo");
+  cluster_map.emplace("static_cluster_foo", cluster);
 
-  config.mutable_api_config_source()->add_cluster_names("bar");
-  cluster_map.emplace("bar", cluster);
+  config.mutable_api_config_source()->add_cluster_names("static_cluster_bar");
+  cluster_map.emplace("static_cluster_bar", cluster);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
@@ -164,11 +164,11 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
 
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-      "foo");
-  cluster_map.emplace("foo", cluster);
+      "static_cluster_foo");
+  cluster_map.emplace("static_cluster_foo", cluster);
   config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-      "bar");
-  cluster_map.emplace("bar", cluster);
+      "static_cluster_bar");
+  cluster_map.emplace("static_cluster_bar", cluster);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
@@ -204,44 +204,44 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  api_config_source->add_cluster_names("foo");
+  api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("foo", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*legacy_subscription_, start(_, _));
-  subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
 TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  api_config_source->add_cluster_names("foo");
+  api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("foo", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  EXPECT_CALL(cm_, httpAsyncClientForCluster("foo"));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
   EXPECT_CALL(cm_.async_client_, send_(_, _, _))
       .WillOnce(Invoke([this](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                               const absl::optional<std::chrono::milliseconds>& timeout) {
         UNREFERENCED_PARAMETER(callbacks);
         UNREFERENCED_PARAMETER(timeout);
         EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
-        EXPECT_EQ("foo", std::string(request->headers().Host()->value().c_str()));
+        EXPECT_EQ("static_cluster", std::string(request->headers().Host()->value().c_str()));
         EXPECT_EQ("/v2/discovery:endpoints",
                   std::string(request->headers().Path()->value().c_str()));
         return &http_request_;
       }));
   EXPECT_CALL(http_request_, cancel());
-  subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
 // Confirm error when no refresh delay is set (not checked by schema).
@@ -249,14 +249,14 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  api_config_source->add_cluster_names("foo");
+  api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("foo", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}, callbacks_),
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_),
                             EnvoyException,
                             "refresh_delay is required for REST API configuration sources");
 }
@@ -265,12 +265,12 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   envoy::api::v2::core::GrpcService expected_grpc_service;
-  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo_cluster");
+  expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   NiceMock<Upstream::MockCluster> cluster;
-  cluster_map.emplace("foo_cluster", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
@@ -284,7 +284,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
       }));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-  subscriptionFromConfigSource(config)->start({"foo"}, callbacks_);
+  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
 INSTANTIATE_TEST_CASE_P(SubscriptionFactoryTestApiConfigSource,
@@ -298,16 +298,16 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   } else {
-    api_config_source->add_cluster_names("foo");
+    api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
+      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
@@ -315,20 +315,20 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   } else {
-    api_config_source->add_cluster_names("foo");
+    api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("foo", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillOnce(Return(true));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
+      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
 TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
@@ -336,21 +336,21 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
   } else {
-    api_config_source->add_cluster_names("foo");
+    api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
-  cluster_map.emplace("foo", cluster);
+  cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::api::v2::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"foo"}, callbacks_), EnvoyException,
+      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined "
-      "non-EDS cluster: 'foo' does not exist, was added via api, or is an EDS cluster");
+      "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
 } // namespace Config
