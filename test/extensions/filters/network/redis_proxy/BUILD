@@ -3,15 +3,19 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
         "//source/common/buffer:buffer_lib",
@@ -21,9 +25,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
         "//source/common/stats:stats_lib",
@@ -32,9 +37,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
         "//source/common/event:dispatcher_lib",
@@ -48,9 +54,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         ":redis_mocks",
         "//source/common/config:filter_json_lib",
@@ -75,9 +82,10 @@ envoy_cc_mock(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
     deps = [
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",

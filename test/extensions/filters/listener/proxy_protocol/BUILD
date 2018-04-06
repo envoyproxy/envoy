@@ -2,15 +2,19 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
+    extension_name = "envoy.filters.listener.proxy_protocol",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

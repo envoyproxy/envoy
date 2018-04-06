@@ -187,6 +187,29 @@ void InstanceImpl::initialize(Options& options,
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
+  ENVOY_LOG(info, "statically linked extensions:");
+  ENVOY_LOG(info, "  access_loggers: {}",
+            Registry::FactoryRegistry<Configuration::AccessLogInstanceFactory>::allFactoryNames());
+  ENVOY_LOG(
+      info, "  filters.http: {}",
+      Registry::FactoryRegistry<Configuration::NamedHttpFilterConfigFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  filters.listener: {}",
+            Registry::FactoryRegistry<
+                Configuration::NamedListenerFilterConfigFactory>::allFactoryNames());
+  ENVOY_LOG(
+      info, "  filters.network: {}",
+      Registry::FactoryRegistry<Configuration::NamedNetworkFilterConfigFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  stat_sinks: {}",
+            Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  tracers: {}",
+            Registry::FactoryRegistry<Configuration::HttpTracerFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  transport_sockets.downstream: {}",
+            Registry::FactoryRegistry<
+                Configuration::DownstreamTransportSocketConfigFactory>::allFactoryNames());
+  ENVOY_LOG(info, "  transport_sockets.upstream: {}",
+            Registry::FactoryRegistry<
+                Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
+
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options);

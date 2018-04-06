@@ -65,9 +65,12 @@ code/extensions, and also will allow us in the future to more easily scale out o
 maintainers by having OWNERS files specific to certain extensions. (As of this writing, this is not
 currently implemented but that is the plan moving forward.)
 
-* All extensions are registered in [all_extensions.bzl](source/extensions/all_extensions.bzl). In
-  the future this mechanism will easily allow us to compile out extensions based on build system
-  configuration. This is not currently implemented but is the plan moving forward.
+* All extensions are either registered in [all_extensions.bzl](source/extensions/all_extensions.bzl)
+  or [extensions_build_config.bzl](source/extensions/extensions_build_config.bzl). The former is
+  for extensions that cannot be removed from the primary Envoy build. The latter is for extensions
+  that can be removed on a site specific basis. See [bazel/README.md](bazel/README.md) for how to
+  compile out extensions on a site specific basis. Note that by default extensions should be
+  removable from the build unless there is a very good reason.
 * These are the top level extension directories and associated namespaces:
   * [access_loggers/](/source/extensions/access_loggers): Access log implementations which use
     the `Envoy::Extensions::AccessLoggers` namespace.

@@ -1,5 +1,5 @@
 licenses(["notice"])  # Apache 2
-# Built-in plain text connection transport socket.
+# Built-in plaintext connection transport socket.
 
 load(
     "//bazel:envoy_build_system.bzl",
