@@ -1,5 +1,4 @@
 #include "server/listener_manager_impl.h"
-#include "server/listener_socket_option_impl.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
@@ -16,6 +15,7 @@
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
+#include "server/listener_socket_option_impl.h"
 
 namespace Envoy {
 namespace Server {
