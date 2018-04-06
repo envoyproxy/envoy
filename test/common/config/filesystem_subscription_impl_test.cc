@@ -1,7 +1,12 @@
 #include "test/common/config/filesystem_subscription_test_harness.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
+
+using ::testing::Throw;
 
 namespace Envoy {
 namespace Config {
@@ -29,11 +34,15 @@ TEST_F(FilesystemSubscriptionImplTest, InitialFile) {
 }
 
 // Validate that if we fail to set a watch, we get a sensible warning.
-TEST_F(FilesystemSubscriptionImplTest, BadWatch) {
-  updateFile("", true);
-  EXPECT_THROW_WITH_MESSAGE(
-      FilesystemEdsSubscriptionImpl(dispatcher_, "@/dev/null", stats_), EnvoyException,
-      "unable to add filesystem watch for file @/dev/null: No such file or directory");
+TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
+  Event::MockDispatcher dispatcher;
+  Stats::MockIsolatedStatsStore stats_store;
+  SubscriptionStats stats{Utility::generateStats(stats_store)};
+  auto* watcher = new Filesystem::MockWatcher();
+  EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
+  EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
+  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats),
+                            EnvoyException, "bad path");
 }
 
 } // namespace
