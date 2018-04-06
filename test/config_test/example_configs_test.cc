@@ -15,7 +15,11 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr);
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
 
+#ifdef __APPLE__
+  EXPECT_EQ(27UL, ConfigTest::run(directory));
+#else
   EXPECT_EQ(28UL, ConfigTest::run(directory));
+#endif
   ConfigTest::testMerge();
   ConfigTest::testIncompatibleMerge();
 
