@@ -204,7 +204,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_.reset(new Config::GrpcMuxImpl(
         bootstrap.node(),
-        Config::Utility::factoryForGrpcApiConfigSource(
+        Config::Utility::factoryForApiConfigSource(
             *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
             ->create(),
         main_thread_dispatcher,
@@ -291,12 +291,11 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_.reset(
-        new LoadStatsReporter(bootstrap.node(), *this, stats,
-                              Config::Utility::factoryForGrpcApiConfigSource(
-                                  *async_client_manager_, load_stats_config, stats)
-                                  ->create(),
-                              main_thread_dispatcher));
+    load_stats_reporter_.reset(new LoadStatsReporter(
+        bootstrap.node(), *this, stats,
+        Config::Utility::factoryForApiConfigSource(*async_client_manager_, load_stats_config, stats)
+            ->create(),
+        main_thread_dispatcher));
   }
 }
 
