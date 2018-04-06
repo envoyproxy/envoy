@@ -20,3 +20,16 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/common/upstream:health_checker_lib",
+        "//source/extensions/health_checkers/redis:config",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)

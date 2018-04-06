@@ -20,3 +20,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/health_checker/redis/v2:redis_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":redis",
+        "//include/envoy/registry",
+        "//include/envoy/server:health_checker_interface",
+        "//source/common/common:assert_lib",
+    ],
+)

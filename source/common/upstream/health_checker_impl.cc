@@ -1,8 +1,11 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include "envoy/server/health_checker_config.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/config/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/router/router.h"
@@ -34,6 +37,12 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
+  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
+            hc_config.custom_health_check().name());
+    return factory.createCustomHealthChecker(hc_config, cluster, runtime, random, dispatcher);
+  }
   default:
     // Checked by schema.
     NOT_REACHED;
