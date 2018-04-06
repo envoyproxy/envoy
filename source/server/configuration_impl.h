@@ -30,23 +30,23 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
- * class RegisterFactory.
+ * Implemented by each HttpTracer and registered via Registry::registerFactory() or
+ * the convenience class RegisterFactory.
  */
-class TracerFactory {
+class HttpTracerFactory {
 public:
-  virtual ~TracerFactory() {}
+  virtual ~HttpTracerFactory() {}
 
   /**
-   * Create a particular Tracer implementation. If the implementation is unable to produce an Tracer
-   * with the provided parameters, it should throw an EnvoyException in the case of general error or
-   * a Json::Exception if the json configuration is erroneous. The returned pointer should always be
-   * valid.
-   * @param json_config supplies the general json configuration for the Tracer
+   * Create a particular HttpTracer implementation. If the implementation is unable to produce an
+   * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
+   * general error or a Json::Exception if the json configuration is erroneous. The returned
+   * pointer should always be valid.
+   * @param json_config supplies the general json configuration for the HttpTracer
    * @param server supplies the server instance
    */
-  virtual Tracing::HttpTracerPtr createTracer(const Json::Object& json_config,
-                                              Instance& server) PURE;
+  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                                  Instance& server) PURE;
 
   /**
    * Returns the identifying name for a particular implementation of HttpTracer produced by the

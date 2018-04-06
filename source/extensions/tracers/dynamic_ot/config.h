@@ -12,13 +12,13 @@ namespace Tracers {
 namespace DynamicOt {
 
 /**
- * Config registration for the dynamic opentracing tracer. @see TracerFactory.
+ * Config registration for the dynamic opentracing tracer. @see HttpTracerFactory.
  */
-class DynamicOpenTracingTracerFactory : public Server::Configuration::TracerFactory {
+class DynamicOpenTracingHttpTracerFactory : public Server::Configuration::HttpTracerFactory {
 public:
-  // TracerFactory
-  Tracing::HttpTracerPtr createTracer(const Json::Object& json_config,
-                                      Server::Instance& server) override;
+  // HttpTracerFactory
+  Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                          Server::Instance& server) override;
   std::string name() override;
 };
 

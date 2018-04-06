@@ -33,9 +33,9 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   )EOF",
                                                 TestEnvironment::runfilesDirectory());
   const Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
-  DynamicOpenTracingTracerFactory factory;
+  DynamicOpenTracingHttpTracerFactory factory;
 
-  const Tracing::HttpTracerPtr tracer = factory.createTracer(*valid_json, server);
+  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*valid_json, server);
   EXPECT_NE(nullptr, tracer);
 }
 

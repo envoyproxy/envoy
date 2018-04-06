@@ -206,8 +206,11 @@ public:
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
                                                             Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr);
+
+    if (config == nullptr) {
+      throw EnvoyException(fmt::format(
+          "{} factory returned nullptr instead of empty config message.", factory.name()));
+    }
 
     if (enclosing_message.has_config()) {
       MessageUtil::jsonConvert(enclosing_message.config(), *config);

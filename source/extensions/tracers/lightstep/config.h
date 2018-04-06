@@ -12,13 +12,13 @@ namespace Tracers {
 namespace Lightstep {
 
 /**
- * Config registration for the lightstep tracer. @see TracerFactory.
+ * Config registration for the lightstep tracer. @see HttpTracerFactory.
  */
-class LightstepTracerFactory : public Server::Configuration::TracerFactory {
+class LightstepHttpTracerFactory : public Server::Configuration::HttpTracerFactory {
 public:
-  // TracerFactory
-  Tracing::HttpTracerPtr createTracer(const Json::Object& json_config,
-                                      Server::Instance& server) override;
+  // HttpTracerFactory
+  Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
+                                          Server::Instance& server) override;
 
   std::string name() override;
 };

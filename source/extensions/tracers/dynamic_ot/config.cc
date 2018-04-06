@@ -14,8 +14,8 @@ namespace Tracers {
 namespace DynamicOt {
 
 Tracing::HttpTracerPtr
-DynamicOpenTracingTracerFactory::createTracer(const Json::Object& json_config,
-                                              Server::Instance& server) {
+DynamicOpenTracingHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
+                                                      Server::Instance& server) {
   const std::string library = json_config.getString("library");
   const std::string config = json_config.getObject("config")->asJsonString();
   Tracing::DriverPtr dynamic_driver{
@@ -23,15 +23,15 @@ DynamicOpenTracingTracerFactory::createTracer(const Json::Object& json_config,
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
 }
 
-std::string DynamicOpenTracingTracerFactory::name() {
+std::string DynamicOpenTracingHttpTracerFactory::name() {
   return Config::TracerNames::get().DYNAMIC_OT;
 }
 
 /**
  * Static registration for the dynamic opentracing http tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DynamicOpenTracingTracerFactory,
-                                 Server::Configuration::TracerFactory>
+static Registry::RegisterFactory<DynamicOpenTracingHttpTracerFactory,
+                                 Server::Configuration::HttpTracerFactory>
     register_;
 
 } // namespace DynamicOt
