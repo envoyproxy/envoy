@@ -44,13 +44,13 @@ class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
-                 const bool skip_recalculating_route = false) {
+                 const bool match_incoming_request_route = false) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
     envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
-    proto_config.set_skip_recalculating_route(skip_recalculating_route);
+    proto_config.set_match_incoming_request_route(match_incoming_request_route);
     return proto_config;
   }
 
@@ -205,20 +205,20 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 
 class GrpcJsonTranscoderFilterTest : public testing::Test {
 public:
-  GrpcJsonTranscoderFilterTest(const bool skip_recalculating_route = false)
-      : config_(bookstoreProtoConfig(skip_recalculating_route)), filter_(config_) {
+  GrpcJsonTranscoderFilterTest(const bool match_incoming_request_route = false)
+      : config_(bookstoreProtoConfig(match_incoming_request_route)), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
-  bookstoreProtoConfig(const bool skip_recalculating_route) {
+  bookstoreProtoConfig(const bool match_incoming_request_route) {
     std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                               "\",\"services\": [\"bookstore.Bookstore\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
     envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config{};
     Envoy::Config::FilterJson::translateGrpcJsonTranscoder(*json_config, proto_config);
-    proto_config.set_skip_recalculating_route(skip_recalculating_route);
+    proto_config.set_match_incoming_request_route(match_incoming_request_route);
     return proto_config;
   }
 
