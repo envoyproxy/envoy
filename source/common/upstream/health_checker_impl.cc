@@ -46,7 +46,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      request_headers_parser_(
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -83,6 +85,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
+const RequestInfo::RequestInfoImpl
+    HttpHealthCheckerImpl::HttpActiveHealthCheckSession::REQUEST_INFO;
+
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -102,6 +107,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }
