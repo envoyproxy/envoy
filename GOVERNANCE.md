@@ -96,6 +96,8 @@
   to the next development release. E.g., "1.7.0-dev". At the same time, also add a new empty section
   to the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
   for the following version. E.g., "1.7.0".
+* Update [DEPRECATED.md](DEPRECATED.md) to remove the '(pending)' comment on the current version,
+  replacing it with the release date. Add a placeholder for the next version.
 
 ## When does a maintainer lose maintainer status
 

@@ -20,11 +20,11 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-std::string DateFormatter::fromTime(const SystemTime& time) {
+std::string DateFormatter::fromTime(const SystemTime& time) const {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
 
-std::string DateFormatter::fromTimeT(time_t time) {
+std::string DateFormatter::fromTimeT(time_t time) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
@@ -248,10 +248,10 @@ std::string StringUtil::escape(const std::string& source) {
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
+  static DateFormatter default_date_format("%Y-%m-%dT%H:%M:%S");
 
   return fmt::format(
-      "{}.{:03d}Z", date_format.fromTime(time),
+      "{}.{:03d}Z", default_date_format.fromTime(time),
       std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count() %
           1000);
 }
