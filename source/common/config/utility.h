@@ -122,6 +122,15 @@ public:
   static void checkFilesystemSubscriptionBackingPath(const std::string& path);
 
   /**
+   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
+   * @param api_config_source the config source to validate.
+   * @throws EnvoyException when an API config has the wrong number of gRPC
+   * services or cluster names, depending on expectations set by its API type.
+   */
+  static void
+  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
    * @param api_config_source the config source to validate.
@@ -240,9 +249,9 @@ public:
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
-  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                            const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                            Stats::Scope& scope);
+  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                                Stats::Scope& scope);
 };
 
 } // namespace Config
