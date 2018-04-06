@@ -63,11 +63,10 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
 
-  EXPECT_CALL(cm_, clusters());
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
@@ -76,11 +75,10 @@ TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
 TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
 
-  EXPECT_CALL(cm_, clusters());
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
@@ -256,9 +254,9 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_),
-                            EnvoyException,
-                            "refresh_delay is required for REST API configuration sources");
+  EXPECT_THROW_WITH_MESSAGE(
+      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
+      "refresh_delay is required for REST API configuration sources");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
@@ -298,7 +296,8 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, NonExistentCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+        "static_cluster");
   } else {
     api_config_source->add_cluster_names("static_cluster");
   }
@@ -315,7 +314,8 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+        "static_cluster");
   } else {
     api_config_source->add_cluster_names("static_cluster");
   }
@@ -336,7 +336,8 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(GetParam());
   if (api_config_source->api_type() == envoy::api::v2::core::ApiConfigSource::GRPC) {
-    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+    api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+        "static_cluster");
   } else {
     api_config_source->add_cluster_names("static_cluster");
   }

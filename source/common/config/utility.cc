@@ -78,8 +78,7 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
   }
 }
 
-void Utility::checkApiConfigSourceSubscriptionBackingCluster(
-    const Upstream::ClusterManager::ClusterInfoMap& clusters,
+void Utility::checkApiConfigSourceNames(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
@@ -99,11 +98,19 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
           "envoy::api::v2::core::ConfigSource must not have a gRPC service specified");
     }
     if (api_config_source.cluster_names().size() != 1) {
-      // TODO(htuch): Add support for multiple clusters, #1170.
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
     }
   }
+}
+
+void Utility::checkApiConfigSourceSubscriptionBackingCluster(
+    const Upstream::ClusterManager::ClusterInfoMap& clusters,
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
+  Utility::checkApiConfigSourceNames(api_config_source);
+
+  const bool is_grpc =
+      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
   // we ought to validate the cluster name if and only if there is a cluster name.
   if (is_grpc) {
@@ -201,27 +208,7 @@ void Utility::checkObjNameLength(const std::string& error_prefix, const std::str
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::api::v2::core::ApiConfigSource& api_config_source, Stats::Scope& scope) {
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
-  envoy::api::v2::core::GrpcService grpc_service;
-
-  if (!api_config_source.cluster_names().empty()) {
-    throw EnvoyException(
-        fmt::format("Found unexpected cluster_names in envoy::api::v2::core::ApiConfigSource. Use "
-                    "grpc_services instead: {}",
-                    api_config_source.DebugString()));
-  }
-
-  if (api_config_source.grpc_services().empty()) {
-    throw EnvoyException(
-        fmt::format("Missing gRPC services in envoy::api::v2::core::ApiConfigSource: {}",
-                    api_config_source.DebugString()));
-  }
-  // TODO(htuch): Implement multiple gRPC services.
-  if (api_config_source.grpc_services().size() != 1) {
-    throw EnvoyException(fmt::format("Only singleton gRPC service lists supported in "
-                                     "envoy::api::v2::core::ApiConfigSource: {}",
-                                     api_config_source.DebugString()));
-  }
+  Utility::checkApiConfigSourceNames(api_config_source);
 
   return async_client_manager.factoryForGrpcService(api_config_source.grpc_services(0), scope,
                                                     false);
