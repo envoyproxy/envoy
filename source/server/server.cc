@@ -202,7 +202,7 @@ void InstanceImpl::initialize(Options& options,
   ENVOY_LOG(info, "  stat_sinks: {}",
             Registry::FactoryRegistry<Configuration::StatsSinkFactory>::allFactoryNames());
   ENVOY_LOG(info, "  tracers: {}",
-            Registry::FactoryRegistry<Configuration::HttpTracerFactory>::allFactoryNames());
+            Registry::FactoryRegistry<Configuration::TracerFactory>::allFactoryNames());
   ENVOY_LOG(info, "  transport_sockets.downstream: {}",
             Registry::FactoryRegistry<
                 Configuration::DownstreamTransportSocketConfigFactory>::allFactoryNames());
