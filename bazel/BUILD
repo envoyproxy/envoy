@@ -7,6 +7,30 @@ exports_files([
     "sh_test_wrapper.sh",
 ])
 
+genrule(
+    name = "gnu_build_id",
+    outs = ["gnu_build_id.ldscript"],
+    cmd = """
+      echo --build-id=0x$$(
+          grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
+        | sed 's/^BUILD_SCM_REVISION //') \\
+        > $@
+    """,
+    stamp = 1,
+)
+
+# For MacOS, which doesn't have GNU ld's `--build-id` flag.
+genrule(
+    name = "raw_build_id",
+    outs = ["raw_build_id.ldscript"],
+    cmd = """
+      grep BUILD_SCM_REVISION bazel-out/volatile-status.txt \\
+    | sed 's/^BUILD_SCM_REVISION //' \\
+    > $@
+    """,
+    stamp = 1,
+)
+
 config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
