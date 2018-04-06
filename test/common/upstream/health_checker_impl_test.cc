@@ -16,7 +16,6 @@
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
