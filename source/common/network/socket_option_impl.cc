@@ -16,7 +16,7 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
         setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
                           &should_transparent, sizeof(should_transparent));
     if (error != 0) {
-      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
+      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(errno));
       return false;
     }
   }
@@ -28,7 +28,7 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
           setIpSocketOption(socket, ENVOY_SOCKET_IP_FREEBIND, ENVOY_SOCKET_IPV6_FREEBIND,
                             &should_freebind, sizeof(should_freebind));
       if (error != 0) {
-        ENVOY_LOG(warn, "Setting IP_FREEBIND on listener socket failed: {}", strerror(error));
+        ENVOY_LOG(warn, "Setting IP_FREEBIND on listener socket failed: {}", strerror(errno));
         return false;
       }
     }
