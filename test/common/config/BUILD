@@ -14,6 +14,9 @@ envoy_cc_test(
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [
         ":filesystem_subscription_test_harness",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 

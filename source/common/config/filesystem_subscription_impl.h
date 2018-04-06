@@ -25,7 +25,14 @@ class FilesystemSubscriptionImpl : public Config::Subscription<ResourceType>,
 public:
   FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path,
                              SubscriptionStats stats)
-      : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats) {}
+      : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats) {
+    watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
+      UNREFERENCED_PARAMETER(events);
+      if (started_) {
+        refresh();
+      }
+    });
+  }
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
@@ -33,10 +40,7 @@ public:
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
     callbacks_ = &callbacks;
-    watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {
-      UNREFERENCED_PARAMETER(events);
-      refresh();
-    });
+    started_ = true;
     // Attempt to read in case there is a file there already.
     refresh();
   }
@@ -79,6 +83,7 @@ private:
     }
   }
 
+  bool started_{};
   const std::string path_;
   std::string version_info_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
