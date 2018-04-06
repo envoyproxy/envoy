@@ -2,13 +2,16 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "dynamic_opentracing_driver_impl_test",
     srcs = [
         "dynamic_opentracing_driver_impl_test.cc",
@@ -16,6 +19,7 @@ envoy_cc_test(
     data = [
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
+    extension_name = "envoy.tracers.dynamic_ot",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/tracers/dynamic_ot:dynamic_opentracing_driver_lib",
@@ -26,12 +30,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
+    extension_name = "envoy.tracers.dynamic_ot",
     deps = [
         "//source/extensions/tracers/dynamic_ot:config",
         "//test/mocks/server:server_mocks",

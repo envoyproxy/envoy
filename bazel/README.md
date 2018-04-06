@@ -22,7 +22,7 @@ As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/bl
 version](https://github.com/envoyproxy/envoy/blob/master/bazel/repositories.bzl) of the various Envoy
 dependencies are provided. These are provided as is, they are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
-up-to-date with the latest security patches. See 
+up-to-date with the latest security patches. See
 [this doc](https://github.com/envoyproxy/envoy/blob/master/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
 for how to update or override dependencies.
 
@@ -241,7 +241,7 @@ bazel test -c dbg --config=clang-tsan //test/...
 
 ## Log Verbosity
 
-Log verbosity is controlled at runtime in all builds. 
+Log verbosity is controlled at runtime in all builds.
 
 ## Disabling optional features
 
@@ -256,8 +256,52 @@ The following optional features can be disabled on the Bazel build command-line:
 The following optional features can be enabled on the Bazel build command-line:
 
 * Exported symbols during linking with `--define exported_symbols=enabled`.
-  This is useful in cases where you have a lua script that loads shared object libraries, such as those installed via luarocks.
-* Perf annotation with `define perf_annotation=enabled` (see source/common/common/perf_annotation.h for details).
+  This is useful in cases where you have a lua script that loads shared object libraries, such as
+  those installed via luarocks.
+* Perf annotation with `--define perf_annotation=enabled` (see
+  source/common/common/perf_annotation.h for details).
+
+## Disabling extensions
+
+Envoy uses a modular build which allows extensions to be removed if they are not needed or desired.
+Extensions that can be removed are contained in
+[extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl). Use the following
+procedure to customize the extensions for your build:
+
+* The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
+  contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
+  a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+  Thus, the default build has all extensions.
+* Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
+  This workspace should contain:
+  * Empty WORKSPACE file.
+  * Empty BUILD file.
+  * A copy of [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+  * Comment out any extensions that you don't want to build in your file copy.
+
+To have your local build use your overridden configuration repository there are two options:
+
+1. Use the [`--override_repository`](https://docs.bazel.build/versions/master/command-line-reference.html)
+   CLI option to override the `@envoy_build_config` repo.
+2. Use the following snippet in your WORKSPACE before you load the Envoy repository. E.g.,
+
+```
+workspace(name = "envoy")
+
+local_repository(
+    name = "envoy_build_config",
+    # Relative paths are also supported.
+    path = "/somewhere/on/filesystem/envoy_build_config",
+)
+
+local_repository(
+    name = "envoy",
+    # Relative paths are also supported.
+    path = "/somewhere/on/filesystem/envoy",
+)
+
+...
+```
 
 ## Stats Tunables
 
@@ -270,7 +314,6 @@ value. For example:
 ```
 bazel build --copts=-DENVOY_DEFAULT_MAX_STATS=32768 --copts=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
 ```
-
 
 # Release builds
 
