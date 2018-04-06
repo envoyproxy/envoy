@@ -11,6 +11,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:admin_interface",
         "//source/common/common:assert_lib",
+        "//source/server/http:config_tracker_lib",
     ],
 )
 

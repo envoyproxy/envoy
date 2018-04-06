@@ -4,6 +4,8 @@
 
 #include "common/common/assert.h"
 
+#include "server/http/config_tracker_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -17,6 +19,10 @@ public:
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
+  ConfigTracker& getConfigTracker() override;
+
+private:
+  ConfigTrackerImpl config_tracker_;
 };
 
 } // namespace Server

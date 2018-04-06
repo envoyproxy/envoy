@@ -18,9 +18,9 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-MockOptions::MockOptions(const std::string& config_path)
-    : config_path_(config_path), admin_address_path_("") {
+MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, v2ConfigOnly()).WillByDefault(Invoke([this] { return v2_config_only_; }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
@@ -33,7 +33,11 @@ MockOptions::MockOptions(const std::string& config_path)
 }
 MockOptions::~MockOptions() {}
 
-MockAdmin::MockAdmin() {}
+MockAdmin::MockAdmin() {
+  ON_CALL(*this, getConfigTracker()).WillByDefault(testing::ReturnRef(config_tracker));
+  ON_CALL(config_tracker, addReturnsRaw(_, _))
+      .WillByDefault(ReturnNew<Server::MockConfigTracker::MockEntryOwner>());
+}
 MockAdmin::~MockAdmin() {}
 
 MockDrainManager::MockDrainManager() {

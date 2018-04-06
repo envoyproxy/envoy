@@ -10,8 +10,13 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
-                                               const envoy::api::v2::core::GrpcService& config)
+                                               const envoy::api::v2::core::GrpcService& config,
+                                               bool skip_cluster_check)
     : cm_(cm), config_(config) {
+  if (skip_cluster_check) {
+    return;
+  }
+
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
   auto clusters = cm_.clusters();
   const auto& it = clusters.find(cluster_name);
@@ -65,10 +70,10 @@ AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 
 AsyncClientFactoryPtr
 AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
-                                              Stats::Scope& scope) {
+                                              Stats::Scope& scope, bool skip_cluster_check) {
   switch (config.target_specifier_case()) {
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, config);
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check);
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope, config);
   default:

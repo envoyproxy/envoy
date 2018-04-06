@@ -15,7 +15,8 @@ void Runner::setupEnvironment(int argc, char** argv) {
   TestEnvironment::initializeOptions(argc, argv);
 
   static auto* lock = new Thread::MutexBasicLockable();
-  Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(), *lock);
+  Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
+                               TestEnvironment::getOptions().logFormat(), *lock);
 }
 
 } // namespace Fuzz
