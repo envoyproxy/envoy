@@ -141,7 +141,8 @@ TEST_F(SocketOptionImplTest, V4EmptyOptionNames) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
-  EXPECT_EQ(ENOTSUP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
+  EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
+  EXPECT_EQ(ENOTSUP, errno);
 }
 
 // If a platform doesn't suppport IPv4 and IPv6 socket option variants for an IPv4 address, we fail
@@ -150,7 +151,8 @@ TEST_F(SocketOptionImplTest, V6EmptyOptionNames) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
-  EXPECT_EQ(ENOTSUP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
+  EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
+  EXPECT_EQ(ENOTSUP, errno);
 }
 
 // If a platform suppports IPv4 socket option variant for an IPv4 address,

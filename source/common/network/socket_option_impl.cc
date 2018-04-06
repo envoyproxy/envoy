@@ -69,7 +69,8 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
   if (ip->version() == Network::Address::IpVersion::v4) {
     if (!ipv4_optname) {
       ENVOY_LOG(warn, "Unsupported IPv4 socket option");
-      return ENOTSUP;
+      errno = ENOTSUP;
+      return -1;
     }
     return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
   }
@@ -84,7 +85,8 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
     return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
   }
   ENVOY_LOG(warn, "Unsupported IPv6 socket option");
-  return ENOTSUP;
+  errno = ENOTSUP;
+  return -1;
 }
 
 } // namespace Network
