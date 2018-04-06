@@ -28,8 +28,7 @@ MaglevTable::MaglevTable(const HostsPerLocality& hosts_per_locality,
   uint32_t total_hosts = 0;
   for (uint32_t i = 0; i < hosts_per_locality.get().size(); ++i) {
     for (const auto& host : hosts_per_locality.get()[i]) {
-      max_host_weight =
-          effective_weight(std::max(effective_weight(host->weight(), i), max_host_weight), i);
+      max_host_weight = std::max(effective_weight(host->weight(), i), max_host_weight);
       ++total_hosts;
     }
   }
