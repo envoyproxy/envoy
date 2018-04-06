@@ -66,10 +66,13 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::list<HistogramSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
+  // TODO(ramaraochavali): incorporate the scopes into the histogram names.
   for (ScopeImpl* scope : scopes_) {
     for (auto histogram : scope->central_cache_.histograms_) {
-      if (names.insert(histogram.first).second) {
-        ret.push_back(histogram.second);
+      const std::string& hist_name = histogram.first;
+      const ParentHistogramSharedPtr& parent_hist = histogram.second;
+      if (names.insert(hist_name).second) {
+        ret.push_back(parent_hist);
       }
     }
   }
@@ -97,7 +100,8 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
             for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
-              histogram.second->beginMerge();
+              const TlsHistogramSharedPtr& tls_hist = histogram.second;
+              tls_hist->beginMerge();
             }
           }
         },

@@ -391,6 +391,15 @@ public:
 
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
 
+  /**
+   * Clears the old computed values and refreshes it with values computed from passed histogram.
+   */
+  void refresh(histogram_t* new_histogram_ptr) {
+    computed_quantiles_.clear();
+    hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(),
+                         supported_quantiles_.size(), computed_quantiles_.data());
+  }
+
 private:
   const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
   std::vector<double> computed_quantiles_;

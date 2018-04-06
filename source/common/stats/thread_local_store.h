@@ -40,7 +40,7 @@ public:
     flags_ |= Flags::Used;
   }
 
-  // TODO: split the Histogram interface in to two - parent and tls.
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
   void merge() override { NOT_IMPLEMENTED; }
 
   bool used() const override { return flags_ & Flags::Used; }
@@ -79,9 +79,7 @@ class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
   HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                       std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
-        interval_statistics_(std::make_unique<HistogramStatisticsImpl>()),
-        cumulative_statistics_(std::make_unique<HistogramStatisticsImpl>()) {
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
     interval_histogram_ = hist_alloc();
     cumulative_histogram_ = hist_alloc();
   }
@@ -92,7 +90,7 @@ public:
   }
 
   // Stats::Histogram
-  // TODO: split the Histogram interface in to two - parent and tls.
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
   void recordValue(uint64_t) override { NOT_IMPLEMENTED; }
 
   bool used() const override {
@@ -117,15 +115,15 @@ public:
       histogram_t* hist_array[1];
       hist_array[0] = interval_histogram_;
       hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
-      cumulative_statistics_ = std::make_unique<HistogramStatisticsImpl>(cumulative_histogram_);
-      interval_statistics_ = std::make_unique<HistogramStatisticsImpl>(interval_histogram_);
+      cumulative_statistics_.refresh(cumulative_histogram_);
+      interval_statistics_.refresh(interval_histogram_);
     }
   }
 
-  const HistogramStatistics& intervalStatistics() const override { return *interval_statistics_; }
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
 
   const HistogramStatistics& cumulativeStatistics() const override {
-    return *cumulative_statistics_;
+    return cumulative_statistics_;
   }
 
   void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
@@ -150,8 +148,8 @@ private:
 
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
-  std::unique_ptr<HistogramStatisticsImpl> interval_statistics_;
-  std::unique_ptr<HistogramStatisticsImpl> cumulative_statistics_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
 
