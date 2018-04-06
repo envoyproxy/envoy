@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"

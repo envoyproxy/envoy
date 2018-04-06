@@ -13,6 +13,15 @@
 
 namespace Envoy {
 
+TEST(UtilityTest, RepeatedPtrUtilDebugString) {
+  Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
+  EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
+  repeated.Add()->set_value(10);
+  EXPECT_EQ("[value: 10\n]", RepeatedPtrUtil::debugString(repeated));
+  repeated.Add()->set_value(20);
+  EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
+}
+
 TEST(UtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
