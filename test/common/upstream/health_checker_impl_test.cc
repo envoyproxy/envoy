@@ -143,6 +143,9 @@ public:
   };
 
   typedef std::unique_ptr<TestSession> TestSessionPtr;
+  typedef std::unordered_map<std::string,
+                             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig&>
+      HostWithHealthCheckMap;
 
   HttpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
 
@@ -236,20 +239,13 @@ public:
     return config;
   }
 
-  void appendTestHosts(
-      std::shared_ptr<MockCluster> cluster,
-      const std::unordered_map<std::string,
-                               const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>& hosts,
-      const std::string& protocol = "tcp://", const uint32_t priority = 0) {
+  void appendTestHosts(std::shared_ptr<MockCluster> cluster, const HostWithHealthCheckMap& hosts,
+                       const std::string& protocol = "tcp://", const uint32_t priority = 0) {
     for (const auto& host : hosts) {
       cluster->prioritySet().getMockHostSet(priority)->hosts_.emplace_back(
           makeTestHost(cluster->info_, fmt::format("{}{}", protocol, host.first), host.second));
     }
   }
-
-  typedef std::unordered_map<std::string,
-                             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>
-      HostWithHealthCheckMap;
 
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map = {}) {
     // Expectations are in LIFO order.
