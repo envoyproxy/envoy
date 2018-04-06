@@ -87,7 +87,8 @@ void BM_MaglevLoadBalancerBuildTable(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     BaseTester tester(num_hosts);
     state.ResumeTiming();
-    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
+                      nullptr);
   }
 }
 BENCHMARK(BM_MaglevLoadBalancerBuildTable)
@@ -172,7 +173,8 @@ void BM_MaglevLoadBalancerChooseHost(benchmark::State& state) {
     const uint64_t num_hosts = state.range(0);
     const uint64_t keys_to_simulate = state.range(1);
     BaseTester tester(num_hosts);
-    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
+                      nullptr);
     std::unordered_map<std::string, uint64_t> hit_counter;
     state.ResumeTiming();
 
@@ -248,14 +250,16 @@ void BM_MaglevLoadBalancerHostLoss(benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(2);
 
     BaseTester tester(num_hosts);
-    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
+                      nullptr);
     std::vector<HostConstSharedPtr> hosts;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       hosts.push_back(table.chooseHost(hashInt(i)));
     }
 
     BaseTester tester2(num_hosts - hosts_to_lose);
-    MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table2(HostsPerLocalityImpl(tester2.priority_set_.getOrCreateHostSet(0).hosts()),
+                       nullptr);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       hosts2.push_back(table2.chooseHost(hashInt(i)));
@@ -290,14 +294,16 @@ void BM_MaglevLoadBalancerWeighted(benchmark::State& state) {
     const uint64_t keys_to_simulate = state.range(4);
 
     BaseTester tester(num_hosts, weighted_subset_percent, before_weight);
-    MaglevTable table(tester.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table(HostsPerLocalityImpl(tester.priority_set_.getOrCreateHostSet(0).hosts()),
+                      nullptr);
     std::vector<HostConstSharedPtr> hosts;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       hosts.push_back(table.chooseHost(hashInt(i)));
     }
 
     BaseTester tester2(num_hosts, weighted_subset_percent, after_weight);
-    MaglevTable table2(tester2.priority_set_.getOrCreateHostSet(0).hosts());
+    MaglevTable table2(HostsPerLocalityImpl(tester2.priority_set_.getOrCreateHostSet(0).hosts()),
+                       nullptr);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       hosts2.push_back(table2.chooseHost(hashInt(i)));
