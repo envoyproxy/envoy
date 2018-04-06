@@ -78,9 +78,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else {
-    if (status != Filters::Common::ExtAuthz::CheckStatus::OK && config_->failureModeAllow()) {
-      // Status is not OK and yet we are allowing the traffic. Make a note.
-      config_->stats().error_allowed_.inc();
+    if (config_->failureModeAllow() && status == Filters::Common::ExtAuthz::CheckStatus::Error) {
+      // Status is Error and yet we are configured to allow traffic. Click a counter.
+      config_->stats().failure_mode_allowed_.inc();
     }
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_check_) {

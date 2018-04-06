@@ -28,7 +28,7 @@ namespace ExtAuthz {
   COUNTER(total)                                        \
   COUNTER(error)                                        \
   COUNTER(denied)                                       \
-  COUNTER(error_allowed)                                \
+  COUNTER(failure_mode_allowed)                         \
   COUNTER(ok)                                           \
   COUNTER(cx_closed)                                    \
   GAUGE  (active)

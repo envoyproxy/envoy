@@ -334,9 +334,9 @@ TEST_F(HttpExtAuthzFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
-  EXPECT_EQ(
-      1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error_allowed")
-              .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ext_authz.failure_mode_allowed")
+                    .value());
 }
 
 } // namespace ExtAuthz
