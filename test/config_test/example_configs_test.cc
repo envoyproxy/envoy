@@ -16,6 +16,7 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
 
 #ifdef __APPLE__
+  // freebind/freebind.yaml is not supported on OS X and disabled via Bazel.
   EXPECT_EQ(27UL, ConfigTest::run(directory));
 #else
   EXPECT_EQ(28UL, ConfigTest::run(directory));
