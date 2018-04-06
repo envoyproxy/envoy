@@ -105,7 +105,7 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
       MessageUtil::getJsonObjectFromMessage(configuration.http().config());
 
   // Now see if there is a factory that will accept the config.
-  auto& factory = Config::Utility::getAndCheckFactory<HttpTracerFactory>(type);
+  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
   http_tracer_ = factory.createHttpTracer(*driver_config, server);
 }
 
