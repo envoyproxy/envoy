@@ -232,7 +232,7 @@ TEST(UtilityTest, CheckApiConfigSourceSubscriptionBackingCluster) {
   Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source);
 }
 
-TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
+TEST(UtilityTest, FactoryForApiConfigSource) {
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;
 
@@ -240,9 +240,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::api::v2::core::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope),
+        EnvoyException, "Missing gRPC services in envoy::api::v2::core::ApiConfigSource:");
   }
 
   {
@@ -251,9 +250,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        "Only singleton gRPC service lists supported in envoy::api::v2::core::ApiConfigSource:");
   }
 
   {
@@ -262,31 +261,20 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
     EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified");
-  }
-
-  {
-    envoy::api::v2::core::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-    api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
-    EXPECT_THROW_WITH_REGEX(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException,
-        "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
-        "specified");
+        "Only singleton cluster name lists supported in envoy::api::v2::core::ApiConfigSource:");
   }
 
   {
     envoy::api::v2::core::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-    api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    api_config_source.add_cluster_names("foo");
     envoy::api::v2::core::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope);
+    Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope);
   }
 
   {
@@ -295,7 +283,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), _));
-    Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope);
+    Utility::factoryForApiConfigSource(async_client_manager, api_config_source, scope);
   }
 }
 
