@@ -3,8 +3,8 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/logging.h"
 
-#include "gtest/gtest.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::testing::Throw;
 
