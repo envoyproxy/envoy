@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::_;
