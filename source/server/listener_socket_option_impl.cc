@@ -1,11 +1,25 @@
-#include "common/api/os_sys_calls_impl.h"
-
 #include "server/listener_socket_option_impl.h"
+
+#include "common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Server {
 
-bool ListenerSocketOptionImpl::setOption(Network::Socket& socket, Network::Socket::SocketState state) const {
+ListenerSocketOptionImpl::ListenerSocketOptionImpl(const envoy::api::v2::Listener& config)
+    : Network::SocketOptionImpl(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{})),
+      tcp_fast_open_queue_length_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, tcp_fast_open_queue_length, absl::optional<uint32_t>{})) {}
+
+ListenerSocketOptionImpl::ListenerSocketOptionImpl(
+    absl::optional<bool> transparent, absl::optional<bool> freebind,
+    absl::optional<uint32_t> tcp_fast_open_queue_length)
+    : Network::SocketOptionImpl(transparent, freebind),
+      tcp_fast_open_queue_length_(tcp_fast_open_queue_length) {}
+
+bool ListenerSocketOptionImpl::setOption(Network::Socket& socket,
+                                         Network::Socket::SocketState state) const {
   if (state == Network::Socket::SocketState::Listening) {
     if (tcp_fast_open_queue_length_.has_value()) {
       const int tfo_value = tcp_fast_open_queue_length_.value();
