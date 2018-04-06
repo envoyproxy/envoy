@@ -91,9 +91,13 @@ protected:
     uint64_t content_length;
     ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
+    Http::TestHeaderMapImpl continue_headers;
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(continue_headers));
     EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+    Http::TestHeaderMapImpl trailers;
+    EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
   }
 
   GzipFilterConfigSharedPtr config_;
@@ -121,7 +125,11 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
 
 // Acceptance Testing with default configuration.
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
-  doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, true);
+  doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  Http::TestHeaderMapImpl trailers;
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
