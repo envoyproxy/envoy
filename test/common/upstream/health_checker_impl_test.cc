@@ -144,7 +144,7 @@ public:
 
   typedef std::unique_ptr<TestSession> TestSessionPtr;
   typedef std::unordered_map<std::string,
-                             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig&>
+                             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig>
       HostWithHealthCheckMap;
 
   HttpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
@@ -986,7 +986,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
 
   // Prepares a host with its designated health check port.
-  const HostWithHealthCheckMap& hosts{{"127.0.0.1:80", makeHealthCheckConfig(8000)}};
+  const HostWithHealthCheckMap hosts{{"127.0.0.1:80", makeHealthCheckConfig(8000)}};
   appendTestHosts(cluster_, hosts);
   cluster_->info_->stats().upstream_cx_total_.inc();
   expectSessionCreate(hosts);
@@ -1019,8 +1019,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
 
   // Prepares a set of hosts along with its designated health check ports.
-  const HostWithHealthCheckMap& hosts = {{"127.0.0.1:80", makeHealthCheckConfig(8000)},
-                                         {"127.0.0.1:81", makeHealthCheckConfig(8001)}};
+  const HostWithHealthCheckMap hosts = {{"127.0.0.1:80", makeHealthCheckConfig(8000)},
+                                        {"127.0.0.1:81", makeHealthCheckConfig(8001)}};
   appendTestHosts(cluster_, hosts);
   cluster_->info_->stats().upstream_cx_total_.inc();
   cluster_->info_->stats().upstream_cx_total_.inc();
