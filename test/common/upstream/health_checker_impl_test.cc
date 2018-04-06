@@ -281,6 +281,7 @@ public:
               if (!health_check_map.empty()) {
                 const auto& health_check_config =
                     health_check_map.at(conn_data.host_description_->address()->asString());
+                // To make sure health checker checks the correct port.
                 EXPECT_EQ(health_check_config.port_value(),
                           conn_data.host_description_->healthCheckAddress()->ip()->port());
               }
@@ -1016,7 +1017,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, false)).Times(2);
 
-  // Prepares a set of hosts along its designated health check port.
+  // Prepares a set of hosts along with its designated health check ports.
   const HostWithHealthCheckMap& hosts = {{"127.0.0.1:80", makeHealthCheckConfig(8000)},
                                          {"127.0.0.1:81", makeHealthCheckConfig(8001)}};
   appendTestHosts(cluster_, hosts);

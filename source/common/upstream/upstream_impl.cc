@@ -852,5 +852,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
 }
+
 } // namespace Upstream
 } // namespace Envoy
