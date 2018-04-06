@@ -216,6 +216,20 @@ public:
     return config;
   }
 
+  template <class ProtoMessage, class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryRDSConfig(const ProtoMessage& source,
+                                                               Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyRDSConfigProto();
+
+    if (config == nullptr) {
+      throw EnvoyException(fmt::format(
+          "{} factory returned nullptr instead of empty RDS config message.", factory.name()));
+    }
+
+    MessageUtil::jsonConvert(source, *config);
+    return config;
+  }
+
   /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid
    * unexpected tag name overwriting.

@@ -4,6 +4,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
+#include "envoy/server/filter_config.h"
+
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/config/well_known_names.h"
@@ -13,10 +16,13 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
+#include "server/config/http/buffer.h"
+
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -4203,6 +4209,163 @@ virtual_hosts:
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
+}
+
+TEST(PerFilterConfigsTest, PerFilterConfigs) {
+  Server::Configuration::BufferFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
+      factory);
+
+  std::string yaml = R"EOF(
+max_request_bytes: 123
+max_request_time:
+  seconds: 456
+  nanos: 789
+)EOF";
+
+  Protobuf::Struct buffer_cfg;
+  MessageUtil::loadFromYaml(yaml, buffer_cfg);
+  Protobuf::Map<std::string, Protobuf::Struct> proto_cfgs;
+  proto_cfgs[factory.name()] = buffer_cfg;
+  PerFilterConfigs configs{proto_cfgs};
+
+  ASSERT_EQ(nullptr, configs.get("unknown.filter"))
+      << "filter configs that aren't present should return nullptr";
+
+  const Protobuf::Message* processed = configs.get(factory.name());
+  ASSERT_NE(nullptr, processed) << "filter configs present should return a concrete Message";
+
+  ASSERT_NO_THROW({
+    const envoy::config::filter::http::buffer::v2::Buffer* buf =
+        dynamic_cast<const envoy::config::filter::http::buffer::v2::Buffer*>(processed);
+
+    ASSERT_EQ(123, buf->max_request_bytes().value());
+    ASSERT_EQ(456, buf->max_request_time().seconds());
+    ASSERT_EQ(789, buf->max_request_time().nanos());
+  }) << "returned message should be castable to known type";
+}
+
+TEST(PerFilterConfigsTest, UnknownFilter) {
+  std::string yaml = R"EOF(
+foo: "bar"
+)EOF";
+
+  Protobuf::Struct some_cfg;
+  MessageUtil::loadFromYaml(yaml, some_cfg);
+  Protobuf::Map<std::string, Protobuf::Struct> proto_cfgs;
+  proto_cfgs["unknown.filter"] = some_cfg;
+
+  ASSERT_THROW(PerFilterConfigs{proto_cfgs}, EnvoyException)
+      << "should throw on unrecognized filter";
+}
+
+void checkPerFilterConfig(const Protobuf::Message* cfg, uint32_t expected_max_bytes,
+                          std::string source) {
+  ASSERT_NE(nullptr, cfg) << "config should not be null for source: " << source;
+  ASSERT_NO_THROW({
+    const auto buffer = dynamic_cast<const envoy::config::filter::http::buffer::v2::Buffer*>(cfg);
+    ASSERT_EQ(expected_max_bytes, buffer->max_request_bytes().value())
+        << "config value does not match expected for source: " << source;
+  }) << "config should properly dynamic_cast to the appropriate type for source: "
+     << source;
+}
+
+TEST(PerFilterConfigsTest, RouteLocalConfig) {
+  Server::Configuration::BufferFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
+      factory);
+
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        per_filter_config: { envoy.buffer: { max_request_bytes: 123 } }
+    per_filter_config: { envoy.buffer: { max_request_bytes: 456 } }
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  const auto* route_entry = route->routeEntry();
+  const auto& vhost = route_entry->virtualHost();
+
+  checkPerFilterConfig(route_entry->perFilterConfig(factory.name()), 123, "route entry");
+  checkPerFilterConfig(route->perFilterConfig(factory.name()), 123, "route");
+  checkPerFilterConfig(vhost.perFilterConfig(factory.name()), 456, "virtual host");
+}
+
+TEST(PerFilterConfigTest, WeightedClusterConfig) {
+  Server::Configuration::BufferFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
+      factory);
+
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                per_filter_config: { envoy.buffer: { max_request_bytes: 789 } }
+    per_filter_config: { envoy.buffer: { max_request_bytes: 1011 } }
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  const auto* route_entry = route->routeEntry();
+  const auto& vhost = route_entry->virtualHost();
+
+  checkPerFilterConfig(route_entry->perFilterConfig(factory.name()), 789, "route entry");
+  checkPerFilterConfig(route->perFilterConfig(factory.name()), 789, "route");
+  checkPerFilterConfig(vhost.perFilterConfig(factory.name()), 1011, "virtual host");
+}
+
+TEST(PerFilterConfigTest, WeightedClusterFallthroughConfig) {
+  Server::Configuration::BufferFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
+      factory);
+
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+        per_filter_config: { envoy.buffer: { max_request_bytes: 1213 } }
+    per_filter_config: { envoy.buffer: { max_request_bytes: 1415 } }
+)EOF";
+
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Upstream::MockClusterManager> cm;
+  const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime, cm, true);
+
+  const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+  const auto* route_entry = route->routeEntry();
+  const auto& vhost = route_entry->virtualHost();
+
+  checkPerFilterConfig(route_entry->perFilterConfig(factory.name()), 1213, "route entry");
+  checkPerFilterConfig(route->perFilterConfig(factory.name()), 1213, "route");
+  checkPerFilterConfig(vhost.perFilterConfig(factory.name()), 1415, "virtual host");
 }
 } // namespace
 } // namespace Router

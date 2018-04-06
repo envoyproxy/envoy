@@ -4,10 +4,6 @@ REPOSITORY_LOCATIONS = dict(
         commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
         remote = "https://github.com/google/boringssl",
     ),
-    com_google_absl = dict(
-        commit = "787891a3882795cee0364e8a0f0dda315578d155",
-        remote = "https://github.com/abseil/abseil-cpp",
-    ),
     com_github_bombela_backward = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",
@@ -35,23 +31,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_grpc_grpc = dict(
-        commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1
+        commit = "474c5950686e3962bd339c93d27e369bf64f568f",  # v1.10.0
         remote = "https://github.com/grpc/grpc.git",
     ),
-    io_opentracing_cpp = dict(
-        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
-        remote = "https://github.com/opentracing/opentracing-cpp",
-    ),
-    com_lightstep_tracer_cpp = dict(
-        commit = "6a198acd328f976984699f7272bbec7c8b220f65",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.1
-    ),
-    lightstep_vendored_googleapis = dict(
-        commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
-        remote = "https://github.com/google/googleapis",
-    ),
     com_github_nodejs_http_parser = dict(
-        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
+        commit = "dd74753cf5cf8944438d6f49ddf46f9659993dfb",  # v2.8.0
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -66,6 +50,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51",  # v1.1.0
         remote = "https://github.com/tencent/rapidjson",
     ),
+    com_google_absl = dict(
+        commit = "787891a3882795cee0364e8a0f0dda315578d155",
+        remote = "https://github.com/abseil/abseil-cpp",
+    ),
     com_google_googletest = dict(
         commit = "43863938377a9ea1399c0596269e0890b5c5515a",
         remote = "https://github.com/google/googletest",
@@ -75,8 +63,12 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protobuf-3.5.0",
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
+    com_lightstep_tracer_cpp = dict(
+        commit = "6a198acd328f976984699f7272bbec7c8b220f65",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp",  # v0.6.1
+    ),
     envoy_api = dict(
-        commit = "2dcc435e8ae1d35f8c3a4fa9f132778482fb1a78",
+        commit = "c15104fce713856203fa4ad948d752e9a1f657c1",
         remote = "https://github.com/envoyproxy/data-plane-api",
     ),
     grpc_httpjson_transcoding = dict(
@@ -84,8 +76,16 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.10.3",
+        commit = "0.10.1",
         remote = "https://github.com/bazelbuild/rules_go",
+    ),
+    io_opentracing_cpp = dict(
+        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
+        remote = "https://github.com/opentracing/opentracing-cpp",
+    ),
+    lightstep_vendored_googleapis = dict(
+        commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
+        remote = "https://github.com/google/googleapis",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.
