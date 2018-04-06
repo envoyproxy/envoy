@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
@@ -24,10 +25,7 @@ public:
     const std::string prefix = "envoy.";
     for (const auto& name : v2_names) {
       // Ensure there are no misplaced names provided to this constructor.
-      if (name.find(prefix) != 0) {
-        throw EnvoyException(fmt::format(
-            "Attempted to create a conversion for a v2 name that isn't prefixed by {}", prefix));
-      }
+      ASSERT(name.find(prefix) == 0);
       v1_to_v2_names_[name.substr(prefix.size())] = name;
     }
   }

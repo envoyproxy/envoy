@@ -1572,6 +1572,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
     route->routeEntry()->virtualCluster(headers);
     route->routeEntry()->virtualHost();
     route->routeEntry()->virtualHost().rateLimitPolicy();
+    route->routeEntry()->pathMatchCriterion();
   }
 }
 
@@ -2300,6 +2301,7 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
       EXPECT_EQ("https://www.lyft.com/foo",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
+      EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
     }
     {
       Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
@@ -2938,6 +2940,7 @@ TEST(NullConfigImplTest, All) {
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
   EXPECT_EQ(nullptr, config.route(headers, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
+  EXPECT_EQ("", config.name());
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
