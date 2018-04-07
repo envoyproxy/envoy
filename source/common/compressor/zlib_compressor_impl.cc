@@ -82,5 +82,28 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
   zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
+void ZlibCompressorImpl::reset() {
+  const bool result = deflateReset(zstream_ptr_.get());
+  RELEASE_ASSERT(result == Z_OK);
+}
+
+void ZlibCompressorImpl::finish(Buffer::Instance& output_buffer) {
+  // Once the Z_FINISH parameter is provided, deflate() will begin to complete the compressed output
+  // stream. However depending on how much output space is provided, deflate() may have to be called
+  // several times until it has provided the complete compressed stream, even after it has consumed
+  // all of the input. The flush parameter must continue to be Z_FINISH for those subsequent calls.
+  // Ref: https://zlib.net/zlib_how.html.
+  const int result = deflate(zstream_ptr_.get(), Z_FINISH);
+  updateOutput(output_buffer);
+  if (result == Z_OK || result == Z_BUF_ERROR) {
+    finish(output_buffer);
+  } else {
+    // While Z_OK, Z_BUF_ERROR (covered in above case) and Z_STREAM_END are the acceptable values,
+    // the Z_STREAM_ERROR is only possible if the stream is not initialized properly. Ref:
+    // https://zlib.net/zlib_how.html.
+    RELEASE_ASSERT(result == Z_STREAM_END);
+  }
+}
+
 } // namespace Compressor
 } // namespace Envoy

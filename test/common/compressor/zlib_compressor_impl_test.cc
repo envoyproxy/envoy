@@ -103,6 +103,9 @@ TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {
                   compressed_slices[num_comp_slices - 1].len_);
   // FOOTER four-byte sequence (sync flush)
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+  compressor.finish(output_buffer);
+  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
 /**
@@ -142,6 +145,12 @@ TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
                     compressed_slices[num_comp_slices - 1].len_);
     // FOOTER four-byte sequence (sync flush)
     EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+    compressor.finish(output_buffer);
+    EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+    // Re-init the compressor.
+    compressor.reset();
   }
 }
 
@@ -180,6 +189,9 @@ TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
       Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
                   compressed_slices[num_comp_slices - 1].len_);
   // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+  compressor.finish(output_buffer);
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
@@ -241,6 +253,9 @@ TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
                   compressed_slices[num_comp_slices - 1].len_);
   // FOOTER four-byte sequence (sync flush)
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+  compressor.finish(output_buffer);
+  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
 /**
@@ -278,6 +293,9 @@ TEST_F(ZlibCompressorImplTest, CompressWithNotCommonParams) {
       Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
                   compressed_slices[num_comp_slices - 1].len_);
   // FOOTER four-byte sequence (sync flush)
+  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+
+  compressor.finish(output_buffer);
   EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
 }
 
