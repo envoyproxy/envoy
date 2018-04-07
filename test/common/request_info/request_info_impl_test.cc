@@ -143,11 +143,11 @@ TEST(RequestInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufWkt::Struct structObj2;
+  ProtobufWkt::Struct struct_obj2;
   ProtobufWkt::Value val2;
   val2.set_string_value("another_value");
-  (*structObj2.mutable_fields())["another_key"] = val2;
-  request_info.setDynamicMetadata("com.test", structObj2);
+  (*struct_obj2.mutable_fields())["another_key"] = val2;
+  request_info.setDynamicMetadata("com.test", struct_obj2);
   EXPECT_EQ("another_value", Config::Metadata::metadataValue(request_info.dynamicMetadata(),
                                                              "com.test", "another_key")
                                  .string_value());

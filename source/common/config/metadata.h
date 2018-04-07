@@ -33,7 +33,7 @@ public:
    */
   static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                  const std::string& filter,
-                                                 const std::vector<std::string> path);
+                                                 const std::vector<std::string>& path);
   /**
    * Obtain mutable reference to metadata value for a given filter and key.
    * @param metadata reference.

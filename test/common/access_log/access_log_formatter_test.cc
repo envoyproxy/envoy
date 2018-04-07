@@ -227,24 +227,24 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
  */
 void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
-  ProtobufWkt::Struct structObj;
+  ProtobufWkt::Struct struct_obj;
   ProtobufWkt::Value val;
-  auto& fieldsMap = *structObj.mutable_fields();
+  auto& fields_map = *struct_obj.mutable_fields();
   val.set_string_value("test_value");
-  fieldsMap["test_key"] = val;
+  fields_map["test_key"] = val;
   val.set_string_value("inner_value");
-  ProtobufWkt::Struct structInner;
-  (*structInner.mutable_fields())["inner_key"] = val;
+  ProtobufWkt::Struct struct_inner;
+  (*struct_inner.mutable_fields())["inner_key"] = val;
   val.clear_string_value();
-  *val.mutable_struct_value() = structInner;
-  fieldsMap["test_obj"] = val;
-  (*metadata.mutable_filter_metadata())["com.test"] = structObj;
+  *val.mutable_struct_value() = struct_inner;
+  fields_map["test_obj"] = val;
+  (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
 TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
   envoy::api::v2::core::Metadata metadata;
   populateMetadataTestData(metadata);
-  
+
   {
     MetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
     std::string json = formatter.format(metadata);

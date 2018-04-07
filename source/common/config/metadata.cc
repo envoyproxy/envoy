@@ -5,13 +5,13 @@ namespace Config {
 
 const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
-                                                  const std::vector<std::string> path) {
+                                                  const std::vector<std::string>& path) {
   const auto filter_it = metadata.filter_metadata().find(filter);
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Value::default_instance();
   }
   const ProtobufWkt::Struct* data_struct = &(filter_it->second);
-  const Protobuf::Value* val = nullptr;
+  const ProtobufWkt::Value* val = nullptr;
   // go through path to select sub entries
   for (const auto p : path) {
     if (nullptr == data_struct) { // sub entry not found
