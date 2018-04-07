@@ -381,8 +381,7 @@ public:
     std::vector<std::string> summary;
     for (size_t i = 0; i < supported_quantiles_.size(); ++i) {
       summary.push_back(
-          fmt::format("P{}: {}", 100 * supported_quantiles_[i],
-                      std::isnan(computed_quantiles_[i]) ? 0 : computed_quantiles_[i]));
+          fmt::format("P{}: {}", 100 * supported_quantiles_[i], computed_quantiles_[i]));
     }
     return absl::StrJoin(summary, ", ");
   }

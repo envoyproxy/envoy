@@ -124,10 +124,10 @@ public:
     for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
       if (histogram->name().find(hist_name) != std::string::npos) {
         EXPECT_EQ(histogram->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
-        // EXPECT_EQ(histogram->intervalStatistics().summary(), h1_interval_statistics.summary());
+        EXPECT_EQ(histogram->intervalStatistics().summary(), h1_interval_statistics.summary());
       } else {
         EXPECT_EQ(histogram->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
-        // EXPECT_EQ(histogram->intervalStatistics().summary(), h2_interval_statistics.summary());
+        EXPECT_EQ(histogram->intervalStatistics().summary(), h2_interval_statistics.summary());
       }
     }
 
@@ -347,7 +347,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicMultiHistogramMerge) {
   EXPECT_CALL(*this, free(_));
 }
 
-TEST_F(StatsThreadLocalStoreTest, MultipleMerges) {
+TEST_F(StatsThreadLocalStoreTest, MultiHistogramMultipleMerges) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 

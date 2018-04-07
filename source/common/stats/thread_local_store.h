@@ -79,10 +79,9 @@ class HistogramParentImpl : public Histogram, public MetricImpl {
 public:
   HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                       std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {
-    interval_histogram_ = hist_alloc();
-    cumulative_histogram_ = hist_alloc();
-  }
+      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+        interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+        interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
 
   virtual ~HistogramParentImpl() {
     hist_free(interval_histogram_);
