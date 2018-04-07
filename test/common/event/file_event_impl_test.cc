@@ -6,6 +6,7 @@
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -34,7 +35,8 @@ protected:
 class FileEventImplActivateTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, FileEventImplActivateTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(FileEventImplActivateTest, Activate) {
   int fd;

@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
@@ -181,15 +181,16 @@ public:
     active_clusters_.clear();
   }
 
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
-  }
+  const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
+
+  ClusterUpdateCallbacksHandlePtr
+  addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
 private:
   /**
@@ -199,17 +200,7 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::unordered_map<uint64_t, Http::ConnectionPool::InstancePtr> ConnPools;
-
-      uint64_t key(ResourcePriority priority, Http::Protocol protocol, uint32_t hash_key) {
-        // One bit needed for priority
-        static_assert(NumResourcePriorities == 2,
-                      "Fix shifts below to match number of bits needed for 'priority'");
-        // Two bits needed for protocol
-        static_assert(Http::NumProtocols <= 4,
-                      "Fix shifts below to match number of bits needed for 'protocol'");
-        return uint64_t(hash_key) << 3 | uint64_t(protocol) << 1 | uint64_t(priority);
-      }
+      typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -252,6 +243,7 @@ private:
                                         HostVectorConstSharedPtr healthy_hosts,
                                         HostsPerLocalityConstSharedPtr hosts_per_locality,
                                         HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+                                        LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
@@ -260,6 +252,7 @@ private:
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
 
@@ -284,6 +277,16 @@ private:
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
   };
 
+  struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
+    ClusterUpdateCallbacksHandleImpl(ClusterUpdateCallbacks& cb,
+                                     std::list<ClusterUpdateCallbacks*>& parent);
+    ~ClusterUpdateCallbacksHandleImpl() override;
+
+  private:
+    std::list<ClusterUpdateCallbacks*>::iterator entry;
+    std::list<ClusterUpdateCallbacks*>& list;
+  };
+
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;
   typedef std::unordered_map<std::string, ClusterDataPtr> ClusterMap;
 
@@ -305,7 +308,7 @@ private:
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
-  Network::Address::InstanceConstSharedPtr source_address_;
+  envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;

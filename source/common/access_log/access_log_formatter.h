@@ -8,6 +8,8 @@
 #include "envoy/common/time.h"
 #include "envoy/request_info/request_info.h"
 
+#include "common/common/utility.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -55,6 +57,11 @@ private:
   static void parseCommand(const std::string& token, const size_t start,
                            const std::string& separator, std::string& main,
                            std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
+  
+  // the indexes of where the parameters for each directive is expected to begin
+  static const size_t ReqParamStart{std::strlen("REQ(")};
+  static const size_t RespParamStart{std::strlen("RESP(")};
+  static const size_t StartTimeParamStart{std::strlen("START_TIME(")};
 };
 
 /**
@@ -185,6 +192,19 @@ public:
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo::RequestInfo& request_info) const override;
+};
+
+/** 
+ * Formatter
+ */
+class StartTimeFormatter : public Formatter {
+public:
+  StartTimeFormatter(const std::string& format);
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+                     const RequestInfo::RequestInfo&) const override;
+
+private:
+  const Envoy::DateFormatter date_formatter_;
 };
 
 } // namespace AccessLog

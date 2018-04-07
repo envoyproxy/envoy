@@ -125,11 +125,13 @@ RingHashLoadBalancer::Ring::Ring(
   std::sort(ring_.begin(), ring_.end(), [](const RingEntry& lhs, const RingEntry& rhs) -> bool {
     return lhs.hash_ < rhs.hash_;
   });
-#ifndef NVLOG
-  for (auto entry : ring_) {
-    ENVOY_LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(), entry.hash_);
+
+  if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+    for (auto entry : ring_) {
+      ENVOY_LOG(trace, "ring hash: host={} hash={}", entry.host_->address()->asString(),
+                entry.hash_);
+    }
   }
-#endif
 }
 
 } // namespace Upstream

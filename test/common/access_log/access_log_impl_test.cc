@@ -216,7 +216,7 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   TestRequestInfo request_info_;
   std::shared_ptr<Filesystem::MockFile> file_;
-  std::string output_;
+  StringViewSaver output_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -664,30 +664,6 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
     log->log(&header_map, &response_headers_, request_info_);
   }
-}
-
-TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
-
-  envoy::config::filter::accesslog::v2::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
-  config.set_name(Config::AccessLogNames::get().FILE);
-
-  InstanceSharedPtr log = AccessLogFactory::fromProto(config, context_);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
 }
 
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {

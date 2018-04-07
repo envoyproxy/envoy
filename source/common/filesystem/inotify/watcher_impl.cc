@@ -20,11 +20,12 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
       inotify_event_(dispatcher.createFileEvent(inotify_fd_,
                                                 [this](uint32_t events) -> void {
                                                   ASSERT(events == Event::FileReadyType::Read);
-                                                  UNREFERENCED_PARAMETER(events);
                                                   onInotifyEvent();
                                                 },
                                                 Event::FileTriggerType::Edge,
-                                                Event::FileReadyType::Read)) {}
+                                                Event::FileReadyType::Read)) {
+  RELEASE_ASSERT(inotify_fd_ >= 0);
+}
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 
@@ -36,7 +37,7 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb
     throw EnvoyException(fmt::format("invalid watch path {}", path));
   }
 
-  std::string directory = path.substr(0, last_slash);
+  std::string directory = last_slash != 0 ? path.substr(0, last_slash) : "/";
   std::string file = StringUtil::subspan(path, last_slash + 1, path.size());
 
   int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), IN_ALL_EVENTS);

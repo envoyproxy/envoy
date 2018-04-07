@@ -1,31 +1,14 @@
 #include "common/upstream/health_checker_impl.h"
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <vector>
-
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/http/codes.h"
-#include "envoy/runtime/runtime.h"
-#include "envoy/stats/stats.h"
-
-#include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
 #include "common/grpc/common.h"
-#include "common/http/codec_client.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/redis/conn_pool_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
+
+#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -41,8 +24,9 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
     return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
-    return std::make_shared<RedisHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
-                                                    Redis::ConnPool::ClientFactoryImpl::instance_);
+    return std::make_shared<RedisHealthCheckerImpl>(
+        cluster, hc_config, dispatcher, runtime, random,
+        Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
@@ -51,229 +35,9 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
   default:
-    // TODO(htuch): This should be subsumed eventually by the constraint checking in #1308.
-    throw EnvoyException("Health checker type not set");
+    // Checked by schema.
+    NOT_REACHED;
   }
-}
-
-const std::chrono::milliseconds HealthCheckerImplBase::NO_TRAFFIC_INTERVAL{60000};
-
-HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
-                                             const envoy::api::v2::core::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random)
-    : cluster_(cluster), dispatcher_(dispatcher),
-      timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
-      unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
-      healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
-      stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
-      reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
-      interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
-      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
-  cluster_.prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
-        onClusterMemberUpdate(hosts_added, hosts_removed);
-      });
-}
-
-void HealthCheckerImplBase::decHealthy() {
-  ASSERT(local_process_healthy_ > 0);
-  local_process_healthy_--;
-  refreshHealthyStat();
-}
-
-HealthCheckerStats HealthCheckerImplBase::generateStats(Stats::Scope& scope) {
-  std::string prefix("health_check.");
-  return {ALL_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                   POOL_GAUGE_PREFIX(scope, prefix))};
-}
-
-void HealthCheckerImplBase::incHealthy() {
-  local_process_healthy_++;
-  refreshHealthyStat();
-}
-
-std::chrono::milliseconds HealthCheckerImplBase::interval() const {
-  // See if the cluster has ever made a connection. If so, we use the defined HC interval. If not,
-  // we use a much slower interval to keep the host info relatively up to date in case we suddenly
-  // start sending traffic to this cluster. In general host updates are rare and this should
-  // greatly smooth out needless health checking.
-  uint64_t base_time_ms;
-  if (cluster_.info()->stats().upstream_cx_total_.used()) {
-    base_time_ms = interval_.count();
-  } else {
-    base_time_ms = NO_TRAFFIC_INTERVAL.count();
-  }
-
-  if (interval_jitter_.count() > 0) {
-    base_time_ms += (random_.random() % interval_jitter_.count());
-  }
-
-  uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
-  uint64_t max_interval = runtime_.snapshot().getInteger("health_check.max_interval",
-                                                         std::numeric_limits<uint64_t>::max());
-
-  uint64_t final_ms = std::min(base_time_ms, max_interval);
-  final_ms = std::max(final_ms, min_interval);
-  return std::chrono::milliseconds(final_ms);
-}
-
-void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
-  for (const HostSharedPtr& host : hosts) {
-    active_sessions_[host] = makeSession(host);
-    host->setHealthChecker(
-        HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
-    active_sessions_[host]->start();
-  }
-}
-
-void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
-                                                  const HostVector& hosts_removed) {
-  addHosts(hosts_added);
-  for (const HostSharedPtr& host : hosts_removed) {
-    auto session_iter = active_sessions_.find(host);
-    ASSERT(active_sessions_.end() != session_iter);
-    active_sessions_.erase(session_iter);
-  }
-}
-
-void HealthCheckerImplBase::refreshHealthyStat() {
-  // Each hot restarted process health checks independently. To make the stats easier to read,
-  // we assume that both processes will converge and the last one that writes wins for the host.
-  stats_.healthy_.set(local_process_healthy_);
-}
-
-void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, bool changed_state) {
-  // When a parent process shuts down, it will kill all of the active health checking sessions,
-  // which will decrement the healthy count and the healthy stat in the parent. If the child is
-  // stable and does not update, the healthy stat will be wrong. This routine is called any time
-  // any HC happens against a host so just refresh the healthy stat here so that it is correct.
-  refreshHealthyStat();
-
-  for (const HostStatusCb& cb : callbacks_) {
-    cb(host, changed_state);
-  }
-}
-
-void HealthCheckerImplBase::HealthCheckHostMonitorImpl::setUnhealthy() {
-  // This is called cross thread. The cluster/health checker might already be gone.
-  std::shared_ptr<HealthCheckerImplBase> health_checker = health_checker_.lock();
-  if (health_checker) {
-    health_checker->setUnhealthyCrossThread(host_.lock());
-  }
-}
-
-void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
-  // The threading here is complex. The cluster owns the only strong reference to the health
-  // checker. It might go away when we post to the main thread from a worker thread. To deal with
-  // this we use the following sequence of events:
-  // 1) We capture a weak reference to the health checker and post it from worker thread to main
-  //    thread.
-  // 2) On the main thread, we make sure it is still valid (as the cluster may have been destroyed).
-  // 3) Additionally, the host/session may also be gone by then so we check that also.
-  std::weak_ptr<HealthCheckerImplBase> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host]() -> void {
-    std::shared_ptr<HealthCheckerImplBase> shared_this = weak_this.lock();
-    if (shared_this == nullptr) {
-      return;
-    }
-
-    const auto session = shared_this->active_sessions_.find(host);
-    if (session == shared_this->active_sessions_.end()) {
-      return;
-    }
-
-    session->second->setUnhealthy(ActiveHealthCheckSession::FailureType::Passive);
-  });
-}
-
-void HealthCheckerImplBase::start() {
-  for (auto& host_set : cluster_.prioritySet().hostSetsPerPriority()) {
-    addHosts(host_set->hosts());
-  }
-}
-
-HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
-    HealthCheckerImplBase& parent, HostSharedPtr host)
-    : host_(host), parent_(parent),
-      interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
-      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
-
-  if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    parent.incHealthy();
-  }
-}
-
-HealthCheckerImplBase::ActiveHealthCheckSession::~ActiveHealthCheckSession() {
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    parent_.decHealthy();
-  }
-}
-
-void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
-  // If we are healthy, reset the # of unhealthy to zero.
-  num_unhealthy_ = 0;
-
-  bool changed_state = false;
-  if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    // If this is the first time we ever got a check result on this host, we immediately move
-    // it to healthy. This makes startup faster with a small reduction in overall reliability
-    // depending on the HC settings.
-    if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
-      host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-      parent_.incHealthy();
-      changed_state = true;
-    }
-  }
-
-  parent_.stats_.success_.inc();
-  first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
-
-  timeout_timer_->disableTimer();
-  interval_timer_->enableTimer(parent_.interval());
-}
-
-void HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(FailureType type) {
-  // If we are unhealthy, reset the # of healthy to zero.
-  num_healthy_ = 0;
-
-  bool changed_state = false;
-  if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (type != FailureType::Network || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
-      host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-      parent_.decHealthy();
-      changed_state = true;
-    }
-  }
-
-  parent_.stats_.failure_.inc();
-  if (type == FailureType::Network) {
-    parent_.stats_.network_failure_.inc();
-  } else if (type == FailureType::Passive) {
-    parent_.stats_.passive_failure_.inc();
-  }
-
-  first_check_ = false;
-  parent_.runCallbacks(host_, changed_state);
-}
-
-void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(FailureType type) {
-  setUnhealthy(type);
-  timeout_timer_->disableTimer();
-  interval_timer_->enableTimer(parent_.interval());
-}
-
-void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
-  onInterval();
-  timeout_timer_->enableTimer(parent_.timeout_);
-  parent_.stats_.attempt_.inc();
-}
-
-void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
-  onTimeout();
-  handleFailure(FailureType::Network);
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
@@ -282,7 +46,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              Runtime::Loader& runtime,
                                              Runtime::RandomGenerator& random)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
-      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()) {
+      path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      request_headers_parser_(
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -319,6 +85,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
+const RequestInfo::RequestInfoImpl
+    HttpHealthCheckerImpl::HttpActiveHealthCheckSession::REQUEST_INFO;
+
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -338,6 +107,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
 
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }
@@ -405,7 +175,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
-                                   data.host_description_);
+                                   data.host_description_, dispatcher_);
 }
 
 TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
@@ -520,12 +290,10 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
-RedisHealthCheckerImpl::RedisHealthCheckerImpl(const Cluster& cluster,
-                                               const envoy::api::v2::core::HealthCheck& config,
-                                               Event::Dispatcher& dispatcher,
-                                               Runtime::Loader& runtime,
-                                               Runtime::RandomGenerator& random,
-                                               Redis::ConnPool::ClientFactory& client_factory)
+RedisHealthCheckerImpl::RedisHealthCheckerImpl(
+    const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       client_factory_(client_factory), key_(config.redis_health_check().key()) {
   if (!key_.empty()) {
@@ -581,19 +349,21 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onInterval() {
 }
 
 void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onResponse(
-    Redis::RespValuePtr&& value) {
+    Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) {
   current_request_ = nullptr;
 
   switch (parent_.type_) {
   case Type::Exists:
-    if (value->type() == Redis::RespType::Integer && value->asInteger() == 0) {
+    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::Integer &&
+        value->asInteger() == 0) {
       handleSuccess();
     } else {
       handleFailure(FailureType::Active);
     }
     break;
   case Type::Ping:
-    if (value->type() == Redis::RespType::SimpleString && value->asString() == "PONG") {
+    if (value->type() == Extensions::NetworkFilters::RedisProxy::RespType::SimpleString &&
+        value->asString() == "PONG") {
       handleSuccess();
     } else {
       handleFailure(FailureType::Active);
@@ -620,20 +390,20 @@ void RedisHealthCheckerImpl::RedisActiveHealthCheckSession::onTimeout() {
 }
 
 RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest(const std::string& key) {
-  std::vector<Redis::RespValue> values(2);
-  values[0].type(Redis::RespType::BulkString);
+  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(2);
+  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
   values[0].asString() = "EXISTS";
-  values[1].type(Redis::RespType::BulkString);
+  values[1].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
   values[1].asString() = key;
-  request_.type(Redis::RespType::Array);
+  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
   request_.asArray().swap(values);
 }
 
 RedisHealthCheckerImpl::HealthCheckRequest::HealthCheckRequest() {
-  std::vector<Redis::RespValue> values(1);
-  values[0].type(Redis::RespType::BulkString);
+  std::vector<Extensions::NetworkFilters::RedisProxy::RespValue> values(1);
+  values[0].type(Extensions::NetworkFilters::RedisProxy::RespType::BulkString);
   values[0].asString() = "PING";
-  request_.type(Redis::RespType::Array);
+  request_.type(Extensions::NetworkFilters::RedisProxy::RespType::Array);
   request_.asArray().swap(values);
 }
 
@@ -892,18 +662,15 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
     grpc_status_message = fmt::format("{}", grpc_status);
   }
 
-  // The following can be compiled out when defining NVLOG.
-  // TODO(mattklein123): Refactor this to make this less ugly.
-  UNREFERENCED_PARAMETER(service_status);
-  UNREFERENCED_PARAMETER(grpc_status_message);
   ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,
                  grpc_status_message, service_status, HostUtility::healthFlagsToString(*host_));
 }
 
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_);
+  return std::make_unique<Http::CodecClientProd>(Http::CodecClient::Type::HTTP2,
+                                                 std::move(data.connection_),
+                                                 data.host_description_, dispatcher_);
 }
 
 } // namespace Upstream

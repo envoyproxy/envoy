@@ -124,10 +124,12 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
   }
 }
 
+// TODO(derekargueta): #2967 - Rewrite AccessLogformatter with parser library & formal grammar
 std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterPtr> formatters;
   const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
+  const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
@@ -136,29 +138,32 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         current_token = "";
       }
 
-      size_t command_end_position = format.find('%', pos + 1);
-      if (command_end_position == std::string::npos) {
-        throw EnvoyException(fmt::format(
-            "Incorrect configuration: {}. Expected end of operation '%', around position {}",
-            format, pos));
+      std::smatch m;
+      std::string search_space = format.substr(pos);
+      if (!(std::regex_search(search_space, m, command_w_args_regex) || m.position() == 0)) {
+        throw EnvoyException(
+            fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
+                        format, pos));
       }
-      std::string token = format.substr(pos + 1, command_end_position - (pos + 1));
+
+      const std::string match = m.str(0);
+      const std::string token = match.substr(1, match.length() - 2);
+      pos += 1;
+      int command_end_position = pos + token.length();
 
       if (token.find("REQ(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
-        const size_t start = 4;
 
-        parseCommandHeader(token, start, main_header, alternative_header, max_length);
+        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             new RequestHeaderFormatter(main_header, alternative_header, max_length));
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
-        const size_t start = 5;
 
-        parseCommandHeader(token, start, main_header, alternative_header, max_length);
+        parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
             new ResponseHeaderFormatter(main_header, alternative_header, max_length));
@@ -170,10 +175,17 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         parseCommand(token, start, ":", filter_namespace, path, max_length);
         formatters.emplace_back(new DynamicMetadataFormatter(filter_namespace, path, max_length));
+      } else if (token.find("START_TIME") == 0) {
+        const size_t parameters_length = pos + StartTimeParamStart + 1;
+        const size_t parameters_end = command_end_position - parameters_length;
+
+        const std::string args = token[StartTimeParamStart - 1] == '('
+                                     ? token.substr(StartTimeParamStart, parameters_end)
+                                     : "";
+        formatters.emplace_back(new StartTimeFormatter(args));
       } else {
         formatters.emplace_back(new RequestInfoFormatter(token));
       }
-
       pos = command_end_position;
     } else {
       current_token += format[pos];
@@ -188,11 +200,8 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 }
 
 RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
-  if (field_name == "START_TIME") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
-    };
-  } else if (field_name == "REQUEST_DURATION") {
+
+  if (field_name == "REQUEST_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());
     };
@@ -371,6 +380,17 @@ DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_nam
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const RequestInfo::RequestInfo& request_info) const {
   return MetadataFormatter::format(request_info.dynamicMetadata());
+}
+
+StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
+
+std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                       const RequestInfo::RequestInfo& request_info) const {
+  if (date_formatter_.formatString().empty()) {
+    return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
+  } else {
+    return date_formatter_.fromTime(request_info.startTime());
+  }
 }
 
 } // namespace AccessLog

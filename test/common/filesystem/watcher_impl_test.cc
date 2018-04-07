@@ -124,5 +124,12 @@ TEST(WatcherImplTest, ParentDirectoryRemoved) {
   dispatcher.run(Event::Dispatcher::RunType::NonBlock);
 }
 
+TEST(WatcherImplTest, RootDirectoryPath) {
+  Event::DispatcherImpl dispatcher;
+  Filesystem::WatcherPtr watcher = dispatcher.createFilesystemWatcher();
+
+  EXPECT_NO_THROW(watcher->addWatch("/", Watcher::Events::MovedTo, [&](uint32_t) -> void {}));
+}
+
 } // namespace Filesystem
 } // namespace Envoy

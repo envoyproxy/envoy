@@ -89,6 +89,18 @@ def _build_recipe_repository_impl(ctxt):
         # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
         fail("External dep build failed")
 
+def _default_envoy_build_config_impl(ctx):
+    ctx.file("WORKSPACE", "")
+    ctx.file("BUILD.bazel", "")
+    ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
+
+_default_envoy_build_config = repository_rule(
+    implementation = _default_envoy_build_config_impl,
+    attrs = {
+        "config": attr.label(default="@envoy//source/extensions:extensions_build_config.bzl"),
+    },
+)
+
 # Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
 # wrap them, but for now we can treat them as first-class Bazel.
 def _python_deps():
@@ -170,6 +182,11 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
                 name = t,
                 actual = path + ":" + t,
             )
+
+    # Treat Envoy's overall build config as an external repo, so projects that
+    # build Envoy as a subcomponent can easily override the config.
+    if "envoy_build_config" not in native.existing_rules().keys():
+        _default_envoy_build_config(name = "envoy_build_config")
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate

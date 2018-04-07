@@ -35,5 +35,15 @@ void* OsSysCallsImpl::mmap(void* addr, size_t length, int prot, int flags, int f
 
 int OsSysCallsImpl::stat(const char* pathname, struct stat* buf) { return ::stat(pathname, buf); }
 
+int OsSysCallsImpl::setsockopt(int sockfd, int level, int optname, const void* optval,
+                               socklen_t optlen) {
+  return ::setsockopt(sockfd, level, optname, optval, optlen);
+}
+
+int OsSysCallsImpl::getsockopt(int sockfd, int level, int optname, void* optval,
+                               socklen_t* optlen) {
+  return ::getsockopt(sockfd, level, optname, optval, optlen);
+}
+
 } // namespace Api
 } // namespace Envoy

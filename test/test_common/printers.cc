@@ -3,8 +3,6 @@
 
 #include <iostream>
 
-#include "envoy/redis/codec.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
@@ -38,10 +36,4 @@ void PrintTo(const Buffer::OwnedImpl& buffer, std::ostream* os) {
   PrintTo(dynamic_cast<const Buffer::Instance&>(buffer), os);
 }
 } // namespace Buffer
-
-namespace Redis {
-void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
-
-void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
-} // namespace Redis
 } // namespace Envoy

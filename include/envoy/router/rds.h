@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -23,6 +24,12 @@ public:
   virtual Router::ConfigConstSharedPtr config() PURE;
 
   /**
+   * @return envoy::api::v2::RouteConfiguration the underlying RouteConfiguration object associated
+   * with this provider.
+   */
+  virtual const envoy::api::v2::RouteConfiguration& configAsProto() const PURE;
+
+  /**
    * @return const std::string version info from last accepted config.
    *
    * TODO(dnoe): This would ideally return by reference, but this causes a
@@ -33,32 +40,7 @@ public:
   virtual const std::string versionInfo() const PURE;
 };
 
-/**
- * A provider for dynamic route configurations.
- */
-class RdsRouteConfigProvider : public RouteConfigProvider {
-public:
-  virtual ~RdsRouteConfigProvider() {}
-
-  /**
-   * @return std::string the loaded route table in JSON format.
-   */
-  virtual std::string configAsJson() const PURE;
-
-  /**
-   * @return const std::string& the name of the configured route table.
-   */
-  virtual const std::string& routeConfigName() const PURE;
-
-  /**
-   * @return const std::string& the configuration of the service the RdsRouteConfigProvider is
-   * issuing RDS requests to.
-   */
-  virtual const std::string& configSource() const PURE;
-};
-
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
-typedef std::shared_ptr<RdsRouteConfigProvider> RdsRouteConfigProviderSharedPtr;
 
 } // namespace Router
 } // namespace Envoy

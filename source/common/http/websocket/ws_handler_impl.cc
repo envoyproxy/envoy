@@ -18,8 +18,9 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
                              const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks)
-    : Filter::TcpProxy(nullptr, cluster_manager), request_headers_(request_headers),
-      request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
+    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(nullptr, cluster_manager),
+      request_headers_(request_headers), request_info_(request_info), route_entry_(route_entry),
+      ws_callbacks_(callbacks) {
 
   initializeReadFilterCallbacks(*read_callbacks);
 }

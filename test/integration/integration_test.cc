@@ -15,16 +15,12 @@
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, IntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, RouterNotFound) { testRouterNotFound(); }
 
 TEST_P(IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
-
-TEST_P(IntegrationTest, RouterNotFoundBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterNotFoundWithBody();
-}
 
 TEST_P(IntegrationTest, RouterClusterNotFound404) { testRouterClusterNotFound404(); }
 
@@ -59,16 +55,6 @@ TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(1024, 512, false);
-}
-
-TEST_P(IntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterRequestAndResponseWithBody(4 * 1024 * 1024, 4 * 1024 * 1024, false);
-}
-
 TEST_P(IntegrationTest, FlowControlOnAndGiantBody) {
   config_helper_.setBufferLimits(1024, 1024);
   testRouterRequestAndResponseWithBody(1024 * 1024, 1024 * 1024, false);
@@ -79,11 +65,6 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 }
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
-}
-
-TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   testRouterHeaderOnlyRequestAndResponse(true);
 }
 
@@ -134,6 +115,14 @@ TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
+
+// Tests idle timeout behaviour with single request and validates that idle timer kicks in
+// after given timeout.
+TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
+
+// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
+// after both the requests are done.
+TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
 // the headers are not proxied, the connection manager will send a 500.
