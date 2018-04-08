@@ -53,10 +53,10 @@ def generate_v2_config(template_path, template, output_file, **context):
     data = template.render(**context)
     print data
 
-generate_v2_config(SCRIPT_DIR, 'envoy_front_proxy.template.yaml',
-                       './envoy_front_proxy.yaml', clusters=front_envoy_clusters)
-# generate_v2_config(SCRIPT_DIR, 'envoy_double_proxy.template.yaml',
-                        # './envoy_double_proxy.yaml')
+# generate_v2_config(SCRIPT_DIR, 'envoy_front_proxy.template.yaml',
+                       # './envoy_front_proxy.yaml', clusters=front_envoy_clusters)
+generate_v2_config(SCRIPT_DIR, 'envoy_double_proxy.template.yaml',
+                        './envoy_double_proxy.yaml')
 
 # generate_v2_config("./", 'envoy_service_to_service.template.yaml',
                     # 'envoy_service_to_service.yaml',
