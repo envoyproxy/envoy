@@ -229,6 +229,41 @@ public:
     });
   }
 
+  void setupServiceValidationWithAdditionalHeaders() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      host: "www.envoyproxy.io"
+      request_headers_to_add:
+        - header:
+            key: x-envoy-ok
+            value: ok
+        - header:
+            key: x-envoy-cool
+            value: cool
+        - header:
+            key: x-envoy-awesome
+            value: awesome
+        # The following entry replaces the current user-agent.
+        - header:
+            key: user-agent
+            value: CoolEnvoy/HC
+          append: false
+    )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
+      onHostStatus(host, changed_state);
+    });
+  }
+
   void expectSessionCreate() {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
@@ -486,6 +521,58 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
         EXPECT_NE(nullptr, headers.Path());
         EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), path);
+      }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, true, false, health_checked_cluster);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
+  const Http::LowerCaseString headerOk("x-envoy-ok");
+  const Http::LowerCaseString headerCool("x-envoy-cool");
+  const Http::LowerCaseString headerAwesome("x-envoy-awesome");
+
+  const std::string valueOk = "ok";
+  const std::string valueCool = "cool";
+  const std::string valueAwesome = "awesome";
+
+  const std::string valueUserAgent = "CoolEnvoy/HC";
+
+  setupServiceValidationWithAdditionalHeaders();
+  // requires non-empty `service_name` in config.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, false)).Times(1);
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
+        EXPECT_TRUE(headers.get(headerOk));
+        EXPECT_TRUE(headers.get(headerCool));
+        EXPECT_TRUE(headers.get(headerAwesome));
+
+        EXPECT_NE(nullptr, headers.get(headerOk));
+        EXPECT_NE(nullptr, headers.get(headerCool));
+        EXPECT_NE(nullptr, headers.get(headerAwesome));
+
+        EXPECT_EQ(headers.get(headerOk)->value().c_str(), valueOk);
+        EXPECT_EQ(headers.get(headerCool)->value().c_str(), valueCool);
+        EXPECT_EQ(headers.get(headerAwesome)->value().c_str(), valueAwesome);
+
+        EXPECT_EQ(headers.UserAgent()->value().c_str(), valueUserAgent);
       }));
   health_checker_->start();
 

@@ -42,6 +42,11 @@ public:
    */
   std::string now();
 
+  /**
+   * @return std::string the format string used.
+   */
+  const std::string& formatString() const { return format_string_; }
+
 private:
   std::string format_string_;
 };

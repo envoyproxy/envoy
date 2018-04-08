@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {
@@ -60,7 +60,7 @@ public:
    *
    */
   virtual void check(RequestCallbacks& callback,
-                     const envoy::service::auth::v2::CheckRequest& request,
+                     const envoy::service::auth::v2alpha::CheckRequest& request,
                      Tracing::Span& parent_span) PURE;
 };
 

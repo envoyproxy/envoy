@@ -248,7 +248,7 @@ std::string StringUtil::escape(const std::string& source) {
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
+  static DateFormatter default_date_format("%Y-%m-%dT%H:%M:%S");
 
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
@@ -279,7 +279,7 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   if (cached_time.initialized_ && cached_time.epoch_time_seconds == epoch_time_seconds) {
     return cached_time.formatted_time + millis;
   }
-  auto formatted_time = date_format.fromTime(epoch_time_seconds.count());
+  auto formatted_time = default_date_format.fromTime(epoch_time_seconds.count());
   cached_time.epoch_time_seconds = epoch_time_seconds;
   cached_time.formatted_time = formatted_time;
   cached_time.initialized_ = true;

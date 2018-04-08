@@ -73,7 +73,7 @@ private:
     std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
   };
 
-  virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostVector& hosts) PURE;
+  virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
