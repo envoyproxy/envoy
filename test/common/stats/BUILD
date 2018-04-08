@@ -85,10 +85,11 @@ envoy_cc_test(
     name = "hystrix_test",
     srcs = ["hystrix_test.cc"],
     deps = [
-        "//source/common/common:empty_string",
-        "//source/common/http:codes_lib",
         "//source/common/stats:hystrix_lib",
         "//source/common/stats:stats_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )

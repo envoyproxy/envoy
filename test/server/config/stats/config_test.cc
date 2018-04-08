@@ -5,9 +5,11 @@
 
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/hystrix.h"
 #include "common/stats/statsd.h"
 
 #include "server/config/stats/dog_statsd.h"
+#include "server/config/stats/hystrix.h"
 #include "server/config/stats/statsd.h"
 
 #include "test/mocks/server/mocks.h"
@@ -115,6 +117,23 @@ TEST(DogStatsdConfigTest, ValidateFail) {
   EXPECT_THROW(
       DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v2::DogStatsdSink(), server),
       ProtoValidationException);
+}
+
+TEST(StatsConfigTest, ValidHystrixSink) {
+  const std::string name = Config::StatsSinkNames::get().HYSTRIX;
+
+  envoy::config::metrics::v2::HystrixSink sink_config;
+
+  StatsSinkFactory* factory = Registry::FactoryRegistry<StatsSinkFactory>::getFactory(name);
+  ASSERT_NE(factory, nullptr);
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(sink_config, *message);
+
+  NiceMock<MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  EXPECT_NE(sink, nullptr);
+  EXPECT_NE(dynamic_cast<Stats::HystrixNameSpace::HystrixSink*>(sink.get()), nullptr);
 }
 
 } // namespace Configuration

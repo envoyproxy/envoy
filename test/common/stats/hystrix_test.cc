@@ -1,132 +1,182 @@
+#include <chrono>
+#include <memory>
 #include <sstream>
 
-#include "common/common/empty_string.h"
-#include "common/http/codes.h"
 #include "common/stats/hystrix.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/mocks/server/mocks.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::InSequence;
+using testing::Invoke;
+using testing::NiceMock;
+using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Stats {
 
-// copied from CodeUtilityTest in codes_test.cc
-class HystrixUtilityTest : public testing::Test {
-public:
-  void addResponse(uint64_t code, bool canary, bool internal_request,
-                   const std::string& request_vhost_name = EMPTY_STRING,
-                   const std::string& request_vcluster_name = EMPTY_STRING,
-                   const std::string& from_az = EMPTY_STRING,
-                   const std::string& to_az = EMPTY_STRING) {
-    Http::CodeUtility::ResponseStatInfo info{global_store_,
-                                             cluster_scope_,
-                                             "cluster.clusterName.",
-                                             code,
-                                             internal_request,
-                                             request_vhost_name,
-                                             request_vcluster_name,
-                                             from_az,
-                                             to_az,
-                                             canary};
+namespace HystrixNameSpace {
 
-    Http::CodeUtility::chargeResponseStat(info);
+class HystrixSinkTest : public testing::Test {
+public:
+  HystrixSinkTest() { sink_.reset(new HystrixSink(server_)); }
+
+  std::string getStreamField(std::string dataMessage, std::string key) {
+    std::string actual = dataMessage.substr(dataMessage.find(key));
+    actual = actual.substr(actual.find(" ") + 1);
+    std::size_t length = actual.find(",");
+    actual = actual.substr(0, length);
+    return actual;
   }
 
-  IsolatedStoreImpl global_store_;
-  IsolatedStoreImpl cluster_scope_;
+  Buffer::OwnedImpl createClusterAndCallbacks() {
+
+    // set cluster
+    cluster_.info_->name_ = "test_cluster";
+    cluster_map_.emplace("test_cluster", cluster_);
+    ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+
+    // set callbacks to send data to buffer
+    Buffer::OwnedImpl buffer;
+    auto encode_callback = [&buffer](Buffer::Instance& data, bool) {
+      buffer.add(
+          data); // This will append to the end of the buffer, so multiple calls will all be dumped
+                 // one after another into this buffer. See Buffer::Instance for other buffer
+                 // buffer modification options.
+    };
+    ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke(encode_callback));
+
+    return buffer;
+  }
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<Server::MockInstance> server_;
+  NiceMock<Upstream::MockCluster> cluster_;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
+
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  std::unique_ptr<HystrixSink> sink_;
 };
 
-std::string getStreamField(std::string dataMessage, std::string key) {
-  std::string actual = dataMessage.substr(dataMessage.find(key));
-  actual = actual.substr(actual.find(" ") + 1);
-  std::size_t length = actual.find(",");
-  actual = actual.substr(0, length);
-  // EXPECT_EQ(actual, std::to_string(expected));
-  return actual;
+TEST_F(HystrixSinkTest, EmptyFlush) {
+  InSequence s;
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // register callback to sink
+  sink_->registerConnection(&callbacks_);
+
+  sink_->beginFlush();
+  sink_->endFlush();
+  std::string data_message = TestUtility::bufferToString(buffer);
+  EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "0");
+  EXPECT_EQ(getStreamField(data_message, "errorCount"), "0");
+  EXPECT_EQ(getStreamField(data_message, "requestCount"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "0");
 }
 
-// this part is useful for testing updateRollingWindowMap()
-// by using addResponse() to
-TEST_F(HystrixUtilityTest, CreateDataMessage) {
-  Stats::Hystrix hystrix;
-  std::stringstream ss;
-  std::string cluster_name = "clusterName";
-  uint64_t expected_queue_size = 12;
-  uint64_t expectedReportingHosts = 16;
+TEST_F(HystrixSinkTest, BasicFlow) {
+  InSequence s;
 
-  // insert data to rolling window
-  for (uint64_t i = 0; i < 14; i++) {
-    hystrix.incCounter();
-    addResponse(201, false, false);
-    addResponse(401, false, false);
-    addResponse(501, false, true);
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // register callback to sink
+  sink_->registerConnection(&callbacks_);
 
-    hystrix.updateRollingWindowMap(cluster_scope_, cluster_name);
+  NiceMock<MockCounter> success_counter;
+  success_counter.name_ = "cluster.test_cluster.upstream_rq_2xx";
+  NiceMock<MockCounter> error_counter;
+  error_counter.name_ = "cluster.test_cluster.upstream_rq_5xx";
+  NiceMock<MockCounter> timeout_counter;
+  timeout_counter.name_ = "cluster.test_cluster.upstream_rq_timeout";
+  NiceMock<MockCounter> rejected_counter;
+  rejected_counter.name_ = "cluster.test_cluster.upstream_rq_pending_overflow";
+
+  for (int i = 0; i < 12; i++) {
+    buffer.drain(buffer.length());
+    ON_CALL(timeout_counter, value()).WillByDefault(Return((i + 1) * 3));
+    ON_CALL(error_counter, value()).WillByDefault(Return((i + 1) * 17));
+    ON_CALL(success_counter, value()).WillByDefault(Return((i + 1) * 7));
+    ON_CALL(rejected_counter, value()).WillByDefault(Return((i + 1) * 8));
+    sink_->beginFlush();
+    sink_->flushCounter(timeout_counter, 1);
+    sink_->flushCounter(error_counter, 1);
+    sink_->flushCounter(success_counter, 1);
+    sink_->flushCounter(rejected_counter, 1);
+    sink_->endFlush();
+    // std::cout << "BasicFlow: buffer = " << TestUtility::bufferToString(buffer) << std::endl;
   }
+  // std::string window = sink_->getStats().printRollingWindow(); // just to cover it
+  // TODO (@trabetti) : add something to check the data?
 
-  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
-  std::string dataMessage = ss.str();
+  std::string data_message = TestUtility::bufferToString(buffer);
 
   // check stream format and data
-  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "66");
-  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "20");
-  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "30");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "10");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "propertyValue_queueSizeRejectionThreshold"),
-            std::to_string(expected_queue_size));
-  EXPECT_EQ(getStreamField(dataMessage, "reportingHosts"), std::to_string(expectedReportingHosts));
+  EXPECT_EQ(getStreamField(data_message, "errorCount"), "140"); // note that on regular operation,
+                                                                // 5xx and timeout are raised
+                                                                // together, so timeouts are reduced
+                                                                // from 5xx count
+  EXPECT_EQ(getStreamField(data_message, "requestCount"), "320");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "80");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "70");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "30");
+  EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "78");
+
+  // check the values are reset
+  buffer.drain(buffer.length());
+  sink_->getStats().resetRollingWindow();
+  sink_->beginFlush();
+  sink_->endFlush();
+  data_message = TestUtility::bufferToString(buffer);
+  EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "0");
+  EXPECT_EQ(getStreamField(data_message, "errorCount"), "0");
+  EXPECT_EQ(getStreamField(data_message, "requestCount"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
+  EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "0");
 }
 
-TEST(Hystrix, CreateDataMessage) {
-  Stats::Hystrix hystrix;
-  std::stringstream ss;
-  std::string cluster_name = "clusterName";
-  uint64_t expected_queue_size = 12;
-  uint64_t expectedReportingHosts = 16;
+TEST_F(HystrixSinkTest, Disconnect) {
+  InSequence s;
 
-  EXPECT_EQ(hystrix.GetRollingWindowIntervalInMs(), 1000);
-  EXPECT_EQ(hystrix.GetPingIntervalInMs(), 3000);
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
-  // insert data to rolling window
-  for (uint64_t i = 0; i < 15; i++) {
-    hystrix.incCounter();
-    hystrix.pushNewValue("cluster.clusterName.timeouts", (i + 1) * 3);
-    hystrix.pushNewValue("cluster.clusterName.errors", (i + 1) * 17);
-    hystrix.pushNewValue("cluster.clusterName.success", (i + 1) * 7);
-    hystrix.pushNewValue("cluster.clusterName.rejected", (i + 1) * 8);
-    hystrix.pushNewValue("cluster.clusterName.total", (i + 1) * 35);
-  }
-  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
-  std::string dataMessage = ss.str();
+  // flush with no connection
+  NiceMock<MockCounter> success_counter;
+  success_counter.name_ = "cluster.test_cluster.upstream_rq_2xx";
+  ON_CALL(success_counter, value()).WillByDefault(Return(1234));
 
-  // check stream format and data
-  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "80");
-  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "170");
-  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "350");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "80");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "70");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "30");
-  EXPECT_EQ(getStreamField(dataMessage, "propertyValue_queueSizeRejectionThreshold"),
-            std::to_string(expected_queue_size));
-  EXPECT_EQ(getStreamField(dataMessage, "reportingHosts"), std::to_string(expectedReportingHosts));
+  sink_->beginFlush();
+  sink_->flushCounter(success_counter, 1);
+  sink_->endFlush();
+  EXPECT_EQ(buffer.length(), 0);
 
-  // check reset of window
-  ss.str("");
-  hystrix.resetRollingWindow();
-  hystrix.getClusterStats(ss, cluster_name, expected_queue_size, expectedReportingHosts);
-  dataMessage = ss.str();
+  // register callback to sink
+  sink_->registerConnection(&callbacks_);
+  sink_->beginFlush();
+  sink_->flushCounter(success_counter, 1);
+  sink_->endFlush();
+  std::string data_message = TestUtility::bufferToString(buffer);
+  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
+  EXPECT_NE(buffer.length(), 0);
 
-  EXPECT_EQ(getStreamField(dataMessage, "errorPercentage"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "errorCount"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "requestCount"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSemaphoreRejected"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountSuccess"), "0");
-  EXPECT_EQ(getStreamField(dataMessage, "rollingCountTimeout"), "0");
+  // connection disconnect
+  buffer.drain(buffer.length());
+  sink_->unregisterConnection();
+  sink_->beginFlush();
+  sink_->flushCounter(success_counter, 1);
+  sink_->endFlush();
+  EXPECT_EQ(buffer.length(), 0);
 }
+
+} // namespace HystrixNameSpace
 
 } // namespace Stats
 } // namespace Envoy

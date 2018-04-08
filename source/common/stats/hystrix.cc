@@ -113,8 +113,6 @@ void Hystrix::updateRollingWindowMap(std::map<std::string, uint64_t> current_sta
   uint64_t total = errors + timeouts + success + rejected;
   pushNewValue(counter_name_lookup[cluster_name]["total"], total);
 
-  std::cout << printRollingWindow() << std::endl;
-
   // TODO (@trabetti) : why does it fail compilation?
   // ENVOY_LOG(trace, "{}", printRollingWindow());
 }
@@ -267,13 +265,10 @@ HystrixSink::HystrixSink(Server::Instance& server)
 
 void HystrixSink::beginFlush() { current_stat_values_.clear(); }
 
-void HystrixSink::flushCounter(const Counter& counter, uint64_t delta) {
+void HystrixSink::flushCounter(const Counter& counter, uint64_t) {
   if (callbacks_ == nullptr) {
-    std::cout << "callback is null" << std::endl;
     return;
   }
-  std::cout << "callback is not null. flushing counter: " << counter.name()
-            << ", delta: " << std::to_string(delta) << std::endl;
   if (counter.name().find("upstream_rq_") != std::string::npos) {
     current_stat_values_[counter.name()] = counter.value();
   }

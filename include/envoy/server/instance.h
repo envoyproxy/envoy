@@ -185,7 +185,7 @@ public:
    */
   virtual std::chrono::milliseconds statsFlushInterval() PURE;
 
-  // TODO (@trabetti) :  too specific?
+  // TODO (@trabetti) : for the two methods below - too specific? what is a better way?
   /**
    * @ Registers a callbacks connection to Hystrix sink.
    */

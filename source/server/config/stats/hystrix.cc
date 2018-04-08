@@ -17,9 +17,6 @@ namespace Configuration {
 Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message&,
                                                    Server::Instance& server) {
 
-  //   const auto& hystrix_sink =
-  //       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::HystrixSink&>(config);
-  std::cout << "HystrixSinkFactory::createStatsSink" << std::endl;
   return Stats::SinkPtr(new Stats::HystrixNameSpace::HystrixSink(server));
 }
 
