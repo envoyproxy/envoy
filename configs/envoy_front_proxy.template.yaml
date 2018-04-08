@@ -1,69 +1,69 @@
+---
 {% import 'routing_helper.template.yaml' as helper -%}
-
-{% macro listener(address) %}
-
-address: "{{ address }}"
-{% if kwargs['ssl'] -%}
-ssl_context:
-  alpn_protocols: h2,http/1.1
-  alt_alpn_protocols: http/1.1
-  {% if kwargs.get('pin_double_proxy_client', False) -%}  
-  ca_cert_file: certs/cacert.pem  
-  verify_certificate_hash: fill me in
-  {% endif -%}  
-  cert_chain_file: certs/servercert.pem
-  private_key_file: certs/serverkey.pem
+{% macro someshit() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
+{% macro listener(address) -%}
+- address: "{{ address }}"
+  {% if kwargs['ssl'] -%}
+  ssl_context:
+    alpn_protocols: h2,http/1.1
+    alt_alpn_protocols: http/1.1
+    {% if kwargs.get('pin_double_proxy_client', False) -%}  
+    ca_cert_file: certs/cacert.pem
+    verify_certificate_hash: fill me in
+    {% endif -%}  
+    cert_chain_file: certs/servercert.pem
+    private_key_file: certs/serverkey.pem
   {% endif -%}
   {% if kwargs['proxy_proto'] -%}  
-use_proxy_proto: true
+  use_proxy_proto: true
   {% endif -%}
-
-filters:
-- name: http_connection_manager
-  config:
-    codec_type: auto
-    add_user_agent: true
-    tracing:
-      operation_name: ingress
-    idle_timeout_s: 840
-    access_log:
-    - path: "/var/log/envoy/access_error.log"
-      filter:
-        type: logical_or
-        filters:
-        - type: status_code
-          op: ">="
-          value: 500
-        - type: duration
-          op: ">="
-          value: 1000
-        - type: traceable_request
-    - path: "/var/log/envoy/access.log"
-    stat_prefix: router
-    {% if kwargs['proxy_proto'] -%}
-    use_remote_address: true
-    {% endif -%}
-    route_config: {% include kwargs['router_file'] %}
-    filters:
-    - name: health_check
-      config:
-        pass_through_mode: false
-        endpoint: "/healthcheck"
-    - name: buffer
-      config:
-        max_request_bytes: 5242880
-        max_request_time_s: 120
-    - name: rate_limit
-      config:
-        domain: envoy_front
-        request_type: external
-    - name: router
-      config: {}
-{% endmacro %}
+  filters:
+  - name: http_connection_manager
+    config:
+      codec_type: auto
+      add_user_agent: true
+      tracing:
+        operation_name: ingress
+      idle_timeout_s: 840
+      access_log:
+      - path: "/var/log/envoy/access_error.log"
+        filter:
+          type: logical_or
+          filters:
+          - type: status_code
+            op: ">="
+            value: 500
+          - type: duration
+            op: ">="
+            value: 1000
+          - type: traceable_request
+      - path: "/var/log/envoy/access.log"
+      stat_prefix: router
+      {% if kwargs['proxy_proto'] -%}
+      use_remote_address: true
+      {% endif -%}
+      route_config:
+        {{ someshit(router_file='envoy_router.template.yaml')|indent(8) }}
+      filters:
+      - name: health_check
+        config:
+          pass_through_mode: false
+          endpoint: "/healthcheck"
+      - name: buffer
+        config:
+          max_request_bytes: 5242880
+          max_request_time_s: 120
+      - name: rate_limit
+        config:
+          domain: envoy_front
+          request_type: external
+      - name: router
+        config: {}
+{%- endmacro -%}
 listeners:
-    {{ listener("tcp://0.0.0.0:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.yaml') }}
-    {{ listener("tcp://0.0.0.0:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.yaml') }}
-    {{ listener("tcp://0.0.0.0:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
+{{ listener("tcp://0.0.0.0:9300", ssl=True, proxy_proto=True, router_file='envoy_router.template.yaml') }}
+{{ listener("tcp://0.0.0.0:9301", ssl=False, proxy_proto=True, router_file='envoy_router.template.yaml') }}
+{{ listener("tcp://0.0.0.0:9400", ssl=True, proxy_proto=False, pin_double_proxy_client=True,
                 router_file='envoy_router.template.yaml') }}
 admin:
   access_log_path: "/var/log/envoy/admin_access.log"
@@ -116,7 +116,7 @@ cluster_manager:
     hosts:
     - url: tcp://collector-grpc.lightstep.com:443
   {% for service, options in clusters.iteritems() -%}
-    - {{ helper.internal_cluster_definition(service, options) }}
-  {% if not loop.last %}
-  {% endif %}
+  - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
+  {% if not loop.last -%}
+  {% endif -%}
   {% endfor -%}

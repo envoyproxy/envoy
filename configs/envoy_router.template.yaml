@@ -1,4 +1,4 @@
-{% import 'routing_helper.template.yaml' as helper with context -%}
+{%- import 'routing_helper.template.yaml' as helper with context -%}
 virtual_hosts:
 - name: www
   require_ssl: all
@@ -12,9 +12,9 @@ virtual_hosts:
     runtime:
       key: routing.www.use_service_2
       default: 0
-    {{ helper.make_route('service2') }}
+    {{ helper.make_route('service2')|indent(2) }}
   - prefix: "/"
-    {{ helper.make_route('service1') }}  
+    {{ helper.make_route('service1')|indent(2) }}  
 - name: www_redirect
   require_ssl: all
   domains:
@@ -34,6 +34,6 @@ virtual_hosts:
     - type: remote_address
   routes:
   - path: "/foo/bar"
-    {{ helper.make_route('service3') }}  
+    {{ helper.make_route('service3')|indent(2) }}  
   - prefix: "/"
-    {{ helper.make_route('service1') }}
+    {{ helper.make_route('service1')|indent(2) }}
