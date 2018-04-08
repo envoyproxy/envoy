@@ -27,20 +27,12 @@ static void BM_AccessLogDateTimeFormatter(benchmark::State& state) {
   // pair of times is uniformly distributed in the range (-10ms, 20ms).
   // This is meant to simulate the situation where requests handled at
   // approximately the same time may get logged out of order.
-  static const int ITERATIONS = 1000;
-  std::vector<Envoy::SystemTime> times;
-  times.reserve(ITERATIONS);
-  Envoy::SystemTime time(std::chrono::seconds(1522796769));
-  std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
-  std::uniform_int_distribution<long> distribution(-10, 20);
-  for (int i = 0; i < ITERATIONS; i++) {
-    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
-    times.emplace_back(time);
-  }
+  static Envoy::SystemTime time(std::chrono::seconds(1522796769));
+  static std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  static std::uniform_int_distribution<long> distribution(-10, 20);
   for (auto _ : state) {
-    for (const auto& time : times) {
-      outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time).length();
-    }
+    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    outputBytes += Envoy::AccessLogDateTimeFormatter::fromTime(time).length();
   }
   benchmark::DoNotOptimize(outputBytes);
 }

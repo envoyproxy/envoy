@@ -20,11 +20,11 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-std::string DateFormatter::fromTime(const SystemTime& time) {
-  return fromTimeT(std::chrono::system_clock::to_time_t(time));
+std::string DateFormatter::fromTime(const SystemTime& time) const {
+  return fromTime(std::chrono::system_clock::to_time_t(time));
 }
 
-std::string DateFormatter::fromTimeT(time_t time) {
+std::string DateFormatter::fromTime(time_t time) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
@@ -36,7 +36,7 @@ std::string DateFormatter::fromTimeT(time_t time) {
 std::string DateFormatter::now() {
   time_t current_time_t;
   time(&current_time_t);
-  return fromTimeT(current_time_t);
+  return fromTime(current_time_t);
 }
 
 ProdSystemTimeSource ProdSystemTimeSource::instance_;
@@ -251,24 +251,36 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
 
   struct CachedTime {
-    std::chrono::time_point<std::chrono::system_clock> time_in_seconds;
+    std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
     bool initialized_{false};
   };
   static thread_local CachedTime cached_time;
 
-  auto millis = fmt::format(
-      ".{:03d}Z",
-      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count() %
-          1000);
+  std::chrono::milliseconds epoch_time_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
 
-  std::chrono::time_point<std::chrono::system_clock> time_in_seconds =
-      std::chrono::time_point_cast<std::chrono::seconds>(time);
-  if (cached_time.initialized_ && cached_time.time_in_seconds == time_in_seconds) {
+  // The following string concatenation is equivalent to
+  //   std::string millis = fmt::format(".{:03d}Z", epoch_time_ms.count() % 1000)
+  // but the fmt::format call proved to be too expensive in benchmark testing.
+  std::string millis;
+  millis += '.';
+  unsigned msec = epoch_time_ms.count() % 1000;
+  millis += ('0' + (msec / 100));
+  msec %= 100;
+  millis += ('0' + (msec / 10));
+  msec %= 10;
+  millis += ('0' + msec);
+  millis += 'Z';
+
+  std::chrono::seconds epoch_time_seconds =
+      std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
+
+  if (cached_time.initialized_ && cached_time.epoch_time_seconds == epoch_time_seconds) {
     return cached_time.formatted_time + millis;
   }
-  auto formatted_time = date_format.fromTime(time);
-  cached_time.time_in_seconds = time_in_seconds;
+  auto formatted_time = date_format.fromTime(epoch_time_seconds.count());
+  cached_time.epoch_time_seconds = epoch_time_seconds;
   cached_time.formatted_time = formatted_time;
   cached_time.initialized_ = true;
   return formatted_time + millis;
