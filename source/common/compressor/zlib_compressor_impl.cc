@@ -68,11 +68,11 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
   }
 
   if (flush_state == Z_SYNC_FLUSH) {
-    updateOutput(output_buffer);
+    updateOutput(output_buffer, true);
   }
 }
 
-void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
+void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer, const bool require_finish) {
   const uint64_t n_output = chunk_size_ - zstream_ptr_->avail_out;
   if (n_output > 0) {
     output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
@@ -80,6 +80,10 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
   chunk_char_ptr_.reset(new unsigned char[chunk_size_]);
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
+
+  if (require_finish) {
+    finish(output_buffer);
+  }
 }
 
 void ZlibCompressorImpl::reset() {
@@ -93,16 +97,12 @@ void ZlibCompressorImpl::finish(Buffer::Instance& output_buffer) {
   // several times until it has provided the complete compressed stream, even after it has consumed
   // all of the input. The flush parameter must continue to be Z_FINISH for those subsequent calls.
   // Ref: https://zlib.net/zlib_how.html.
-  const int result = deflate(zstream_ptr_.get(), Z_FINISH);
-  updateOutput(output_buffer);
-  if (result == Z_OK || result == Z_BUF_ERROR) {
-    finish(output_buffer);
-  } else {
-    // While Z_OK, Z_BUF_ERROR (covered in above case) and Z_STREAM_END are the acceptable values,
-    // the Z_STREAM_ERROR is only possible if the stream is not initialized properly. Ref:
-    // https://zlib.net/zlib_how.html.
-    RELEASE_ASSERT(result == Z_STREAM_END);
+  int result = Z_OK;
+  while (result == Z_OK || result == Z_BUF_ERROR) {
+    result = deflate(zstream_ptr_.get(), Z_FINISH);
+    updateOutput(output_buffer);
   }
+  RELEASE_ASSERT(result == Z_STREAM_END);
 }
 
 } // namespace Compressor

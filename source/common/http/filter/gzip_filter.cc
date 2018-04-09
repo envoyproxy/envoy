@@ -139,7 +139,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 
   if (end_stream) {
     compressor_.flush(compressed_data_);
-    compressor_.finish(compressed_data_);
+
     // Reset is required to re-init the compressor's z_stream.
     compressor_.reset();
   }

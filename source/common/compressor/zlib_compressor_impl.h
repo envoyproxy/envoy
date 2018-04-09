@@ -82,16 +82,11 @@ public:
   uint64_t checksum();
 
   /**
-   * This is required to re-init the stream after calling finish(_).
+   * This function is equivalent to deflateEnd followed by deflateInit, but does not free and
+   * reallocate the internal compression state. The stream will leave the compression level and any
+   * other attributes that may have been set unchanged.
    */
   void reset();
-
-  /**
-   * Completes the compressed output stream. To indicate that the currently pointed data is the last
-   * chunk of input data to compress.
-   * @param output_buffer supplies the buffer to output compressed data.
-   */
-  void finish(Buffer::Instance& output_buffer);
 
   // Compressor
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
@@ -99,7 +94,11 @@ public:
 private:
   bool deflateNext(int64_t flush_state);
   void process(Buffer::Instance& output_buffer, int64_t flush_state);
-  void updateOutput(Buffer::Instance& output_buffer);
+  void updateOutput(Buffer::Instance& output_buffer, const bool require_finish = false);
+
+  // Completes the compressed output stream. To indicate that the currently pointed data is the last
+  // chunk of input data to compress.
+  void finish(Buffer::Instance& output_buffer);
 
   const uint64_t chunk_size_;
   bool initialized_;
