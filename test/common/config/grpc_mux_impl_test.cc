@@ -340,7 +340,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
       {"trace", "Sending DiscoveryRequest for foo: version_info"}};
 
   // Without waiting full 5s, no rate limit logs is expected.
-  EXPECT_LOG_SEQ(no_discovery_request_log, onReceiveMessage(1));
+  EXPECT_LOG_SEQ(no_rate_limit_log, onReceiveMessage(1));
 }
 
 } // namespace
