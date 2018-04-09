@@ -1,6 +1,4 @@
-#include "common/http/filter/squash_filter.h"
-
-#include <string>
+#include "extensions/filters/http/squash/squash_filter.h"
 
 #include "envoy/http/codes.h"
 
@@ -14,7 +12,9 @@
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Squash {
 
 using std::placeholders::_1;
 
@@ -132,20 +132,20 @@ SquashFilter::~SquashFilter() {}
 
 void SquashFilter::onDestroy() { cleanup(); }
 
-FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   // Check for squash header
-  if (!headers.get(Headers::get().XSquashDebug)) {
-    return FilterHeadersStatus::Continue;
+  if (!headers.get(Http::Headers::get().XSquashDebug)) {
+    return Http::FilterHeadersStatus::Continue;
   }
 
   ENVOY_LOG(debug, "Squash: Holding request and requesting debug attachment");
 
-  MessagePtr request(new RequestMessageImpl());
+  Http::MessagePtr request(new Http::RequestMessageImpl());
   request->headers().insertContentType().value().setReference(
-      Headers::get().ContentTypeValues.Json);
+      Http::Headers::get().ContentTypeValues.Json);
   request->headers().insertPath().value().setReference(POST_ATTACHMENT_PATH);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
-  request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Post);
+  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   request->body().reset(new Buffer::OwnedImpl(config_->attachmentJson()));
 
   is_squashing_ = true;
@@ -156,7 +156,7 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(debug, "Squash: can't create request for squash server");
     is_squashing_ = false;
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   attachment_timeout_timer_ =
@@ -164,35 +164,35 @@ FilterHeadersStatus SquashFilter::decodeHeaders(HeaderMap& headers, bool) {
   attachment_timeout_timer_->enableTimer(config_->attachmentTimeout());
   // Check if the timer expired inline.
   if (!is_squashing_) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  return FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
-FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
+Http::FilterDataStatus SquashFilter::decodeData(Buffer::Instance&, bool) {
   if (is_squashing_) {
-    return FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  return FilterDataStatus::Continue;
+  return Http::FilterDataStatus::Continue;
 }
 
-FilterTrailersStatus SquashFilter::decodeTrailers(HeaderMap&) {
+Http::FilterTrailersStatus SquashFilter::decodeTrailers(Http::HeaderMap&) {
   if (is_squashing_) {
-    return FilterTrailersStatus::StopIteration;
+    return Http::FilterTrailersStatus::StopIteration;
   }
-  return FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
-void SquashFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void SquashFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 }
 
-void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
+void SquashFilter::onCreateAttachmentSuccess(Http::MessagePtr&& m) {
   in_flight_request_ = nullptr;
 
   // Get the config object that was created
-  if (Utility::getResponseStatus(m->headers()) != enumToInt(Code::Created)) {
+  if (Http::Utility::getResponseStatus(m->headers()) != enumToInt(Http::Code::Created)) {
     ENVOY_LOG(debug, "Squash: can't create attachment object. status {} - not squashing",
               m->headers().Status()->value().c_str());
     doneSquashing();
@@ -216,7 +216,7 @@ void SquashFilter::onCreateAttachmentSuccess(MessagePtr&& m) {
   }
 }
 
-void SquashFilter::onCreateAttachmentFailure(AsyncClient::FailureReason) {
+void SquashFilter::onCreateAttachmentFailure(Http::AsyncClient::FailureReason) {
   // in_flight_request_ will be null if we are called inline of async client send()
   bool request_created = in_flight_request_ != nullptr;
   in_flight_request_ = nullptr;
@@ -229,7 +229,7 @@ void SquashFilter::onCreateAttachmentFailure(AsyncClient::FailureReason) {
   }
 }
 
-void SquashFilter::onGetAttachmentSuccess(MessagePtr&& m) {
+void SquashFilter::onGetAttachmentSuccess(Http::MessagePtr&& m) {
   in_flight_request_ = nullptr;
 
   std::string attachmentstate;
@@ -249,7 +249,7 @@ void SquashFilter::onGetAttachmentSuccess(MessagePtr&& m) {
   }
 }
 
-void SquashFilter::onGetAttachmentFailure(AsyncClient::FailureReason) {
+void SquashFilter::onGetAttachmentFailure(Http::AsyncClient::FailureReason) {
   in_flight_request_ = nullptr;
   scheduleRetry();
 }
@@ -263,8 +263,8 @@ void SquashFilter::scheduleRetry() {
 }
 
 void SquashFilter::pollForAttachment() {
-  MessagePtr request(new RequestMessageImpl());
-  request->headers().insertMethod().value().setReference(Headers::get().MethodValues.Get);
+  Http::MessagePtr request(new Http::RequestMessageImpl());
+  request->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request->headers().insertPath().value().setReference(debug_attachment_path_);
   request->headers().insertHost().value().setReference(SERVER_AUTHORITY);
 
@@ -301,7 +301,7 @@ void SquashFilter::cleanup() {
   debug_attachment_path_ = EMPTY_STRING;
 }
 
-Json::ObjectSharedPtr SquashFilter::getJsonBody(MessagePtr&& m) {
+Json::ObjectSharedPtr SquashFilter::getJsonBody(Http::MessagePtr&& m) {
   Buffer::InstancePtr& data = m->body();
   uint64_t num_slices = data->getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
@@ -314,5 +314,7 @@ Json::ObjectSharedPtr SquashFilter::getJsonBody(MessagePtr&& m) {
   return Json::Factory::loadFromString(jsonbody);
 }
 
-} // namespace Http
+} // namespace Squash
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
