@@ -143,16 +143,17 @@ void InstanceImpl::flushStats() {
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
 }
 
-void InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) {
+bool InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) {
   for (const auto& sink : config_->statsSinks()) {
     // TODO: is there a better way to find the hystrix sink?
     Stats::HystrixNameSpace::HystrixSink* hystrix_sink =
         dynamic_cast<Stats::HystrixNameSpace::HystrixSink*>(sink.get());
     if (hystrix_sink != nullptr) {
       hystrix_sink->registerConnection(callbacks);
-      return;
+      return true;
     }
   }
+  return false;
 }
 
 void InstanceImpl::unregisterHystrixSink() {

@@ -242,6 +242,13 @@ TEST_P(IntegrationAdminTest, Admin) {
     EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
               (*listener_info_it)->asString());
   }
+
+  // TODO (@trabetti) : how to test the endpoint? we don't have response->complete().
+  //  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET",
+  //  "/hystrix_event_stream", "",
+  //                                                downstreamProtocol(), version_);
+  //  //EXPECT_TRUE(response->complete());
+  //  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 }
 
 // Successful call to startProfiler requires tcmalloc.

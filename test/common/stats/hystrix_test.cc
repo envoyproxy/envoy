@@ -28,11 +28,16 @@ class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_.reset(new HystrixSink(server_)); }
 
-  std::string getStreamField(std::string dataMessage, std::string key) {
-    std::string actual = dataMessage.substr(dataMessage.find(key));
-    actual = actual.substr(actual.find(" ") + 1);
-    std::size_t length = actual.find(",");
-    actual = actual.substr(0, length);
+  absl::string_view getStreamField(absl::string_view dataMessage, absl::string_view key) {
+    absl::string_view::size_type key_pos = dataMessage.find(key);
+    EXPECT_NE(absl::string_view::npos, key_pos);
+    absl::string_view trimDataBeforeKey = dataMessage.substr(key_pos);
+    key_pos = trimDataBeforeKey.find(" ");
+    EXPECT_NE(absl::string_view::npos, key_pos);
+    absl::string_view trimDataAfterValue = trimDataBeforeKey.substr(key_pos + 1);
+    key_pos = trimDataAfterValue.find(",");
+    EXPECT_NE(absl::string_view::npos, key_pos);
+    absl::string_view actual = trimDataAfterValue.substr(0, key_pos);
     return actual;
   }
 
@@ -114,7 +119,11 @@ TEST_F(HystrixSinkTest, BasicFlow) {
     // std::cout << "BasicFlow: buffer = " << TestUtility::bufferToString(buffer) << std::endl;
   }
   // std::string window = sink_->getStats().printRollingWindow(); // just to cover it
+  // std::cout << "printRollingWindow: " << sink_->getStats().printRollingWindow() << std::endl;
   // TODO (@trabetti) : add something to check the data?
+  absl::string_view::size_type pos =
+      sink_->getStats().printRollingWindow().find("cluster.test_cluster.total");
+  EXPECT_NE(absl::string_view::npos, pos);
 
   std::string data_message = TestUtility::bufferToString(buffer);
 
@@ -167,7 +176,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
 
-  // connection disconnect
+  // disconnect
   buffer.drain(buffer.length());
   sink_->unregisterConnection();
   sink_->beginFlush();

@@ -593,11 +593,21 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
   Stats::HystrixHandlerInfoImpl& hystrix_handler_info =
       dynamic_cast<Stats::HystrixHandlerInfoImpl&>(handler_info);
 
-  server_.registerToHystrixSink(hystrix_handler_info.callbacks_);
+  // TODO (@trabetti) : what should we do when a sink not present?
+  // is this error message to user enough?
+  // does it make sense to response with 503?
+  if (server_.registerToHystrixSink(hystrix_handler_info.callbacks_)) {
 
-  ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
-            hystrix_handler_info.callbacks_->connection()->localAddress()->asString());
-  return Http::Code::OK;
+    ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
+              hystrix_handler_info.callbacks_->connection()->localAddress()->asString());
+    return Http::Code::OK;
+  } else {
+    ENVOY_LOG(
+        warn,
+        "Hystrix sink is not set up in config file, could not establish connection on port {}",
+        hystrix_handler_info.callbacks_->connection()->localAddress()->asString());
+    return Http::Code::ServiceUnavailable;
+  }
 }
 
 void AdminFilter::onComplete() {

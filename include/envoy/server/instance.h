@@ -189,7 +189,7 @@ public:
   /**
    * @ Registers a callbacks connection to Hystrix sink.
    */
-  virtual void registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
+  virtual bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
 
   /**
    * @ Unregisters a callbacks connection to Hystrix sink.

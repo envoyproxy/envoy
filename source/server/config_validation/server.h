@@ -89,7 +89,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
-  void registerToHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
+  bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
   void unregisterHystrixSink() override { NOT_IMPLEMENTED; }
 
   // Server::ListenerComponentFactory
