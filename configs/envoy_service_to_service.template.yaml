@@ -1,78 +1,76 @@
+---
 {% import 'routing_helper.template.yaml' as helper -%}
-{% import 'access_log_format_helper.template.json' as access_log_helper -%}
-
-{% macro ingress_listener(address) %}
-
-address: "{{ address }}"
-filters:
-- name: http_connection_manager
-  config:
-    codec_type: auto
-    tracing:
-      operation_name: ingress
-    idle_timeout_s: 840
-    access_log:
-    - path: "/var/log/envoy/ingress_http.log"
-      filter:
-        type: not_healthcheck
-      {{ access_log_helper.ingress_full() }}  
-    - path: "/var/log/envoy/ingress_http_error.log"
-      filter:
-        type: logical_and
-        filters:
-        - type: logical_or
+{% import 'access_log_format_helper.template.yaml' as access_log_helper -%}
+{% macro ingress_listener(address) -%}
+- address: "{{ address }}"
+  filters:
+  - name: http_connection_manager
+    config:
+      codec_type: auto
+      tracing:
+        operation_name: ingress
+      idle_timeout_s: 840
+      access_log:
+      - path: "/var/log/envoy/ingress_http.log"
+        filter:
+          type: not_healthcheck
+        {{ access_log_helper.ingress_full()|indent(6) }}  
+      - path: "/var/log/envoy/ingress_http_error.log"
+        filter:
+          type: logical_and
           filters:
-          - type: status_code
-            op: ">="
-            value: 400
-          - type: status_code
-            op: "="
-            value: 0
-          - type: duration
-            op: ">="
-            value: 2000
-          - type: traceable_request
-        - type: not_healthcheck
-      {{ access_log_helper.ingress_sampled_log() }}        
-    - path: "/var/log/envoy/ingress_http_sampled.log"
-      filter:
-        type: logical_and
-        filters:
-        - type: not_healthcheck
-        - type: runtime
-          key: access_log.ingress_http
-      {{ access_log_helper.ingress_sampled_log() }}          
-    stat_prefix: ingress_http
-    route_config:
-      virtual_hosts:
-      - name: local_service
-        domains:
-        - "*"
-        routes:
-        - timeout_ms: 0
-          prefix: "/"
-          headers:
-          - name: content-type
-            value: application/grpc
-          cluster: local_service_grpc
-        - timeout_ms: 0
-          prefix: "/"
-          cluster: local_service
-    filters:
-    - name: health_check
-      config:
-        pass_through_mode: true
-        cache_time_ms: 2500
-        endpoint: "/healthcheck"
-    - name: buffer
-      config:
-        max_request_bytes: 5242880
-        max_request_time_s: 120
-    - name: router
-      config: {}
-{% endmacro %}
-
-
+          - type: logical_or
+            filters:
+            - type: status_code
+              op: ">="
+              value: 400
+            - type: status_code
+              op: "="
+              value: 0
+            - type: duration
+              op: ">="
+              value: 2000
+            - type: traceable_request
+          - type: not_healthcheck
+        {{ access_log_helper.ingress_sampled_log()|indent(6) }}        
+      - path: "/var/log/envoy/ingress_http_sampled.log"
+        filter:
+          type: logical_and
+          filters:
+          - type: not_healthcheck
+          - type: runtime
+            key: access_log.ingress_http
+        {{ access_log_helper.ingress_sampled_log()|indent(6) }}          
+        
+      stat_prefix: ingress_http
+      route_config:
+        virtual_hosts:
+        - name: local_service
+          domains:
+          - "*"
+          routes:
+          - timeout_ms: 0
+            prefix: "/"
+            headers:
+            - name: content-type
+              value: application/grpc
+            cluster: local_service_grpc
+          - timeout_ms: 0
+            prefix: "/"
+            cluster: local_service
+      filters:
+      - name: health_check
+        config:
+          pass_through_mode: true
+          cache_time_ms: 2500
+          endpoint: "/healthcheck"
+      - name: buffer
+        config:
+          max_request_bytes: 5242880
+          max_request_time_s: 120
+      - name: router
+        config: {}
+{% endmacro -%}
 listeners:
 {{ ingress_listener("tcp://0.0.0.0:9211") }}
 - address: tcp://127.0.0.1:9001
@@ -95,26 +93,26 @@ listeners:
           - type: duration
             op: ">="
             value: 2000
-        {{ access_log_helper.egress_error_log() }}            
+        {{ access_log_helper.egress_error_log()|indent(6) }}            
       stat_prefix: egress_http
       use_remote_address: true
       route_config:
         virtual_hosts:
-        {% for service, options in internal_virtual_hosts.iteritems() -%}          
+        {% for service, options in internal_virtual_hosts.iteritems() %}          
         - name: "{{ service }}"
           domains:
           - "{{ service }}"
           routes:
           - prefix: "/"
-            {{ helper.make_route_internal(service, options) }}
+            {{ helper.make_route_internal(service, options)|indent(10) }}
             {% if options.get('service_to_service_rate_limit', False) %}          
             rate_limits:
             - actions:
               - type: destination_cluster
               - type: source_cluster
-            {% endif %}  
-      {% if not loop.last %}{% endif -%}
-      {% endfor -%}            
+            {% endif -%}  
+      {% if not loop.last %}{% endif %}
+      {% endfor %}            
       filters:
       - name: rate_limit
         config:
@@ -143,7 +141,7 @@ listeners:
           - type: duration
             op: ">="
             value: 2000
-        {{ access_log_helper.egress_error_log() }}
+        {{ access_log_helper.egress_error_log()|indent(6) }}
       stat_prefix: egress_http
       use_remote_address: true
       rds:
@@ -182,14 +180,14 @@ listeners:
             value: 2000
             {% endif %}
         {% if mapping.get('is_amzn_service', False) -%}
-        {{ access_log_helper.egress_error_amazon_service() }}
+        {{ access_log_helper.egress_error_amazon_service()|indent(6) }}
         {% else -%}
-        {{ access_log_helper.egress_error_log() }}
+        {{ access_log_helper.egress_error_log()|indent(6) }}
         {% endif %}              
       stat_prefix: egress_{{ mapping['name'] }}
       route_config:
         virtual_hosts:
-        {% for host in mapping['hosts'] -%}          
+        {% for host in mapping['hosts'] %}          
         - name: egress_{{ host['name'] }}
           domains:
           - "{{ host['domain'] }}"
@@ -198,23 +196,20 @@ listeners:
             cluster: egress_{{ host['name'] }}
             retry_policy:
               retry_on: connect-failure
-            {% if host.get('host_rewrite', False) -%}
+            {% if host.get('host_rewrite', False) %}
             host_rewrite: "{{host['host_rewrite']}}"
-            {% endif -%}              
-        {% if not loop.last %}{% endif -%}
-        {% endfor -%}
-
+            {% endif %}              
+        {% if not loop.last %}{% endif %}
+        {% endfor %}
       filters:
-      {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] %}        
+      {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
       - name: http_dynamo_filter
         config: {}
-      {% endif %}        
+      {% endif -%}
       - name: router
         config: {}
 {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
 {% endfor -%}        
-
-
 {% for key, value in mongos_servers.iteritems() -%}  
 - address: "{{ value['address'] }}"
   filters:
@@ -239,9 +234,6 @@ listeners:
         - cluster: mongo_{{ key }}
 {% if not loop.last %}{% endif -%}
 {% endfor -%}
-
-
-
 admin:
   access_log_path: "/var/log/envoy/admin_access.log"
   address: tcp://0.0.0.0:9901
@@ -281,10 +273,9 @@ cluster_manager:
       hosts:
       - url: tcp://cds.yourcompany.net:80
   clusters:
-    {% for service, options in internal_virtual_hosts.iteritems() -%}
-      {{ helper.internal_cluster_definition(service, options) }}
-    {% endfor -%}
-
+  {% for service, options in internal_virtual_hosts.iteritems() -%}
+  - {{ helper.internal_cluster_definition(service, options)|indent(2)}}
+  {% endfor -%}
   {% for mapping in external_virtual_hosts -%}
   {% for host in mapping['hosts'] -%}    
   - name: egress_{{ host['name'] }}
@@ -295,19 +286,19 @@ cluster_manager:
       sni: "{{ host['sni'] }}"
       {% endif -%}      
       {% if host.get('verify_subject_alt_name', False) -%}      
-      verify_subject_alt_name:        
-      - "{{          host['verify_subject_alt_name'] }}"
-      {% endif -%}
+      verify_subject_alt_name:
+      - "{{host['verify_subject_alt_name'] }}"
+      {% endif %}
     connect_timeout_ms: 1000    
     {% else -%}  
     connect_timeout_ms: 250
     {% endif -%}
+    type: logical_dns
     lb_type: round_robin
     hosts:
     - url: tcp://{{ host['remote_address'] }}
   {% endfor -%}
   {% endfor -%}    
-  
   {% for key, value in mongos_servers.iteritems() -%}  
   - name: mongo_{{ key }}
     connect_timeout_ms: 250
@@ -318,9 +309,9 @@ cluster_manager:
     {% set host = server.split(':')[0] -%}
     {% set port = server.split(':')[1] -%}    
     - url: tcp://{{ host }}:{{ port }}
-    {% if not loop.last %}{% endif %}
+    {% if not loop.last -%}{% endif -%}
     {% endfor -%}    
-    {% endfor -%}    
+    {% endfor %}    
   - name: local_service
     connect_timeout_ms: 250
     type: static
@@ -364,6 +355,3 @@ cluster_manager:
     lb_type: round_robin
     hosts:
     - url: tcp://collector-grpc.lightstep.com:443
-
-
-

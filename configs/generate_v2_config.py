@@ -55,11 +55,11 @@ def generate_v2_config(template_path, template, output_file, **context):
 
 # generate_v2_config(SCRIPT_DIR, 'envoy_front_proxy.template.yaml',
                        # './envoy_front_proxy.yaml', clusters=front_envoy_clusters)
-generate_v2_config(SCRIPT_DIR, 'envoy_double_proxy.template.yaml',
-                        './envoy_double_proxy.yaml')
+# generate_v2_config(SCRIPT_DIR, 'envoy_double_proxy.template.yaml',
+                        # './envoy_double_proxy.yaml')
 
-# generate_v2_config("./", 'envoy_service_to_service.template.yaml',
-                    # 'envoy_service_to_service.yaml',
-                # internal_virtual_hosts=service_to_service_envoy_clusters,
-                # external_virtual_hosts=external_virtual_hosts,
-                # mongos_servers=mongos_servers)
+generate_v2_config("./", 'envoy_service_to_service.template.yaml',
+                    'envoy_service_to_service.yaml',
+                internal_virtual_hosts=service_to_service_envoy_clusters,
+                external_virtual_hosts=external_virtual_hosts,
+                mongos_servers=mongos_servers)
