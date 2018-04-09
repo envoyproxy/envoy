@@ -139,7 +139,6 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
 
   if (end_stream) {
     compressor_.flush(compressed_data_);
-    compressor_.finish(compressed_data_);
   }
 
   if (compressed_data_.length()) {
