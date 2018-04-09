@@ -9,20 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "buffer_filter_test",
-    srcs = ["buffer_filter_test.cc"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:buffer_filter_lib",
-        "//source/common/stats:stats_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "cors_filter_test",
     srcs = ["cors_filter_test.cc"],
     deps = [

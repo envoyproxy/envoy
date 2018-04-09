@@ -9,20 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "buffer_lib",
-    srcs = ["buffer.cc"],
-    hdrs = ["buffer.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/http/filter:buffer_filter_lib",
-        "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "cors_lib",
     srcs = ["cors.cc"],
     hdrs = ["cors.h"],

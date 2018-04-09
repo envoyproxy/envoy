@@ -135,6 +135,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/http:http_mocks",
@@ -152,6 +153,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
@@ -196,6 +198,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
     ],
 )
@@ -288,7 +291,6 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/http:buffer_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:grpc_http1_bridge_lib",
@@ -339,17 +341,6 @@ envoy_cc_test(
         "//source/extensions/filters/network/echo:config",
         "//test/server:utility_lib",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "buffer_filter_integration_test",
-    srcs = [
-        "buffer_filter_integration_test.cc",
-    ],
-    deps = [
-        ":http_protocol_integration_lib",
-        "//test/config:utility_lib",
     ],
 )
 

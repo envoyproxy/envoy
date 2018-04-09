@@ -11,6 +11,7 @@ EXTENSIONS = {
     # HTTP filters
     #
 
+    "envoy.filters.http.buffer":                "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.dynamo":                "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":             "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.health_check":          "//source/extensions/filters/http/health_check:config",
