@@ -38,28 +38,34 @@ void Writer::write(const std::string& message) {
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
-                             Network::Address::InstanceConstSharedPtr address, const bool use_tag)
+                             Network::Address::InstanceConstSharedPtr address, const bool use_tag,
+                             const std::string _prefix)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
+  if (_prefix.size() == 0) {
+    prefix = Statsd::DEFAULT_PREFIX;
+  } else {
+    prefix = _prefix;
+  }
 }
 
 void UdpStatsdSink::flushCounter(const Stats::Counter& counter, uint64_t delta) {
   const std::string message(
-      fmt::format("envoy.{}:{}|c{}", getName(counter), delta, buildTagStr(counter.tags())));
+      fmt::format("{}.{}:{}|c{}", prefix, getName(counter), delta, buildTagStr(counter.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
-  const std::string message(
-      fmt::format("envoy.{}:{}|g{}", getName(gauge), value, buildTagStr(gauge.tags())));
+  const std::string message(fmt::format("{}.{}:{}|g{}", prefix, getName(gauge), value,
+                                        buildTagStr(gauge.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
-  const std::string message(fmt::format("envoy.{}:{}|ms{}", getName(histogram),
+  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix, getName(histogram),
                                         std::chrono::milliseconds(value).count(),
                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
@@ -86,11 +92,10 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   return "|#" + StringUtil::join(tag_strings, ",");
 }
 
-char TcpStatsdSink::STAT_PREFIX[] = "envoy.";
-
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
-                             Upstream::ClusterManager& cluster_manager, Stats::Scope& scope)
+                             Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+                             const std::string _prefix)
     : tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
@@ -100,6 +105,11 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
+  if (_prefix.size() == 0) {
+    prefix = Statsd::DEFAULT_PREFIX;
+  } else {
+    prefix = _prefix;
+  }
 }
 
 TcpStatsdSink::TlsSink::TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher)
@@ -135,8 +145,10 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // This written this way for maximum perf since with a large number of stats and at a high flush
   // rate this can become expensive.
   const char* snapped_current = current_slice_mem_;
-  memcpy(current_slice_mem_, STAT_PREFIX, sizeof(STAT_PREFIX) - 1);
-  current_slice_mem_ += sizeof(STAT_PREFIX) - 1;
+  memcpy(current_slice_mem_, parent_.getPrefix().c_str(), parent_.getPrefix().size());
+  current_slice_mem_ += parent_.getPrefix().size();
+  *current_slice_mem_ = '.';
+  current_slice_mem_ += 1;
   memcpy(current_slice_mem_, name.c_str(), name.size());
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
@@ -178,7 +190,8 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
   // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
   // also currently not possible that this interleaves with any counter/gauge flushing.
   ASSERT(current_slice_mem_ == nullptr);
-  Buffer::OwnedImpl buffer(fmt::format("envoy.{}:{}|ms\n", name, ms.count()));
+  Buffer::OwnedImpl buffer(
+      fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
   write(buffer);
 }
 
