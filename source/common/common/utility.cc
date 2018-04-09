@@ -257,7 +257,7 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   };
   static thread_local CachedTime cached_time;
 
-  std::chrono::milliseconds epoch_time_ms =
+  const std::chrono::milliseconds epoch_time_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
 
   // The following string concatenation is equivalent to
@@ -271,13 +271,13 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   msec %= 10;
   millis[3] = ('0' + msec);
 
-  std::chrono::seconds epoch_time_seconds =
+  const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.initialized_ && cached_time.epoch_time_seconds == epoch_time_seconds) {
     return cached_time.formatted_time + millis;
   }
-  auto formatted_time = default_date_format.fromTime(epoch_time_seconds.count());
+  const auto formatted_time = default_date_format.fromTime(epoch_time_seconds.count());
   cached_time.epoch_time_seconds = epoch_time_seconds;
   cached_time.formatted_time = formatted_time;
   cached_time.initialized_ = true;
