@@ -67,7 +67,7 @@ TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), defaultPrefix);
+  EXPECT_EQ(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), defaultPrefix);
 }
 
 TEST(StatsConfigTest, UdpSinkCustomPrefix) {
@@ -93,7 +93,7 @@ TEST(StatsConfigTest, UdpSinkCustomPrefix) {
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), customPrefix);
+  EXPECT_EQ(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), customPrefix);
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
