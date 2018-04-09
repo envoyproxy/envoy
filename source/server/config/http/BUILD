@@ -66,10 +66,11 @@ envoy_cc_library(
     srcs = ["grpc_json_transcoder.cc"],
     hdrs = ["grpc_json_transcoder.h"],
     deps = [
-        "//include/envoy/server:instance_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
         "//source/common/config:well_known_names",
         "//source/common/grpc:json_transcoder_filter_lib",
-        "//source/server/config/network:http_connection_manager_lib",
     ],
 )
 

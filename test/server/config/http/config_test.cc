@@ -16,7 +16,6 @@
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
-#include "server/config/network/http_connection_manager.h"
 #include "server/http/health_check.h"
 
 #include "extensions/filters/http/lua/config.h"

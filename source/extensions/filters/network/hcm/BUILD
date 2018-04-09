@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "http_connection_manager_lib",
-    srcs = ["http_connection_manager.cc"],
-    hdrs = ["http_connection_manager.h"],
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:conn_manager_lib",
+        "//source/common/http:default_server_string_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
