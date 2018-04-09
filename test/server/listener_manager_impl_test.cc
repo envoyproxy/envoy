@@ -1512,6 +1512,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
   }
 }
 
+// Set the resolver to the default IP resolver. The address resolver logic is unit tested in
+// resolver_impl_test.cc.
+TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: AddressResolverdListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111, resolver_name: envoy.ip }
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
