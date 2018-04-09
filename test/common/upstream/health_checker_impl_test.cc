@@ -41,13 +41,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
-  return health_check;
-}
-
 envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
   envoy::api::v2::core::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
@@ -152,7 +145,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -173,7 +166,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -229,7 +222,7 @@ public:
           append: false
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -1085,7 +1078,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 
@@ -1102,7 +1095,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 
@@ -1124,7 +1117,7 @@ public:
       }
       )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 

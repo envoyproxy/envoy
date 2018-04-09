@@ -92,6 +92,30 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedConfig) {
                     .get()));
 }
 
+TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
+  const std::string json = R"EOF(
+    {
+      "type": "redis",
+      "timeout_ms": 1000,
+      "interval_ms": 1000,
+      "unhealthy_threshold": 1,
+      "healthy_threshold": 1
+    }
+    )EOF";
+
+  NiceMock<Upstream::MockCluster> cluster;
+  Runtime::MockLoader runtime;
+  Runtime::MockRandomGenerator random;
+  Event::MockDispatcher dispatcher;
+  EXPECT_NE(nullptr,
+            dynamic_cast<CustomRedisHealthChecker*>(
+                // Always use Upstream's HealthCheckerFactory when creating instance using
+                // deprecated config.
+                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV1Json(json),
+                                                       cluster, runtime, random, dispatcher)
+                    .get()));
+}
+
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions
