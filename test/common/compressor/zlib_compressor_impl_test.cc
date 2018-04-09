@@ -37,6 +37,13 @@ protected:
   static const uint64_t default_input_size{796};
 };
 
+struct ZlibCompressorImplTestHelper : public ZlibCompressorImpl {
+  void unitializedFinish() {
+    Buffer::OwnedImpl output_buffer;
+    ZlibCompressorImpl::finish(output_buffer);
+  }
+};
+
 class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
 protected:
   static void compressorBadInitTestHelper(int64_t window_bits, int64_t mem_level) {
@@ -52,6 +59,22 @@ protected:
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     compressor.compress(input_buffer, output_buffer);
   }
+
+  static void resetUnitializedCompressorTestHelper() {
+    ZlibCompressorImpl compressor;
+    compressor.reset();
+  }
+
+  static void flushUnitializedCompressorTestHelper() {
+    ZlibCompressorImpl compressor;
+    Buffer::OwnedImpl output_buffer;
+    compressor.flush(output_buffer);
+  }
+
+  static void finishUnitializedCompressorTestHelper() {
+    ZlibCompressorImplTestHelper compressor;
+    compressor.unitializedFinish();
+  }
 };
 
 /**
@@ -62,6 +85,13 @@ TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
+
+  EXPECT_DEATH(resetUnitializedCompressorTestHelper(),
+               std::string{"assert failure: result == Z_OK"});
+  EXPECT_DEATH(flushUnitializedCompressorTestHelper(),
+               std::string{"assert failure: result == Z_OK"});
+  EXPECT_DEATH(finishUnitializedCompressorTestHelper(),
+               std::string{"assert failure: result == Z_STREAM_END"});
 }
 
 /**
