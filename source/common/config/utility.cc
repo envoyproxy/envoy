@@ -94,7 +94,7 @@ void Utility::checkApiConfigSourceNames(
     }
   } else {
     if (api_config_source.grpc_services().size() != 0) {
-      ENVOY_LOG_MISC(warn, "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
+      throw EnvoyException("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
                            "a gRPC service specified");
     }
     if (api_config_source.cluster_names().size() != 1) {

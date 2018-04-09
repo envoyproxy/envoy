@@ -276,7 +276,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+        "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
+        "specified");
   }
 
   {
