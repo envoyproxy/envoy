@@ -244,9 +244,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  // HTTP request properities.
+  // HTTP request properties.
   // TODO(mattklein123): Populate port field.
-  // TODO(mattklein123): Populate custom request headers.
   auto* request_properties = log_entry->mutable_request();
   if (request_headers->Scheme() != nullptr) {
     request_properties->set_scheme(request_headers->Scheme()->value().c_str());
@@ -281,15 +280,36 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         std::string(request_headers->Method()->value().c_str()), &method);
     request_properties->set_request_method(method);
   }
+  if (config_.additional_request_headers_to_log_size() > 0) {
+    auto* logged_headers = request_properties->mutable_request_headers();
+
+    for (const auto& additional_header : config_.additional_request_headers_to_log()) {
+      const Http::HeaderEntry* entry =
+          request_headers->get(Http::LowerCaseString(additional_header));
+      if (entry != nullptr && !entry->value().empty()) {
+        logged_headers->insert({additional_header, ProtobufTypes::String(entry->value().c_str())});
+      }
+    }
+  }
 
   // HTTP response properties.
-  // TODO(mattklein123): Populate custom response headers.
   auto* response_properties = log_entry->mutable_response();
   if (request_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(request_info.responseCode().value());
   }
   response_properties->set_response_headers_bytes(response_headers->byteSize());
   response_properties->set_response_body_bytes(request_info.bytesSent());
+  if (config_.additional_response_headers_to_log_size() > 0) {
+    auto* logged_headers = response_properties->mutable_response_headers();
+
+    for (const auto& additional_header : config_.additional_response_headers_to_log()) {
+      const Http::HeaderEntry* entry =
+          response_headers->get(Http::LowerCaseString(additional_header));
+      if (entry != nullptr && !entry->value().empty()) {
+        logged_headers->insert({additional_header, ProtobufTypes::String(entry->value().c_str())});
+      }
+    }
+  }
 
   // TODO(mattklein123): Consider batching multiple logs and flushing.
   grpc_access_log_streamer_->send(message, config_.common_config().log_name());
