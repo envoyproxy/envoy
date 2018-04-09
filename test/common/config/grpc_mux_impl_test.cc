@@ -324,15 +324,23 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   // API calls go over the limit for the first time.
   EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
 
-  // Logging limmiter waits for 5s, so a second warning message is expected.
+  // Logging limiter waits for 5s, so a second warning message is expected.
   EXPECT_CALL(time_source_, currentTime())
       .Times(4)
       .WillOnce(Return(std::chrono::steady_clock::time_point{}))
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))
-      .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
+      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(6)}))
+      .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(7)}));
 
   // API calls go over the limit for the second time.
   EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
+
+  const ExpectedLogSequence no_rate_limit_log = {
+      {"debug", "Received gRPC message for foo at version baz"},
+      {"trace", "Sending DiscoveryRequest for foo: version_info"}};
+
+  // Without waiting full 5s, no rate limit logs is expected.
+  EXPECT_LOG_SEQ(no_discovery_request_log, onReceiveMessage(1));
 }
 
 } // namespace

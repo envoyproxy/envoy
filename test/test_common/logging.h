@@ -14,7 +14,7 @@ namespace Envoy {
 
 /**
  * Provides a mechanism to temporarily set the logging level on
- * construction, restoring its previous state on deconstruction.
+ * construction, restoring its previous state on destruction.
  *
  * The log_level is the minimum log severity required to print messages.
  * Messages below this loglevel will be suppressed.
@@ -72,18 +72,17 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLogSequence;
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     ASSERT_EQ(expected_log_sequence.size(), log_recorder.messages().size());                       \
-    auto expected_it = expected_log_sequence.begin();                                              \
-    auto actual_it = log_recorder.messages().begin();                                              \
-    for (;                                                                                         \
-         expected_it != expected_log_sequence.end() && actual_it != log_recorder.messages().end(); \
-         expected_it++, actual_it++) {                                                             \
+    const auto actual_logs = log_recorder.messages();                                              \
+    for (uint64_t i = 0; i < expected_log_sequence.size(); i++) {                                  \
       /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */     \
-      std::vector<absl::string_view> pieces = absl::StrSplit(*actual_it, "][");                    \
-      const auto expected_log_level = expected_it->first;                                          \
-      const auto actual_log_level = std::string(pieces[2]);                                        \
-      const auto actual_log_message = absl::string_view(pieces[3]).find(expected_it->second);      \
-      EXPECT_EQ(expected_log_level, actual_log_level);                                             \
-      EXPECT_NE(actual_log_message, absl::string_view::npos);                                      \
+      std::vector<absl::string_view> pieces = absl::StrSplit(actual_logs[i], "][");                \
+      ASSERT_LE(3, pieces.size());                                                                 \
+      EXPECT_EQ(expected_log_sequence[i].first, std::string(pieces[2]));                           \
+      const auto message = absl::string_view(actual_logs[i]);                                      \
+      /* TODO(gsagula): improve error message with string diff. */                                 \
+      EXPECT_TRUE(message.find(expected_log_sequence[i].second) != absl::string_view::npos)        \
+          << "\n Actual Log:         " << actual_logs[i]                                           \
+          << "\n Expected Substring: " << expected_log_sequence[i].second;                         \
     }                                                                                              \
   } while (false)
 
@@ -92,15 +91,8 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLogSequence;
   do {                                                                                             \
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
-    stmt;                                                                                          \
-    ASSERT_EQ(1, log_recorder.messages().size());                                                  \
-    std::string recorded_log = log_recorder.messages()[0];                                         \
-    std::vector<absl::string_view> pieces = absl::StrSplit(recorded_log, "][");                    \
-    /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */       \
-    ASSERT_LE(3, pieces.size());                                                                   \
-    EXPECT_EQ(loglevel, std::string(pieces[2])); /* error message is legible if cast to string */  \
-    EXPECT_TRUE(absl::string_view(recorded_log).find(substr) != absl::string_view::npos)           \
-        << "\n Actual Log:         " << recorded_log << "\n Expected Substring: " << substr;       \
+    const ExpectedLogSequence expected_log = {{loglevel, substr}};                                 \
+    EXPECT_LOG_SEQ(expected_log, stmt);                                                            \
   } while (false)
 
 // Validates that when stmt is executed, no logs will be emitted.
