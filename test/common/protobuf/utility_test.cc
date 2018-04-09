@@ -72,6 +72,13 @@ TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
 
+TEST(UtilityTest, KeyValueStruct) {
+  const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
+  EXPECT_EQ(obj.fields_size(), 1);
+  EXPECT_EQ(obj.fields().at("test_key").kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
+  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
+}
+
 TEST(UtilityTest, ValueUtilEqual_NullValues) {
   ProtobufWkt::Value v1, v2;
   v1.set_null_value(ProtobufWkt::NULL_VALUE);
