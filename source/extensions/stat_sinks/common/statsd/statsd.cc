@@ -58,8 +58,8 @@ void UdpStatsdSink::flushCounter(const Stats::Counter& counter, uint64_t delta) 
 }
 
 void UdpStatsdSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
-  const std::string message(fmt::format("{}.{}:{}|g{}", prefix, getName(gauge), value,
-                                        buildTagStr(gauge.tags())));
+  const std::string message(
+      fmt::format("{}.{}:{}|g{}", prefix, getName(gauge), value, buildTagStr(gauge.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
