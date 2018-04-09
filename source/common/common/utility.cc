@@ -263,15 +263,13 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
   // The following string concatenation is equivalent to
   //   std::string millis = fmt::format(".{:03d}Z", epoch_time_ms.count() % 1000)
   // but the fmt::format call proved to be too expensive in benchmark testing.
-  std::string millis;
-  millis += '.';
-  unsigned msec = epoch_time_ms.count() % 1000;
-  millis += ('0' + (msec / 100));
+  std::string millis(".000Z");
+  uint32_t msec = epoch_time_ms.count() % 1000;
+  millis[1] = ('0' + (msec / 100));
   msec %= 100;
-  millis += ('0' + (msec / 10));
+  millis[2] = ('0' + (msec / 10));
   msec %= 10;
-  millis += ('0' + msec);
-  millis += 'Z';
+  millis[3] = ('0' + msec);
 
   std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
