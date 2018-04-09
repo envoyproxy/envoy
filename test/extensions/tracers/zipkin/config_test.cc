@@ -24,15 +24,15 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   }
   )EOF";
   Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
-  ZipkinHttpTracerFactory factory;
+  ZipkinTracerFactory factory;
   Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*valid_json, server);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
 TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE((Registry::RegisterFactory<ZipkinHttpTracerFactory,
-                                                       Server::Configuration::HttpTracerFactory>()),
-                            EnvoyException, "Double registration for name: 'envoy.zipkin'");
+  EXPECT_THROW_WITH_MESSAGE(
+      (Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>()),
+      EnvoyException, "Double registration for name: 'envoy.zipkin'");
 }
 
 } // namespace Zipkin

@@ -1,5 +1,3 @@
-#include <string>
-
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -7,11 +5,9 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
-#include "server/config/network/http_connection_manager.h"
-
-#include "extensions/filters/http/dynamo/dynamo_filter.h"
 #include "extensions/filters/network/client_ssl_auth/config.h"
 #include "extensions/filters/network/ext_authz/config.h"
+#include "extensions/filters/network/hcm/config.h"
 #include "extensions/filters/network/mongo_proxy/config.h"
 #include "extensions/filters/network/ratelimit/config.h"
 #include "extensions/filters/network/redis_proxy/config.h"
@@ -39,7 +35,8 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
 
   Extensions::NetworkFilters::ClientSslAuth::ClientSslAuthConfigFactory client_ssl_auth_factory;
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth client_ssl_auth_proto;
-  HttpConnectionManagerFilterConfigFactory hcm_factory;
+  Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFilterConfigFactory
+      hcm_factory;
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_proto;
   Extensions::NetworkFilters::MongoProxy::MongoProxyFilterConfigFactory mongo_factory;
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy mongo_proto;
@@ -66,172 +63,6 @@ TEST(NetworkFilterConfigTest, ValidateFail) {
     EXPECT_THROW(filter_case.first.createFilterFactoryFromProto(filter_case.second, context),
                  ProtoValidationException);
   }
-}
-
-TEST(NetworkFilterConfigTest, BadHttpConnectionMangerConfig) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filter" : [{}]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
-}
-
-TEST(NetworkFilterConfigTest, BadAccessLogConfig) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path" : "mypath",
-        "filter" : []
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
-}
-
-TEST(NetworkFilterConfigTest, BadAccessLogType) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path" : "mypath",
-        "filter" : {
-          "type" : "bad_type"
-        }
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
-}
-
-TEST(NetworkFilterConfigTest, BadAccessLogNestedTypes) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path": "/dev/null",
-        "filter": {
-          "type": "logical_and",
-          "filters": [
-            {
-              "type": "logical_or",
-              "filters": [
-                {"type": "duration", "op": ">=", "value": 10000},
-                {"type": "bad_type"}
-              ]
-            },
-            {"type": "not_healthcheck"}
-          ]
-        }
-      }
-    ]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  NiceMock<MockFactoryContext> context;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context), Json::Exception);
 }
 
 TEST(NetworkFilterConfigTest, DoubleRegistrationTest) {
