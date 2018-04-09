@@ -261,21 +261,22 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
+    // this also logs a warning for setting REST cluster names for a gRPC API config.
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified");
+        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
   }
 
   {
     envoy::api::v2::core::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
+    // this also logs a warning for configuring gRPC clusters for a REST API config.
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
-        "specified");
+        "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
   }
 
   {
