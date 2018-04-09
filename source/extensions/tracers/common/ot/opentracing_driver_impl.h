@@ -63,7 +63,7 @@ public:
   enum class PropagationMode { SingleHeader, TracerNative };
 
   /**
-   * Controls how span context is propagated in HTTP hedaers. PropagationMode::SingleHeader will
+   * Controls how span context is propagated in HTTP headers. PropagationMode::SingleHeader will
    * propagate span context as a single header within the inline header HeaderMap::OtSpanContext;
    * otherwise, span context will be propagated using the native format of the tracing library.
    */
