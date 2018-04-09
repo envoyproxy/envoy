@@ -274,6 +274,13 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   request_properties->set_request_headers_bytes(request_headers->byteSize());
   request_properties->set_request_body_bytes(request_info.bytesReceived());
+  if (request_headers->Method() != nullptr) {
+    envoy::api::v2::core::RequestMethod method =
+        envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED;
+    envoy::api::v2::core::RequestMethod_Parse(
+        std::string(request_headers->Method()->value().c_str()), &method);
+    request_properties->set_request_method(method);
+  }
 
   // HTTP response properties.
   // TODO(mattklein123): Populate custom response headers.
