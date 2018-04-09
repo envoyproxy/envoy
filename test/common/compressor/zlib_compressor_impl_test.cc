@@ -38,7 +38,7 @@ protected:
 };
 
 struct ZlibCompressorImplTestHelper : public ZlibCompressorImpl {
-  void unitializedFinish() {
+  void uninitializedFinish() {
     Buffer::OwnedImpl output_buffer;
     ZlibCompressorImpl::finish(output_buffer);
   }
@@ -52,7 +52,7 @@ protected:
                     ZlibCompressorImpl::CompressionStrategy::Standard, window_bits, mem_level);
   }
 
-  static void unitializedCompressorTestHelper() {
+  static void uninitializedCompressorTestHelper() {
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl output_buffer;
     ZlibCompressorImpl compressor;
@@ -60,20 +60,20 @@ protected:
     compressor.compress(input_buffer, output_buffer);
   }
 
-  static void resetUnitializedCompressorTestHelper() {
+  static void resetUninitializedCompressorTestHelper() {
     ZlibCompressorImpl compressor;
     compressor.reset();
   }
 
-  static void flushUnitializedCompressorTestHelper() {
+  static void flushUninitializedCompressorTestHelper() {
     ZlibCompressorImpl compressor;
     Buffer::OwnedImpl output_buffer;
     compressor.flush(output_buffer);
   }
 
-  static void finishUnitializedCompressorTestHelper() {
+  static void finishUninitializedCompressorTestHelper() {
     ZlibCompressorImplTestHelper compressor;
-    compressor.unitializedFinish();
+    compressor.uninitializedFinish();
   }
 };
 
@@ -84,13 +84,13 @@ protected:
 TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH(compressorBadInitTestHelper(100, 8), std::string{"assert failure: result >= 0"});
   EXPECT_DEATH(compressorBadInitTestHelper(31, 10), std::string{"assert failure: result >= 0"});
-  EXPECT_DEATH(unitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
+  EXPECT_DEATH(uninitializedCompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
 
-  EXPECT_DEATH(resetUnitializedCompressorTestHelper(),
+  EXPECT_DEATH(resetUninitializedCompressorTestHelper(),
                std::string{"assert failure: result == Z_OK"});
-  EXPECT_DEATH(flushUnitializedCompressorTestHelper(),
+  EXPECT_DEATH(flushUninitializedCompressorTestHelper(),
                std::string{"assert failure: result == Z_OK"});
-  EXPECT_DEATH(finishUnitializedCompressorTestHelper(),
+  EXPECT_DEATH(finishUninitializedCompressorTestHelper(),
                std::string{"assert failure: result == Z_STREAM_END"});
 }
 
