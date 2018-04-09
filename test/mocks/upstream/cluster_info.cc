@@ -52,6 +52,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
+  ON_CALL(*this, tcpKeepaliveSettings()).WillByDefault(ReturnRef(tcp_keepalive_config_));
 }
 
 MockClusterInfo::~MockClusterInfo() {}

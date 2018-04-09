@@ -188,6 +188,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tcp_keepalive_option_lib",
+    srcs = ["tcp_keepalive_option_impl.cc"],
+    hdrs = ["tcp_keepalive_option_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

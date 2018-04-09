@@ -341,6 +341,10 @@ public:
   // Server::Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
 
+  const envoy::api::v2::core::TcpKeepalive& tcpKeepaliveSettings() const override {
+    return tcp_keepalive_config_;
+  }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -378,6 +382,7 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
+  const envoy::api::v2::core::TcpKeepalive tcp_keepalive_config_;
 };
 
 /**

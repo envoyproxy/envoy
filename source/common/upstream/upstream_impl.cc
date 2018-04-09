@@ -25,6 +25,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/tcp_keepalive_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -67,6 +68,13 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
       config.upstream_bind_config().freebind().value()) {
     features |= ClusterInfoImpl::Features::FREEBIND;
   }
+  if ((bind_config.has_tcp_keepalive() && (!bind_config.tcp_keepalive().has_disable() ||
+                                           !bind_config.tcp_keepalive().disable().value())) ||
+      (config.upstream_bind_config().has_tcp_keepalive() &&
+       (!config.upstream_bind_config().tcp_keepalive().has_disable() ||
+        !config.upstream_bind_config().tcp_keepalive().disable().value()))) {
+    features |= ClusterInfoImpl::Features::TCP_KEEPALIVE;
+  }
   return features;
 }
 
@@ -101,6 +109,21 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     cluster_options->emplace_back(new UpstreamSocketOption(cluster));
   } else {
     cluster_options = options;
+  }
+  if (cluster.features() & ClusterInfo::Features::TCP_KEEPALIVE) {
+    if (!cluster_options) {
+      cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
+      if (options) {
+        *cluster_options = *options;
+      }
+    }
+    cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_probes,
+                                        absl::optional<int>()),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_time,
+                                        absl::optional<int>()),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_interval,
+                                        absl::optional<int>())));
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
@@ -239,7 +262,10 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
-      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()) {
+      metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
+      tcp_keepalive_config_(bind_config.has_tcp_keepalive()
+                                ? bind_config.tcp_keepalive()
+                                : config.upstream_bind_config().tcp_keepalive()) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if

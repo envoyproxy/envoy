@@ -20,6 +20,7 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "absl/types/optional.h"
+#include "external/envoy_api/envoy/api/v2/core/address.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -390,6 +391,8 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Use IP_FREEBIND socket option when binding.
     static const uint64_t FREEBIND = 0x4;
+    // Enable TCP keepalives on the socket
+    static const uint64_t TCP_KEEPALIVE = 0x8;
   };
 
   virtual ~ClusterInfo() {}
@@ -512,6 +515,12 @@ public:
    * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::api::v2::core::TcpKeepalive>& the tcp keepalive settings
+   * for this cluster
+   */
+  virtual const envoy::api::v2::core::TcpKeepalive& tcpKeepaliveSettings() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
