@@ -126,66 +126,6 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
   server_.thread_local_.shutdownThread();
 }
 
-TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenLSTracing) {
-  std::string json = R"EOF(
-  {
-    "listeners" : [
-      {
-        "address": "tcp://127.0.0.1:1234",
-        "filters": []
-      }
-    ],
-    "cluster_manager": {
-      "clusters": []
-    },
-    "tracing": {
-      "http": {
-        "driver": {
-          "type": "lightstep",
-          "config": {
-            "collector_cluster": "cluster_0",
-            "access_token_file": "/etc/envoy/envoy.cfg"
-          }
-        }
-      }
-    },
-    "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
-  }
-  )EOF";
-
-  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
-
-  server_.local_info_.node_.set_cluster("");
-  MainImpl config;
-  EXPECT_THROW(config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException);
-}
-
-TEST_F(ConfigurationImplTest, ServiceClusterNotSetWhenOtDynamicTracing) {
-  std::string yaml = fmt::sprintf(R"EOF(
-  admin:
-    access_log_path: /dev/null
-    address:
-      socket_address: { address: 1.2.3.4, port_value: 5678 }
-
-  tracing:
-    http:
-      name: envoy.dynamic.ot
-      config:
-        library: %s/external/io_opentracing_cpp/mocktracer/libmocktracer_plugin.so
-        config: {
-          "output_file" : "fake_file"
-        }
-  )EOF",
-                                  TestEnvironment::runfilesDirectory());
-
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromYaml(yaml, bootstrap);
-
-  server_.local_info_.node_.set_cluster("");
-  MainImpl config;
-  config.initialize(bootstrap, server_, cluster_manager_factory_);
-}
-
 TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
   std::string json = R"EOF(
   {

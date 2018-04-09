@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
@@ -244,6 +245,19 @@ public:
    * will be nullptr if no route was selected.
    */
   virtual const Router::RouteEntry* routeEntry() const PURE;
+
+  /**
+   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
+   */
+  virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
+
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter
+   * @param value the struct to set on the namespace. A merge will be performed with new values for
+   * the same key overriding existing.
+   */
+  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 };
 
 } // namespace RequestInfo

@@ -26,7 +26,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2alpha::CheckResponse>
     ExtAuthzAsyncCallbacks;
 
 struct ConstantValues {
@@ -47,12 +47,13 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
+  void check(RequestCallbacks& callbacks,
+             const envoy::service::auth::v2alpha::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -86,7 +87,7 @@ public:
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                               const Envoy::Http::HeaderMap& headers,
-                              envoy::service::auth::v2::CheckRequest& request);
+                              envoy::service::auth::v2alpha::CheckRequest& request);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -96,16 +97,16 @@ public:
    *
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                             envoy::service::auth::v2::CheckRequest& request);
+                             envoy::service::auth::v2alpha::CheckRequest& request);
 
 private:
-  static void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+  static void setAttrContextPeer(envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
                                  const Network::Connection& connection, const std::string& service,
                                  const bool local);
-  static void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
+  static void setHttpRequest(::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
                              const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                              const Envoy::Http::HeaderMap& headers);
-  static void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
+  static void setAttrContextRequest(::envoy::service::auth::v2alpha::AttributeContext_Request& req,
                                     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                                     const Envoy::Http::HeaderMap& headers);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);

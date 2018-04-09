@@ -173,6 +173,12 @@ public:
     return duration(end_time_);
   }
 
+  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+
+  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+  };
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -194,6 +200,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
+  envoy::api::v2::core::Metadata metadata_{};
 };
 
 class AccessLogImplTest : public testing::Test {
@@ -657,30 +664,6 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
     log->log(&header_map, &response_headers_, request_info_);
   }
-}
-
-TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
-
-  envoy::config::filter::accesslog::v2::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
-  config.set_name(Config::AccessLogNames::get().FILE);
-
-  InstanceSharedPtr log = AccessLogFactory::fromProto(config, context_);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
 }
 
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {

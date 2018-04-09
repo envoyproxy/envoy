@@ -226,7 +226,6 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     deps = [
         "//source/common/protobuf",
-        "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
@@ -335,5 +334,8 @@ envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:const_singleton",
+    ],
 )
