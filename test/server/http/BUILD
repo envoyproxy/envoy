@@ -35,14 +35,3 @@ envoy_cc_test(
         "//test/mocks:common_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "health_check_test",
-    srcs = ["health_check_test.cc"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/server/http:health_check_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)

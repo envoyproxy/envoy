@@ -131,15 +131,12 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
-    data = [
-        "//test/config/integration:server_config_files",
-        "//test/config/integration:server_http2.json",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/health_check:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -152,10 +149,10 @@ envoy_cc_test(
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
-    data = ["//test/config/integration:server_http2_upstream.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
 )
@@ -196,14 +193,10 @@ envoy_cc_test(
         "integration_admin_test.cc",
         "integration_admin_test.h",
     ],
-    data = [
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
-        "//test/test_common:utility_lib",
-    ],
     deps = [
         ":http_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/extensions/filters/http/health_check:config",
     ],
 )
 
@@ -303,7 +296,6 @@ envoy_cc_test_library(
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
-        "//source/server/http:health_check_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -329,6 +321,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
 )

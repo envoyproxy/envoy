@@ -46,7 +46,6 @@ envoy_cc_library(
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
-        "//source/server/http:health_check_lib",
     ] + envoy_all_extensions(),
 )
 

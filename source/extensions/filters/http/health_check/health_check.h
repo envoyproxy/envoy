@@ -5,40 +5,14 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
-
 namespace Envoy {
-namespace Server {
-namespace Configuration {
-
-class HealthCheckFilterConfig : public NamedHttpFilterConfigFactory {
-public:
-  HttpFilterFactoryCb createFilterFactory(const Json::Object& json_config, const std::string&,
-                                          FactoryContext& context) override;
-  HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                   const std::string& stats_prefix,
-                                                   FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::config::filter::http::health_check::v2::HealthCheck()};
-  }
-
-  std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
-
-private:
-  HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
-               const std::string& stats_prefix, FactoryContext& context);
-};
-
-} // namespace Configuration
-} // namespace Server
+namespace Extensions {
+namespace HttpFilters {
+namespace HealthCheck {
 
 /**
  * Shared cache manager used by all instances of a health check filter configuration as well as
@@ -121,4 +95,7 @@ private:
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
 
+} // namespace HealthCheck
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
