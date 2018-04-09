@@ -5,9 +5,16 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 envoy_package()
 
+# The TCP proxy extension gets pulled in by the HTTP connection manager for websocket handling.
+# Thus, even if we don't want to explicitly allow configuration of the "tcp_proxy" filter, we
+# should always test this code which is why it's registered with envoy_cc_test().
 envoy_cc_test(
     name = "tcp_proxy_test",
     srcs = ["tcp_proxy_test.cc"],
@@ -31,9 +38,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.tcp_proxy",
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/server:server_mocks",

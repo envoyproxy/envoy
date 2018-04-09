@@ -1,12 +1,14 @@
 #pragma once
 
+#include <map>
 #include <string>
-#include <unordered_map>
 
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Registry {
@@ -31,6 +33,19 @@ template <typename T> class InjectFactory;
  */
 template <class Base> class FactoryRegistry {
 public:
+  /**
+   * Return all registered factories in a comma delimited list.
+   */
+  static std::string allFactoryNames() {
+    std::vector<std::string> ret;
+    ret.reserve(factories().size());
+    for (const auto& factory : factories()) {
+      ret.push_back(factory.first);
+    }
+
+    return absl::StrJoin(ret, ",");
+  }
+
   static void registerFactory(Base& factory) {
     auto result = factories().emplace(std::make_pair(factory.name(), &factory));
     if (!result.second) {
@@ -81,11 +96,10 @@ private:
   }
 
   /**
-   * Gets the current map of factory implementations.
+   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
    */
-  static std::unordered_map<std::string, Base*>& factories() {
-    static std::unordered_map<std::string, Base*>* factories =
-        new std::unordered_map<std::string, Base*>;
+  static std::map<std::string, Base*>& factories() {
+    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
     return *factories;
   }
 };

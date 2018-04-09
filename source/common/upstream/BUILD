@@ -238,6 +238,7 @@ envoy_cc_library(
     hdrs = ["maglev_lb.h"],
     deps = [
         ":thread_aware_lb_lib",
+        ":upstream_lib",
     ],
 )
 

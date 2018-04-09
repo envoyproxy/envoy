@@ -23,18 +23,18 @@ TEST(NetworkFilterConfigTest, ExtAuthzCorrectProto) {
   stat_prefix: name
 )EOF";
 
-  envoy::config::filter::network::ext_authz::v2::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
+  ExtAuthzConfigFactory factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  MessageUtil::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  ExtAuthzConfigFactory factory;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Server::Configuration::NetworkFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, context);
+      factory.createFilterFactoryFromProto(*proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

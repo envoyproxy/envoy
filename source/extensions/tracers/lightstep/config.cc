@@ -15,8 +15,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
 
-Tracing::HttpTracerPtr LightstepHttpTracerFactory::createHttpTracer(const Json::Object& json_config,
-                                                                    Server::Instance& server) {
+Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracer(const Json::Object& json_config,
+                                                                Server::Instance& server) {
 
   std::unique_ptr<lightstep::LightStepTracerOptions> opts(new lightstep::LightStepTracerOptions());
   const auto access_token_file =
@@ -31,13 +31,12 @@ Tracing::HttpTracerPtr LightstepHttpTracerFactory::createHttpTracer(const Json::
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver), server.localInfo());
 }
 
-std::string LightstepHttpTracerFactory::name() { return Config::TracerNames::get().LIGHTSTEP; }
+std::string LightstepTracerFactory::name() { return Config::TracerNames::get().LIGHTSTEP; }
 
 /**
- * Static registration for the lightstep http tracer. @see RegisterFactory.
+ * Static registration for the lightstep tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<LightstepHttpTracerFactory,
-                                 Server::Configuration::HttpTracerFactory>
+static Registry::RegisterFactory<LightstepTracerFactory, Server::Configuration::TracerFactory>
     register_;
 
 } // namespace Lightstep
