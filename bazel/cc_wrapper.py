@@ -64,6 +64,18 @@ def main():
         argv.append(arg)
   else:
     argv = sys.argv[1:]
+
+  # Add compiler-specific options
+  if "clang" in compiler:
+    argv.append("-fno-limit-debug-info")
+
+  if "gcc" in compiler:
+    # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
+    # to prevent build breakage. This option does not exist in clang, so setting
+    # it in clang builds causes a build error because of unknown command line
+    # flag.
+    argv.append("-Wno-maybe-uninitialized")
+
   os.execv(compiler, [compiler] + argv)
 
 

@@ -12,11 +12,6 @@ def envoy_copts(repository, test = False):
         "-Wnon-virtual-dtor",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
-
-        # -Wmaybe-initialized is warning about many uses of absl::optional. Disable
-        # to prevent build breakage.
-        "-Wno-maybe-uninitialized",
-
         "-std=c++14",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
