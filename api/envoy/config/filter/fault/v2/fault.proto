@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.config.filter.fault.v2;
+option go_package = "v2";
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Common fault injection types]
+
+// Delay specification is used to inject latency into the
+// HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
+message FaultDelay {
+  enum FaultDelayType {
+    // Fixed delay (step function).
+    FIXED = 0;
+  }
+
+  // Delay type to use (fixed|exponential|..). Currently, only fixed delay (step function) is
+  // supported.
+  FaultDelayType type = 1 [(validate.rules).enum.defined_only = true];
+
+  // An integer between 0-100 indicating the percentage of operations/connection requests
+  // on which the delay will be injected.
+  uint32 percent = 2 [(validate.rules).uint32.lte = 100];
+
+  oneof fault_delay_secifier {
+    option (validate.required) = true;
+    // Add a fixed delay before forwarding the operation upstream. See
+    // https://developers.google.com/protocol-buffers/docs/proto3#json for
+    // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
+    // delay will be injected before a new request/operation. For TCP
+    // connections, the proxying of the connection upstream will be delayed
+    // for the specified period. This is required if type is FIXED.
+    google.protobuf.Duration fixed_delay = 3
+        [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  }
+}
