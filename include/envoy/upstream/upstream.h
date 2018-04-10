@@ -20,7 +20,6 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "absl/types/optional.h"
-#include "external/envoy_api/envoy/api/v2/core/address.pb.h"
 
 namespace Envoy {
 namespace Upstream {
