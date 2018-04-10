@@ -68,18 +68,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "squash_filter_test",
-    srcs = ["squash_filter_test.cc"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:squash_filter_lib",
-        "//source/common/stats:stats_lib",
-        "//source/server/config/http:squash_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)

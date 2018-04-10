@@ -17,6 +17,7 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":          "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.lua":                   "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.ratelimit":             "//source/extensions/filters/http/ratelimit:config",
+    "envoy.filters.http.squash":                "//source/extensions/filters/http/squash:config",
 
     #
     # Listener filters

@@ -3,11 +3,10 @@
 
 #include "common/config/filter_json.h"
 #include "common/config/json_utility.h"
-#include "common/http/filter/squash_filter.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 
-#include "server/config/http/squash.h"
+#include "extensions/filters/http/squash/squash_filter.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -25,7 +24,9 @@ using testing::_;
 using Envoy::Protobuf::util::MessageDifferencer;
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Squash {
 
 namespace {
 SquashFilterConfig constructSquashFilterConfigFromJson(
@@ -444,5 +445,7 @@ TEST_F(SquashFilterTest, TimerExpiresInline) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
-} // namespace Http
+} // namespace Squash
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

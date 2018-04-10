@@ -1,9 +1,5 @@
 #pragma once
 
-#include <map>
-#include <regex>
-#include <string>
-
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
@@ -15,7 +11,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Squash {
 
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
@@ -55,21 +53,22 @@ private:
 
 typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
 
-class AsyncClientCallbackShim : public AsyncClient::Callbacks {
+class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
-  AsyncClientCallbackShim(std::function<void(MessagePtr&&)>&& on_success,
-                          std::function<void(AsyncClient::FailureReason)>&& on_fail)
+  AsyncClientCallbackShim(std::function<void(Http::MessagePtr&&)>&& on_success,
+                          std::function<void(Http::AsyncClient::FailureReason)>&& on_fail)
       : on_success_(on_success), on_fail_(on_fail) {}
   // Http::AsyncClient::Callbacks
-  void onSuccess(MessagePtr&& m) override { on_success_(std::forward<MessagePtr>(m)); }
-  void onFailure(AsyncClient::FailureReason f) override { on_fail_(f); }
+  void onSuccess(Http::MessagePtr&& m) override { on_success_(std::forward<Http::MessagePtr>(m)); }
+  void onFailure(Http::AsyncClient::FailureReason f) override { on_fail_(f); }
 
 private:
-  std::function<void(MessagePtr&&)> on_success_;
-  std::function<void(AsyncClient::FailureReason)> on_fail_;
+  std::function<void(Http::MessagePtr&&)> on_success_;
+  std::function<void(Http::AsyncClient::FailureReason)> on_fail_;
 };
 
-class SquashFilter : public StreamDecoderFilter, protected Logger::Loggable<Logger::Id::filter> {
+class SquashFilter : public Http::StreamDecoderFilter,
+                     protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
   ~SquashFilter();
@@ -78,18 +77,18 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool) override;
-  FilterDataStatus decodeData(Buffer::Instance&, bool) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap&) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   // AsyncClient callbacks for create attachment request
-  void onCreateAttachmentSuccess(MessagePtr&&);
-  void onCreateAttachmentFailure(AsyncClient::FailureReason);
+  void onCreateAttachmentSuccess(Http::MessagePtr&&);
+  void onCreateAttachmentFailure(Http::AsyncClient::FailureReason);
   // AsyncClient callbacks for get attachment request
-  void onGetAttachmentSuccess(MessagePtr&&);
-  void onGetAttachmentFailure(AsyncClient::FailureReason);
+  void onGetAttachmentSuccess(Http::MessagePtr&&);
+  void onGetAttachmentFailure(Http::AsyncClient::FailureReason);
 
   // Schedules a pollForAttachment
   void scheduleRetry();
@@ -99,7 +98,7 @@ private:
   void doneSquashing();
   void cleanup();
   // Creates a JSON from the message body.
-  Json::ObjectSharedPtr getJsonBody(MessagePtr&& m);
+  Json::ObjectSharedPtr getJsonBody(Http::MessagePtr&& m);
 
   const SquashFilterConfigSharedPtr config_;
 
@@ -115,7 +114,7 @@ private:
   // filter iteration
   Event::TimerPtr attachment_timeout_timer_;
   // The current inflight request to the squash server.
-  AsyncClient::Request* in_flight_request_;
+  Http::AsyncClient::Request* in_flight_request_;
   // Shims to get AsyncClient callbacks to specific methods, per API method.
   AsyncClientCallbackShim create_attachment_callback_;
   AsyncClientCallbackShim check_attachment_callback_;
@@ -123,7 +122,7 @@ private:
   // ClusterManager to send requests to squash server
   Upstream::ClusterManager& cm_;
   // Callbacks used to continue filter iteration.
-  StreamDecoderFilterCallbacks* decoder_callbacks_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
 
   // Create debug attachment URL path.
   const static std::string POST_ATTACHMENT_PATH;
@@ -135,5 +134,7 @@ private:
   const static std::string ERROR_STATE;
 };
 
-} // namespace Http
+} // namespace Squash
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

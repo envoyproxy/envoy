@@ -25,7 +25,6 @@ envoy_cc_test(
         "//source/server/config/http:grpc_web_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
-        "//source/server/config/http:squash_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
