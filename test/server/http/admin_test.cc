@@ -377,8 +377,7 @@ TEST(PrometheusStatsFormatter, MetricName) {
 }
 
 TEST(PrometheusStatsFormatter, FormattedTags) {
-  // if value has - then it should be replaced
-  // by -
+  // If value has - then it should be replaced by - .
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
   Stats::Tag tag2 = {"another_tag_name", "another.tag-value"};
