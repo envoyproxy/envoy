@@ -86,7 +86,7 @@ void Utility::checkApiConfigSourceNames(
   if (is_grpc) {
     if (api_config_source.cluster_names().size() != 0) {
       ENVOY_LOG_MISC(
-          warn, "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified");
+          warn, "Setting a cluster name for API config source type envoy::api::v2::core::ConfigSource::GRPC is deprecated");
     }
     if (api_config_source.grpc_services().size() != 1) {
       throw EnvoyException(
