@@ -7,7 +7,7 @@
 
 #include "extensions/filters/network/client_ssl_auth/config.h"
 #include "extensions/filters/network/ext_authz/config.h"
-#include "extensions/filters/network/hcm/config.h"
+#include "extensions/filters/network/http_connection_manager/config.h"
 #include "extensions/filters/network/mongo_proxy/config.h"
 #include "extensions/filters/network/ratelimit/config.h"
 #include "extensions/filters/network/redis_proxy/config.h"

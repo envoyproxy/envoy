@@ -213,7 +213,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":integration_lib",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
     ],
 )
@@ -349,7 +349,7 @@ envoy_cc_test(
     srcs = ["stats_integration_test.cc"],
     deps = [
         ":integration_lib",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
