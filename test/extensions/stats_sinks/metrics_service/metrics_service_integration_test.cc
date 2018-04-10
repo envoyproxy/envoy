@@ -82,8 +82,6 @@ public:
       }
       if (metrics_family.name() == "cluster.cluster_0.upstream_rq_time" &&
           metrics_family.type() == ::io::prometheus::client::MetricType::SUMMARY) {
-        std::cout << "histogram exists:" << metrics_family.metric(0).summary().quantile_size()
-                  << "\n";
         known_histogram_exists = true;
         Stats::HistogramStatisticsImpl empty_statistics;
         EXPECT_EQ(metrics_family.metric(0).summary().quantile_size(),
