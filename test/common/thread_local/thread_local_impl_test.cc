@@ -82,6 +82,31 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
+// Validate ThreadLocal::runOnAllThreadsWithBarrier's behavior.
+TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreadsWithBarrier) {
+
+  SlotPtr tlsptr = tls_.allocateSlot();
+
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  EXPECT_CALL(main_dispatcher_, post(_));
+
+  // Ensure that the thread local call back and all_thread_complete call back are called.
+  std::shared_ptr<std::atomic<bool>> all_threads_complete =
+      std::make_shared<std::atomic<bool>>(false);
+  std::shared_ptr<std::atomic<uint64_t>> thread_local_calls =
+      std::make_shared<std::atomic<uint64_t>>(0);
+
+  tlsptr->runOnAllThreadsWithBarrier(
+      [thread_local_calls]() -> void { ++*thread_local_calls; },
+      [all_threads_complete]() -> void { *all_threads_complete = true; });
+
+  EXPECT_TRUE(*all_threads_complete);
+  EXPECT_EQ(*thread_local_calls, 1);
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
