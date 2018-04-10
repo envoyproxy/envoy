@@ -391,7 +391,7 @@ public:
     // Use IP_FREEBIND socket option when binding.
     static const uint64_t FREEBIND = 0x4;
     // Enable TCP keepalives on the socket
-    static const uint64_t TCP_KEEPALIVE = 0x8;
+    static const uint64_t USE_TCP_KEEPALIVE = 0x8;
   };
 
   virtual ~ClusterInfo() {}

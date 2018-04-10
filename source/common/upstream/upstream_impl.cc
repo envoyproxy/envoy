@@ -73,7 +73,7 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
       (config.upstream_bind_config().has_tcp_keepalive() &&
        (!config.upstream_bind_config().tcp_keepalive().has_disable() ||
         !config.upstream_bind_config().tcp_keepalive().disable().value()))) {
-    features |= ClusterInfoImpl::Features::TCP_KEEPALIVE;
+    features |= ClusterInfoImpl::Features::USE_TCP_KEEPALIVE;
   }
   return features;
 }
@@ -110,7 +110,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     cluster_options = options;
   }
-  if (cluster.features() & ClusterInfo::Features::TCP_KEEPALIVE) {
+  if (cluster.features() & ClusterInfo::Features::USE_TCP_KEEPALIVE) {
     if (!cluster_options) {
       cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
       if (options) {
