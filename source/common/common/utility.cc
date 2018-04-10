@@ -248,40 +248,48 @@ std::string StringUtil::escape(const std::string& source) {
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static DateFormatter default_date_format("%Y-%m-%dT%H:%M:%S");
+  static const char DefaultDateFormat[] = "%Y-%m-%dT%H:%M:%S.000Z";
 
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
-    std::string formatted_time;
-    bool initialized_{false};
+    char formatted_time[1024];
+    size_t formatted_time_length{0};
   };
   static thread_local CachedTime cached_time;
 
   const std::chrono::milliseconds epoch_time_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
 
-  // The following string concatenation is equivalent to
-  //   std::string millis = fmt::format(".{:03d}Z", epoch_time_ms.count() % 1000)
-  // but the fmt::format call proved to be too expensive in benchmark testing.
-  std::string millis(".000Z");
-  uint32_t msec = epoch_time_ms.count() % 1000;
-  millis[1] = ('0' + (msec / 100));
-  msec %= 100;
-  millis[2] = ('0' + (msec / 10));
-  msec %= 10;
-  millis[3] = ('0' + msec);
-
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
-  if (cached_time.initialized_ && cached_time.epoch_time_seconds == epoch_time_seconds) {
-    return cached_time.formatted_time + millis;
+  if (cached_time.formatted_time_length == 0 ||
+      cached_time.epoch_time_seconds != epoch_time_seconds) {
+    time_t time = static_cast<time_t>(epoch_time_seconds.count());
+    tm date_time;
+    gmtime_r(&time, &date_time);
+    cached_time.formatted_time_length =
+        strftime(cached_time.formatted_time, sizeof(cached_time.formatted_time), DefaultDateFormat,
+                 &date_time);
+    cached_time.epoch_time_seconds = epoch_time_seconds;
   }
-  const auto formatted_time = default_date_format.fromTime(epoch_time_seconds.count());
-  cached_time.epoch_time_seconds = epoch_time_seconds;
-  cached_time.formatted_time = formatted_time;
-  cached_time.initialized_ = true;
-  return formatted_time + millis;
+
+  if (cached_time.formatted_time_length >= 4) {
+    // Overwrite the digits in the ".000Z" at the end of the string with the
+    // millisecond count from the input time.
+    size_t offset = cached_time.formatted_time_length - 4;
+    uint32_t msec = epoch_time_ms.count() % 1000;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 100));
+    msec %= 100;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 10));
+    msec %= 10;
+    cached_time.formatted_time[offset++] = ('0' + msec);
+  } else if (cached_time.formatted_time_length == 0) {
+    // This can happen if strftime fails. Truncate the string to ensure a sensible output.
+    cached_time.formatted_time[0] = '\0';
+  }
+
+  return cached_time.formatted_time;
 }
 
 bool StringUtil::endsWith(const std::string& source, const std::string& end) {
