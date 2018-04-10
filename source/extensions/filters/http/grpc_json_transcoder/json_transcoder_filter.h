@@ -7,8 +7,9 @@
 #include "envoy/json/json_object.h"
 
 #include "common/common/logger.h"
-#include "common/grpc/transcoder_input_stream_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
@@ -16,7 +17,9 @@
 #include "grpc_transcoding/type_helper.h"
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcJsonTranscoder {
 
 /**
  * VariableBinding specifies a value for a single field in the request message.
@@ -128,5 +131,7 @@ private:
   bool stream_reset_{false};
 };
 
-} // namespace Grpc
+} // namespace GrpcJsonTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -69,7 +69,8 @@ private:
   Event::TimerPtr request_timeout_;
   bool stream_destroyed_{};
 };
-}
+
+} // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

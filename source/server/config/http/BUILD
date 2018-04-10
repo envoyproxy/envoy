@@ -35,32 +35,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_http1_bridge_lib",
-    srcs = ["grpc_http1_bridge.cc"],
-    hdrs = ["grpc_http1_bridge.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/grpc:http1_bridge_filter_lib",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "grpc_json_transcoder_lib",
-    srcs = ["grpc_json_transcoder.cc"],
-    hdrs = ["grpc_json_transcoder.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/grpc:json_transcoder_filter_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "gzip_lib",
     srcs = ["gzip.cc"],
     hdrs = ["gzip.h"],
@@ -70,19 +44,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http/filter:gzip_filter_lib",
         "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "grpc_web_lib",
-    srcs = ["grpc_web.cc"],
-    hdrs = ["grpc_web.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
-        "//source/common/grpc:grpc_web_filter_lib",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
 

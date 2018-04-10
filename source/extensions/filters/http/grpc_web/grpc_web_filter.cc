@@ -1,4 +1,4 @@
-#include "common/grpc/grpc_web_filter.h"
+#include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include <arpa/inet.h>
 
@@ -11,10 +11,10 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
-#include "spdlog/spdlog.h"
-
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcWeb {
 
 // Bit mask denotes a trailers frame of gRPC-Web.
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
@@ -154,7 +154,7 @@ Http::FilterDataStatus GrpcWebFilter::encodeData(Buffer::Instance& data, bool) {
 
   // The decoder always consumes and drains the given buffer. Incomplete data frame is buffered
   // inside the decoder.
-  std::vector<Frame> frames;
+  std::vector<Grpc::Frame> frames;
   decoder_.decode(data, frames);
   if (frames.empty()) {
     // We don't have enough data to decode for one single frame, stop iteration until more data
@@ -220,12 +220,15 @@ void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
   do_stat_tracking_ =
-      Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
+      Grpc::Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
 }
 
 void GrpcWebFilter::chargeStat(const Http::HeaderMap& headers) {
-  Common::chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_, headers.GrpcStatus());
+  Grpc::Common::chargeStat(*cluster_, "grpc-web", grpc_service_, grpc_method_,
+                           headers.GrpcStatus());
 }
 
-} // namespace Grpc
+} // namespace GrpcWeb
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

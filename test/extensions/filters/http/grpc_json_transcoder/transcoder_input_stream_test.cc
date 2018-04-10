@@ -1,10 +1,13 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/grpc/transcoder_input_stream_impl.h"
+
+#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcJsonTranscoder {
 namespace {
 
 class TranscoderInputStreamTest : public testing::Test {
@@ -44,5 +47,7 @@ TEST_F(TranscoderInputStreamTest, BackUp) {
 }
 
 } // namespace
-} // namespace Grpc
+} // namespace GrpcJsonTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

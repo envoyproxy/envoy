@@ -3,10 +3,11 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"
 #include "common/common/utility.h"
-#include "common/grpc/grpc_web_filter.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+
+#include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -24,8 +25,11 @@ using testing::Values;
 using testing::_;
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcWeb {
 namespace {
+
 const char MESSAGE[] = "\x00\x00\x00\x00\x11grpc-web-bin-data";
 const size_t MESSAGE_SIZE = sizeof(MESSAGE) - 1;
 const char TEXT_MESSAGE[] = "\x00\x00\x00\x00\x12grpc-web-text-data";
@@ -38,6 +42,7 @@ const char INVALID_B64_MESSAGE[] = "****";
 const size_t INVALID_B64_MESSAGE_SIZE = sizeof(INVALID_B64_MESSAGE) - 1;
 const char TRAILERS[] = "\x80\x00\x00\x00\x20grpc-status:0\r\ngrpc-message:ok\r\n";
 const size_t TRAILERS_SIZE = sizeof(TRAILERS) - 1;
+
 } // namespace
 
 class GrpcWebFilterTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
@@ -349,5 +354,7 @@ INSTANTIATE_TEST_CASE_P(Unary, GrpcWebFilterTest,
                                        Http::Headers::get().ContentTypeValues.GrpcWebText,
                                        Http::Headers::get().ContentTypeValues.GrpcWebTextProto)));
 
-} // namespace Grpc
+} // namespace GrpcWeb
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

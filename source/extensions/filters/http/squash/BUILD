@@ -1,4 +1,6 @@
 licenses(["notice"])  # Apache 2
+# L7 HTTP filter that implements the Squash microservice debugger
+# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/http_filters/squash_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

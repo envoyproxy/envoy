@@ -1,13 +1,12 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
-namespace Grpc {
-
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcHttp1Bridge {
 /**
  * See docs/configuration/http_filters/grpc_http1_bridge_filter.rst
  */
@@ -56,5 +55,7 @@ private:
   std::string grpc_method_;
 };
 
-} // namespace Grpc
+} // namespace GrpcHttp1Bridge
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

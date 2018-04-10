@@ -1,4 +1,4 @@
-#include "common/grpc/http1_bridge_filter.h"
+#include "extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -14,10 +14,12 @@
 #include "common/http/http1/codec_impl.h"
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcHttp1Bridge {
 
 void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
-  Common::chargeStat(*cluster_, "grpc", grpc_service_, grpc_method_, headers.GrpcStatus());
+  Grpc::Common::chargeStat(*cluster_, "grpc", grpc_service_, grpc_method_, headers.GrpcStatus());
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
@@ -101,8 +103,10 @@ void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
     return;
   }
   do_stat_tracking_ =
-      Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
+      Grpc::Common::resolveServiceAndMethod(headers.Path(), &grpc_service_, &grpc_method_);
 }
 
-} // namespace Grpc
+} // namespace GrpcHttp1Bridge
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
