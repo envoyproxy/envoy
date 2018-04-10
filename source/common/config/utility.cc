@@ -83,12 +83,23 @@ void Utility::checkApiConfigSourceNames(
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
+  if (api_config_source.cluster_names().size() == 0 &&
+      api_config_source.grpc_services().size() == 0) {
+    throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
+  }
+
   if (is_grpc) {
     if (api_config_source.cluster_names().size() != 0) {
       ENVOY_LOG_MISC(warn, "Setting a cluster name for API config source type "
                            "envoy::api::v2::core::ConfigSource::GRPC is deprecated");
     }
-    if (api_config_source.grpc_services().size() != 1) {
+    if (api_config_source.cluster_names().size() > 1) {
+      ENVOY_LOG_MISC(warn, "Setting a cluster name for API config source type "
+                           "envoy::api::v2::core::ConfigSource::GRPC is deprecated");
+      throw EnvoyException(
+          "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+    }
+    if (api_config_source.grpc_services().size() > 1) {
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
     }

@@ -199,8 +199,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        EnvoyException, "API configs must have either a gRPC service or a cluster name defined");
   }
 
   {
@@ -223,7 +222,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
   }
 
   {
@@ -272,7 +271,8 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+      "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS cluster: "
+      "'foo_cluster' does not exist, was added via api, or is an EDS cluster");
 
   // Non-existent cluster.
   api_config_source->add_grpc_services();
