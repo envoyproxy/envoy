@@ -3,9 +3,10 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/http/filter/buffer_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/stats/stats_impl.h"
+
+#include "extensions/filters/http/buffer/buffer_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -22,7 +23,9 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace BufferFilter {
 
 class BufferFilterTest : public testing::Test {
 public:
@@ -35,7 +38,7 @@ public:
 
   void expectTimerCreate() { timer_ = new NiceMock<Event::MockTimer>(&callbacks_.dispatcher_); }
 
-  NiceMock<MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Stats::IsolatedStoreImpl store_;
   std::shared_ptr<BufferFilterConfig> config_;
   BufferFilter filter_;
@@ -43,8 +46,8 @@ public:
 };
 
 TEST_F(BufferFilterTest, HeaderOnlyRequest) {
-  TestHeaderMapImpl headers;
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, true));
 }
 
 TEST_F(BufferFilterTest, RequestWithData) {
@@ -52,14 +55,14 @@ TEST_F(BufferFilterTest, RequestWithData) {
 
   expectTimerCreate();
 
-  TestHeaderMapImpl headers;
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
   Buffer::OwnedImpl data2(" world");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data2, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data2, true));
 }
 
 TEST_F(BufferFilterTest, RequestTimeout) {
@@ -67,10 +70,10 @@ TEST_F(BufferFilterTest, RequestTimeout) {
 
   expectTimerCreate();
 
-  TestHeaderMapImpl headers;
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
-  TestHeaderMapImpl response_headers{
+  Http::TestHeaderMapImpl response_headers{
       {":status", "408"}, {"content-length", "22"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
@@ -85,19 +88,21 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
 
   expectTimerCreate();
 
-  TestHeaderMapImpl headers;
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
 
   Buffer::OwnedImpl data1("hello");
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data1, false));
 
   Buffer::OwnedImpl data2(" world");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_.decodeData(data2, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data2, true));
 
   // It's possible that the stream will be reset on the TX side even after RX end stream. Mimic
   // that here.
   filter_.onDestroy();
 }
 
-} // namespace Http
+} // namespace BufferFilter
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

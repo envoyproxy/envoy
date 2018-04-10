@@ -11,7 +11,9 @@
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace BufferFilter {
 
 /**
  * All stats for the buffer filter. @see stats_macros.h
@@ -42,7 +44,7 @@ typedef std::shared_ptr<const BufferFilterConfig> BufferFilterConfigConstSharedP
 /**
  * A filter that is capable of buffering an entire request before dispatching it upstream.
  */
-class BufferFilter : public StreamDecoderFilter {
+class BufferFilter : public Http::StreamDecoderFilter {
 public:
   BufferFilter(BufferFilterConfigConstSharedPtr config);
   ~BufferFilter();
@@ -53,20 +55,21 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   void onRequestTimeout();
   void resetInternalState();
 
   BufferFilterConfigConstSharedPtr config_;
-  StreamDecoderFilterCallbacks* callbacks_{};
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
   bool stream_destroyed_{};
 };
-
-} // Http
+}
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

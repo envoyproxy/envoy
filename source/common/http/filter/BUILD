@@ -9,27 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "buffer_filter_lib",
-    srcs = ["buffer_filter.cc"],
-    hdrs = ["buffer_filter.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:codes_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:utility_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "cors_filter_lib",
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],

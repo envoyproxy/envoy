@@ -1,6 +1,4 @@
-#include "common/http/filter/buffer_filter.h"
-
-#include <string>
+#include "extensions/filters/http/buffer/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -15,38 +13,40 @@
 #include "common/http/utility.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace BufferFilter {
 
 BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
-FilterHeadersStatus BufferFilter::decodeHeaders(HeaderMap&, bool end_stream) {
+Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
   if (end_stream) {
     // If this is a header only request, we don't need to do any buffering.
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   } else {
     // Otherwise stop further iteration.
     request_timeout_ =
         callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
     request_timeout_->enableTimer(config_->max_request_time_);
-    return FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 }
 
-FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
   if (end_stream) {
     resetInternalState();
-    return FilterDataStatus::Continue;
+    return Http::FilterDataStatus::Continue;
   }
 
   // Buffer until the complete request has been processed or the ConnectionManagerImpl sends a 413.
-  return FilterDataStatus::StopIterationAndBuffer;
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-FilterTrailersStatus BufferFilter::decodeTrailers(HeaderMap&) {
+Http::FilterTrailersStatus BufferFilter::decodeTrailers(Http::HeaderMap&) {
   resetInternalState();
-  return FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 BufferFilterStats BufferFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -67,10 +67,12 @@ void BufferFilter::onRequestTimeout() {
 
 void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
-void BufferFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
 }
 
-} // namespace Http
+} // namespace BufferFilter
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

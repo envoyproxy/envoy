@@ -8,7 +8,6 @@
 #include "common/protobuf/utility.h"
 #include "common/router/router.h"
 
-#include "server/config/http/buffer.h"
 #include "server/config/http/fault.h"
 #include "server/config/http/grpc_http1_bridge.h"
 #include "server/config/http/grpc_json_transcoder.h"
@@ -17,6 +16,7 @@
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
 
+#include "extensions/filters/http/buffer/config.h"
 #include "extensions/filters/http/lua/config.h"
 #include "extensions/filters/http/ratelimit/config.h"
 
@@ -40,7 +40,7 @@ namespace Configuration {
 TEST(HttpFilterConfigTest, ValidateFail) {
   NiceMock<MockFactoryContext> context;
 
-  BufferFilterConfig buffer_factory;
+  Extensions::HttpFilters::BufferFilter::BufferFilterConfigFactory buffer_factory;
   envoy::config::filter::http::buffer::v2::Buffer buffer_proto;
   FaultFilterConfig fault_factory;
   envoy::config::filter::http::fault::v2::HTTPFault fault_proto;
@@ -64,66 +64,6 @@ TEST(HttpFilterConfigTest, ValidateFail) {
         filter_case.first.createFilterFactoryFromProto(filter_case.second, "stats", context),
         ProtoValidationException);
   }
-}
-
-TEST(HttpFilterConfigTest, BufferFilterCorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : 2
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  BufferFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BufferFilterIncorrectJson) {
-  std::string json_string = R"EOF(
-  {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : "2"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  BufferFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
-}
-
-TEST(HttpFilterConfigTest, BufferFilterCorrectProto) {
-  envoy::config::filter::http::buffer::v2::Buffer config{};
-  config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
-
-  NiceMock<MockFactoryContext> context;
-  BufferFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BufferFilterEmptyProto) {
-  BufferFilterConfig factory;
-  envoy::config::filter::http::buffer::v2::Buffer config =
-      *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
-          factory.createEmptyConfigProto().get());
-
-  config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
-
-  NiceMock<MockFactoryContext> context;
-  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, FaultFilterCorrectJson) {
