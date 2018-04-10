@@ -44,7 +44,7 @@ class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
   const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
-                 const bool match_incoming_request_route = false) {
+                 bool match_incoming_request_route = false) {
     std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                               "\",\"services\": [\"" + service_name + "\"]}";
     auto json_config = Json::Factory::loadFromString(json_string);
@@ -233,11 +233,6 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-class GrpcJsonTranscoderFilterSkipRecalculatingTest : public GrpcJsonTranscoderFilterTest {
-public:
-  GrpcJsonTranscoderFilterSkipRecalculatingTest() : GrpcJsonTranscoderFilterTest(true) {}
-};
-
 TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   Http::TestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
                                           {":method", "POST"},
@@ -339,6 +334,11 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
+
+class GrpcJsonTranscoderFilterSkipRecalculatingTest : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterSkipRecalculatingTest() : GrpcJsonTranscoderFilterTest(true) {}
+};
 
 TEST_F(GrpcJsonTranscoderFilterSkipRecalculatingTest, TranscodingUnaryPostSkipRecalculate) {
   Http::TestHeaderMapImpl request_headers{

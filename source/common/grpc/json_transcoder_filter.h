@@ -67,7 +67,7 @@ public:
    * This allows Envoy to select the upstream cluster based on the incoming request
    * rather than the outgoing.
    */
-  bool matchIncomingRequestRoute();
+  bool matchIncomingRequestInfo() const ;
 
 private:
   /**
