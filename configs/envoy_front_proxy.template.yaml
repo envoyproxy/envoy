@@ -1,6 +1,6 @@
 ---
 {% import 'routing_helper.template.yaml' as helper -%}
-{% macro someshit() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
+{% macro router_file_content() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
 {% macro listener(address) -%}
 - address: "{{ address }}"
   {% if kwargs['ssl'] -%}
@@ -43,7 +43,7 @@
       use_remote_address: true
       {% endif -%}
       route_config:
-        {{ someshit(router_file='envoy_router.template.yaml')|indent(8) }}
+        {{ router_file_content(router_file='envoy_router.template.yaml')|indent(8) }}
       filters:
       - name: health_check
         config:
