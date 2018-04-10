@@ -131,7 +131,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
 }
 
-bool JsonTranscoderConfig::matchIncomingRequestInfo() const { return match_incoming_request_route_; }
+bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
+  return match_incoming_request_route_;
+}
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
