@@ -21,20 +21,12 @@ void ThreadAwareLoadBalancerBase::refresh() {
       priority_set_.hostSetsPerPriority().size());
   auto per_priority_load = std::make_shared<std::vector<uint32_t>>(per_priority_load_);
 
-  // Note that we only compute global panic on host set refresh. Given that the runtime setting will
-  // rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
-  // need to create one per priority level.
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
     const uint32_t priority = host_set->priority();
     (*per_priority_state_vector)[priority].reset(new PerPriorityState);
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
-    if (isGlobalPanic(*host_set)) {
-      per_priority_state->current_lb_ = createLoadBalancer(host_set->hosts());
-      per_priority_state->global_panic_ = true;
-    } else {
-      per_priority_state->current_lb_ = createLoadBalancer(host_set->healthyHosts());
-      per_priority_state->global_panic_ = false;
-    }
+    per_priority_state->current_lb_ = createLoadBalancer(*host_set);
+    per_priority_state->global_panic_ = isGlobalPanic(*host_set);
   }
 
   {

@@ -2,17 +2,21 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "lightstep_tracer_impl_test",
     srcs = [
         "lightstep_tracer_impl_test.cc",
     ],
+    extension_name = "envoy.tracers.lightstep",
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
@@ -32,9 +36,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.tracers.lightstep",
     deps = [
         "//source/extensions/tracers/lightstep:config",
         "//test/mocks/server:server_mocks",

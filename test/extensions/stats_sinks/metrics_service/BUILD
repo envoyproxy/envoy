@@ -2,15 +2,19 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "metrics_service_test",
     srcs = ["grpc_metrics_service_impl_test.cc"],
+    extension_name = "envoy.stat_sinks.metrics_service",
     deps = [
         "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
@@ -25,9 +29,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "metrics_service_integration_test",
     srcs = ["metrics_service_integration_test.cc"],
+    extension_name = "envoy.stat_sinks.metrics_service",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

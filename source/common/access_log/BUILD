@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/http:utility_lib",
         "//source/common/request_info:utility_lib",
     ],

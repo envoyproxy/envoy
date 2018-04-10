@@ -7,8 +7,13 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/metadata.h"
 #include "common/http/utility.h"
 #include "common/request_info/utility.h"
+
+#include "absl/strings/str_split.h"
+
+using Envoy::Config::Metadata;
 
 namespace Envoy {
 namespace AccessLog {
@@ -61,11 +66,31 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
+void AccessLogFormatParser::parseCommandHeader(const std::string& token, const size_t start,
+                                               std::string& main_header,
+                                               std::string& alternative_header,
+                                               absl::optional<size_t>& max_length) {
+  std::vector<std::string> subs;
+  parseCommand(token, start, "?", main_header, subs, max_length);
+  if (subs.size() > 1) {
+    throw EnvoyException(
+        // Header format rules support only one alternative header.
+        // https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
+        fmt::format("More than 1 alternative header specified in token: {}", token));
+  }
+  if (subs.size() == 1) {
+    alternative_header = subs.front();
+  } else {
+    alternative_header = "";
+  }
+}
+
 void AccessLogFormatParser::parseCommand(const std::string& token, const size_t start,
-                                         std::string& main_header, std::string& alternative_header,
+                                         const std::string& separator, std::string& main,
+                                         std::vector<std::string>& sub_items,
                                          absl::optional<size_t>& max_length) {
   size_t end_request = token.find(')', start);
-
+  sub_items.clear();
   if (end_request != token.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
@@ -87,15 +112,15 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     max_length = length_value;
   }
 
-  const std::string header_name = token.substr(start, end_request - start);
-  size_t separator = header_name.find('?');
-
-  if (separator == std::string::npos) {
-    main_header = header_name;
-    alternative_header = "";
-  } else {
-    main_header = header_name.substr(0, separator);
-    alternative_header = header_name.substr(separator + 1, end_request - separator - 1);
+  const std::string name_data = token.substr(start, end_request - start);
+  const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
+  if (!keys.empty()) {
+    // The main value is the first key
+    main = keys.at(0);
+    if (keys.size() > 1) {
+      // Sub items contain additional keys
+      sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
+    }
   }
 }
 
@@ -103,12 +128,13 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
 std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format) {
   std::string current_token;
   std::vector<FormatterPtr> formatters;
+  const std::string DYNAMIC_META_TOKEN = "DYNAMIC_METADATA(";
   const std::regex command_w_args_regex(R"EOF(%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
   for (size_t pos = 0; pos < format.length(); ++pos) {
     if (format[pos] == '%') {
       if (!current_token.empty()) {
-        formatters.emplace_back(FormatterPtr{new PlainStringFormatter(current_token)});
+        formatters.emplace_back(new PlainStringFormatter(current_token));
         current_token = "";
       }
 
@@ -129,18 +155,26 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
-        parseCommand(token, ReqParamStart, main_header, alternative_header, max_length);
+        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            FormatterPtr(new RequestHeaderFormatter(main_header, alternative_header, max_length)));
+            new RequestHeaderFormatter(main_header, alternative_header, max_length));
       } else if (token.find("RESP(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
-        parseCommand(token, RespParamStart, main_header, alternative_header, max_length);
+        parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
         formatters.emplace_back(
-            FormatterPtr(new ResponseHeaderFormatter(main_header, alternative_header, max_length)));
+            new ResponseHeaderFormatter(main_header, alternative_header, max_length));
+      } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
+        std::string filter_namespace;
+        absl::optional<size_t> max_length;
+        std::vector<std::string> path;
+        const size_t start = DYNAMIC_META_TOKEN.size();
+
+        parseCommand(token, start, ":", filter_namespace, path, max_length);
+        formatters.emplace_back(new DynamicMetadataFormatter(filter_namespace, path, max_length));
       } else if (token.find("START_TIME") == 0) {
         const size_t parameters_length = pos + StartTimeParamStart + 1;
         const size_t parameters_end = command_end_position - parameters_length;
@@ -148,9 +182,9 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         const std::string args = token[StartTimeParamStart - 1] == '('
                                      ? token.substr(StartTimeParamStart, parameters_end)
                                      : "";
-        formatters.emplace_back(FormatterPtr(new StartTimeFormatter(args)));
+        formatters.emplace_back(new StartTimeFormatter(args));
       } else {
-        formatters.emplace_back(FormatterPtr(new RequestInfoFormatter(token)));
+        formatters.emplace_back(new RequestInfoFormatter(token));
       }
       pos = command_end_position;
     } else {
@@ -159,7 +193,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   }
 
   if (!current_token.empty()) {
-    formatters.emplace_back(FormatterPtr{new PlainStringFormatter(current_token)});
+    formatters.emplace_back(new PlainStringFormatter(current_token));
   }
 
   return formatters;
@@ -262,7 +296,7 @@ std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::Hea
 
 HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  const std::string& alternative_header,
-                                 const absl::optional<size_t>& max_length)
+                                 absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
 std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
@@ -288,7 +322,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
                                                  const std::string& alternative_header,
-                                                 const absl::optional<size_t>& max_length)
+                                                 absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
@@ -299,13 +333,53 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
 
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
-                                               const absl::optional<size_t>& max_length)
+                                               absl::optional<size_t> max_length)
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
                                            const Http::HeaderMap&,
                                            const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(request_headers);
+}
+
+MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
+                                     const std::vector<std::string>& path,
+                                     absl::optional<size_t> max_length)
+    : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
+
+std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& metadata) const {
+  const Protobuf::Message* data;
+  if (path_.empty()) {
+    const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
+    if (filter_it == metadata.filter_metadata().end()) {
+      return UnspecifiedValueString;
+    }
+    data = &(filter_it->second);
+  } else {
+    const ProtobufWkt::Value& val = Metadata::metadataValue(metadata, filter_namespace_, path_);
+    if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
+      return UnspecifiedValueString;
+    }
+    data = &val;
+  }
+  std::string json;
+  Protobuf::util::MessageToJsonString(*data, &json);
+  if (max_length_ && json.length() > max_length_.value()) {
+    return json.substr(0, max_length_.value());
+  }
+  return json;
+}
+
+// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
+// See: https://github.com/envoyproxy/envoy/issues/3006
+DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   absl::optional<size_t> max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                             const RequestInfo::RequestInfo& request_info) const {
+  return MetadataFormatter::format(request_info.dynamicMetadata());
 }
 
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}

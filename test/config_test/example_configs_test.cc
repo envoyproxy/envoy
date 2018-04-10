@@ -15,7 +15,12 @@ TEST(ExampleConfigsTest, All) {
   RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr);
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
 
-  EXPECT_EQ(26UL, ConfigTest::run(directory));
+#ifdef __APPLE__
+  // freebind/freebind.yaml is not supported on OS X and disabled via Bazel.
+  EXPECT_EQ(27UL, ConfigTest::run(directory));
+#else
+  EXPECT_EQ(28UL, ConfigTest::run(directory));
+#endif
   ConfigTest::testMerge();
   ConfigTest::testIncompatibleMerge();
 

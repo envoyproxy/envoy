@@ -62,6 +62,13 @@ public:
                    std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
                    const Protobuf::MethodDescriptor*& method_descriptor);
 
+  /**
+   * If true, skip clearing the route cache after the incoming request has been modified.
+   * This allows Envoy to select the upstream cluster based on the incoming request
+   * rather than the outgoing.
+   */
+  bool matchIncomingRequestInfo() const;
+
 private:
   /**
    * Convert method descriptor to RequestInfo that needed for transcoding library
@@ -74,6 +81,8 @@ private:
   google::grpc::transcoding::PathMatcherPtr<const Protobuf::MethodDescriptor*> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
+
+  bool match_incoming_request_route_{false};
 };
 
 typedef std::shared_ptr<JsonTranscoderConfig> JsonTranscoderConfigSharedPtr;

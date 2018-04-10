@@ -333,5 +333,8 @@ envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:const_singleton",
+    ],
 )

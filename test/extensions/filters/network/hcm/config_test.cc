@@ -3,7 +3,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/router/rds_impl.h"
 
-#include "server/config/network/http_connection_manager.h"
+#include "extensions/filters/network/hcm/config.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -17,9 +17,9 @@ using testing::ContainerEq;
 using testing::Return;
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
-namespace {
+namespace Extensions {
+namespace NetworkFilters {
+namespace HttpConnectionManager {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
 parseHttpConnectionManagerFromJson(const std::string& json_string) {
@@ -32,7 +32,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
-  NiceMock<MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
   Router::RouteConfigProviderManagerImpl route_config_provider_manager_{
       context_.runtime(),   context_.dispatcher(),  context_.random(),
@@ -141,8 +141,10 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
-  NetworkFilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
-  NetworkFilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
+  Server::Configuration::NetworkFilterFactoryCb cb1 =
+      factory.createFilterFactory(*json_config, context_);
+  Server::Configuration::NetworkFilterFactoryCb cb2 =
+      factory.createFilterFactory(*json_config, context_);
 }
 
 TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
@@ -189,7 +191,169 @@ TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
   }
 }
 
-} // namespace
-} // namespace Configuration
-} // namespace Server
+TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filter" : [{}]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, BadAccessLogConfig) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path" : "mypath",
+        "filter" : []
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, BadAccessLogType) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path" : "mypath",
+        "filter" : {
+          "type" : "bad_type"
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
+  std::string json_string = R"EOF(
+  {
+    "codec_type" : "http1",
+    "stat_prefix" : "my_stat_prefix",
+    "route_config" : {
+      "virtual_hosts" : [
+        {
+          "name" : "default",
+          "domains" : ["*"],
+          "routes" : [
+            {
+              "prefix" : "/",
+              "cluster": "fake_cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters" : [
+      {
+        "type" : "both",
+        "name" : "http_dynamo_filter",
+        "config" : {}
+      }
+    ],
+    "access_log" :[
+      {
+        "path": "/dev/null",
+        "filter": {
+          "type": "logical_and",
+          "filters": [
+            {
+              "type": "logical_or",
+              "filters": [
+                {"type": "duration", "op": ">=", "value": 10000},
+                {"type": "bad_type"}
+              ]
+            },
+            {"type": "not_healthcheck"}
+          ]
+        }
+      }
+    ]
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  HttpConnectionManagerFilterConfigFactory factory;
+  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+} // namespace HttpConnectionManager
+} // namespace NetworkFilters
+} // namespace Extensions
 } // namespace Envoy

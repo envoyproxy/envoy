@@ -146,6 +146,13 @@ struct RequestInfoImpl : public RequestInfo {
   }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
+
+  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+
+  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+  };
+
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
 
@@ -169,6 +176,7 @@ struct RequestInfoImpl : public RequestInfo {
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
+  envoy::api::v2::core::Metadata metadata_{};
 };
 
 } // namespace RequestInfo
