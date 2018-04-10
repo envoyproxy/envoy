@@ -129,8 +129,8 @@ private:
   AccessLog::FilterPtr filter_;
   const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
-  std::vector<Http::LowerCaseString> request_headers_to_log_{};
-  std::vector<Http::LowerCaseString> response_headers_to_log_{};
+  std::vector<Http::LowerCaseString> request_headers_to_log_;
+  std::vector<Http::LowerCaseString> response_headers_to_log_;
 };
 
 } // namespace HttpGrpc
