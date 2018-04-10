@@ -127,6 +127,12 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   print_options_.always_print_primitive_fields = print_config.always_print_primitive_fields();
   print_options_.always_print_enums_as_ints = print_config.always_print_enums_as_ints();
   print_options_.preserve_proto_field_names = print_config.preserve_proto_field_names();
+
+  match_incoming_request_route_ = proto_config.match_incoming_request_route();
+}
+
+bool JsonTranscoderConfig::matchIncomingRequestInfo() const {
+  return match_incoming_request_route_;
 }
 
 ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
@@ -217,7 +223,9 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
   headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
-  decoder_callbacks_->clearRouteCache();
+  if (!config_.matchIncomingRequestInfo()) {
+    decoder_callbacks_->clearRouteCache();
+  }
 
   if (end_stream) {
     request_in_.finish();
