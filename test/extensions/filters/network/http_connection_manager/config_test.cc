@@ -3,7 +3,7 @@
 #include "common/http/date_provider_impl.h"
 #include "common/router/rds_impl.h"
 
-#include "extensions/filters/network/hcm/config.h"
+#include "extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"

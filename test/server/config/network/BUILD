@@ -17,7 +17,7 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/client_ssl_auth:config",
         "//source/extensions/filters/network/ext_authz:config",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/mongo_proxy:config",
         "//source/extensions/filters/network/ratelimit:config",
         "//source/extensions/filters/network/redis_proxy:config",
