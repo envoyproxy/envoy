@@ -252,8 +252,8 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
 
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
-    char formatted_time[1024];
     size_t formatted_time_length{0};
+    char formatted_time[32];
   };
   static thread_local CachedTime cached_time;
 
