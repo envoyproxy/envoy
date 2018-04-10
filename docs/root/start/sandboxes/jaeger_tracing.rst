@@ -46,9 +46,9 @@ To build this sandbox example, and start the example apps run the following comm
     $ docker-compose ps
             Name                       Command               State      Ports
     -------------------------------------------------------------------------------------------------------------
-    jaegertracing_service1_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
-    jaegertracing_service2_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
-    jaegertracing_front-envoy_1   /bin/sh -c /usr/local/bin/ ...    Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+    jaegertracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
+    jaegertracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
+    jaegertracing_front-envoy_1   /bin/sh -c /usr/local/bin/ ... Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
 
 **Step 2: Generate some load**
 

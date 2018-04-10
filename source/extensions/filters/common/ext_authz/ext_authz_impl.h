@@ -72,7 +72,7 @@ private:
  * and fill out the details in the authorization protobuf that is sent to authorization
  * service.
  * The specific information in the request is as per the specification in the
- * data-plane-api.
+ * data plane API.
  */
 class CheckRequestUtils {
 public:

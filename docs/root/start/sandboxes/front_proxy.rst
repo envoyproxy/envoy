@@ -55,9 +55,9 @@ or ``git clone https://github.com/envoyproxy/envoy.git``::
     $ docker-compose ps
             Name                       Command               State      Ports
     -------------------------------------------------------------------------------------------------------------
-    example_service1_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
-    example_service2_1      /bin/sh -c /usr/local/bin/ ...    Up       80/tcp
-    example_front-envoy_1   /bin/sh -c /usr/local/bin/ ...    Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+    example_service1_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
+    example_service2_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
+    example_front-envoy_1   /bin/sh -c /usr/local/bin/ ... Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
 
 **Step 5: Test Envoy's routing capabilities**
 

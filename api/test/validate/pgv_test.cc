@@ -1,6 +1,6 @@
 // NOLINT(namespace-envoy)
-#include <iostream>
 #include <cstdlib>
+#include <iostream>
 
 // We don't use all the headers in the test below, but including them anyway as
 // a cheap way to get some C++ compiler sanity checking.
@@ -50,7 +50,7 @@ template <class Proto> struct TestCase {
 };
 
 // Basic protoc-gen-validate C++ validation header inclusion and Validate calls
-// from data-plane-api.
+// from data plane API.
 int main(int argc, char* argv[]) {
   envoy::config::bootstrap::v2::Bootstrap invalid_bootstrap;
   // This is a baseline test of the validation features we care about. It's

@@ -17,7 +17,7 @@ SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst")
 DOCS_SUFFIX = (".md", ".rst")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf')
+GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf', 'api/test')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -93,6 +93,10 @@ def checkProtobufExternalDeps(file_path):
     return []
 
 
+def isApiFile(file_path):
+  return file_path.startswith('./api/')
+
+
 def isBuildFile(file_path):
   basename = os.path.basename(file_path)
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
@@ -146,8 +150,12 @@ def fixFileContents(file_path):
 def checkFilePath(file_path):
   error_messages = []
   if isBuildFile(file_path):
-    command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
-    error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
+    # TODO(htuch): Add API specific BUILD fixer script.
+    if not isApiFile(file_path):
+      command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path,
+                                       file_path)
+      error_messages += executeCommand(
+          command, "envoy_build_fixer check failed", file_path)
 
     command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
     error_messages += executeCommand(command, "buildifier check failed", file_path)
@@ -183,14 +191,14 @@ def executeCommand(command, error_message, file_path,
       return output.split("\n")
     return []
   except subprocess.CalledProcessError as e:
-      if (e.returncode != 0 and e.returncode != 1):
-        return ["ERROR: something went wrong while executing: %s" % e.cmd]
-      # In case we can't find any line numbers, record an error message first.
-      error_messages = ["%s for file: %s" % (error_message, file_path)]
-      for line in e.output.splitlines():
-        for num in regex.findall(line):
-          error_messages.append("  %s:%s" % (file_path, num))
-      return error_messages
+    if (e.returncode != 0 and e.returncode != 1):
+      return ["ERROR: something went wrong while executing: %s" % e.cmd]
+    # In case we can't find any line numbers, record an error message first.
+    error_messages = ["%s for file: %s" % (error_message, file_path)]
+    for line in e.output.splitlines():
+      for num in regex.findall(line):
+        error_messages.append("  %s:%s" % (file_path, num))
+    return error_messages
 
 def fixHeaderOrder(file_path):
   command = "%s --rewrite %s" % (HEADER_ORDER_PATH, file_path)
@@ -206,8 +214,11 @@ def clangFormat(file_path):
 
 def fixFilePath(file_path):
   if isBuildFile(file_path):
-    if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-      return ["envoy_build_fixer rewrite failed for file: %s" % file_path]
+    # TODO(htuch): Add API specific BUILD fixer script.
+    if not isApiFile(file_path):
+      if os.system(
+          "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+        return ["envoy_build_fixer rewrite failed for file: %s" % file_path]
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
       return ["buildifier rewrite failed for file: %s" % file_path]
     return []

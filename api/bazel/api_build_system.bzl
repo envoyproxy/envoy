@@ -80,7 +80,7 @@ def api_go_grpc_library(name, proto, deps = []):
 # from api_proto_library.
 def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], deps = [], has_services = 0, require_py = 1):
     # This is now vestigial, since there are no direct consumers in
-    # data-plane-api. However, we want to maintain native proto_library support
+    # the data plane API. However, we want to maintain native proto_library support
     # in the proto graph to (1) support future C++ use of native rules with
     # cc_proto_library (or some Bazel aspect that works on proto_library) when
     # it can play well with the PGV plugin and (2) other language support that

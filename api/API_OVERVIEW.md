@@ -26,9 +26,7 @@ See
 [here](https://www.envoyproxy.io/docs/envoy/latest/configuration/overview/v2_overview.html#status)
 for the current status of the v2 APIs.
 
-See
-[here](https://github.com/envoyproxy/data-plane-api/blob/master/CONTRIBUTING.md#api-changes)
-for the v2 API change process.
+See [here](CONTRIBUTING.md#api-changes) for the v2 API change process.
 
 ## Principles
 

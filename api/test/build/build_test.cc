@@ -1,6 +1,6 @@
 // NOLINT(namespace-envoy)
-#include <iostream>
 #include <cstdlib>
+#include <iostream>
 
 #include "google/protobuf/descriptor.h"
 

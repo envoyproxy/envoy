@@ -67,10 +67,10 @@ INHERITED_ANNOTATIONS = set([
     PROTO_STATUS_ANNOTATION,
 ])
 
-# Template for data-plane-api URLs.
+# Template for data plane API URLs.
 # TODO(htuch): Add the ability to build a permalink by feeding a hash
 # to the tool or inferring from local tree (only really make sense in CI).
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/data-plane-api/blob/master/%s#L%d'
+DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/master/api/%s#L%d'
 
 
 class ProtodocError(Exception):
@@ -167,13 +167,13 @@ class SourceCodeInfo(object):
     return '', []
 
   def GithubUrl(self, path):
-    """Obtain data-plane-api Github URL by path from SourceCodeInfo.
+    """Obtain data plane API Github URL by path from SourceCodeInfo.
 
     Args:
       path: a list of path indexes as per
         https://github.com/google/protobuf/blob/a08b03d4c00a5793b88b494f672513f6ad46a681/src/google/protobuf/descriptor.proto#L717.
     Returns:
-      A string with a corresponding data-plan-api GitHub Url.
+      A string with a corresponding data plane API GitHub Url.
     """
     for location in self._proto.location:
       if location.path == path:
