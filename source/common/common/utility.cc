@@ -274,20 +274,18 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
     cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
-  if (cached_time.formatted_time_length >= 4) {
-    // Overwrite the digits in the ".000Z" at the end of the string with the
-    // millisecond count from the input time.
-    size_t offset = cached_time.formatted_time_length - 4;
-    uint32_t msec = epoch_time_ms.count() % 1000;
-    cached_time.formatted_time[offset++] = ('0' + (msec / 100));
-    msec %= 100;
-    cached_time.formatted_time[offset++] = ('0' + (msec / 10));
-    msec %= 10;
-    cached_time.formatted_time[offset++] = ('0' + msec);
-  } else if (cached_time.formatted_time_length == 0) {
-    // This can happen if strftime fails. Truncate the string to ensure a sensible output.
-    cached_time.formatted_time[0] = '\0';
-  }
+  ASSERT(cached_time.formatted_time_length == 24 &&
+         cached_time.formatted_time_length < sizeof(cached_time.formatted_time));
+
+  // Overwrite the digits in the ".000Z" at the end of the string with the
+  // millisecond count from the input time.
+  size_t offset = cached_time.formatted_time_length - 4;
+  uint32_t msec = epoch_time_ms.count() % 1000;
+  cached_time.formatted_time[offset++] = ('0' + (msec / 100));
+  msec %= 100;
+  cached_time.formatted_time[offset++] = ('0' + (msec / 10));
+  msec %= 10;
+  cached_time.formatted_time[offset++] = ('0' + msec);
 
   return cached_time.formatted_time;
 }
