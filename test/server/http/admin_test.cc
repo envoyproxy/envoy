@@ -377,12 +377,14 @@ TEST(PrometheusStatsFormatter, MetricName) {
 }
 
 TEST(PrometheusStatsFormatter, FormattedTags) {
+  // if value has - then it should be replaced
+  // by -
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+  Stats::Tag tag2 = {"another_tag_name", "another.tag-value"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+  std::string expected = "a_tag_name=\"a_tag_value\",another_tag_name=\"another_tag_value\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }
