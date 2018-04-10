@@ -332,10 +332,14 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
   InSequence s;
 
   config_.add_additional_request_headers_to_log("X-Custom-Request");
-  config_.add_additional_request_headers_to_log("x-envoy-max-retries");
+  config_.add_additional_request_headers_to_log("X-Custom-Empty");
+  config_.add_additional_request_headers_to_log("X-Envoy-Max-Retries");
+  config_.add_additional_request_headers_to_log("X-Envoy-Force-Trace");
 
   config_.add_additional_response_headers_to_log("X-Custom-Response");
-  config_.add_additional_response_headers_to_log("x-envoy-immediate-health-check-fail");
+  config_.add_additional_response_headers_to_log("X-Custom-Empty");
+  config_.add_additional_response_headers_to_log("X-Envoy-Immediate-Health-Check-Fail");
+  config_.add_additional_response_headers_to_log("X-Envoy-Upstream-Service-Time");
   init();
 
   {
@@ -350,11 +354,13 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {":method", "POST"},
         {"x-envoy-max-retries", "3"}, // test inline header not otherwise logged
         {"x-custom-request", "custom_value"},
+        {"x-custom-empty", ""},
     };
     Http::TestHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
+        {"x-custom-empty", ""},
     };
 
     expectLog(R"EOF(
@@ -376,14 +382,16 @@ http_logs:
       authority: "authority_value"
       path: "path_value"
       request_method: "POST"
-      request_headers_bytes: 118
+      request_headers_bytes: 132
       request_headers:
-        "X-Custom-Request": "custom_value"
+        "x-custom-request": "custom_value"
+        "x-custom-empty": ""
         "x-envoy-max-retries": "3"
     response:
-      response_headers_bytes: 78
+      response_headers_bytes: 92
       response_headers:
-        "X-Custom-Response": "custom_value"
+        "x-custom-response": "custom_value"
+        "x-custom-empty": ""
         "x-envoy-immediate-health-check-fail": "true"
 )EOF");
     access_log_->log(&request_headers, &response_headers, request_info);

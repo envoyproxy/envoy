@@ -67,7 +67,15 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
     const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig& config,
     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer)
     : filter_(std::move(filter)), config_(config),
-      grpc_access_log_streamer_(grpc_access_log_streamer) {}
+      grpc_access_log_streamer_(grpc_access_log_streamer) {
+  for (const auto& header : config_.additional_request_headers_to_log()) {
+    request_headers_to_log_.emplace_back(header);
+  }
+
+  for (const auto& header : config_.additional_response_headers_to_log()) {
+    response_headers_to_log_.emplace_back(header);
+  }
+}
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::config::filter::accesslog::v2::AccessLogCommon& common_access_log,
@@ -280,14 +288,13 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         std::string(request_headers->Method()->value().c_str()), &method);
     request_properties->set_request_method(method);
   }
-  if (config_.additional_request_headers_to_log_size() > 0) {
+  if (!request_headers_to_log_.empty()) {
     auto* logged_headers = request_properties->mutable_request_headers();
 
-    for (const auto& additional_header : config_.additional_request_headers_to_log()) {
-      const Http::HeaderEntry* entry =
-          request_headers->get(Http::LowerCaseString(additional_header));
-      if (entry != nullptr && !entry->value().empty()) {
-        logged_headers->insert({additional_header, ProtobufTypes::String(entry->value().c_str())});
+    for (const auto& header : request_headers_to_log_) {
+      const Http::HeaderEntry* entry = request_headers->get(header);
+      if (entry != nullptr) {
+        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
       }
     }
   }
@@ -299,14 +306,13 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   response_properties->set_response_headers_bytes(response_headers->byteSize());
   response_properties->set_response_body_bytes(request_info.bytesSent());
-  if (config_.additional_response_headers_to_log_size() > 0) {
+  if (!response_headers_to_log_.empty()) {
     auto* logged_headers = response_properties->mutable_response_headers();
 
-    for (const auto& additional_header : config_.additional_response_headers_to_log()) {
-      const Http::HeaderEntry* entry =
-          response_headers->get(Http::LowerCaseString(additional_header));
-      if (entry != nullptr && !entry->value().empty()) {
-        logged_headers->insert({additional_header, ProtobufTypes::String(entry->value().c_str())});
+    for (const auto& header : response_headers_to_log_) {
+      const Http::HeaderEntry* entry = response_headers->get(header);
+      if (entry != nullptr) {
+        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
       }
     }
   }
