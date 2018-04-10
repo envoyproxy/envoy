@@ -237,11 +237,13 @@ void BaseIntegrationTest::initialize() {
 }
 
 void BaseIntegrationTest::createUpstreams() {
-  if (autonomous_upstream_) {
-    fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
-  } else {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
+  for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    if (autonomous_upstream_) {
+      fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_));
+    } else {
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(0, upstream_protocol_, version_, enable_half_close_));
+    }
   }
 }
 
@@ -299,14 +301,27 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
   RELEASE_ASSERT(false);
 }
 
+void BaseIntegrationTest::setUpstreamAddress(uint32_t upstream_index,
+                                             envoy::api::v2::endpoint::LbEndpoint& endpoint) const {
+  auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
+  socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+  socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
+}
+
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names) {
   auto port_it = port_names.cbegin();
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; port_it != port_names.end() && listener_it != listeners.end(); ++port_it, ++listener_it) {
-    registerPort(*port_it, listener_it->get().socket().localAddress()->ip()->port());
+    const auto listen_addr = listener_it->get().socket().localAddress();
+    if (listen_addr->type() == Network::Address::Type::Ip) {
+      registerPort(*port_it, listen_addr->ip()->port());
+    }
   }
-  registerPort("admin", test_server_->server().admin().socket().localAddress()->ip()->port());
+  const auto admin_addr = test_server_->server().admin().socket().localAddress();
+  if (admin_addr->type() == Network::Address::Type::Ip) {
+    registerPort("admin", admin_addr->ip()->port());
+  }
 }
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,

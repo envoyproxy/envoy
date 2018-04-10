@@ -39,6 +39,7 @@ TEST(StatsIsolatedStoreImplTest, All) {
 
   Histogram& h1 = store.histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
+  scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
   EXPECT_EQ("h1", h1.tagExtractedName());
@@ -87,6 +88,7 @@ TEST(StatsMacros, All) {
 
 TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
+  EXPECT_EQ("cluster_name", tag_extractor.name());
   std::string name = "cluster.test_cluster.upstream_cx_total";
   std::vector<Tag> tags;
   IntervalSetImpl<size_t> remove_characters;
@@ -109,6 +111,18 @@ TEST(TagExtractorTest, SingleSubexpression) {
   ASSERT_EQ(1, tags.size());
   EXPECT_EQ("80.", tags.at(0).value_);
   EXPECT_EQ("listner_port", tags.at(0).name_);
+}
+
+TEST(TagExtractorTest, substrMismatch) {
+  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.", ".foo.");
+  EXPECT_TRUE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
+}
+
+TEST(TagExtractorTest, noSubstrMismatch) {
+  TagExtractorImpl tag_extractor("listner_port", "^listener\\.(\\d+?\\.)\\.foo\\.");
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total"));
+  EXPECT_FALSE(tag_extractor.substrMismatch("listener.80.downstream_cx_total.foo.bar"));
 }
 
 TEST(TagExtractorTest, EmptyName) {

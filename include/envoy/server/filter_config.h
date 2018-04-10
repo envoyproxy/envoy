@@ -90,7 +90,7 @@ public:
    * @return a new ratelimit client. The implementation depends on the configuration of the server.
    */
   virtual RateLimit::ClientPtr
-  rateLimitClient(const Optional<std::chrono::milliseconds>& timeout) PURE;
+  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
@@ -135,7 +135,7 @@ public:
   /**
    * Store socket options to be set on the listen socket before listening.
    */
-  virtual void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+  virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
 };
 
 /**

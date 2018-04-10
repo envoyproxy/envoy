@@ -9,6 +9,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -87,9 +89,11 @@ public:
   const char* c_str() const { return buffer_.ref_; }
 
   /**
-   * @return a std::string.
+   * @return an absl::string_view.
    */
-  std::string getString() const { return std::string(buffer_.ref_, string_length_); }
+  absl::string_view getStringView() const {
+    return absl::string_view(buffer_.ref_, string_length_);
+  }
 
   /**
    * Return the string to a default state. Reference strings are not touched. Both inline/dynamic

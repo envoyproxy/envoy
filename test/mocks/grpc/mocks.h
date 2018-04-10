@@ -64,7 +64,7 @@ public:
   MOCK_METHOD5_T(send, AsyncRequest*(const Protobuf::MethodDescriptor& service_method,
                                      const Protobuf::Message& request,
                                      AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                     const Optional<std::chrono::milliseconds>& timeout));
+                                     const absl::optional<std::chrono::milliseconds>& timeout));
   MOCK_METHOD2_T(start, AsyncStream*(const Protobuf::MethodDescriptor& service_method,
                                      AsyncStreamCallbacks& callbacks));
 };
@@ -82,9 +82,9 @@ public:
   MockAsyncClientManager();
   ~MockAsyncClientManager();
 
-  MOCK_METHOD2(factoryForGrpcService,
+  MOCK_METHOD3(factoryForGrpcService,
                AsyncClientFactoryPtr(const envoy::api::v2::core::GrpcService& grpc_service,
-                                     Stats::Scope& scope));
+                                     Stats::Scope& scope, bool skip_cluster_check));
 };
 
 } // namespace Grpc

@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/common/optional.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
 #include "envoy/upstream/upstream.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -43,30 +45,49 @@ enum ResponseFlag {
   FaultInjected = 0x400,
   // Request was ratelimited locally by rate limit filter.
   RateLimited = 0x800,
-  // Request was unauthorized.
-  Unauthorized = 0x1000,
+  // Request was unauthorized by external authorization service.
+  UnauthorizedExternalService = 0x1000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = Unauthorized
+  LastFlag = UnauthorizedExternalService
 };
 
 /**
  * Additional information about a completed request for logging.
- * TODO(mattklein123): This interface needs a thorough cleanup in terms of how we handle time
- *                     durations. I will be following up with a dedicated change for this.
  */
 class RequestInfo {
 public:
   virtual ~RequestInfo() {}
 
   /**
-   * Each filter can set independent response flags. The flags are accumulated.
+   * @param response_flag the response flag. Each filter can set independent response flags. The
+   * flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
-   * Filters can trigger this callback when an upstream host has been selected.
+   * @param host the selected upstream host for the request.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return the number of body bytes received in the request.
+   */
+  virtual uint64_t bytesReceived() const PURE;
+
+  /**
+   * @return the protocol of the request.
+   */
+  virtual absl::optional<Http::Protocol> protocol() const PURE;
+
+  /**
+   * @param protocol the request's protocol.
+   */
+  virtual void protocol(Http::Protocol protocol) PURE;
+
+  /**
+   * @return the response code.
+   */
+  virtual absl::optional<uint32_t> responseCode() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -74,60 +95,113 @@ public:
   virtual SystemTime startTime() const PURE;
 
   /**
-   * @return duration from request start to when the entire request was received from the
-   * downstream client in microseconds.
-   */
-  virtual const Optional<std::chrono::microseconds>& requestReceivedDuration() const PURE;
+   * @return the monotonic time that the first byte of the request was received. Duration
+  calculations should be made relative to this value.
+  */
+  virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
-   * Set the duration from request start to when the entire request was received from the
-   * downstream client.
-   * @param time monotonic clock time when the response was received.
+   * @return the duration between the last byte of the request was received and the start of the
+   * request.
    */
-  virtual void requestReceivedDuration(MonotonicTime time) PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
 
   /**
-   * @return the duration from request start to when the first byte of the response was received
-   * from the upstream host in microseconds.
+   * Sets the time when the last byte of the request was received.
    */
-  virtual const Optional<std::chrono::microseconds>& responseReceivedDuration() const PURE;
+  virtual void onLastDownstreamRxByteReceived() PURE;
 
   /**
-   * Set the duration from request start to when the first byte of the response was received
-   * from the upstream host in microseconds.
-   * @param time monotonic clock time when the first byte of the response was received.
+   * @return the duration between the first byte of the request was sent upstream and the start of
+   * the request. There may be a considerable delta between lastDownstreamByteReceived and this
+   * value due to filters.
    */
-  virtual void responseReceivedDuration(MonotonicTime time) PURE;
+  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
 
   /**
-   * @return the # of body bytes received in the request.
+   * Sets the time when the first byte of the request was sent upstream.
    */
-  virtual uint64_t bytesReceived() const PURE;
+  virtual void onFirstUpstreamTxByteSent() PURE;
 
   /**
-   * @return the protocol of the request.
+   * @return the duration between the last bye of the request was sent upstream and the start of the
+   * request.
    */
-  virtual const Optional<Http::Protocol>& protocol() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
 
   /**
-   * Set the request's protocol.
+   * Sets the time when the last bye of the request was sent upstream.
    */
-  virtual void protocol(Http::Protocol protocol) PURE;
+  virtual void onLastUpstreamTxByteSent() PURE;
 
   /**
-   * @return the response code.
+   * @return the duration between the first byte of the response is received from upstream and the
+   * start of the request.
    */
-  virtual const Optional<uint32_t>& responseCode() const PURE;
+  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
 
   /**
-   * @return the # of body bytes sent in the response.
+   * Sets the time when the first byte of the response is received from
+   * upstream.
+   */
+  virtual void onFirstUpstreamRxByteReceived() PURE;
+
+  /**
+   * @return the duration between the last byte of the response is received from upstream and the
+   * start of the request.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
+
+  /**
+   * Sets the time when the last byte of the response is received from
+   * upstream.
+   */
+  virtual void onLastUpstreamRxByteReceived() PURE;
+
+  /**
+   * @return the duration between the first byte of the response is sent downstream and the start of
+   * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
+   * due to filters.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
+
+  /**
+   * Sets the time when the first byte of the response is sent downstream.
+   */
+  virtual void onFirstDownstreamTxByteSent() PURE;
+
+  /**
+   * @return the duration between the last byte of the response is sent downstream and the start of
+   * the request.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
+
+  /**
+   * Sets the time when the last byte of the response is sent downstream.
+   */
+  virtual void onLastDownstreamTxByteSent() PURE;
+
+  /**
+   * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+   * and may be longer than lastDownstreamTxByteSent.
+   */
+  virtual absl::optional<std::chrono::nanoseconds> requestComplete() const PURE;
+
+  /**
+   * Sets the end time for the request. This method is called once the request has been fully
+   * completed (i.e., when the request's ActiveStream is destroyed).
+   */
+  virtual void onRequestComplete() PURE;
+
+  /**
+   * Resets all timings related to the upstream in the event of a retry.
+   */
+  virtual void resetUpstreamTimings() PURE;
+
+  /**
+   * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
-
-  /**
-   * @return the microseconds duration of the first byte received to the last byte sent.
-   */
-  virtual std::chrono::microseconds duration() const PURE;
 
   /**
    * @return whether response flag is set or not.
@@ -140,7 +214,7 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
-   * Get the upstream local address.
+   * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
 
@@ -150,17 +224,17 @@ public:
   virtual bool healthCheck() const PURE;
 
   /**
-   * Set whether the request is a health check request or not.
+   * @param is_hc whether the request is a health check request or not.
    */
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * Get the downstream local address. Note that this will never be nullptr.
+   * @return the downstream local address. Note that this will never be nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
 
   /**
-   * Get the downstream remote address. Note that this will never be nullptr. Additionally note
+   * @return the downstream remote address. Note that this will never be nullptr. Additionally note
    * that this may not be the address of the physical connection if for example the address was
    * inferred from proxy proto, x-forwarded-for, etc.
    */
@@ -171,6 +245,19 @@ public:
    * will be nullptr if no route was selected.
    */
   virtual const Router::RouteEntry* routeEntry() const PURE;
+
+  /**
+   * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
+   */
+  virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
+
+  /**
+   * @param name the namespace used in the metadata in reverse DNS format, for example:
+   * envoy.test.my_filter
+   * @param value the struct to set on the namespace. A merge will be performed with new values for
+   * the same key overriding existing.
+   */
+  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 };
 
 } // namespace RequestInfo

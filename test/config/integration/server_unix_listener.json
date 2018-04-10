@@ -1,0 +1,38 @@
+{
+  "admin": {
+    "access_log_path": "/dev/null",
+    "address": "tcp://{{ ip_loopback_address }}:0"
+  },
+  "cluster_manager": {
+    "clusters": [{
+      "name": "cluster_0",
+      "connect_timeout_ms": 5000,
+      "type": "static",
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://{{ ip_loopback_address }}:0"}]
+    }]
+  },
+  "listeners": [{
+    "address": "unix://{{ socket_dir }}/unix-sockets.listener_0",
+    "filters": [{
+      "type": "read",
+      "name": "http_connection_manager",
+      "config": {
+        "codec_type": "auto",
+        "drain_timeout_ms": 5000,
+        "stat_prefix": "router",
+        "filters": [{ "type": "decoder", "name": "router", "config": {}}],
+        "route_config": {
+          "virtual_hosts": [{
+            "name": "vhost_0",
+            "domains": ["*"],
+            "routes": [{
+              "prefix": "/",
+              "cluster": "cluster_0"
+            }]
+          }]
+        }
+      }
+    }]
+  }]
+}

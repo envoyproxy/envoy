@@ -24,7 +24,7 @@ class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
 public:
   RingHashLoadBalancer(PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random,
-                       const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+                       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
                        const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
 private:
@@ -34,7 +34,7 @@ private:
   };
 
   struct Ring : public HashingLoadBalancer {
-    Ring(const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
+    Ring(const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
          const HostVector& hosts);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
@@ -45,11 +45,18 @@ private:
   typedef std::shared_ptr<const Ring> RingConstSharedPtr;
 
   // ThreadAwareLoadBalancerBase
-  HashingLoadBalancerSharedPtr createLoadBalancer(const HostVector& hosts) override {
-    return std::make_shared<Ring>(config_, hosts);
+  HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) override {
+    // Note that we only compute global panic on host set refresh. Given that the runtime setting
+    // will rarely change, this is a reasonable compromise to avoid creating extra LBs when we only
+    // need to create one per priority level.
+    if (isGlobalPanic(host_set)) {
+      return std::make_shared<Ring>(config_, host_set.hosts());
+    } else {
+      return std::make_shared<Ring>(config_, host_set.healthyHosts());
+    }
   }
 
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config_;
 };
 
 } // namespace Upstream

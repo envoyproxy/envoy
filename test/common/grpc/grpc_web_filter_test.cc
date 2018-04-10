@@ -91,6 +91,8 @@ public:
   void expectRequiredGrpcUpstreamHeaders(const Http::HeaderMap& request_headers) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
               request_headers.ContentType()->value().c_str());
+    // Ensure we never send content-length upstream
+    EXPECT_EQ(nullptr, request_headers.ContentLength());
     EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers.TE()->value().c_str());
     EXPECT_EQ(Http::Headers::get().GrpcAcceptEncodingValues.Default,
               request_headers.GrpcAcceptEncoding()->value().c_str());
@@ -226,6 +228,8 @@ TEST_P(GrpcWebFilterTest, Unary) {
   Http::TestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::Headers::get().ContentType, request_content_type());
   request_headers.addCopy(Http::Headers::get().Accept, request_accept());
+  request_headers.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   expectRequiredGrpcUpstreamHeaders(request_headers);
 

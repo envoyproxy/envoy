@@ -445,6 +445,11 @@ TEST(JsonLoaderTest, YamlObject) {
   }
 }
 
+TEST(JsonLoaderTest, YamlAsJsonString) {
+  const Json::ObjectSharedPtr json = Json::Factory::loadFromYamlString("");
+  EXPECT_EQ(json->asJsonString(), "null");
+}
+
 TEST(JsonLoaderTest, BadYamlException) {
   std::string bad_yaml = R"EOF(
 admin:

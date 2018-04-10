@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/time.h"
 
 #include "common/network/utility.h"
@@ -17,6 +16,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -217,7 +217,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -228,7 +228,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -302,7 +302,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -313,7 +313,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -396,7 +396,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
       .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Interval that does bring the host back in.
   EXPECT_CALL(time_source_, currentTime())
@@ -407,7 +407,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   interval_timer_->callback_();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime().valid());
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   // Eject host again but with a mix of 500s and 503s to trigger 5xx ejection first
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -743,8 +743,8 @@ TEST(DetectorHostMonitorNullImplTest, All) {
   DetectorHostMonitorNullImpl null_sink;
 
   EXPECT_EQ(0UL, null_sink.numEjections());
-  EXPECT_FALSE(null_sink.lastEjectionTime().valid());
-  EXPECT_FALSE(null_sink.lastUnejectionTime().valid());
+  EXPECT_FALSE(null_sink.lastEjectionTime());
+  EXPECT_FALSE(null_sink.lastUnejectionTime());
 }
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
@@ -755,61 +755,65 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
   NiceMock<MockSystemTimeSource> time_source;
   NiceMock<MockMonotonicTimeSource> monotonic_time_source;
-  Optional<SystemTime> time;
-  Optional<MonotonicTime> monotonic_time;
+  absl::optional<SystemTime> time;
+  absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
   EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_source, monotonic_time_source);
 
-  std::string log1;
+  StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"-1\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"5xx\", \"num_ejections\": \"0\", "
-                           "\"enforced\": \"true\"}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"-1\", \"cluster\": "
+                         "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+                         "\"eject\", \"type\": \"5xx\", \"num_ejections\": 0, "
+                         "\"enforced\": \"true\"}\n")))
       .WillOnce(SaveArg<0>(&log1));
   event_logger.logEject(host, detector, EjectionType::Consecutive5xx, true);
   Json::Factory::loadFromString(log1);
 
-  std::string log2;
+  StringViewSaver log2;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"-1\", \"cluster\": \"fake_cluster\", "
-                           "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"-1\", \"cluster\": \"fake_cluster\", "
+                         "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
+                         "\"num_ejections\": 0}\n")))
       .WillOnce(SaveArg<0>(&log2));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
-  time.value(time_source.currentTime() - std::chrono::seconds(30));
-  monotonic_time.value(monotonic_time_source.currentTime() - std::chrono::seconds(30));
+  time = (time_source.currentTime() - std::chrono::seconds(30));
+  monotonic_time = (monotonic_time_source.currentTime() - std::chrono::seconds(30));
 
-  std::string log3;
+  StringViewSaver log3;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
   EXPECT_CALL(host->outlier_detector_, successRate()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateAverage()).WillOnce(Return(-1));
   EXPECT_CALL(detector, successRateEjectionThreshold()).WillOnce(Return(-1));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"30\", \"cluster\": "
-                           "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
-                           "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": \"0\", "
-                           "\"enforced\": \"false\", "
-                           "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
-                           "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
-                           "}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"30\", \"cluster\": "
+                         "\"fake_cluster\", \"upstream_url\": \"10.0.0.1:443\", \"action\": "
+                         "\"eject\", \"type\": \"SuccessRate\", \"num_ejections\": 0, "
+                         "\"enforced\": \"false\", "
+                         "\"host_success_rate\": \"-1\", \"cluster_average_success_rate\": "
+                         "\"-1\", \"cluster_success_rate_ejection_threshold\": \"-1\""
+                         "}\n")))
       .WillOnce(SaveArg<0>(&log3));
   event_logger.logEject(host, detector, EjectionType::SuccessRate, false);
   Json::Factory::loadFromString(log3);
 
-  std::string log4;
+  StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
-  EXPECT_CALL(*file, write("{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
-                           "\"30\", \"cluster\": \"fake_cluster\", "
-                           "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
-                           "\"num_ejections\": 0}\n"))
+  EXPECT_CALL(*file, write(absl::string_view(
+                         "{\"time\": \"1970-01-01T00:00:00.000Z\", \"secs_since_last_action\": "
+                         "\"30\", \"cluster\": \"fake_cluster\", "
+                         "\"upstream_url\": \"10.0.0.1:443\", \"action\": \"uneject\", "
+                         "\"num_ejections\": 0}\n")))
       .WillOnce(SaveArg<0>(&log4));
   event_logger.logUneject(host);
   Json::Factory::loadFromString(log4);

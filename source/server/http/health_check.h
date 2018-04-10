@@ -120,4 +120,5 @@ private:
   const std::string endpoint_;
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
+
 } // namespace Envoy

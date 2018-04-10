@@ -26,7 +26,12 @@ public:
       fd_ = -1;
     }
   }
-  void setOptions(const OptionsSharedPtr& options) override { options_ = options; }
+  void addOption(const OptionConstSharedPtr& option) override {
+    if (!options_) {
+      options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
+    }
+    options_->emplace_back(std::move(option));
+  }
   const OptionsSharedPtr& options() const override { return options_; }
 
 protected:
@@ -44,6 +49,7 @@ protected:
       : SocketImpl(fd, local_address) {}
 
   void doBind();
+  void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
 };
 
 /**
@@ -51,15 +57,18 @@ protected:
  */
 class TcpListenSocket : public ListenSocketImpl {
 public:
-  TcpListenSocket(const Address::InstanceConstSharedPtr& address, bool bind_to_port);
-  TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
+  TcpListenSocket(const Address::InstanceConstSharedPtr& address,
+                  const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+  TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
+                  const Network::Socket::OptionsSharedPtr& options);
 };
 
 typedef std::unique_ptr<TcpListenSocket> TcpListenSocketPtr;
 
 class UdsListenSocket : public ListenSocketImpl {
 public:
-  UdsListenSocket(const std::string& uds_path);
+  UdsListenSocket(const Address::InstanceConstSharedPtr& address);
+  UdsListenSocket(int fd, const Address::InstanceConstSharedPtr& address);
 };
 
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
@@ -72,7 +81,6 @@ public:
   const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
                        bool restored) override {
-    ASSERT(!restored || *local_address != *local_address_);
     local_address_ = local_address;
     local_address_restored_ = restored;
   }

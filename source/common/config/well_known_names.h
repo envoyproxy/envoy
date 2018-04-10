@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
@@ -24,10 +25,7 @@ public:
     const std::string prefix = "envoy.";
     for (const auto& name : v2_names) {
       // Ensure there are no misplaced names provided to this constructor.
-      if (name.find(prefix) != 0) {
-        throw EnvoyException(fmt::format(
-            "Attempted to create a conversion for a v2 name that isn't prefixed by {}", prefix));
-      }
+      ASSERT(name.find(prefix) == 0);
       v1_to_v2_names_[name.substr(prefix.size())] = name;
     }
   }
@@ -48,6 +46,8 @@ private:
 
 /**
  * Well-known listener filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.listener.name.
  */
 class ListenerFilterNameValues {
 public:
@@ -61,6 +61,8 @@ typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
 
 /**
  * Well-known network filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.network.name.
  */
 class NetworkFilterNameValues {
 public:
@@ -104,6 +106,8 @@ typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
 
 /**
  * Well-known http filter names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New filters should use the well known name: envoy.filters.http.name.
  */
 class HttpFilterNameValues {
 public:
@@ -150,9 +154,11 @@ public:
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
 
 /**
- * Well-known access log names.
+ * Well-known tracer names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New tracers should use the well known name: envoy.tracers.name.
  */
-class HttpTracerNameValues {
+class TracerNameValues {
 public:
   // Lightstep tracer
   const std::string LIGHTSTEP = "envoy.lightstep";
@@ -162,10 +168,12 @@ public:
   const std::string DYNAMIC_OT = "envoy.dynamic.ot";
 };
 
-typedef ConstSingleton<HttpTracerNameValues> HttpTracerNames;
+typedef ConstSingleton<TracerNameValues> TracerNames;
 
 /**
  * Well-known stats sink names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New sinks should use the well known name: envoy.stat_sinks.name.
  */
 class StatsSinkNameValues {
 public:
@@ -182,7 +190,10 @@ public:
 typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
 
 /**
- * Well-known access log names.
+ * Well-known access logger names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New access loggers should use the well known name:
+ * envoy.access_loggers.name.
  */
 class AccessLogNameValues {
 public:
@@ -206,7 +217,7 @@ public:
 typedef ConstSingleton<MetadataFilterValues> MetadataFilters;
 
 /**
- * Keys for MetadataFilterConstants::ENVOY_LB metadata.
+ * Keys for MetadataFilterValues::ENVOY_LB metadata.
  */
 class MetadataEnvoyLbKeyValues {
 public:
@@ -232,9 +243,11 @@ public:
    * tags, such as "_rq_(\\d)xx$", will probably stay as regexes.
    */
   struct Descriptor {
-    Descriptor(const std::string& name, const std::string& regex) : name_(name), regex_(regex) {}
+    Descriptor(const std::string& name, const std::string& regex, const std::string& substr = "")
+        : name_(name), regex_(regex), substr_(substr) {}
     const std::string name_;
     const std::string regex_;
+    const std::string substr_;
   };
 
   // Cluster name tag
@@ -291,7 +304,7 @@ public:
   const std::vector<Descriptor>& descriptorVec() const { return descriptor_vec_; }
 
 private:
-  void addRegex(const std::string& name, const std::string& regex);
+  void addRegex(const std::string& name, const std::string& regex, const std::string& substr = "");
 
   // Collection of tag descriptors.
   std::vector<Descriptor> descriptor_vec_;
@@ -299,6 +312,12 @@ private:
 
 typedef ConstSingleton<TagNameValues> TagNames;
 
+/**
+ * Well-known transport socket names.
+ * TODO(mattklein123): Move this to extensions directory when the migration is complete.
+ * TODO(mattklein123): New transport sockets should use the well known name:
+ * envoy.transport_sockets.name.
+ */
 class TransportSocketNameValues {
 public:
   const std::string RAW_BUFFER = "raw_buffer";

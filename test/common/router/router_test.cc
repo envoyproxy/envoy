@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/network/utility.h"
 #include "common/router/router.h"
+#include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -32,6 +33,7 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::_;
@@ -215,10 +217,10 @@ TEST_F(RouterTest, Http2Upstream) {
 }
 
 TEST_F(RouterTest, UseDownstreamProtocol1) {
-  Optional<Http::Protocol> downstream_protocol{Http::Protocol::Http11};
+  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http11};
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http11, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -235,10 +237,10 @@ TEST_F(RouterTest, UseDownstreamProtocol1) {
 }
 
 TEST_F(RouterTest, UseDownstreamProtocol2) {
-  Optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
+  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
       .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
-  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnRef(downstream_protocol));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -258,7 +260,7 @@ TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Return(Optional<uint64_t>(10)));
+      .WillOnce(Return(absl::optional<uint64_t>(10)));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
@@ -283,12 +285,12 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Return(Optional<uint64_t>()));
+      .WillOnce(Return(absl::optional<uint64_t>()));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, &router_))
       .WillOnce(
           Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
                      Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(false, context->computeHashKey().valid());
+            EXPECT_FALSE(context->computeHashKey());
             return &cm_.conn_pool_;
           }));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -331,7 +333,7 @@ TEST_F(RouterTest, AddCookie) {
       .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
         cookie_value = add_cookie("foo", std::chrono::seconds(1337));
-        return Optional<uint64_t>(10);
+        return absl::optional<uint64_t>(10);
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -378,7 +380,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
                            const HashPolicy::AddCookieCallback add_cookie) {
         // this should be ignored
         add_cookie("foo", std::chrono::seconds(1337));
-        return Optional<uint64_t>(10);
+        return absl::optional<uint64_t>(10);
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -426,7 +428,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
                            const HashPolicy::AddCookieCallback add_cookie) {
         choco_c = add_cookie("choco", std::chrono::seconds(15));
         foo_c = add_cookie("foo", std::chrono::seconds(1337));
-        return Optional<uint64_t>(10);
+        return absl::optional<uint64_t>(10);
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))

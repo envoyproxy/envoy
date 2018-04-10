@@ -1,8 +1,11 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
 
+#include "common/config/well_known_names.h"
+
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -23,7 +26,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, StatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();

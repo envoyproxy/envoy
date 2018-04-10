@@ -105,7 +105,8 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, AddressImplSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port with an IP loopback address.
@@ -298,6 +299,29 @@ TEST(PipeInstanceTest, AbstractNamespace) {
 #else
   EXPECT_THROW(PipeInstance address("@/foo"), EnvoyException);
 #endif
+}
+
+TEST(PipeInstanceTest, BadAddress) {
+  std::string long_address(1000, 'X');
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(long_address), EnvoyException,
+                          "exceeds maximum UNIX domain socket path size");
+}
+
+TEST(PipeInstanceTest, UnlinksExistingFile) {
+  const auto bind_uds_socket = [](const std::string& path) {
+    PipeInstance address(path);
+    const int listen_fd = address.socket(SocketType::Stream);
+    ASSERT_GE(listen_fd, 0) << address.asString();
+    ScopedFdCloser closer(listen_fd);
+
+    const int rc = address.bind(listen_fd);
+    const int err = errno;
+    ASSERT_EQ(rc, 0) << address.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+  };
+
+  const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");
+  bind_uds_socket(path);
+  bind_uds_socket(path); // after closing, second bind to the same path should succeed.
 }
 
 TEST(AddressFromSockAddr, IPv4) {

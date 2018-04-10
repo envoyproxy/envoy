@@ -5,6 +5,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/ratelimit/ratelimit_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -33,7 +34,7 @@ class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::AsyncClientPtr{async_client_}, Optional<std::chrono::milliseconds>()) {}
+        client_(Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>()) {}
 
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncRequest async_request_;
@@ -50,14 +51,15 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::HeaderMapImpl headers;
     GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}});
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
-        .WillOnce(Invoke([this](const Protobuf::MethodDescriptor& service_method,
-                                const Protobuf::Message&, Grpc::AsyncRequestCallbacks&,
-                                Tracing::Span&,
-                                const Optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
-          EXPECT_EQ("pb.lyft.ratelimit.RateLimitService", service_method.service()->full_name());
-          EXPECT_EQ("ShouldRateLimit", service_method.name());
-          return &async_request_;
-        }));
+        .WillOnce(
+            Invoke([this](const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                          const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+              EXPECT_EQ("pb.lyft.ratelimit.RateLimitService",
+                        service_method.service()->full_name());
+              EXPECT_EQ("ShouldRateLimit", service_method.name());
+              return &async_request_;
+            }));
 
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
 
@@ -125,12 +127,12 @@ TEST(RateLimitGrpcFactoryTest, Create) {
   Grpc::MockAsyncClientManager async_client_manager;
   Stats::MockStore scope;
   EXPECT_CALL(async_client_manager,
-              factoryForGrpcService(ProtoEq(config.grpc_service()), Ref(scope)))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+              factoryForGrpcService(ProtoEq(config.grpc_service()), Ref(scope), _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(Optional<std::chrono::milliseconds>());
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -142,17 +144,17 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
   envoy::api::v2::core::GrpcService expected_grpc_service;
   expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(async_client_manager,
-              factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope)))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&) {
+              factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _))
+      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(Optional<std::chrono::milliseconds>());
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 TEST(RateLimitNullFactoryTest, Basic) {
   NullFactoryImpl factory;
-  ClientPtr client = factory.create(Optional<std::chrono::milliseconds>());
+  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
   MockRequestCallbacks request_callbacks;
   EXPECT_CALL(request_callbacks, complete(LimitStatus::OK));
   client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());

@@ -65,7 +65,7 @@ void ValidationInstance::initialize(Options& options,
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options.configPath(), options.v2ConfigOnly());
+  InstanceUtil::loadBootstrapConfig(bootstrap, options);
 
   Config::Utility::createTagProducer(bootstrap);
 

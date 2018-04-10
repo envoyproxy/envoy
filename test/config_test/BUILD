@@ -6,6 +6,10 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+)
 
 envoy_package()
 
@@ -22,7 +26,6 @@ envoy_cc_test(
     ],
     deps = [
         ":config_test_lib",
-        "//source/server/config/stats:statsd_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
@@ -39,5 +42,6 @@ envoy_cc_test_library(
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
-    ],
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ] + envoy_all_extensions(),
 )

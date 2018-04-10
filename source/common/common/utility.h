@@ -30,15 +30,20 @@ public:
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
    */
-  std::string fromTime(const SystemTime& time);
+  std::string fromTime(const SystemTime& time) const;
 
   /**
    * @return std::string representing the current GMT/UTC time based on the format string.
    */
   std::string now();
 
+  /**
+   * @return std::string the format string used.
+   */
+  const std::string& formatString() const { return format_string_; }
+
 private:
-  std::string fromTimeT(time_t time);
+  std::string fromTimeT(time_t time) const;
 
   std::string format_string_;
 };
@@ -118,9 +123,15 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
-   * @param return TRUE if successful, FALSE otherwise.
+   * @param return true if successful, false otherwise.
    */
   static bool atoul(const char* str, uint64_t& out, int base = 10);
+
+  /**
+   * Convert a string to a long, checking for error.
+   * @param return true if successful, false otherwise.
+   */
+  static bool atol(const char* str, int64_t& out, int base = 10);
 
   /**
    * Perform a case insensitive compare of 2 strings.
@@ -266,8 +277,9 @@ public:
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
    * length.
+   * @return string substring starting at start, and ending right before end.
    */
-  static std::string subspan(const std::string& source, size_t start, size_t end);
+  static std::string subspan(absl::string_view source, size_t start, size_t end);
 
   /**
    * Escape strings for logging purposes. Returns a copy of the string with

@@ -20,11 +20,11 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-std::string DateFormatter::fromTime(const SystemTime& time) {
+std::string DateFormatter::fromTime(const SystemTime& time) const {
   return fromTimeT(std::chrono::system_clock::to_time_t(time));
 }
 
-std::string DateFormatter::fromTimeT(time_t time) {
+std::string DateFormatter::fromTimeT(time_t time) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
@@ -71,8 +71,24 @@ bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
   }
 
   char* end_ptr;
+  errno = 0;
   out = strtoul(str, &end_ptr, base);
   if (*end_ptr != '\0' || (out == ULONG_MAX && errno == ERANGE)) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+bool StringUtil::atol(const char* str, int64_t& out, int base) {
+  if (strlen(str) == 0) {
+    return false;
+  }
+
+  char* end_ptr;
+  errno = 0;
+  out = strtol(str, &end_ptr, base);
+  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;
@@ -199,8 +215,8 @@ std::string StringUtil::join(const std::vector<std::string>& source, const std::
   return ret.substr(0, ret.length() - delimiter.length());
 }
 
-std::string StringUtil::subspan(const std::string& source, size_t start, size_t end) {
-  return source.substr(start, end - start);
+std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
+  return std::string(source.data() + start, end - start);
 }
 
 std::string StringUtil::escape(const std::string& source) {
@@ -232,10 +248,10 @@ std::string StringUtil::escape(const std::string& source) {
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static DateFormatter date_format("%Y-%m-%dT%H:%M:%S");
+  static DateFormatter default_date_format("%Y-%m-%dT%H:%M:%S");
 
   return fmt::format(
-      "{}.{:03d}Z", date_format.fromTime(time),
+      "{}.{:03d}Z", default_date_format.fromTime(time),
       std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count() %
           1000);
 }

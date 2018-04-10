@@ -3,11 +3,9 @@
 #include <string>
 
 #include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
-#include "envoy/server/instance.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/config/well_known_names.h"
-
-#include "server/config/network/http_connection_manager.h"
 
 namespace Envoy {
 namespace Server {

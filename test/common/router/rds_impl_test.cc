@@ -1,6 +1,9 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2/config_dump.pb.validate.h"
+
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
@@ -44,17 +47,12 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
 class RdsImplTest : public testing::Test {
 public:
   RdsImplTest() : request_(&cm_.async_client_) {
-    EXPECT_CALL(admin_,
-                addHandler("/routes", "print out currently loaded dynamic HTTP route tables", _,
-                           true, false))
-        .WillOnce(DoAll(SaveArg<2>(&handler_callback_), Return(true)));
+    EXPECT_CALL(admin_.config_tracker, addReturnsRaw("routes", _))
+        .WillOnce(Return(new Server::MockConfigTracker::MockEntryOwner()));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RdsImplTest() {
-    EXPECT_CALL(admin_, removeHandler("/routes"));
-    tls_.shutdownThread();
-  }
+  ~RdsImplTest() { tls_.shutdownThread(); }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -93,9 +91,9 @@ public:
   void expectRequest() {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
-                       const Optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+        .WillOnce(Invoke(
+            [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
+                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
               EXPECT_EQ((Http::TestHeaderMapImpl{
                             {":method", "GET"},
                             {":path", "/v1/routes/foo_route_config/cluster_name/node_name"},
@@ -121,7 +119,6 @@ public:
   RouteConfigProviderSharedPtr rds_;
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
-  Server::Admin::HandlerCb handler_callback_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -211,32 +208,15 @@ TEST_F(RdsImplTest, Basic) {
 
   // Make sure the initial empty route table works.
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-
-  // Test Admin /routes handler. There should be no route table to dump.
-  const std::string& routes_expected_output_no_routes = R"EOF([
-{
-"version_info": "",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {}
-
-}
-]
-)EOF";
   EXPECT_EQ("", rds_->versionInfo());
+<<<<<<< HEAD
   Http::HeaderMapImpl header_map;
   Server::HandlerInfoImpl handler_info;
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data, handler_info));
   EXPECT_EQ(routes_expected_output_no_routes, TestUtility::bufferToString(data));
   data.drain(data.length());
+=======
+>>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   EXPECT_EQ(0UL, store_.gauge("foo.rds.foo_route_config.version").value());
 
   // Initial request.
@@ -254,33 +234,13 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-
-  // Test Admin /routes handler. Now we should have an empty route table, with exception of name.
-  const std::string routes_expected_output_only_name = R"EOF([
-{
-"version_info": "hash_15ed54077da94d8b",
-"route_config_name": "foo_route_config",
-"config_source": {
- "api_config_source": {
-  "cluster_names": [
-   "foo_cluster"
-  ],
-  "refresh_delay": "1s"
- }
-}
-,
-"route_table_dump": {
- "name": "foo_route_config"
-}
-
-}
-]
-)EOF";
-
   EXPECT_EQ("hash_15ed54077da94d8b", rds_->versionInfo());
+<<<<<<< HEAD
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data, handler_info));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
+=======
+>>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
@@ -295,10 +255,13 @@ TEST_F(RdsImplTest, Basic) {
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
 
+<<<<<<< HEAD
   // Test Admin /routes handler. The route table should not change.
   EXPECT_EQ(Http::Code::OK, handler_callback_("/routes", header_map, data, handler_info));
   EXPECT_EQ(routes_expected_output_only_name, TestUtility::bufferToString(data));
   data.drain(data.length());
+=======
+>>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   EXPECT_EQ(1580011435426663819U, store_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
@@ -344,6 +307,7 @@ TEST_F(RdsImplTest, Basic) {
                        ->routeEntry()
                        ->clusterName());
 
+<<<<<<< HEAD
   // Test Admin /routes handler. The route table should now have the information given in
   // response2_json.
   const std::string routes_expected_output_full_table = R"EOF([
@@ -421,6 +385,10 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_EQ(routes_expected_output_usage, TestUtility::bufferToString(data));
   data.drain(data.length());
 
+=======
+  EXPECT_EQ(8808926191882896258U, store_.gauge("foo.rds.foo_route_config.version").value());
+
+>>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
 
@@ -502,22 +470,19 @@ public:
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
-    provider_ = route_config_provider_manager_->getRouteConfigProvider(
+    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(
         rds_, cm_, store_, "foo_prefix.", init_manager_);
   }
 
   RouteConfigProviderManagerImplTest() {
-    EXPECT_CALL(admin_,
-                addHandler("/routes", "print out currently loaded dynamic HTTP route tables", _,
-                           true, false))
-        .WillOnce(DoAll(SaveArg<2>(&handler_callback_), Return(true)));
+    ON_CALL(admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
+    EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
+        .WillOnce(DoAll(SaveArg<1>(&config_tracker_callback_),
+                        Return(new Server::MockConfigTracker::MockEntryOwner())));
     route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
         runtime_, dispatcher_, random_, local_info_, tls_, admin_));
   }
-  ~RouteConfigProviderManagerImplTest() {
-    EXPECT_CALL(admin_, removeHandler("/routes"));
-    tls_.shutdownThread();
-  }
+  ~RouteConfigProviderManagerImplTest() { tls_.shutdownThread(); }
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -528,11 +493,25 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Init::MockManager> init_manager_;
   NiceMock<Server::MockAdmin> admin_;
+  NiceMock<Server::MockConfigTracker> config_tracker_;
+  Server::ConfigTracker::Cb config_tracker_callback_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   Server::Admin::HandlerCb handler_callback_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
+
+TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
+  setup();
+  auto message_ptr = config_tracker_callback_();
+  EXPECT_NE(nullptr, message_ptr);
+  const auto& route_config_dump =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2::RouteConfigDump&>(*message_ptr);
+  EXPECT_EQ(0, route_config_dump.static_route_configs_size());
+  EXPECT_EQ(1, route_config_dump.dynamic_route_configs_size());
+  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(
+      provider_->configAsProto(), route_config_dump.dynamic_route_configs(0)));
+}
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   Buffer::OwnedImpl data;
@@ -544,8 +523,9 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 = route_config_provider_manager_->getRouteConfigProvider(
-      rds_, cm_, store_, "foo_prefix", init_manager_);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->getRdsRouteConfigProvider(rds_, cm_, store_, "foo_prefix",
+                                                                init_manager_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider_, provider2);
   EXPECT_EQ(2UL, provider_.use_count());
@@ -569,18 +549,20 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
-  RouteConfigProviderSharedPtr provider3 = route_config_provider_manager_->getRouteConfigProvider(
-      rds2, cm_, store_, "foo_prefix", init_manager_);
+  RouteConfigProviderSharedPtr provider3 =
+      route_config_provider_manager_->getRdsRouteConfigProvider(rds2, cm_, store_, "foo_prefix",
+                                                                init_manager_);
   EXPECT_NE(provider3, provider_);
   EXPECT_EQ(2UL, provider_.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
 
-  std::vector<RdsRouteConfigProviderSharedPtr> configured_providers =
-      route_config_provider_manager_->rdsRouteConfigProviders();
+  std::vector<RouteConfigProviderSharedPtr> configured_providers =
+      route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
   EXPECT_EQ(3UL, provider_.use_count());
   EXPECT_EQ(2UL, provider3.use_count());
 
+<<<<<<< HEAD
   const std::string routes_expected_output = R"EOF([
 {
 "version_info": "",
@@ -622,20 +604,22 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_EQ(routes_expected_output, TestUtility::bufferToString(data));
   data.drain(data.length());
 
+=======
+>>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   provider_.reset();
   provider2.reset();
   configured_providers.clear();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider pointed at by provider3.
-  configured_providers = route_config_provider_manager_->rdsRouteConfigProviders();
+  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
   EXPECT_EQ(provider3, configured_providers.front());
 
   provider3.reset();
   configured_providers.clear();
 
-  configured_providers = route_config_provider_manager_->rdsRouteConfigProviders();
+  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(0UL, configured_providers.size());
 }
 

@@ -43,6 +43,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
 
+  Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -55,12 +56,11 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
       restarter_.reset(new Server::HotRestartNopImpl());
     }
 
-    Stats::RawStatData::configure(options_);
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    Logger::Registry::initialize(options_.logLevel(), log_lock);
+    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
 
     stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
     server_.reset(new Server::InstanceImpl(options_, local_address, default_test_hooks_,
@@ -70,7 +70,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   }
   case Server::Mode::Validate:
     restarter_.reset(new Server::HotRestartNopImpl());
-    Logger::Registry::initialize(options_.logLevel(), restarter_->logLock());
+    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), restarter_->logLock());
     break;
   }
 }

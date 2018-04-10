@@ -4,6 +4,7 @@
 
 #include "envoy/http/header_map.h"
 
+#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
@@ -54,9 +55,9 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 IntegrationTestServer::~IntegrationTestServer() {
   ENVOY_LOG(info, "stopping integration test server");
 
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      server_->admin().socket().localAddress()->ip()->port(), "GET", "/quitquitquit", "",
-      Http::CodecClient::Type::HTTP1, server_->admin().socket().localAddress()->ip()->version());
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(server_->admin().socket().localAddress(), "GET",
+                                         "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
@@ -99,4 +100,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   server_.reset();
   stat_store_ = nullptr;
 }
+
+Server::TestOptionsImpl Server::TestOptionsImpl::asConfigYaml() {
+  return TestOptionsImpl("", Filesystem::fileReadToEnd(config_path_), local_address_ip_version_);
+}
+
 } // namespace Envoy

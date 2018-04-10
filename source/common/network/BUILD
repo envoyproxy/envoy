@@ -38,12 +38,12 @@ envoy_cc_library(
     name = "connection_lib",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":filter_manager_lib",
         ":raw_buffer_socket_lib",
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
@@ -170,6 +170,20 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_option_lib",
+    srcs = ["socket_option_impl.cc"],
+    hdrs = ["socket_option_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
     ],
 )
 

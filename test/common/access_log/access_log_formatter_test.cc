@@ -46,38 +46,30 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
-    RequestInfoFormatter start_time_format("START_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
-  }
-
-  {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(5000)};
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
+    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
     EXPECT_EQ("5", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
-    Optional<std::chrono::microseconds> duration;
-    EXPECT_CALL(request_info, requestReceivedDuration()).WillOnce(ReturnRef(duration));
+    absl::optional<std::chrono::nanoseconds> dur;
+    EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
     EXPECT_EQ("-", request_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<std::chrono::microseconds> duration{std::chrono::microseconds(10000)};
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillRepeatedly(ReturnRef(duration));
+    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(10000000);
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("10", response_duration_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_duration_format("RESPONSE_DURATION");
-    Optional<std::chrono::microseconds> duration;
-    EXPECT_CALL(request_info, responseReceivedDuration()).WillOnce(ReturnRef(duration));
+    absl::optional<std::chrono::nanoseconds> dur;
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("-", response_duration_format.format(header, header, request_info));
   }
 
@@ -89,22 +81,22 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter protocol_format("PROTOCOL");
-    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillOnce(ReturnRef(protocol));
+    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillOnce(Return(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_format("RESPONSE_CODE");
-    Optional<uint32_t> response_code{200};
-    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    absl::optional<uint32_t> response_code{200};
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("200", response_format.format(header, header, request_info));
   }
 
   {
     RequestInfoFormatter response_code_format("RESPONSE_CODE");
-    Optional<uint32_t> response_code;
-    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnRef(response_code));
+    absl::optional<uint32_t> response_code;
+    EXPECT_CALL(request_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("0", response_code_format.format(header, header, request_info));
   }
 
@@ -116,9 +108,9 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter duration_format("DURATION");
-    std::chrono::microseconds time{2000};
-    EXPECT_CALL(request_info, duration()).WillOnce(Return(time));
-    EXPECT_EQ("2", duration_format.format(header, header, request_info));
+    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+    EXPECT_CALL(request_info, requestComplete()).WillRepeatedly(Return(dur));
+    EXPECT_EQ("15", duration_format.format(header, header, request_info));
   }
 
   {
@@ -184,22 +176,22 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}};
 
   {
-    RequestHeaderFormatter formatter(":Method", "", Optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
     EXPECT_EQ("GET", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    RequestHeaderFormatter formatter(":path", ":method", Optional<size_t>());
+    RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
     EXPECT_EQ("/", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    RequestHeaderFormatter formatter(":TEST", ":METHOD", Optional<size_t>());
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>());
     EXPECT_EQ("GET", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    RequestHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
+    RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
     EXPECT_EQ("-", formatter.format(request_header, response_header, request_info));
   }
 }
@@ -210,23 +202,109 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   Http::TestHeaderMapImpl response_header{{":method", "PUT"}, {"test", "test"}};
 
   {
-    ResponseHeaderFormatter formatter(":method", "", Optional<size_t>());
+    ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>());
     EXPECT_EQ("PUT", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    ResponseHeaderFormatter formatter("test", ":method", Optional<size_t>());
+    ResponseHeaderFormatter formatter("test", ":method", absl::optional<size_t>());
     EXPECT_EQ("test", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    ResponseHeaderFormatter formatter(":path", ":method", Optional<size_t>());
+    ResponseHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
     EXPECT_EQ("PUT", formatter.format(request_header, response_header, request_info));
   }
 
   {
-    ResponseHeaderFormatter formatter("does_not_exist", "", Optional<size_t>());
+    ResponseHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
     EXPECT_EQ("-", formatter.format(request_header, response_header, request_info));
+  }
+}
+
+/**
+ * Populate a metadata object with the following test data:
+ * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
+ */
+void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
+  ProtobufWkt::Struct struct_obj;
+  ProtobufWkt::Value val;
+  auto& fields_map = *struct_obj.mutable_fields();
+  val.set_string_value("test_value");
+  fields_map["test_key"] = val;
+  val.set_string_value("inner_value");
+  ProtobufWkt::Struct struct_inner;
+  (*struct_inner.mutable_fields())["inner_key"] = val;
+  val.clear_string_value();
+  *val.mutable_struct_value() = struct_inner;
+  fields_map["test_obj"] = val;
+  (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
+}
+
+TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+
+  {
+    MetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test_value\"", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "inner_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"inner_value\"", json);
+  }
+  // not found cases
+  {
+    MetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  // size limit
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test", json);
+  }
+}
+
+TEST(AccessLogFormatterTest, startTimeFormatter) {
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
+  Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+
+  {
+    StartTimeFormatter start_time_format("%Y/%m/%d");
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ("2018/03/28", start_time_format.format(header, header, request_info));
+  }
+
+  {
+    StartTimeFormatter start_time_format("");
+    SystemTime time;
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
   }
 }
 
@@ -240,8 +318,8 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%[]";
     FormatterImpl formatter(format);
 
-    Optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(request_info, protocol()).WillRepeatedly(ReturnRef(protocol));
+    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+    EXPECT_CALL(request_info, protocol()).WillRepeatedly(Return(protocol));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT[]",
               formatter.format(request_header, response_header, request_info));
@@ -257,9 +335,35 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   {
     const std::string format =
         "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%";
+
     FormatterImpl formatter(format);
 
     EXPECT_EQ("GET|G|PU|GET", formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    envoy::api::v2::core::Metadata metadata;
+    populateMetadataTestData(metadata);
+    EXPECT_CALL(request_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
+                               "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+              formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
+                               "%START_TIME%";
+
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("2018/03/28|1522280158|bad_format|2018-03-28T23:35:58.000Z",
+              formatter.format(request_header, response_header, request_info));
   }
 }
 
@@ -282,7 +386,9 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(TEST):10",
       "REQ(:TEST):10%",
       "%REQ(TEST:10%",
-      "%REQ("};
+      "%REQ(",
+      "%REQ(X?Y?Z)%",
+      "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException);

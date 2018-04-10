@@ -31,26 +31,12 @@
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_balancer_impl.h"
+#include "common/upstream/locality.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Wrapper around envoy::api::v2::core::Locality to make it easier to compare for ordering in
-// std::map and in tests to construct literals.
-// TODO(htuch): Consider making this reference based when we have a single string implementation.
-class Locality : public std::tuple<std::string, std::string, std::string> {
-public:
-  Locality(const std::string& region, const std::string& zone, const std::string& sub_zone)
-      : std::tuple<std::string, std::string, std::string>(region, zone, sub_zone) {}
-  Locality(const envoy::api::v2::core::Locality& locality)
-      : std::tuple<std::string, std::string, std::string>(locality.region(), locality.zone(),
-                                                          locality.sub_zone()) {}
-  bool empty() const {
-    return std::get<0>(*this).empty() && std::get<1>(*this).empty() && std::get<2>(*this).empty();
-  }
-};
 
 /**
  * Null implementation of HealthCheckHostMonitor.
@@ -168,7 +154,11 @@ private:
 
 class HostsPerLocalityImpl : public HostsPerLocality {
 public:
-  HostsPerLocalityImpl() : HostsPerLocalityImpl({}, false) {}
+  HostsPerLocalityImpl() : HostsPerLocalityImpl(std::vector<HostVector>(), false) {}
+
+  // Single locality constructor
+  HostsPerLocalityImpl(const HostVector& hosts, bool has_local_locality = false)
+      : HostsPerLocalityImpl(std::vector<HostVector>({hosts}), has_local_locality) {}
 
   HostsPerLocalityImpl(std::vector<HostVector>&& locality_hosts, bool has_local_locality)
       : local_(has_local_locality), hosts_per_locality_(std::move(locality_hosts)) {
@@ -203,13 +193,8 @@ public:
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                   const HostVector& hosts_added, const HostVector& hosts_removed) override {
-    hosts_ = std::move(hosts);
-    healthy_hosts_ = std::move(healthy_hosts);
-    hosts_per_locality_ = std::move(hosts_per_locality);
-    healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
-    runUpdateCallbacks(hosts_added, hosts_removed);
-  }
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) override;
 
   /**
    * Install a callback that will be invoked when the host set membership changes.
@@ -230,6 +215,8 @@ public:
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
   }
+  LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
+  absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
 
 protected:
@@ -238,6 +225,9 @@ protected:
   }
 
 private:
+  // Weight for a locality taking into account health status.
+  double effectiveLocalityWeight(uint32_t index) const;
+
   uint32_t priority_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
@@ -246,6 +236,17 @@ private:
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
+  // Locality weights (used to build WRR locality_scheduler_);
+  LocalityWeightsConstSharedPtr locality_weights_;
+  // WRR locality scheduler state.
+  struct LocalityEntry {
+    LocalityEntry(uint32_t index, double effective_weight)
+        : index_(index), effective_weight_(effective_weight) {}
+    const uint32_t index_;
+    const double effective_weight_;
+  };
+  std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -294,9 +295,9 @@ class ClusterInfoImpl : public ClusterInfo,
                         public Server::Configuration::TransportSocketFactoryContext {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                  const Network::Address::InstanceConstSharedPtr source_address,
-                  Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -307,6 +308,9 @@ public:
     return common_lb_config_;
   }
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
+  const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return idle_timeout_;
+  }
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -314,7 +318,8 @@ public:
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
-  const Optional<envoy::api::v2::Cluster::RingHashLbConfig>& lbRingHashConfig() const override {
+  const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
+  lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
   bool maintenanceMode() const override;
@@ -349,13 +354,12 @@ private:
     Managers managers_;
   };
 
-  static uint64_t parseFeatures(const envoy::api::v2::Cluster& config);
-
   Runtime::Loader& runtime_;
   const std::string name_;
   const envoy::api::v2::Cluster::DiscoveryType type_;
   const uint64_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
@@ -368,7 +372,7 @@ private:
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
-  Optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
@@ -407,6 +411,15 @@ public:
    */
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
 
+  /**
+   * Wrapper around Network::Address::resolveProtoAddress() that provides improved error message
+   * based on the cluster's type.
+   * @param address supplies the address proto to resolve.
+   * @return Network::Address::InstanceConstSharedPtr the resolved address.
+   */
+  const Network::Address::InstanceConstSharedPtr
+  resolveProtoAddress(const envoy::api::v2::core::Address& address);
+
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
@@ -416,9 +429,9 @@ public:
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                  const Network::Address::InstanceConstSharedPtr source_address,
-                  Runtime::Loader& runtime, Stats::Store& stats,
-                  Ssl::ContextManager& ssl_context_manager, bool added_via_api);
+                  const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);

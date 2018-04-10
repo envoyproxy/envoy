@@ -37,6 +37,18 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
+* During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
+  to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
+  is somewhat subjective so just use your best judgment. A few of the most important labels that are
+  not self explanatory are:
+  * **beginner**: Mark any issue that can reasonably be accomplished by a new contributor with
+    this label.
+  * **help wanted**: Unless it is immediately obvious that someone is going to work on an issue (and
+    if so assign it), mark it help wanted.
+  * **question**: If it's unclear if an issue is immediately actionable, mark it with the
+    question label. Questions are easy to search for and close out at a later time. Questions
+    can be promoted to other issue types once it's clear they are actionable (at which point the
+    question label should be removed).
 * Make sure that ongoing PRs are moving forward at the right pace or closing them.
 * Participate when called upon in the [security release process](SECURITY_RELEASE_PROCESS.md). Note
   that although this should be a rare occurrence, if a serious vulnerability is found, the process
@@ -51,6 +63,41 @@
   questions and do all reviews, but it is their responsibility to make sure that everything is
   being actively covered by someone.
 * The on-call rotation is tracked at PagerDuty. The calendar is visible [here](https://pagerduty.github.io/addons/PDcal/index.html?iCalURL=https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH) or you can subscribe to the iCal feed [here](https://cncf.pagerduty.com/private/e44caf2604ce6c5ccc616b7b84f99b94dc801dba4cceb8d71fb128338f75b9af/feed/PXU9KPH).
+
+## Cutting a release
+
+* We do releases approximately every 3 months as described in the
+  [release cadence documentation](CONTRIBUTING.md#release-cadence).
+* Decide on the somewhat arbitrary time that a release will occur.
+* Begin marshalling the ongoing PR flow in both this repo and
+  [data-plane-api](https://github.com/envoyproxy/data-plane-api). Ask maintainers to hold off
+  merging any particularly risky PRs until after the release is tagged. This is because we currently
+  don't use release branches and assume that master is RC quality at all times. At the same time,
+  try to make sure that data-plane-api doc PRs are only merged *after* the Envoy PR so that we don't
+  wind up with stale docs.
+* Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
+  and make any needed corrections.
+* Switch the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION) from a
+  "dev" variant to a final variant. E.g., "1.6.0-dev" to "1.6.0". Get a review and merge.
+* Update the [data-plane-api SHA in Envoy](https://github.com/envoyproxy/envoy/blob/ed312500ec38876446ce8ee70a06f7cda4adc937/bazel/repository_locations.bzl#L79)
+  to the final release SHA. Get the PR approved and merge.
+* **Wait for tests to pass on master.**
+* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
+  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match
+  the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION).**
+* Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
+  the final docs. The final documentation will end up in the
+  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
+* Contact rdl@ on Slack so that the website can be updated for the new release.
+* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
+* If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
+  Envoy account post).
+* Do a new PR to update the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION)
+  to the next development release. E.g., "1.7.0-dev". At the same time, also add a new empty section
+  to the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
+  for the following version. E.g., "1.7.0".
+* Update [DEPRECATED.md](DEPRECATED.md) to remove the '(pending)' comment on the current version,
+  replacing it with the release date. Add a placeholder for the next version.
 
 ## When does a maintainer lose maintainer status
 

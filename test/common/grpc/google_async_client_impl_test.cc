@@ -93,7 +93,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 

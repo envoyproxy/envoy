@@ -27,6 +27,41 @@ using testing::_;
 namespace Envoy {
 namespace Http {
 
+class MockConnectionManagerConfig : public ConnectionManagerConfig {
+public:
+  MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
+
+  // Http::ConnectionManagerConfig
+  ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance& instance,
+                                  ServerConnectionCallbacks& callbacks) override {
+    return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
+  }
+
+  MOCK_METHOD0(accessLogs, const std::list<AccessLog::InstanceSharedPtr>&());
+  MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
+                                               ServerConnectionCallbacks&));
+  MOCK_METHOD0(dateProvider, DateProvider&());
+  MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
+  MOCK_METHOD0(filterFactory, FilterChainFactory&());
+  MOCK_METHOD0(generateRequestId, bool());
+  MOCK_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>&());
+  MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
+  MOCK_METHOD0(serverName, const std::string&());
+  MOCK_METHOD0(stats, ConnectionManagerStats&());
+  MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
+  MOCK_METHOD0(useRemoteAddress, bool());
+  MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
+  MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
+  MOCK_CONST_METHOD0(setCurrentClientCertDetails,
+                     const std::vector<Http::ClientCertDetailsType>&());
+  MOCK_METHOD0(localAddress, const Network::Address::Instance&());
+  MOCK_METHOD0(userAgent, const absl::optional<std::string>&());
+  MOCK_METHOD0(tracingConfig, const Http::TracingConnectionManagerConfig*());
+  MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
+  MOCK_CONST_METHOD0(proxy100Continue, bool());
+  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+};
+
 class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
@@ -62,7 +97,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
-  Optional<std::string> user_agent_;
+  absl::optional<std::string> user_agent_;
   NiceMock<Runtime::MockLoader> runtime_;
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -136,7 +171,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(local_info_, nodeName()).WillByDefault(Return(canary_node_));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", ""}, {"x-envoy-downstream-service-cluster", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -257,7 +292,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers{{"user-agent", "foo"}, {"x-envoy-downstream-service-cluster", "foo"}};
   EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(empty_node_));
 
@@ -272,7 +307,7 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  user_agent_.value("bar");
+  user_agent_ = "bar";
   TestHeaderMapImpl headers;
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),

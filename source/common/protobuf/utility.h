@@ -50,6 +50,13 @@ namespace ProtobufPercentHelper {
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value);
 uint64_t convertPercent(double percent, uint64_t max_value);
 
+/**
+ * Convert a fractional percent denominator enum into an integer.
+ * @param percent supplies percent to convert.
+ * @return the converted denominator.
+ */
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
+
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
 
@@ -156,6 +163,12 @@ public:
     validate(message);
   }
 
+  template <class MessageType>
+  static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
+    loadFromYaml(yaml, message);
+    validate(message);
+  }
+
   /**
    * Downcast and validate protoc-gen-validate constraints on a given protobuf.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
@@ -212,6 +225,14 @@ public:
   static Json::ObjectSharedPtr getJsonObjectFromMessage(const Protobuf::Message& message) {
     return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
   }
+
+  /**
+   * Utility method to create a Struct containing the passed in key/value strings.
+   *
+   * @param key the key to use to set the value
+   * @param value the string value to associate with the key
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 };
 
 class ValueUtil {

@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
     deps = [
+        ":config_tracker_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:listen_socket_interface",
@@ -39,6 +40,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
+        "//source/common/http:default_server_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
@@ -49,7 +51,19 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/stats:hystrix_lib",
         "//source/common/upstream:host_utility_lib",
-        "//source/server/config/network:http_connection_manager_lib",
+        "//source/extensions/access_loggers/file:file_access_log_lib",
+        "@envoy_api//envoy/admin/v2:config_dump_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_tracker_lib",
+    srcs = ["config_tracker_impl.cc"],
+    hdrs = ["config_tracker_impl.h"],
+    deps = [
+        "//include/envoy/server:config_tracker_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:macros",
     ],
 )
 
@@ -63,6 +77,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/config:filter_json_lib",
@@ -72,7 +87,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/server/config/network:http_connection_manager_lib",
         "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
     ],
 )

@@ -12,7 +12,7 @@ namespace Envoy {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const Optional<std::chrono::milliseconds>& timeout)
+                               const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit")),
       async_client_(std::move(async_client)), timeout_(timeout) {}
@@ -68,7 +68,6 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitRes
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  UNREFERENCED_PARAMETER(status);
   callbacks_->complete(LimitStatus::Error);
   callbacks_ = nullptr;
 }
@@ -83,10 +82,10 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
       envoy::config::ratelimit::v2::RateLimitServiceConfig::kClusterName) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
-  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope);
+  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-ClientPtr GrpcFactoryImpl::create(const Optional<std::chrono::milliseconds>& timeout) {
+ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
   return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
 }
 

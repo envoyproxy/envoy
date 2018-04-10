@@ -12,6 +12,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,7 +29,7 @@ namespace ConfigTest {
 
 class ConfigTest {
 public:
-  ConfigTest(const std::string& file_path) : options_(file_path, Network::Address::IpVersion::v6) {
+  ConfigTest(const Server::TestOptionsImpl& options) : options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -36,8 +37,7 @@ public:
         .WillByDefault(Return("access_token"));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_.configPath(),
-                                              options_.v2ConfigOnly());
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
@@ -69,7 +69,8 @@ public:
     try {
       main_config.initialize(bootstrap, server_, *cluster_manager_factory_);
     } catch (const EnvoyException& ex) {
-      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", file_path, ex.what());
+      ADD_FAILURE() << fmt::format("'{}' config failed. Error: {}", options_.configPath(),
+                                   ex.what());
     }
 
     server_.thread_local_.shutdownThread();
@@ -83,20 +84,42 @@ public:
   NiceMock<Server::MockWorkerFactory> worker_factory_;
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
   Runtime::RandomGeneratorImpl random_;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 };
 
+void testMerge() {
+  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  Server::TestOptionsImpl options("google_com_proxy.v2.yaml", overlay,
+                                  Network::Address::IpVersion::v6);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
+}
+
+void testIncompatibleMerge() {
+  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  Server::TestOptionsImpl options("google_com_proxy.v1.yaml", overlay,
+                                  Network::Address::IpVersion::v6);
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, options),
+                            EnvoyException,
+                            "V1 config (detected) with --config-yaml is not supported");
+}
+
 uint32_t run(const std::string& directory) {
-  // Change working directory, otherwise we won't be able to read files using relative paths.
-  char cwd[PATH_MAX];
-  RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr);
-  RELEASE_ASSERT(::chdir(directory.c_str()) == 0);
   uint32_t num_tested = 0;
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
-    ConfigTest config(filename);
+    Server::TestOptionsImpl options(filename, Network::Address::IpVersion::v6);
+    ConfigTest test1(options);
+    // Config flag --config-yaml is only supported for v2 configs.
+    envoy::config::bootstrap::v2::Bootstrap bootstrap;
+    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
+        Server::InstanceUtil::BootstrapVersion::V2) {
+      ConfigTest test2(options.asConfigYaml());
+    }
     num_tested++;
   }
-  // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
-  RELEASE_ASSERT(::chdir(cwd) == 0);
   return num_tested;
 }
 

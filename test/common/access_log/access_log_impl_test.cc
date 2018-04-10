@@ -41,6 +41,12 @@ parseAccessLogFromJson(const std::string& json_string) {
   return access_log;
 }
 
+envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
+  envoy::config::filter::accesslog::v2::AccessLog access_log;
+  MessageUtil::loadFromYaml(yaml, access_log);
+  return access_log;
+}
+
 class TestRequestInfo : public RequestInfo::RequestInfo {
 public:
   TestRequestInfo() {
@@ -49,25 +55,21 @@ public:
     fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on osx
     fake_time.tm_mday = 1;
     start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
+
+    MonotonicTime now = std::chrono::steady_clock::now();
+    start_time_monotonic_ = now;
+    end_time_ = now + std::chrono::milliseconds(3);
   }
 
   SystemTime startTime() const override { return start_time_; }
-  const Optional<std::chrono::microseconds>& requestReceivedDuration() const override {
-    return request_received_duration_;
-  }
-  void requestReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
-  const Optional<std::chrono::microseconds>& responseReceivedDuration() const override {
-    return request_received_duration_;
-  }
-  void responseReceivedDuration(MonotonicTime time) override { UNREFERENCED_PARAMETER(time); }
+  MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
+
   uint64_t bytesReceived() const override { return 1; }
-  const Optional<Http::Protocol>& protocol() const override { return protocol_; }
+  absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
-  const Optional<uint32_t>& responseCode() const override { return response_code_; }
+  absl::optional<uint32_t> responseCode() const override { return response_code_; }
   uint64_t bytesSent() const override { return 2; }
-  std::chrono::microseconds duration() const override {
-    return std::chrono::microseconds(duration_);
-  }
+
   bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
@@ -92,19 +94,113 @@ public:
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
+  absl::optional<std::chrono::nanoseconds>
+  duration(const absl::optional<MonotonicTime>& time) const {
+    if (!time) {
+      return {};
+    }
+
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() -
+                                                                start_time_monotonic_);
+  }
+
+  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
+    return duration(last_rx_byte_received_);
+  }
+
+  void onLastDownstreamRxByteReceived() override {
+    last_rx_byte_received_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
+    return duration(first_upstream_tx_byte_sent_);
+  }
+
+  void onFirstUpstreamTxByteSent() override {
+    first_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
+    return duration(last_upstream_tx_byte_sent_);
+  }
+
+  void onLastUpstreamTxByteSent() override {
+    last_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
+    return duration(first_upstream_rx_byte_received_);
+  }
+
+  void onFirstUpstreamRxByteReceived() override {
+    first_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
+    return duration(last_upstream_rx_byte_received_);
+  }
+
+  void onLastUpstreamRxByteReceived() override {
+    last_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
+    return duration(first_downstream_tx_byte_sent_);
+  }
+
+  void onFirstDownstreamTxByteSent() override {
+    first_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+  }
+
+  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
+    return duration(last_downstream_tx_byte_sent_);
+  }
+
+  void onLastDownstreamTxByteSent() override {
+    last_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+  }
+
+  void onRequestComplete() override { end_time_ = std::chrono::steady_clock::now(); }
+
+  void resetUpstreamTimings() override {
+    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
+    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+  }
+
+  absl::optional<std::chrono::nanoseconds> requestComplete() const override {
+    return duration(end_time_);
+  }
+
+  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+
+  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+    (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
+  };
+
   SystemTime start_time_;
-  Optional<std::chrono::microseconds> request_received_duration_{std::chrono::microseconds(1000)};
-  Optional<std::chrono::microseconds> response_received_duration_{std::chrono::microseconds(2000)};
-  Optional<Http::Protocol> protocol_{Http::Protocol::Http11};
-  Optional<uint32_t> response_code_;
+  MonotonicTime start_time_monotonic_;
+
+  absl::optional<MonotonicTime> last_rx_byte_received_;
+  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> end_time_;
+
+  absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
+  absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
-  uint64_t duration_{3000};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool hc_request_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
+  envoy::api::v2::core::Metadata metadata_{};
 };
 
 class AccessLogImplTest : public testing::Test {
@@ -120,7 +216,7 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   TestRequestInfo request_info_;
   std::shared_ptr<Filesystem::MockFile> file_;
-  std::string output_;
+  StringViewSaver output_;
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -219,7 +315,7 @@ TEST_F(AccessLogImplTest, WithFilterMiss) {
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
+  request_info_.response_code_ = 200;
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -241,11 +337,12 @@ TEST_F(AccessLogImplTest, WithFilterHit) {
   EXPECT_CALL(*file_, write(_)).Times(3);
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  request_info_.response_code_.value(200);
-  request_info_.duration_ = 1000000000;
+  request_info_.response_code_ = 200;
+  request_info_.end_time_ =
+      request_info_.startTimeMonotonic() + std::chrono::microseconds(1001000000000000);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
 
@@ -260,21 +357,99 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
 
   // Value is taken from random generator.
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(true));
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 42, 100))
+      .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0)).WillOnce(Return(false));
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 43, 100))
+      .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(runtime_.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(56));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
+      .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, getInteger("access_log.test_key", 0)).WillOnce(Return(55));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterV2) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: TEN_THOUSAND
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  // Value is taken from random generator.
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  // Value is taken from x-request-id.
+  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterV2IndependentRandomness) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: MILLION
+    use_independent_randomness: true
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  // Value should not be taken from x-request-id.
+  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 43, 1000000))
+      .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, request_info_);
 }
@@ -410,7 +585,7 @@ TEST_F(AccessLogImplTest, andFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -440,7 +615,7 @@ TEST_F(AccessLogImplTest, orFilter) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -473,7 +648,7 @@ TEST_F(AccessLogImplTest, multipleOperators) {
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromJson(json), context_);
-  request_info_.response_code_.value(500);
+  request_info_.response_code_ = 500;
 
   {
     EXPECT_CALL(*file_, write(_));
@@ -489,30 +664,6 @@ TEST_F(AccessLogImplTest, multipleOperators) {
 
     log->log(&header_map, &response_headers_, request_info_);
   }
-}
-
-TEST_F(AccessLogImplTest, ConfigureFromProto) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
-
-  envoy::config::filter::accesslog::v2::FileAccessLog fal_config;
-  fal_config.set_path("/dev/null");
-
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Provided name for static registration lookup was empty.");
-
-  config.set_name(Config::AccessLogNames::get().FILE);
-
-  InstanceSharedPtr log = AccessLogFactory::fromProto(config, context_);
-
-  EXPECT_NE(nullptr, log);
-  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
-
-  config.set_name("INVALID");
-
-  EXPECT_THROW_WITH_MESSAGE(AccessLogFactory::fromProto(config, context_), EnvoyException,
-                            "Didn't find a registered implementation for name: 'INVALID'");
 }
 
 TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
@@ -532,19 +683,19 @@ TEST(AccessLogFilterTest, DurationWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo request_info;
 
-  request_info.duration_ = 100000;
-
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(100000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(1000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 100000001000;
+  request_info.end_time_ =
+      request_info.startTimeMonotonic() + std::chrono::microseconds(100000001000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_TRUE(filter.evaluate(request_info, request_headers));
 
-  request_info.duration_ = 10000;
+  request_info.end_time_ = request_info.startTimeMonotonic() + std::chrono::microseconds(10000);
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 1000000)).WillOnce(Return(100000000));
   EXPECT_FALSE(filter.evaluate(request_info, request_headers));
 }
@@ -567,12 +718,39 @@ TEST(AccessLogFilterTest, StatusCodeWithRuntimeKey) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
   TestRequestInfo info;
 
-  info.response_code_.value(400);
+  info.response_code_ = 400;
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(350));
   EXPECT_TRUE(filter.evaluate(info, request_headers));
 
   EXPECT_CALL(runtime.snapshot_, getInteger("key", 300)).WillOnce(Return(500));
   EXPECT_FALSE(filter.evaluate(info, request_headers));
+}
+
+TEST_F(AccessLogImplTest, StatusCodeLessThan) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  status_code_filter:
+    comparison:
+      op: LE
+      value:
+        default_value: 499
+        runtime_key: hello
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  request_info_.response_code_ = 499;
+  EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, request_info_);
+
+  request_info_.response_code_ = 500;
+  EXPECT_CALL(runtime_.snapshot_, getInteger("hello", 499)).WillOnce(Return(499));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, request_info_);
 }
 
 } // namespace

@@ -87,6 +87,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "edf_scheduler_lib",
+    hdrs = ["edf_scheduler.h"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_library(
+    name = "health_checker_base_lib",
+    srcs = ["health_checker_base_impl.cc"],
+    hdrs = ["health_checker_base_impl.h"],
+    deps = [
+        "//include/envoy/upstream:health_checker_interface",
+        "//source/common/router:router_lib",
+        "@envoy_api//envoy/api/v2/core:health_check_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
@@ -94,35 +111,13 @@ envoy_cc_library(
         "grpc_health_proto",
     ],
     deps = [
-        ":host_utility_lib",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/grpc:status",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/upstream:health_checker_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/common:empty_string",
-        "//source/common/common:enum_to_int",
-        "//source/common/common:hex_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/common:utility_lib",
+        ":health_checker_base_lib",
         "//source/common/grpc:codec_lib",
-        "//source/common/grpc:common_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/network:filter_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/redis:conn_pool_lib",
-        "//source/common/router:router_lib",
-        "@envoy_api//envoy/api/v2/core:health_check_cc",
+        "//source/common/upstream:host_utility_lib",
+        # TODO(mattklein123): The following should not be required once we allow pluggable health
+        # checkers.
+        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
     ],
 )
 
@@ -138,6 +133,7 @@ envoy_cc_library(
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     deps = [
+        ":edf_scheduler_lib",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:load_balancer_interface",
@@ -158,6 +154,15 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_lib",
+    hdrs = ["locality.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -233,6 +238,7 @@ envoy_cc_library(
     hdrs = ["maglev_lb.h"],
     deps = [
         ":thread_aware_lb_lib",
+        ":upstream_lib",
     ],
 )
 
@@ -251,6 +257,7 @@ envoy_cc_library(
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
     deps = [
+        ":locality_lib",
         ":sds_subscription_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
@@ -333,6 +340,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
+        "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -364,6 +372,7 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

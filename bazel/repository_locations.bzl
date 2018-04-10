@@ -1,8 +1,8 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "426db8db7d1cbd17573e295b52d7aab7a97ba1ff",  # chromium-64.0.3282.119
-        remote = "https://boringssl.googlesource.com/boringssl",
+        commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
+        remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
         commit = "787891a3882795cee0364e8a0f0dda315578d155",
@@ -35,11 +35,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_grpc_grpc = dict(
-        commit = "04ecc18e3a5b8de5bb7ffa20700364ad88dc16f9", # v1.9.0-pre3
+        commit = "474c5950686e3962bd339c93d27e369bf64f568f", # v1.10.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "f3c1f42601d13504c68e2bc81c60604f0de055dd",
+        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
@@ -84,7 +84,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.9.0",
+        commit = "0.10.1",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar

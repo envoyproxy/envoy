@@ -185,6 +185,7 @@ const std::string Json::Schema::LISTENER_SCHEMA(R"EOF(
        },
        "drain_type": {"type" : "string", "enum" : ["default", "modify_only"]},
        "ssl_context" : {"$ref" : "#/definitions/ssl_context"},
+       "transparent" : {"type": "boolean"},
        "bind_to_port" : {"type": "boolean"},
        "use_proxy_proto" : {"type" : "boolean"},
        "use_original_dst" : {"type" : "boolean"},
@@ -795,7 +796,14 @@ const std::string Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA(R"EOF(
     "properties" : {
       "name" : {"type" : "string"},
       "value" : {"type" : "string"},
-      "regex" : {"type" : "boolean"}
+      "regex" : {"type" : "boolean"},
+      "range_match" : {
+        "type" : "object",
+        "properties" : {
+          "start" : {"type" : "integer"},
+          "end" : {"type" : "integer"}
+        }
+      }
     },
     "required" : ["name"],
     "additionalProperties" : false

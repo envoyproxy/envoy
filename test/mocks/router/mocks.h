@@ -49,7 +49,7 @@ public:
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
   const std::string& maxAge() const override { return max_age_; };
-  const Optional<bool>& allowCredentials() const override { return allow_credentials_; };
+  const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override { return enabled_; };
 
   std::list<std::string> allow_origin_{};
@@ -57,7 +57,7 @@ public:
   std::string allow_headers_{};
   std::string expose_headers_{};
   std::string max_age_{};
-  Optional<bool> allow_credentials_{};
+  absl::optional<bool> allow_credentials_{};
   bool enabled_{false};
 };
 
@@ -82,7 +82,7 @@ public:
 
   MOCK_METHOD0(enabled, bool());
   MOCK_METHOD3(shouldRetry, RetryStatus(const Http::HeaderMap* response_headers,
-                                        const Optional<Http::StreamResetReason>& reset_reason,
+                                        const absl::optional<Http::StreamResetReason>& reset_reason,
                                         DoRetryCallback callback));
 
   DoRetryCallback callback_;
@@ -175,9 +175,9 @@ public:
   ~MockHashPolicy();
 
   // Router::HashPolicy
-  MOCK_CONST_METHOD3(generateHash, Optional<uint64_t>(const std::string& downstream_address,
-                                                      const Http::HeaderMap& headers,
-                                                      const AddCookieCallback add_cookie));
+  MOCK_CONST_METHOD3(generateHash, absl::optional<uint64_t>(const std::string& downstream_address,
+                                                            const Http::HeaderMap& headers,
+                                                            const AddCookieCallback add_cookie));
 };
 
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {
@@ -244,6 +244,7 @@ public:
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
+  envoy::api::v2::core::Metadata metadata_;
 };
 
 class MockDecorator : public Decorator {
@@ -287,17 +288,22 @@ public:
   std::string name_{"fake_config"};
 };
 
-class MockRouteConfigProviderManager : public ServerRouteConfigProviderManager {
+class MockRouteConfigProviderManager : public RouteConfigProviderManager {
 public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD0(routeConfigProviders, std::vector<RdsRouteConfigProviderSharedPtr>());
-  MOCK_METHOD5(getRouteConfigProvider,
+  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD5(getRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Upstream::ClusterManager& cm, Stats::Scope& scope,
                    const std::string& stat_prefix, Init::Manager& init_manager));
+  MOCK_METHOD3(getStaticRouteConfigProvider,
+               RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
+                                            Runtime::Loader& runtime,
+                                            Upstream::ClusterManager& cm));
+
   MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
 };
 

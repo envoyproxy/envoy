@@ -11,6 +11,7 @@
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::Throw;
 using testing::_;
 
 namespace Envoy {
@@ -63,7 +64,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
   EXPECT_CALL(*child_span, injectContext(_)).Times(0);
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
 }
 
@@ -74,9 +75,9 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _, false))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Optional<std::chrono::milliseconds>&, bool) {
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -100,9 +101,9 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   Http::AsyncClient::StreamCallbacks* http_callbacks;
   Http::MockAsyncClientStream http_stream;
   EXPECT_CALL(http_client_, start(_, _, true))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Optional<std::chrono::milliseconds>&, bool) {
+      .WillOnce(Invoke(
+          [&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const absl::optional<std::chrono::milliseconds>&, bool) {
             http_callbacks = &callbacks;
             return &http_stream;
           }));
@@ -128,8 +129,19 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   EXPECT_CALL(*child_span, finishSpan());
 
   auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
-                                          active_span, Optional<std::chrono::milliseconds>());
+                                          active_span, absl::optional<std::chrono::milliseconds>());
   EXPECT_EQ(grpc_request, nullptr);
+}
+
+// Validate that when the cluster is not present the grpc_client returns immediately with
+// status UNAVAILABLE and error message "Cluster not available"
+TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
+  MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
+  ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
+  EXPECT_CALL(grpc_callbacks,
+              onRemoteClose(Status::GrpcStatus::Unavailable, "Cluster not available"));
+  auto* grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks);
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 } // namespace

@@ -54,13 +54,13 @@ envoy_cc_library(
     name = "cds_json_lib",
     srcs = ["cds_json.cc"],
     hdrs = ["cds_json.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":address_json_lib",
         ":json_utility_lib",
         ":protocol_json_lib",
         ":tls_context_json_lib",
         ":utility_lib",
-        "//include/envoy/common:optional",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
@@ -225,7 +225,6 @@ envoy_cc_library(
     hdrs = ["metadata.h"],
     deps = [
         "//source/common/protobuf",
-        "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
@@ -334,5 +333,8 @@ envoy_cc_library(
     name = "well_known_names",
     srcs = ["well_known_names.cc"],
     hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:const_singleton",
+    ],
 )

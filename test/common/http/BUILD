@@ -85,6 +85,7 @@ envoy_cc_test_library(
         "//include/envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 
@@ -110,6 +111,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/access_loggers/file:file_access_log_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/buffer:buffer_mocks",

@@ -273,6 +273,7 @@ public:
         std::move(shadow_writer_ptr_));
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
+    EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
@@ -334,8 +335,9 @@ public:
                 setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
-    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
-                                                active_span, Optional<std::chrono::milliseconds>());
+    request->grpc_request_ =
+        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
+                           absl::optional<std::chrono::milliseconds>());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {

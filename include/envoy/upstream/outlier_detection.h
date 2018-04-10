@@ -5,9 +5,10 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/common/optional.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -67,13 +68,13 @@ public:
    * Get the time of last ejection.
    * @return the last time this host was ejected, if the host has been ejected previously.
    */
-  virtual const Optional<MonotonicTime>& lastEjectionTime() PURE;
+  virtual const absl::optional<MonotonicTime>& lastEjectionTime() PURE;
 
   /**
    * Get the time of last unejection.
    * @return the last time this host was unejected, if the host has been unejected previously.
    */
-  virtual const Optional<MonotonicTime>& lastUnejectionTime() PURE;
+  virtual const absl::optional<MonotonicTime>& lastUnejectionTime() PURE;
 
   /**
    * @return the success rate of the host in the last calculated interval, in the range 0-100.

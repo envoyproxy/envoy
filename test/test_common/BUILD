@@ -53,7 +53,6 @@ envoy_cc_library(
         ":printers_includes",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/redis:codec_lib",
     ],
 )
 
@@ -89,10 +88,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "lua_wrappers_lib",
-    hdrs = ["lua_wrappers.h"],
+    name = "logging_lib",
+    srcs = ["logging.cc"],
+    hdrs = ["logging.h"],
     deps = [
-        "//test/mocks/thread_local:thread_local_mocks",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
     ],
 )
 
