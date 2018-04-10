@@ -16,7 +16,6 @@
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/router.h"
 #include "server/config/http/squash.h"
-#include "server/http/health_check.h"
 
 #include "extensions/filters/http/lua/config.h"
 #include "extensions/filters/http/ratelimit/config.h"
@@ -203,38 +202,6 @@ TEST(HttpFilterConfigTest, GrpcWebFilter) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, HealthCheckFilter) {
-  std::string json_string = R"EOF(
-  {
-    "pass_through_mode" : true,
-    "endpoint" : "/hc"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  HealthCheckFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BadHealthCheckFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "pass_through_mode" : true,
-    "endpoint" : "/hc",
-    "status" : 500
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  HealthCheckFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
 }
 
 TEST(HttpFilterConfigTest, RouterFilterInJson) {
