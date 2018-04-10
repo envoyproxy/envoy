@@ -199,7 +199,7 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubject) {
 TEST_P(XfccIntegrationTest, MtlsSanitizeSetUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       SANITIZE_SET;
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_,
                                        current_xfcc_by_hash_ + ";" + client_uri_san_);
@@ -218,7 +218,7 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       SANITIZE_SET;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
                                                            client_subject_ + ";" + client_uri_san_);
@@ -238,7 +238,7 @@ TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectUriDns) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       SANITIZE_SET;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   sccd_.set_dns(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
@@ -266,7 +266,7 @@ TEST_P(XfccIntegrationTest, MtlsAppendForwardSubject) {
 TEST_P(XfccIntegrationTest, MtlsAppendForwardUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(
       previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_uri_san_);
@@ -285,7 +285,7 @@ TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_, previous_xfcc_ + "," +
                                                            current_xfcc_by_hash_ + ";" +
@@ -307,7 +307,7 @@ TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectUriDns) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   sccd_.set_dns(true);
   initialize();
   testRequestAndResponseWithXfccHeader(
@@ -318,7 +318,7 @@ TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectUriDns) {
 TEST_P(XfccIntegrationTest, MtlsAppendForwardUriPreviousXfccHeaderEmpty) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader("", current_xfcc_by_hash_ + ";" + client_uri_san_);
 }
