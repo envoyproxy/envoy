@@ -4223,9 +4223,9 @@ max_request_time:
   nanos: 789
 )EOF";
 
-  Protobuf::Struct buffer_cfg;
+  ProtobufWkt::Struct buffer_cfg;
   MessageUtil::loadFromYaml(yaml, buffer_cfg);
-  Protobuf::Map<std::string, Protobuf::Struct> proto_cfgs;
+  Protobuf::Map<std::string, ProtobufWkt::Struct> proto_cfgs;
   proto_cfgs[factory.name()] = buffer_cfg;
   PerFilterConfigs configs{proto_cfgs};
 
@@ -4250,9 +4250,9 @@ TEST(PerFilterConfigsTest, UnknownFilter) {
 foo: "bar"
 )EOF";
 
-  Protobuf::Struct some_cfg;
+  ProtobufWkt::Struct some_cfg;
   MessageUtil::loadFromYaml(yaml, some_cfg);
-  Protobuf::Map<std::string, Protobuf::Struct> proto_cfgs;
+  Protobuf::Map<std::string, ProtobufWkt::Struct> proto_cfgs;
   proto_cfgs["unknown.filter"] = some_cfg;
 
   ASSERT_THROW(PerFilterConfigs{proto_cfgs}, EnvoyException)

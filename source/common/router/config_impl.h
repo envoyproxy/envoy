@@ -46,7 +46,7 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Struct>& configs);
+  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
 
   const Protobuf::Message* get(const std::string& name) const;
 
