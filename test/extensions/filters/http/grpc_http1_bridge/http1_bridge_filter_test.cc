@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
-#include "common/grpc/http1_bridge_filter.h"
 #include "common/http/header_map_impl.h"
+
+#include "extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -17,7 +18,9 @@ using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcHttp1Bridge {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
@@ -182,5 +185,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
-} // namespace Grpc
+} // namespace GrpcHttp1Bridge
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

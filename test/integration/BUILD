@@ -172,24 +172,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "grpc_json_transcoder_integration_test",
-    srcs = [
-        "grpc_json_transcoder_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:server_grpc_json_transcoder.json",
-        "//test/proto:bookstore_proto_descriptor",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/http:header_map_lib",
-        "//test/proto:bookstore_proto",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "integration_admin_test",
     srcs = [
         "integration_admin_test.cc",
@@ -293,8 +275,6 @@ envoy_cc_test_library(
         "//source/server:test_hooks_lib",
         "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
-        "//source/server/config/http:grpc_http1_bridge_lib",
-        "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
@@ -315,14 +295,11 @@ envoy_cc_test(
         "integration_test.cc",
         "integration_test.h",
     ],
-    data = [
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
@@ -332,9 +309,6 @@ envoy_cc_test(
     name = "echo_integration_test",
     srcs = [
         "echo_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:echo_server.json",
     ],
     deps = [
         ":integration_lib",

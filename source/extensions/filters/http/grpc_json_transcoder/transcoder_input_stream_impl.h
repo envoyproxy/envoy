@@ -5,7 +5,9 @@
 #include "grpc_transcoding/transcoder_input_stream.h"
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcJsonTranscoder {
 
 class TranscoderInputStreamImpl : public Buffer::ZeroCopyInputStreamImpl,
                                   public google::grpc::transcoding::TranscoderInputStream {
@@ -14,5 +16,7 @@ public:
   virtual int64_t BytesAvailable() const override;
 };
 
-} // namespace Grpc
+} // namespace GrpcJsonTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

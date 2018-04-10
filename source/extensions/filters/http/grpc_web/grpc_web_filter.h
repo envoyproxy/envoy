@@ -10,7 +10,9 @@
 #include "common/grpc/codec.h"
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcWeb {
 
 /**
  * See docs/configuration/http_filters/grpc_web_filter.rst
@@ -61,7 +63,7 @@ private:
   bool is_text_request_{};
   bool is_text_response_{};
   Buffer::OwnedImpl decoding_buffer_;
-  Decoder decoder_;
+  Grpc::Decoder decoder_;
   std::string grpc_service_;
   std::string grpc_method_;
   bool do_stat_tracking_{};
@@ -69,5 +71,7 @@ private:
   bool is_grpc_web_request_{};
 };
 
-} // namespace Grpc
+} // namespace GrpcWeb
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "common/grpc/json_transcoder_filter.h"
+#include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
@@ -33,7 +33,9 @@ using google::grpc::transcoding::Transcoder;
 using google::grpc::transcoding::TranscoderInputStream;
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcJsonTranscoder {
 
 namespace {
 
@@ -120,7 +122,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   type_helper_.reset(
       new google::grpc::transcoding::TypeHelper(Protobuf::util::NewTypeResolverForDescriptorPool(
-          Common::typeUrlPrefix(), &descriptor_pool_)));
+          Grpc::Common::typeUrlPrefix(), &descriptor_pool_)));
 
   const auto print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
@@ -179,7 +181,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       new JsonRequestTranslator(type_helper_->Resolver(), &request_input, request_info,
                                 method_descriptor->client_streaming(), true)};
 
-  const auto response_type_url = Common::typeUrl(method_descriptor->output_type()->full_name());
+  const auto response_type_url =
+      Grpc::Common::typeUrl(method_descriptor->output_type()->full_name());
   std::unique_ptr<ResponseToJsonTranslator> response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
       &response_input, print_options_)};
@@ -192,7 +195,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 ProtobufUtil::Status
 JsonTranscoderConfig::methodToRequestInfo(const Protobuf::MethodDescriptor* method,
                                           google::grpc::transcoding::RequestInfo* info) {
-  auto request_type_url = Common::typeUrl(method->input_type()->full_name());
+  auto request_type_url = Grpc::Common::typeUrl(method->input_type()->full_name());
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", method->input_type()->full_name());
@@ -303,7 +306,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (!Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
   }
 
@@ -369,11 +372,12 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     return Http::FilterTrailersStatus::Continue;
   }
 
-  const absl::optional<Status::GrpcStatus> grpc_status = Common::getGrpcStatus(trailers);
-  if (!grpc_status || grpc_status.value() == Status::GrpcStatus::InvalidCode) {
+  const absl::optional<Grpc::Status::GrpcStatus> grpc_status =
+      Grpc::Common::getGrpcStatus(trailers);
+  if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
-    response_headers_->Status()->value(Common::grpcToHttpStatus(grpc_status.value()));
+    response_headers_->Status()->value(Grpc::Common::grpcToHttpStatus(grpc_status.value()));
     response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
   }
 
@@ -407,5 +411,7 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   return false;
 }
 
-} // namespace Grpc
+} // namespace GrpcJsonTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

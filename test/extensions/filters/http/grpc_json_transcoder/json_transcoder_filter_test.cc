@@ -6,9 +6,10 @@
 #include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-#include "common/grpc/json_transcoder_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -38,7 +39,9 @@ using google::api::HttpRule;
 using google::grpc::transcoding::Transcoder;
 
 namespace Envoy {
-namespace Grpc {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcJsonTranscoder {
 
 class GrpcJsonTranscoderConfigTest : public testing::Test {
 public:
@@ -291,8 +294,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
-  Decoder decoder;
-  std::vector<Frame> frames;
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
   decoder.decode(request_data, frames);
 
   EXPECT_EQ(1, frames.size());
@@ -321,7 +324,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   response.set_id(20);
   response.set_theme("Children");
 
-  auto response_data = Common::serializeBody(response);
+  auto response_data = Grpc::Common::serializeBody(response);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
@@ -458,7 +461,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   author.set_gender(bookstore::Author_Gender_MALE);
   author.set_last_name("Shakespeare");
 
-  const auto response_data = Common::serializeBody(author);
+  const auto response_data = Grpc::Common::serializeBody(author);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_->encodeData(*response_data, false));
 
@@ -507,5 +510,7 @@ INSTANTIATE_TEST_CASE_P(
     })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
-} // namespace Grpc
+} // namespace GrpcJsonTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

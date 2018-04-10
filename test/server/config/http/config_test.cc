@@ -9,13 +9,11 @@
 #include "common/router/router.h"
 
 #include "server/config/http/fault.h"
-#include "server/config/http/grpc_http1_bridge.h"
-#include "server/config/http/grpc_json_transcoder.h"
-#include "server/config/http/grpc_web.h"
 #include "server/config/http/ip_tagging.h"
 #include "server/config/http/router.h"
 
 #include "extensions/filters/http/buffer/config.h"
+#include "extensions/filters/http/grpc_json_transcoder/config.h"
 #include "extensions/filters/http/lua/config.h"
 #include "extensions/filters/http/ratelimit/config.h"
 
@@ -44,7 +42,8 @@ TEST(HttpFilterConfigTest, ValidateFail) {
   FaultFilterConfig fault_factory;
   envoy::config::filter::http::fault::v2::HTTPFault fault_proto;
   fault_proto.mutable_abort();
-  GrpcJsonTranscoderFilterConfig grpc_json_transcoder_factory;
+  Extensions::HttpFilters::GrpcJsonTranscoder::GrpcJsonTranscoderFilterConfig
+      grpc_json_transcoder_factory;
   envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder grpc_json_transcoder_proto;
   Extensions::HttpFilters::Lua::LuaFilterConfig lua_factory;
   envoy::config::filter::http::lua::v2::Lua lua_proto;
@@ -111,36 +110,6 @@ TEST(HttpFilterConfigTest, FaultFilterEmptyProto) {
   EXPECT_THROW(
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
       EnvoyException);
-}
-
-TEST(HttpFilterConfigTest, GrpcHttp1BridgeFilter) {
-  std::string json_string = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  GrpcHttp1BridgeFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, GrpcWebFilter) {
-  std::string json_string = R"EOF(
-  {
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  GrpcWebFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  cb(filter_callback);
 }
 
 TEST(HttpFilterConfigTest, RouterFilterInJson) {
