@@ -55,10 +55,8 @@ public:
     stats_.update_attempt_.inc();
     version_info_ = version_info;
     stats_.version_.set(HashUtil::xxHash64(version_info_));
-    if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-      ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources: {}", type_url_,
-                resources.size(), RepeatedPtrUtil::debugString(typed_resources));
-    }
+    ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources: {}", type_url_,
+              resources.size(), RepeatedPtrUtil::debugString(typed_resources));
   }
 
   void onConfigUpdateFailed(const EnvoyException* e) override {
