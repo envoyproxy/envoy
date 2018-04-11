@@ -261,7 +261,7 @@ public:
 
   /**
    * @return const Protobuf::Message* the per-filter config for the given
-   * filter name configured for this virtual host. If none is present, the
+   * filter name configured for this virtual host. If none is present,
    * nullptr is returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
@@ -474,7 +474,7 @@ public:
   /**
    * @return const Protobuf::Message* the per-filter config for the given
    * filter name configured for this route entry. Only weighted cluster entries
-   * will potentially have these values available. If none is present, the
+   * will potentially have these values available. If none is present,
    * nullptr is returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
@@ -526,7 +526,7 @@ public:
 
   /**
    * @return const Protobuf::Message* the per-filter config for the given
-   * filter name configured for this route. If none is present, the nullptr is
+   * filter name configured for this route. If none is present, nullptr is
    * returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
