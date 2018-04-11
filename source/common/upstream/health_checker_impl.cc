@@ -91,7 +91,7 @@ const RequestInfo::RequestInfoImpl
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, nullptr);
+        host_->createHealthCheckConnection(parent_.dispatcher_);
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -522,7 +522,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_, nullptr);
+        host_->createHealthCheckConnection(parent_.dispatcher_);
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
