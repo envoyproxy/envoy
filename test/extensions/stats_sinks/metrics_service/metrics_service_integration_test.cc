@@ -41,7 +41,7 @@ public:
       MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
-          Protobuf::util::TimeUtil::MillisecondsToDuration(10000));
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });
 
     HttpIntegrationTest::initialize();
