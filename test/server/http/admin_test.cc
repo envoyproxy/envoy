@@ -90,8 +90,10 @@ public:
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
+    HandlerInfoImpl handler_info;
     request_headers_.insertMethod().value(method.data(), method.size());
-    return admin_.runCallback(path_and_query, request_headers_, response_headers, response);
+    return admin_.runCallback(path_and_query, request_headers_, response_headers, response,
+                              handler_info);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -125,18 +127,9 @@ INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-  EXPECT_EQ(Http::Code::OK,
-            admin_.runCallback("/cpuprofiler?enable=y", header_map, data, handler_info));
-  EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
-  EXPECT_EQ(Http::Code::OK,
-            admin_.runCallback("/cpuprofiler?enable=n", header_map, data, handler_info));
-=======
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -160,16 +153,13 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
                                    server_, listener_scope_.createScope("listener.admin."));
   Http::HeaderMapImpl header_map;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-  admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data, handler_info);
-=======
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
-  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
-                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y",
-                                                              request_headers_, header_map, data)));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+  HandlerInfoImpl handler_info;
+  EXPECT_NO_LOGS(
+      EXPECT_EQ(Http::Code::InternalServerError,
+                admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", request_headers_,
+                                                   header_map, data, handler_info)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -193,83 +183,35 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-<<<<<<< HEAD
-  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
                      HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
-=======
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-
-  EXPECT_EQ(Http::Code::Accepted,
-            admin_.runCallback("/foo/bar", header_map, response, handler_info));
-
-  // Test that removable handler gets removed.
-  EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
-  EXPECT_EQ(Http::Code::NotFound,
-            admin_.runCallback("/foo/bar", header_map, response, handler_info));
-=======
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
   // Test that removable handler gets removed.
   EXPECT_TRUE(admin_.removeHandler("/foo/bar"));
   EXPECT_EQ(Http::Code::NotFound, getCallback("/foo/bar", header_map, response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
   EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
-<<<<<<< HEAD
-  EXPECT_EQ(Http::Code::Accepted,
-            admin_.runCallback("/foo/bar", header_map, response, handler_info));
-=======
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 
   // Add again and make sure it is not there twice.
   EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
-<<<<<<< HEAD
-  EXPECT_EQ(Http::Code::Accepted,
-            admin_.runCallback("/foo/bar", header_map, response, handler_info));
-}
-
-TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
-  EXPECT_FALSE(
-      admin_.addHandler("/foo<script>alert('hi')</script>", "hello", callback, true, false));
-}
-
-TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
-  EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello", callback, true, false));
-}
-
-TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](const std::string&, Http::HeaderMap&, Buffer::Instance&,
-                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
-
-  HandlerInfoImpl handler_info;
-=======
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -277,9 +219,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
@@ -287,10 +228,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     HandlerInfo&) -> Http::Code { return Http::Code::Accepted; };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
@@ -299,11 +238,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-<<<<<<< HEAD
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response, handler_info));
-=======
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_TRUE(content_type.find("text/html")) << content_type.c_str();
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
@@ -314,12 +249,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
 TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/", header_map, response, handler_info));
-=======
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   const std::string logging_action = "<form action='/logging' method='post'";
   const std::string stats_href = "<a href='/stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
@@ -354,9 +284,6 @@ TEST_P(AdminInstanceTest, Runtime) {
 
   Runtime::MockSnapshot snapshot;
   Runtime::MockLoader loader;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-=======
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
@@ -410,18 +337,11 @@ TEST_P(AdminInstanceTest, Runtime) {
         }
     }
 })EOF";
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-<<<<<<< HEAD
-
-  EXPECT_EQ(Http::Code::OK, admin_.runCallback("/runtime", header_map, response, handler_info));
-  EXPECT_EQ("int_key: 1\nother_key: bar\nstring_key: foo\n", TestUtility::bufferToString(response));
-=======
   EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
   EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
@@ -429,35 +349,6 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   Buffer::OwnedImpl response;
 
   Runtime::MockLoader loader;
-<<<<<<< HEAD
-  HandlerInfoImpl handler_info;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
-  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
-  EXPECT_EQ(Http::Code::OK,
-            admin_.runCallback("/runtime?format=json", header_map, response, handler_info));
-
-  std::string output = TestUtility::bufferToString(response);
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(output);
-
-  EXPECT_TRUE(json->hasObject("runtime"));
-  std::vector<Json::ObjectSharedPtr> pairs = json->getObjectArray("runtime");
-  EXPECT_EQ(3, pairs.size());
-
-  Json::ObjectSharedPtr pair = pairs[0];
-  EXPECT_EQ("int_key", pair->getString("name", ""));
-  EXPECT_EQ(1, pair->getInteger("value", -1));
-
-  pair = pairs[1];
-  EXPECT_EQ("other_key", pair->getString("name", ""));
-  EXPECT_EQ("bar", pair->getString("value", ""));
-
-  pair = pairs[2];
-  EXPECT_EQ("string_key", pair->getString("name", ""));
-  EXPECT_EQ("foo", pair->getString("value", ""));
-=======
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
 
   std::unordered_map<std::string, std::string> overrides;
@@ -468,30 +359,14 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_EQ(Http::Code::OK,
             getCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
   EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
 
-<<<<<<< HEAD
-  std::unordered_map<std::string, const Runtime::Snapshot::Entry> entries;
-  Runtime::MockSnapshot snapshot;
-  Runtime::MockLoader loader;
-  HandlerInfoImpl handler_info;
-
-  EXPECT_CALL(snapshot, getAll()).WillRepeatedly(testing::ReturnRef(entries));
-  EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
-  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
-
-  EXPECT_EQ(Http::Code::BadRequest,
-            admin_.runCallback("/runtime?format=foo", header_map, response, handler_info));
-  EXPECT_EQ("usage: /runtime?format=json\n", TestUtility::bufferToString(response));
-=======
   EXPECT_EQ(Http::Code::BadRequest, getCallback("/runtime_modify", header_map, response));
   EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 }
 
 TEST(PrometheusStatsFormatter, MetricName) {

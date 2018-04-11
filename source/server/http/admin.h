@@ -23,9 +23,10 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/stats/hystrix.h"
 
 #include "server/http/config_tracker_impl.h"
+
+#include "extensions/stat_sinks/common/hystrix/hystrix.h"
 
 #include "absl/strings/string_view.h"
 
@@ -33,7 +34,6 @@ namespace Envoy {
 namespace Server {
 
 /**
-<<<<<<< HEAD
  * This class contains data which will be sent from admin filter to a handler
  * and build a class which contains the relevant data.
  */
@@ -44,10 +44,7 @@ public:
 };
 
 /**
- * Implementation of Server::admin.
-=======
  * Implementation of Server::Admin.
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
  */
 class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
@@ -59,13 +56,9 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-<<<<<<< HEAD
-  Http::Code runCallback(const std::string& path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, HandlerInfo& handler_info);
-=======
   Http::Code runCallback(absl::string_view path_and_query, const Http::HeaderMap& request_headers,
-                         Http::HeaderMap& response_headers, Buffer::Instance& response);
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                         Http::HeaderMap& response_headers, Buffer::Instance& response,
+                         HandlerInfo& handler_info);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -165,88 +158,54 @@ private:
   /**
    * URL handlers.
    */
-<<<<<<< HEAD
-  Http::Code handlerAdminHome(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerAdminHome(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                               Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerCerts(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerCerts(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerClusters(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                              Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerCpuProfiler(const std::string& path_and_query,
-                                Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                HandlerInfo&);
-  Http::Code handlerHealthcheckFail(const std::string& path_and_query,
+  Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response, HandlerInfo&) const;
+  Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                                Buffer::Instance& response, HandlerInfo&);
+  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
                                     HandlerInfo&);
-  Http::Code handlerHealthcheckOk(const std::string& path_and_query,
+  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   HandlerInfo&);
-  Http::Code handlerHelp(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerHelp(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerHotRestartVersion(const std::string& path_and_query,
+  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::HeaderMap& response_headers, Buffer::Instance& response,
                                       HandlerInfo&);
-  Http::Code handlerListenerInfo(const std::string& path_and_query,
+  Http::Code handlerListenerInfo(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  HandlerInfo&);
-  Http::Code handlerLogging(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(const std::string& path_and_query,
+  Http::Code handlerMain(const std::string& path, Buffer::Instance& response, HandlerInfo&);
+  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
                                  HandlerInfo&);
-  Http::Code handlerResetCounters(const std::string& path_and_query,
+  Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   HandlerInfo&);
-  Http::Code handlerServerInfo(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerStats(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                           Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerRuntime(const std::string& path_and_query, Http::HeaderMap& response_headers,
+  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
+                                    Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                    HandlerInfo&);
+  Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response, HandlerInfo&);
-  Http::Code handlerHystrixEventStream(const std::string& path_and_query,
+  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                  HandlerInfo&);
+  Http::Code handlerHystrixEventStream(absl::string_view path_and_query,
                                        Http::HeaderMap& response_headers, Buffer::Instance&,
                                        HandlerInfo& handler_info);
-=======
-  Http::Code handlerAdminHome(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                              Buffer::Instance& response);
-  Http::Code handlerCerts(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                          Buffer::Instance& response);
-  Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                             Buffer::Instance& response);
-  Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                               Buffer::Instance& response) const;
-  Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                                Buffer::Instance& response);
-  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
-                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerHelp(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response);
-  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
-                                      Http::HeaderMap& response_headers,
-                                      Buffer::Instance& response);
-  Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                            Buffer::Instance& response);
-  Http::Code handlerMain(const std::string& path, Buffer::Instance& response);
-  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
-                                 Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                               Buffer::Instance& response);
-  Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                          Buffer::Instance& response);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::HeaderMap& response_headers, Buffer::Instance& response);
-  Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                            Buffer::Instance& response);
-  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 
   class AdminListener : public Network::ListenerConfig {
   public:

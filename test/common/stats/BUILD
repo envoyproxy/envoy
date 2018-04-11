@@ -29,16 +29,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "hystrix_test",
-    srcs = ["hystrix_test.cc"],
-    deps = [
-        "//source/common/stats:hystrix_lib",
-        "//source/common/stats:stats_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)

@@ -1,4 +1,4 @@
-#include "common/stats/hystrix.h"
+#include "extensions/stat_sinks/common/hystrix/hystrix.h"
 
 #include <chrono>
 #include <ctime>
@@ -11,7 +11,9 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 
 const uint64_t Hystrix::DEFAULT_NUM_OF_BUCKETS;
 
@@ -260,12 +262,11 @@ absl::string_view Hystrix::printRollingWindow() const {
 }
 
 namespace HystrixNameSpace {
-HystrixSink::HystrixSink(Server::Instance& server)
-    : stats_(new Stats::Hystrix()), server_(&server){};
+HystrixSink::HystrixSink(Server::Instance& server) : stats_(new Hystrix()), server_(&server){};
 
 void HystrixSink::beginFlush() { current_stat_values_.clear(); }
 
-void HystrixSink::flushCounter(const Counter& counter, uint64_t) {
+void HystrixSink::flushCounter(const Stats::Counter& counter, uint64_t) {
   if (callbacks_ == nullptr) {
     return;
   }
@@ -314,6 +315,7 @@ void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbac
 void HystrixSink::unregisterConnection() { callbacks_ = nullptr; }
 
 } // namespace HystrixNameSpace
-
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

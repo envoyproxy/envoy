@@ -36,16 +36,3 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
     ],
 )
-
-envoy_cc_library(
-    name = "hystrix_lib",
-    srcs = ["hystrix.cc"],
-    hdrs = ["hystrix.h"],
-    deps = [
-        ":stats_lib",
-        "//include/envoy/server:admin_interface",
-        "//include/envoy/server:instance_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:logger_lib",
-    ],
-)

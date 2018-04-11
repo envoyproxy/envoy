@@ -1,4 +1,4 @@
-#include "server/config/stats/hystrix.h"
+#include "extensions/stat_sinks/hystrix/config.h"
 
 #include <string>
 
@@ -8,24 +8,22 @@
 
 #include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
-#include "common/stats/hystrix.h"
+
+#include "extensions/stat_sinks/common/hystrix/hystrix.h"
 
 namespace Envoy {
-namespace Server {
-namespace Configuration {
+namespace Extensions {
+namespace StatSinks {
+namespace HystrixNameSpace {
 
 Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message&,
                                                    Server::Instance& server) {
-
-  return Stats::SinkPtr(new Stats::HystrixNameSpace::HystrixSink(server));
+  return std::make_unique<Common::HystrixNameSpace::HystrixSink>(server);
 }
 
 ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
-  // TDOD (@trabetti): until I add hystrix to data_plane_api
   return std::unique_ptr<envoy::config::metrics::v2::HystrixSink>(
       new envoy::config::metrics::v2::HystrixSink());
-  // return std::unique_ptr<envoy::config::metrics::v2::StatsdSink>(
-  // ica    new envoy::config::metrics::v2::StatsdSink());
 }
 
 std::string HystrixSinkFactory::name() { return Config::StatsSinkNames::get().HYSTRIX; }
@@ -33,8 +31,10 @@ std::string HystrixSinkFactory::name() { return Config::StatsSinkNames::get().HY
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HystrixSinkFactory, StatsSinkFactory> register_;
+static Registry::RegisterFactory<HystrixSinkFactory, Server::Configuration::StatsSinkFactory>
+    register_;
 
-} // namespace Configuration
-} // namespace Server
+} // namespace HystrixNameSpace
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

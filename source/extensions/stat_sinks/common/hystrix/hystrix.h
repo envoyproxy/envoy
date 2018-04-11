@@ -7,7 +7,9 @@
 #include "envoy/stats/stats.h"
 
 namespace Envoy {
-namespace Stats {
+namespace Extensions {
+namespace StatSinks {
+namespace Common {
 
 typedef std::vector<uint64_t> RollingStats;
 typedef std::map<const std::string, RollingStats> RollingStatsMap;
@@ -118,14 +120,14 @@ public:
 
 namespace HystrixNameSpace {
 
-class HystrixSink : public Sink {
+class HystrixSink : public Stats::Sink {
 public:
   HystrixSink(Server::Instance& server);
   void beginFlush();
-  void flushCounter(const Counter& counter, uint64_t delta);
-  void flushGauge(const Gauge&, uint64_t){};
+  void flushCounter(const Stats::Counter& counter, uint64_t delta);
+  void flushGauge(const Stats::Gauge&, uint64_t){};
   void endFlush();
-  void onHistogramComplete(const Histogram& histogram, uint64_t value) {
+  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
     std::cout << "histogram complete: " << histogram.name() << ", value: " << std::to_string(value)
               << std::endl;
   };
@@ -141,7 +143,7 @@ public:
   Hystrix& getStats() { return *stats_; }
 
 private:
-  Stats::HystrixPtr stats_;
+  HystrixPtr stats_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Server::Instance* server_;
   std::map<std::string, uint64_t> current_stat_values_;
@@ -150,6 +152,7 @@ private:
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
 
 } // namespace HystrixNameSpace
-
-} // namespace Stats
+} // namespace Common
+} // namespace StatSinks
+} // namespace Extensions
 } // namespace Envoy

@@ -221,13 +221,8 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerClusters(const std::string&, Http::HeaderMap&,
-                                      Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
-                                      Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                      Buffer::Instance& response, HandlerInfo&) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
   for (auto& cluster : server_.clusterManager().clusters()) {
@@ -283,13 +278,9 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerCpuProfiler(const std::string& url, Http::HeaderMap&,
-                                         Buffer::Instance& response, HandlerInfo&) {
-=======
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
-                                        Buffer::Instance& response) const {
+                                        Buffer::Instance& response, HandlerInfo&) const {
   envoy::admin::v2::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
@@ -305,8 +296,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
-                                         Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                         Buffer::Instance& response, HandlerInfo&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -329,48 +319,28 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerHealthcheckFail(const std::string&, Http::HeaderMap&,
-                                             Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
-                                             Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                             Buffer::Instance& response, HandlerInfo&) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerHealthcheckOk(const std::string&, Http::HeaderMap&,
-                                           Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                           Buffer::Instance& response, HandlerInfo&) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerHotRestartVersion(const std::string&, Http::HeaderMap&,
-                                               Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::HeaderMap&,
-                                               Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                               Buffer::Instance& response, HandlerInfo&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerLogging(const std::string& url, Http::HeaderMap&,
-                                     Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
-                                     Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                     Buffer::Instance& response, HandlerInfo&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -395,13 +365,8 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   return rc;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerResetCounters(const std::string&, Http::HeaderMap&,
-                                           Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                           Buffer::Instance& response, HandlerInfo&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -410,13 +375,8 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerServerInfo(const std::string&, Http::HeaderMap&,
-                                        Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
-                                        Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                        Buffer::Instance& response, HandlerInfo&) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
                            server_.healthCheckFailed() ? "draining" : "live",
@@ -426,13 +386,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerStats(const std::string& url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                   Buffer::Instance& response, HandlerInfo& handler_info) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -459,7 +414,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response);
+      return handlerPrometheusStats(url, response_headers, response, handler_info);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -470,7 +425,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 }
 
 Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
-                                             Buffer::Instance& response) {
+                                             Buffer::Instance& response, HandlerInfo&) {
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               response);
   return Http::Code::OK;
@@ -548,25 +503,15 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   return strbuf.GetString();
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerQuitQuitQuit(const std::string&, Http::HeaderMap&,
-                                          Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
-                                          Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                          Buffer::Instance& response, HandlerInfo&) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerListenerInfo(const std::string&, Http::HeaderMap& response_headers,
-                                          Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
-                                          Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                          Buffer::Instance& response, HandlerInfo&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   std::list<std::string> listeners;
@@ -577,38 +522,27 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerCerts(const std::string&, Http::HeaderMap&, Buffer::Instance& response,
-                                   HandlerInfo&){
-=======
-Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&,
-                                   Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
-    // This set is used to track distinct certificates. We may have multiple listeners, upstreams,
-    // etc using the same cert.
-    std::unordered_set<std::string> context_info_set;
-std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
-server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-  context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
-                                      context.getCertChainInformation()));
-});
+Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                   HandlerInfo&) {
+  // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
+  // using the same cert.
+  std::unordered_set<std::string> context_info_set;
+  std::string context_format = "{{\n\t\"ca_cert\": \"{}\",\n\t\"cert_chain\": \"{}\"\n}}\n";
+  server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
+    context_info_set.insert(fmt::format(context_format, context.getCaCertInformation(),
+                                        context.getCertChainInformation()));
+  });
 
-std::string cert_result_string;
-for (const std::string& context_info : context_info_set) {
-  cert_result_string += context_info;
+  std::string cert_result_string;
+  for (const std::string& context_info : context_info_set) {
+    cert_result_string += context_info;
+  }
+  response.add(cert_result_string);
+  return Http::Code::OK;
 }
-response.add(cert_result_string);
-return Http::Code::OK;
-} // namespace Server
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerRuntime(const std::string& url, Http::HeaderMap& response_headers,
-                                     Buffer::Instance& response, HandlerInfo&) {
-  Http::Code rc = Http::Code::OK;
-=======
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
-                                     Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                     Buffer::Instance& response, HandlerInfo&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
@@ -636,10 +570,6 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
       }
     }
   }
-<<<<<<< HEAD
-  return rc;
-}
-=======
   document.AddMember("layers", std::move(layer_names), allocator);
 
   for (const auto& layer : layers) {
@@ -654,22 +584,21 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
       kv.second["layer_values"].PushBack(entry_value_object, allocator);
     }
   }
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 
-rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
-for (auto& kv : entry_objects) {
-  value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
-                             allocator);
+  rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
+  for (auto& kv : entry_objects) {
+    value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
+                               allocator);
+  }
+
+  document.AddMember("entries", std::move(value_arrays_obj), allocator);
+
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  response.add(strbuf.GetString());
+  return Http::Code::OK;
 }
-
-document.AddMember("entries", std::move(value_arrays_obj), allocator);
-
-rapidjson::StringBuffer strbuf;
-rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-document.Accept(writer);
-response.add(strbuf.GetString());
-return Http::Code::OK;
-} // namespace Envoy
 
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
@@ -700,8 +629,7 @@ std::string AdminImpl::runtimeAsJson(
   return strbuf.GetString();
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
+Http::Code AdminImpl::handlerHystrixEventStream(absl::string_view,
                                                 Http::HeaderMap& response_headers,
                                                 Buffer::Instance&, HandlerInfo& handler_info) {
 
@@ -717,14 +645,13 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
       Http::Headers::get().AccessControlAllowOriginValue.All);
   response_headers.insertNoChunks().value().setReference("0");
 
-  Stats::HystrixHandlerInfoImpl& hystrix_handler_info =
-      dynamic_cast<Stats::HystrixHandlerInfoImpl&>(handler_info);
+  Extensions::StatSinks::Common::HystrixHandlerInfoImpl& hystrix_handler_info =
+      dynamic_cast<Extensions::StatSinks::Common::HystrixHandlerInfoImpl&>(handler_info);
 
   // TODO (@trabetti) : what should we do when a sink not present?
   // is this error message to user enough?
   // does it make sense to response with 503?
   if (server_.registerToHystrixSink(hystrix_handler_info.callbacks_)) {
-
     ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
               hystrix_handler_info.callbacks_->connection()->localAddress()->asString());
     return Http::Code::OK;
@@ -737,9 +664,8 @@ Http::Code AdminImpl::handlerHystrixEventStream(const std::string&,
   }
 }
 
-=======
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
-                                           Buffer::Instance& response) {
+                                           Buffer::Instance& response, HandlerInfo&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
@@ -755,30 +681,25 @@ Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMa
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-<<<<<<< HEAD
+  RELEASE_ASSERT(request_headers_);
   Http::Code code;
   bool end_stream = true;
 
   if (path.find("/hystrix_event_stream") == std::string::npos) {
     handler_info_ = std::make_unique<HandlerInfoImpl>();
-    code = parent_.runCallback(path, *header_map, response, *handler_info_);
+    code = parent_.runCallback(path, *request_headers_, *header_map, response, *handler_info_);
   } else {
-    handler_info_ = std::make_unique<Stats::HystrixHandlerInfoImpl>(callbacks_);
-    code = parent_.runCallback(path, *header_map, response, *handler_info_);
+    handler_info_ =
+        std::make_unique<Extensions::StatSinks::Common::HystrixHandlerInfoImpl>(callbacks_);
+    code = parent_.runCallback(path, *request_headers_, *header_map, response, *handler_info_);
     end_stream = false;
   }
-
-=======
-  RELEASE_ASSERT(request_headers_);
-  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response);
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -843,14 +764,12 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
-<<<<<<< HEAD
+          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
+           false, true},
           {"/hystrix_event_stream", "send hystrix event stream",
            MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false}},
-=======
-          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
-           false, true}},
+
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {
@@ -888,15 +807,10 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
   callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{new AdminFilter(*this)});
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::runCallback(const std::string& path_and_query,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  HandlerInfo& handler_info) {
-=======
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   const Http::HeaderMap& request_headers,
-                                  Http::HeaderMap& response_headers, Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                  HandlerInfo& handler_info) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -907,9 +821,6 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
-<<<<<<< HEAD
-      code = handler.handler_(path_and_query, response_headers, response, handler_info);
-=======
       if (handler.mutates_server_state_) {
         const absl::string_view method = request_headers.Method()->value().getStringView();
         if (method != Http::Headers::get().MethodValues.Post) {
@@ -917,8 +828,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                     handler.prefix_, method);
         }
       }
-      code = handler.handler_(path_and_query, response_headers, response);
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+      code = handler.handler_(path_and_query, response_headers, response, handler_info);
       found_handler = true;
       break;
     }
@@ -946,12 +856,8 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
   return sorted_handlers;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerHelp(const std::string&, Http::HeaderMap&, Buffer::Instance& response,
+Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                   HandlerInfo&) {
-=======
-Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -961,13 +867,8 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::I
   return Http::Code::OK;
 }
 
-<<<<<<< HEAD
-Http::Code AdminImpl::handlerAdminHome(const std::string&, Http::HeaderMap& response_headers,
-                                       Buffer::Instance& response, HandlerInfo&) {
-=======
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
-                                       Buffer::Instance& response) {
->>>>>>> aa61c6c34f7bd4c1448649686b5bd7511aaa8d51
+                                       Buffer::Instance& response, HandlerInfo&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);
 
