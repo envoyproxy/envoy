@@ -117,6 +117,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
     callbacks_->requestInfo().setResponseFlag(
         RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
+    if (config_->failureModeAllow() && status == CheckStatus::Error) {
+      // Status is Error and yet we are allowing the request. Click a counter.
+      cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
+    }
     // We can get completion inline, so only call continue if that isn't happening.
     if (!initiating_call_) {
       callbacks_->continueDecoding();

@@ -225,6 +225,14 @@ public:
   static Json::ObjectSharedPtr getJsonObjectFromMessage(const Protobuf::Message& message) {
     return Json::Factory::loadFromString(MessageUtil::getJsonStringFromMessage(message));
   }
+
+  /**
+   * Utility method to create a Struct containing the passed in key/value strings.
+   *
+   * @param key the key to use to set the value
+   * @param value the string value to associate with the key
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 };
 
 class ValueUtil {

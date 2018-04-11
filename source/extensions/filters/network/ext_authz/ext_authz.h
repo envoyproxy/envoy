@@ -27,7 +27,8 @@ namespace ExtAuthz {
 #define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)         \
   COUNTER(total)                                        \
   COUNTER(error)                                        \
-  COUNTER(denied)                                      \
+  COUNTER(denied)                                       \
+  COUNTER(failure_mode_allowed)                         \
   COUNTER(ok)                                           \
   COUNTER(cx_closed)                                    \
   GAUGE  (active)

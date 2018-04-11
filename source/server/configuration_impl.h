@@ -30,12 +30,12 @@ namespace Server {
 namespace Configuration {
 
 /**
- * Implemented by each HttpTracer and registered via Registry::registerFactory() or
- * the convenience class RegisterFactory.
+ * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
+ * class RegisterFactory.
  */
-class HttpTracerFactory {
+class TracerFactory {
 public:
-  virtual ~HttpTracerFactory() {}
+  virtual ~TracerFactory() {}
 
   /**
    * Create a particular HttpTracer implementation. If the implementation is unable to produce an
@@ -49,7 +49,7 @@ public:
                                                   Instance& server) PURE;
 
   /**
-   * Returns the identifying name for a particular implementation of HttpTracer produced by the
+   * Returns the identifying name for a particular implementation of tracer produced by the
    * factory.
    */
   virtual std::string name() PURE;

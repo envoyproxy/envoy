@@ -9,32 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "buffer_filter_test",
-    srcs = ["buffer_filter_test.cc"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:buffer_filter_lib",
-        "//source/common/stats:stats_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
-    name = "cors_filter_test",
-    srcs = ["cors_filter_test.cc"],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:cors_filter_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "fault_filter_test",
     srcs = ["fault_filter_test.cc"],
     deps = [
@@ -80,20 +54,5 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "squash_filter_test",
-    srcs = ["squash_filter_test.cc"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:squash_filter_lib",
-        "//source/common/stats:stats_lib",
-        "//source/server/config/http:squash_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/upstream:upstream_mocks",
     ],
 )

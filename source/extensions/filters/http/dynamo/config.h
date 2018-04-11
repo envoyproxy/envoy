@@ -16,7 +16,7 @@ namespace Dynamo {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class DynamoFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
   Server::Configuration::HttpFilterFactoryCb
   createFilter(const std::string& stat_prefix,

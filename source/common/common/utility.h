@@ -30,16 +30,24 @@ public:
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
    */
-  std::string fromTime(const SystemTime& time);
+  std::string fromTime(const SystemTime& time) const;
+
+  /**
+   * @return std::string representing the GMT/UTC time based on the input time.
+   */
+  std::string fromTime(time_t time) const;
 
   /**
    * @return std::string representing the current GMT/UTC time based on the format string.
    */
   std::string now();
 
-private:
-  std::string fromTimeT(time_t time);
+  /**
+   * @return std::string the format string used.
+   */
+  const std::string& formatString() const { return format_string_; }
 
+private:
   std::string format_string_;
 };
 
