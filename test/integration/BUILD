@@ -95,24 +95,6 @@ envoy_sh_test(
 )
 
 envoy_cc_test(
-    name = "cors_filter_integration_test",
-    srcs = [
-        "cors_filter_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:server_cors_filter.json",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "header_integration_test",
     srcs = [
         "header_integration_test.cc",
@@ -131,15 +113,13 @@ envoy_cc_test(
         "http2_integration_test.cc",
         "http2_integration_test.h",
     ],
-    data = [
-        "//test/config/integration:server_config_files",
-        "//test/config/integration:server_http2.json",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/health_check:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -152,10 +132,11 @@ envoy_cc_test(
         "http2_upstream_integration_test.cc",
         "http2_upstream_integration_test.h",
     ],
-    data = ["//test/config/integration:server_http2_upstream.json"],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
 )
@@ -173,37 +154,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "grpc_json_transcoder_integration_test",
-    srcs = [
-        "grpc_json_transcoder_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:server_grpc_json_transcoder.json",
-        "//test/proto:bookstore_proto_descriptor",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/grpc:codec_lib",
-        "//source/common/http:header_map_lib",
-        "//test/proto:bookstore_proto",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "integration_admin_test",
     srcs = [
         "integration_admin_test.cc",
         "integration_admin_test.h",
     ],
-    data = [
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
-        "//test/test_common:utility_lib",
-    ],
     deps = [
         ":http_integration_lib",
         "//include/envoy/http:header_map_interface",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/health_check:config",
     ],
 )
 
@@ -217,7 +177,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":integration_lib",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
     ],
 )
@@ -295,15 +255,10 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/http:buffer_lib",
-        "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
-        "//source/server/config/http:grpc_http1_bridge_lib",
-        "//source/server/config/http:grpc_json_transcoder_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
         "//source/server/config/http:router_lib",
-        "//source/server/http:health_check_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -321,14 +276,13 @@ envoy_cc_test(
         "integration_test.cc",
         "integration_test.h",
     ],
-    data = [
-        "//test/config/integration:server.json",
-        "//test/config/integration:server_config_files",
-    ],
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
+        "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
 )
@@ -337,9 +291,6 @@ envoy_cc_test(
     name = "echo_integration_test",
     srcs = [
         "echo_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:echo_server.json",
     ],
     deps = [
         ":integration_lib",
@@ -350,22 +301,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "buffer_filter_integration_test",
-    srcs = [
-        "buffer_filter_integration_test.cc",
-    ],
-    deps = [
-        ":http_protocol_integration_lib",
-        "//test/config:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "stats_integration_test",
     srcs = ["stats_integration_test.cc"],
     deps = [
         ":integration_lib",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
@@ -505,21 +445,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "squash_filter_integration_test",
-    srcs = [
-        "squash_filter_integration_test.cc",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/http:header_map_lib",
-        "//source/server/config/http:squash_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
     ],
 )

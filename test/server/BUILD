@@ -20,9 +20,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
-    data = [
-        "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
-    ],
     deps = [
         "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
@@ -133,7 +130,7 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/extensions/filters/listener/original_dst:config",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//source/server:listener_manager_lib",
@@ -155,9 +152,12 @@ envoy_cc_test(
     deps = [
         "//source/common/common:version_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
+        "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/http/ratelimit:config",
-        "//source/extensions/filters/network/hcm:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/server:server_lib",
