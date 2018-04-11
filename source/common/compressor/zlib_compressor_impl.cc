@@ -31,10 +31,6 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
   initialized_ = true;
 }
 
-void ZlibCompressorImpl::flush(Buffer::Instance& output_buffer) {
-  process(output_buffer, Z_SYNC_FLUSH);
-}
-
 uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
@@ -65,10 +61,6 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
     if (zstream_ptr_->avail_out == 0) {
       updateOutput(output_buffer);
     }
-  }
-
-  if (flush_state == Z_SYNC_FLUSH) {
-    updateOutput(output_buffer, true);
   }
 }
 
