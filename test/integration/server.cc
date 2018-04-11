@@ -84,7 +84,7 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
   Server::TestOptionsImpl options(config_path_, version);
-  Server::HotRestartNopImpl restarter;
+  Server::HotRestartNopImpl restarter(options);
   Thread::MutexBasicLockable lock;
 
   ThreadLocal::InstanceImpl tls;

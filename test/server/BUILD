@@ -74,6 +74,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restart_nop_impl_test",
+    srcs = envoy_select_hot_restart(["hot_restart_nop_impl_test.cc"]),
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_nop_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "init_manager_impl_test",
     srcs = ["init_manager_impl_test.cc"],
     deps = [

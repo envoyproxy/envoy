@@ -17,6 +17,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -27,7 +28,7 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   BlockMemoryHashSetOptions hash_set_options;
   hash_set_options.capacity = max_stats;
 
@@ -84,8 +85,8 @@ SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) ==
-                 0);
+  RELEASE_ASSERT(
+      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(Stats::RawStatDataSet)) == 0);
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -115,15 +116,13 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
 
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
-      shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
+      shmem_(
+          SharedMemory::initialize(Stats::RawStatDataSet::numBytes(stats_set_options_), options)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
-    // We must hold the stat lock when attaching to an existing memory segment
-    // because it might be actively written to while we sanityCheck it.
-    std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-    stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                        shmem_.stats_set_data_));
+    stats_allocator_ = std::make_unique<Stats::BlockRawStatDataAllocator>(
+        stats_set_options_, options.restartEpoch() == 0, shmem_.stats_set_data_, stat_lock_);
   }
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
@@ -136,39 +135,6 @@ HotRestartImpl::HotRestartImpl(Options& options)
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);
   RELEASE_ASSERT(rc != -1);
-}
-
-Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
-  // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-  absl::string_view key = name;
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
-    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
-  }
-  auto value_created = stats_set_->insert(key);
-  Stats::RawStatData* data = value_created.first;
-  if (data == nullptr) {
-    return nullptr;
-  }
-  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
-  // automatically, but on recycled entries (value-created.second==false) we need to bump the
-  // ref-count.
-  if (!value_created.second) {
-    ++data->ref_count_;
-  }
-  return data;
-}
-
-void HotRestartImpl::free(Stats::RawStatData& data) {
-  // We must hold the lock since the reference decrement can race with an initialize above.
-  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-  bool key_removed = stats_set_->remove(data.key());
-  ASSERT(key_removed);
-  memset(&data, 0, Stats::RawStatData::size());
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
@@ -472,23 +438,25 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
-  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);
+  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(),
+                       stats_allocator_->version());
 }
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
   const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
-  const size_t bytes = RawStatDataSet::numBytes(options);
+  const size_t bytes = Stats::RawStatDataSet::numBytes(options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
-  RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+  Stats::RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+  auto stats_set_version = stats_set.version();
 
-  return versionHelper(max_num_stats, max_stat_name_len, stats_set);
+  return versionHelper(max_num_stats, max_stat_name_len, stats_set_version);
 }
 
 std::string HotRestartImpl::versionHelper(size_t max_num_stats, size_t max_stat_name_len,
-                                          RawStatDataSet& stats_set) {
-  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+                                          std::string stats_set_version) {
+  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set_version;
 }
 
 } // namespace Server

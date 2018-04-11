@@ -14,11 +14,6 @@
 #include "tclap/CmdLine.h"
 
 // Can be overridden at compile time
-#ifndef ENVOY_DEFAULT_MAX_STATS
-#define ENVOY_DEFAULT_MAX_STATS 16384
-#endif
-
-// Can be overridden at compile time
 // See comment in common/stat/stat_impl.h for rationale behind
 // this constant.
 #ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH

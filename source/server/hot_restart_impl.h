@@ -18,7 +18,7 @@
 namespace Envoy {
 namespace Server {
 
-typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats);
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
@@ -113,9 +113,7 @@ private:
 /**
  * Implementation of HotRestart built for Linux.
  */
-class HotRestartImpl : public HotRestart,
-                       public Stats::RawStatDataAllocator,
-                       Logger::Loggable<Logger::Id::main> {
+class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
 public:
   HotRestartImpl(Options& options);
 
@@ -130,17 +128,13 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& statsAllocator() override { return *this; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
    * based on the configured options.
    */
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
-
-  // RawStatDataAllocator
-  Stats::RawStatData* alloc(const std::string& name) override;
-  void free(Stats::RawStatData& data) override;
 
 private:
   enum class RpcMessageType {
@@ -204,12 +198,12 @@ private:
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
   static std::string versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                   RawStatDataSet& stats_set);
+                                   std::string stats_set_version);
 
   Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  std::unique_ptr<RawStatDataSet> stats_set_;
+  std::unique_ptr<Stats::BlockRawStatDataAllocator> stats_allocator_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;

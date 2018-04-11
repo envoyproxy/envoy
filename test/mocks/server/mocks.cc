@@ -55,6 +55,7 @@ MockGuardDog::~MockGuardDog() {}
 
 MockHotRestart::MockHotRestart() {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
+  ON_CALL(*this, statLock()).WillByDefault(ReturnRef(stat_lock_));
   ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
 }

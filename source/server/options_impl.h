@@ -9,6 +9,11 @@
 
 #include "spdlog/spdlog.h"
 
+// Can be overridden at compile time
+#ifndef ENVOY_DEFAULT_MAX_STATS
+#define ENVOY_DEFAULT_MAX_STATS 16384
+#endif
+
 namespace Envoy {
 /**
  * Implementation of Server::Options.
