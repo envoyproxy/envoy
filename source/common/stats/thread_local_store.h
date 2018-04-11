@@ -17,6 +17,77 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Log Linear Histogram implementation per thread.
+ */
+class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
+public:
+  ThreadLocalHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags);
+
+  virtual ~ThreadLocalHistogramImpl();
+  // Stats::Histogram
+  void recordValue(uint64_t value) override;
+
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
+  void merge() override { NOT_IMPLEMENTED; }
+  bool used() const override { return flags_ & Flags::Used; }
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return cumulative_statistics_;
+  }
+
+  void beginMerge() { current_active_ = 1 - current_active_; }
+  void merge(histogram_t* target);
+
+  Store& parent_;
+
+private:
+  uint64_t current_active_;
+  histogram_t* histograms_[2];
+  std::atomic<uint16_t> flags_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
+};
+
+typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
+
+/**
+ * Log Linear Histogram implementation that is stored in the main thread.
+ */
+class HistogramParentImpl : public Histogram, public MetricImpl {
+public:
+  HistogramParentImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                      std::vector<Tag>&& tags);
+
+  virtual ~HistogramParentImpl();
+
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
+  void recordValue(uint64_t) override { NOT_IMPLEMENTED; }
+  bool used() const override;
+  void merge() override;
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return cumulative_statistics_;
+  }
+
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr);
+
+  Store& parent_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_;
+
+private:
+  bool usedWorker() const;
+
+  histogram_t* interval_histogram_;
+  histogram_t* cumulative_histogram_;
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
+  mutable std::mutex merge_lock_;
+};
+
+typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;
+
+/**
  * Store implementation with thread local caching. This implementation supports the following
  * features:
  * - Thread local per scope stat caching.
@@ -64,6 +135,7 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override;
   std::list<GaugeSharedPtr> gauges() const override;
+  std::list<HistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -74,11 +146,19 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
 
+  void mergeHistograms(PostMergeCb mergeCb) override;
+
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, HistogramSharedPtr> histograms_;
+    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
+  };
+
+  struct CentralCacheEntry {
+    std::unordered_map<std::string, CounterSharedPtr> counters_;
+    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
+    std::unordered_map<std::string, ParentHistogramSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public Scope {
@@ -97,7 +177,7 @@ private:
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
-    TlsCacheEntry central_cache_;
+    CentralCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -113,6 +193,7 @@ private:
   void clearScopeFromCaches(ScopeImpl* scope);
   void releaseScopeCrossThread(ScopeImpl* scope);
   SafeAllocData safeAlloc(const std::string& name);
+  void mergeInternal(PostMergeCb mergeCb);
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};

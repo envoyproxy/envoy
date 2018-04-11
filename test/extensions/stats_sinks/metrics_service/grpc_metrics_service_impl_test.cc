@@ -6,6 +6,7 @@
 #include "test/mocks/thread_local/mocks.h"
 
 using namespace std::chrono_literals;
+
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -110,6 +111,10 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
   NiceMock<Stats::MockGauge> gauge;
   gauge.name_ = "test_gauge";
   sink.flushGauge(gauge, 1);
+
+  NiceMock<Stats::MockHistogram> histogram;
+  histogram.name_ = "test_histogram";
+  sink.flushHistogram(histogram);
   EXPECT_CALL(*streamer_, send(_));
 
   sink.endFlush();

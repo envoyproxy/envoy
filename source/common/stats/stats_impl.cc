@@ -273,5 +273,29 @@ void RawStatData::initialize(absl::string_view key) {
   name_[xfer_size] = '\0';
 }
 
+HistogramStatisticsImpl ::HistogramStatisticsImpl(histogram_t* histogram_ptr)
+    : computed_quantiles_(supported_quantiles_.size(), 0.0) {
+  hist_approx_quantile(histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
+                       computed_quantiles_.data());
+}
+
+std::string HistogramStatisticsImpl ::summary() const {
+  std::vector<std::string> summary;
+  for (size_t i = 0; i < supported_quantiles_.size(); ++i) {
+    summary.push_back(
+        fmt::format("P{}: {}", 100 * supported_quantiles_[i], computed_quantiles_[i]));
+  }
+  return absl::StrJoin(summary, ", ");
+}
+
+/**
+ * Clears the old computed values and refreshes it with values computed from passed histogram.
+ */
+void HistogramStatisticsImpl ::refresh(histogram_t* new_histogram_ptr) {
+  computed_quantiles_.clear();
+  hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
+                       computed_quantiles_.data());
+}
+
 } // namespace Stats
 } // namespace Envoy

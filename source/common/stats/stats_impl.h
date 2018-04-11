@@ -21,7 +21,9 @@
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "circllhist.h"
 
 namespace Envoy {
 namespace Stats {
@@ -167,9 +169,6 @@ public:
  * RawStatData::size() instead.
  */
 struct RawStatData {
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
 
   /**
    * Due to the flexible-array-length of name_, c-style allocation
@@ -284,6 +283,14 @@ public:
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
+protected:
+  /**
+   * Flags used by all stats types to figure out whether they have been used.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x1;
+  };
+
 private:
   const std::string name_;
   const std::string tag_extracted_name_;
@@ -305,13 +312,13 @@ public:
   void add(uint64_t amount) override {
     data_.value_ += amount;
     data_.pending_increment_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
   void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
 private:
@@ -333,13 +340,13 @@ public:
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
     data_.value_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
@@ -347,11 +354,33 @@ public:
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
 private:
   RawStatData& data_;
   RawStatDataAllocator& alloc_;
+};
+
+/**
+ * Implementation of HistogramStatistics for circllhist.
+ */
+class HistogramStatisticsImpl : public HistogramStatistics {
+public:
+  HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
+  HistogramStatisticsImpl(histogram_t* histogram_ptr);
+
+  HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
+  HistogramStatisticsImpl& operator=(HistogramStatisticsImpl const&) = delete;
+
+  std::string summary() const override;
+  const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
+  const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+
+  void refresh(histogram_t* new_histogram_ptr);
+
+private:
+  const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  std::vector<double> computed_quantiles_;
 };
 
 /**
@@ -366,7 +395,22 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
+  void merge() override { NOT_IMPLEMENTED; }
+
+  bool used() const override { return true; }
+
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
+
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return cumulative_statistics_;
+  }
+
   Store& parent_;
+
+private:
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
 };
 
 /**
@@ -446,6 +490,7 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
   std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
+  std::list<HistogramSharedPtr> histograms() const override { return histograms_.toList(); }
 
 private:
   struct ScopeImpl : public Scope {

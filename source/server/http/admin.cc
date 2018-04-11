@@ -36,6 +36,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -393,6 +394,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
+  std::map<std::string, std::string> all_histograms;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
   }
@@ -401,10 +403,20 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
+  for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
+    all_histograms.emplace(histogram->name(),
+                           fmt::format("\n\t Interval:   {}\n\t Cumulative: {}",
+                                       histogram->intervalStatistics().summary(),
+                                       histogram->cumulativeStatistics().summary()));
+  }
+
   if (params.size() == 0) {
     // No Arguments so use the standard.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    }
+    for (auto histogram : all_histograms) {
+      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   } else {
     const std::string format_key = params.begin()->first;
