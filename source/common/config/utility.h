@@ -219,7 +219,7 @@ public:
   template <class ProtoMessage, class Factory>
   static ProtobufTypes::MessagePtr translateToFactoryRDSConfig(const ProtoMessage& source,
                                                                Factory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyRDSConfigProto();
+    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
     if (config == nullptr) {
       throw EnvoyException(fmt::format(
