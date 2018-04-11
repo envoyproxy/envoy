@@ -516,10 +516,10 @@ public:
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
 
   /**
-   * @return const absl::optional<envoy::api::v2::core::TcpKeepalive>& the tcp keepalive settings
+   * @return const Network::TcpKeepaliveConfig& the tcp keepalive settings
    * for this cluster
    */
-  virtual const envoy::api::v2::core::TcpKeepalive& tcpKeepaliveSettings() const PURE;
+  virtual const Network::TcpKeepaliveConfig& tcpKeepaliveSettings() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

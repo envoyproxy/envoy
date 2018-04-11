@@ -46,8 +46,8 @@ typedef absl::optional<int> SocketOptionName;
 
 class TcpKeepaliveOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  TcpKeepaliveOptionImpl(absl::optional<int> keepalive_probes, absl::optional<int> keepalive_time,
-                         absl::optional<int> keepalive_interval)
+  TcpKeepaliveOptionImpl(absl::optional<uint32_t> keepalive_probes, absl::optional<uint32_t> keepalive_time,
+                         absl::optional<uint32_t> keepalive_interval)
       : keepalive_probes_(keepalive_probes), keepalive_time_(keepalive_time),
         keepalive_interval_(keepalive_interval) {}
 
@@ -57,14 +57,14 @@ public:
   // The tcp keepalive options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
-  static bool setTcpKeepalive(Socket& socket, absl::optional<int> keepalive_probes,
-                              absl::optional<int> keepalive_time,
-                              absl::optional<int> keepalive_interval);
+  static bool setTcpKeepalive(Socket& socket, absl::optional<uint32_t> keepalive_probes,
+                              absl::optional<uint32_t> keepalive_time,
+                              absl::optional<uint32_t> keepalive_interval);
 
 private:
-  absl::optional<int> keepalive_probes_;
-  absl::optional<int> keepalive_time_;
-  absl::optional<int> keepalive_interval_;
+  absl::optional<uint32_t> keepalive_probes_;
+  absl::optional<uint32_t> keepalive_time_;
+  absl::optional<uint32_t> keepalive_interval_;
 };
 } // namespace Network
 } // namespace Envoy

@@ -13,9 +13,9 @@ bool TcpKeepaliveOptionImpl::setOption(Network::Socket& socket,
   return true;
 }
 
-bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, absl::optional<int> keepalive_probes,
-                                             absl::optional<int> keepalive_time,
-                                             absl::optional<int> keepalive_interval) {
+bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, absl::optional<uint32_t> keepalive_probes,
+                                             absl::optional<uint32_t> keepalive_time,
+                                             absl::optional<uint32_t> keepalive_interval) {
   if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
     ENVOY_LOG(warn, "TCP keepalive not supported on this platform");
     return false;

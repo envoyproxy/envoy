@@ -77,6 +77,25 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
   return features;
 }
 
+Network::TcpKeepaliveConfig parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config,
+                                           const envoy::api::v2::UpstreamConnectionOptions connection_options) {
+  if (connection_options.has_tcp_keepalive()) {
+    return Network::TcpKeepaliveConfig{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_probes, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_time, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_interval, absl::optional<uint32_t>())
+    };
+  } else if (config.upstream_connection_options().has_tcp_keepalive()) {
+    return Network::TcpKeepaliveConfig{
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(), keepalive_probes, absl::optional<uint32_t>()),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(), keepalive_time, absl::optional<uint32_t>()),
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(), keepalive_interval, absl::optional<uint32_t>())
+    };
+  } else {
+    return Network::TcpKeepaliveConfig{};
+  }
+}
+
 // Socket::Option implementation for API-defined upstream options. This same
 // object can be extended to handle additional upstream socket options.
 class UpstreamSocketOption : public Network::SocketOptionImpl {
@@ -117,12 +136,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
       }
     }
     cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_probes,
-                                        absl::optional<int>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_time,
-                                        absl::optional<int>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.tcpKeepaliveSettings(), keepalive_interval,
-                                        absl::optional<int>())));
+        cluster.tcpKeepaliveSettings().keepalive_probes_,
+        cluster.tcpKeepaliveSettings().keepalive_time_,
+        cluster.tcpKeepaliveSettings().keepalive_interval_));
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
@@ -262,9 +278,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
-      tcp_keepalive_config_(connection_options.has_tcp_keepalive()
-                                ? connection_options.tcp_keepalive()
-                                : config.upstream_connection_options().tcp_keepalive()) {
+      tcp_keepalive_config_(parseTcpKeepaliveConfig(config, connection_options)) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
