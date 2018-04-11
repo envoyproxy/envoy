@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=0.6.1
+VERSION=0.6.2
 
 wget -O yaml-cpp-"$VERSION".tar.gz https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-"$VERSION".tar.gz
 tar xf yaml-cpp-"$VERSION".tar.gz

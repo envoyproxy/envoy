@@ -1,3 +1,5 @@
+#include "common/config/well_known_names.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 

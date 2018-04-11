@@ -112,13 +112,17 @@ public:
 
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
-  HttpGrpcAccessLogTest() {
+  void init() {
     ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_.reset(new HttpGrpcAccessLog(AccessLog::FilterPtr{filter_}, config_, streamer_));
   }
 
   void expectLog(const std::string& expected_request_msg_yaml) {
+    if (access_log_ == nullptr) {
+      init();
+    }
+
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
     MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
     EXPECT_CALL(*streamer_, send(_, "hello_log"))
@@ -222,6 +226,7 @@ http_logs:
         {":scheme", "scheme_value"},
         {":authority", "authority_value"},
         {":path", "path_value"},
+        {":method", "POST"},
         {"user-agent", "user-agent_value"},
         {"referer", "referer_value"},
         {"x-forwarded-for", "x-forwarded-for_value"},
@@ -279,13 +284,115 @@ http_logs:
       forwarded_for: "x-forwarded-for_value"
       request_id: "x-request-id_value"
       original_path: "x-envoy-original-path_value"
-      request_headers_bytes: 219
+      request_headers_bytes: 230
       request_body_bytes: 10
+      request_method: "POST"
     response:
       response_code:
         value: 200
       response_headers_bytes: 10
       response_body_bytes: 20
+)EOF");
+    access_log_->log(&request_headers, &response_headers, request_info);
+  }
+
+  {
+    NiceMock<RequestInfo::MockRequestInfo> request_info;
+    request_info.host_ = nullptr;
+    request_info.start_time_ = SystemTime(1h);
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, request_info);
+  }
+}
+
+// Test HTTP log marshalling with additional headers.
+TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
+  InSequence s;
+
+  config_.add_additional_request_headers_to_log("X-Custom-Request");
+  config_.add_additional_request_headers_to_log("X-Custom-Empty");
+  config_.add_additional_request_headers_to_log("X-Envoy-Max-Retries");
+  config_.add_additional_request_headers_to_log("X-Envoy-Force-Trace");
+
+  config_.add_additional_response_headers_to_log("X-Custom-Response");
+  config_.add_additional_response_headers_to_log("X-Custom-Empty");
+  config_.add_additional_response_headers_to_log("X-Envoy-Immediate-Health-Check-Fail");
+  config_.add_additional_response_headers_to_log("X-Envoy-Upstream-Service-Time");
+  init();
+
+  {
+    NiceMock<RequestInfo::MockRequestInfo> request_info;
+    request_info.host_ = nullptr;
+    request_info.start_time_ = SystemTime(1h);
+
+    Http::TestHeaderMapImpl request_headers{
+        {":scheme", "scheme_value"},
+        {":authority", "authority_value"},
+        {":path", "path_value"},
+        {":method", "POST"},
+        {"x-envoy-max-retries", "3"}, // test inline header not otherwise logged
+        {"x-custom-request", "custom_value"},
+        {"x-custom-empty", ""},
+    };
+    Http::TestHeaderMapImpl response_headers{
+        {":status", "200"},
+        {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
+        {"x-custom-response", "custom_value"},
+        {"x-custom-empty", ""},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+    request:
+      scheme: "scheme_value"
+      authority: "authority_value"
+      path: "path_value"
+      request_method: "POST"
+      request_headers_bytes: 132
+      request_headers:
+        "x-custom-request": "custom_value"
+        "x-custom-empty": ""
+        "x-envoy-max-retries": "3"
+    response:
+      response_headers_bytes: 92
+      response_headers:
+        "x-custom-response": "custom_value"
+        "x-custom-empty": ""
+        "x-envoy-immediate-health-check-fail": "true"
 )EOF");
     access_log_->log(&request_headers, &response_headers, request_info);
   }
