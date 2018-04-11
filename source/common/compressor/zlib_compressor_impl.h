@@ -92,7 +92,7 @@ public:
 private:
   bool deflateNext(int64_t flush_state);
   void process(Buffer::Instance& output_buffer, int64_t flush_state);
-  void updateOutput(Buffer::Instance& output_buffer, const bool require_finish = false);
+  void updateOutput(Buffer::Instance& output_buffer);
 
   const uint64_t chunk_size_;
   bool initialized_;

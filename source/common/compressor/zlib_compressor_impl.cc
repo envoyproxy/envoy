@@ -64,7 +64,7 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
   }
 }
 
-void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer, const bool require_finish) {
+void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
   const uint64_t n_output = chunk_size_ - zstream_ptr_->avail_out;
   if (n_output > 0) {
     output_buffer.add(static_cast<void*>(chunk_char_ptr_.get()), n_output);
@@ -72,10 +72,6 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer, const boo
   chunk_char_ptr_.reset(new unsigned char[chunk_size_]);
   zstream_ptr_->avail_out = chunk_size_;
   zstream_ptr_->next_out = chunk_char_ptr_.get();
-
-  if (require_finish) {
-    finish(output_buffer);
-  }
 }
 
 void ZlibCompressorImpl::reset() {
