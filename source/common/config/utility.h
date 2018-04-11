@@ -216,8 +216,8 @@ public:
     return config;
   }
 
-  template <class ProtoMessage, class Factory>
-  static ProtobufTypes::MessagePtr translateToFactoryRDSConfig(const ProtoMessage& source,
+  template <class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryRDSConfig(const Protobuf::Message& source,
                                                                Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
