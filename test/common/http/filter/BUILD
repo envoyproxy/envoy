@@ -9,18 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "cors_filter_test",
-    srcs = ["cors_filter_test.cc"],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:cors_filter_lib",
-        "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "fault_filter_test",
     srcs = ["fault_filter_test.cc"],
     deps = [

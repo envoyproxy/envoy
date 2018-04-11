@@ -5,9 +5,11 @@
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Cors {
 
-class CorsFilter : public StreamFilter {
+class CorsFilter : public Http::StreamFilter {
 public:
   CorsFilter();
 
@@ -15,25 +17,25 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return FilterDataStatus::Continue;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
   };
-  FilterTrailersStatus decodeTrailers(HeaderMap&) override {
-    return FilterTrailersStatus::Continue;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+    return Http::FilterTrailersStatus::Continue;
   };
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
-    return FilterHeadersStatus::Continue;
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
+    return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
-    return FilterDataStatus::Continue;
+    return Http::FilterDataStatus::Continue;
   };
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    return FilterTrailersStatus::Continue;
+    return Http::FilterTrailersStatus::Continue;
   };
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
@@ -51,12 +53,14 @@ private:
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
 
-  StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   std::array<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 };
 
-} // namespace Http
+} // namespace Cors
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

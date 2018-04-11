@@ -95,24 +95,6 @@ envoy_sh_test(
 )
 
 envoy_cc_test(
-    name = "cors_filter_integration_test",
-    srcs = [
-        "cors_filter_integration_test.cc",
-    ],
-    data = [
-        "//test/config/integration:server_cors_filter.json",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "header_integration_test",
     srcs = [
         "header_integration_test.cc",
@@ -273,7 +255,6 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/http:cors_lib",
         "//source/server/config/http:fault_lib",
         "//source/server/config/http:gzip_lib",
         "//source/server/config/http:ip_tagging_lib",
@@ -298,6 +279,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
