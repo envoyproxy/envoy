@@ -239,6 +239,25 @@ public:
   ipTestParamsToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
+
+  /**
+   * Return flip-ordered bytes.
+   * @param bytes input bytes.
+   * @param mask bit mask
+   * @return Type flip-ordered bytes.
+   */
+  template <class Type> static Type flipOrder(const Type& bytes, const Type mask) {
+  Type result{0};
+  Type data = bytes;
+  for (Type i = 0; i < sizeof(Type); i++) {
+    result <<= 8;
+    // TODO(dio): infer mask from Type.
+    result |= (data & mask);
+    data >>= 8;
+  }
+  return result;
+}
+
 };
 
 /**
