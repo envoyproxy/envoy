@@ -147,7 +147,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
           clusters, api_config_source.grpc_services()[0].envoy_grpc().cluster_name());
     }
   }
-  // Otherwise there is no cluster name to validate.
+  // Otherwise, there is no cluster name to validate.
 }
 
 std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
