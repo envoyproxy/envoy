@@ -8,14 +8,14 @@ namespace Network {
 bool TcpKeepaliveOptionImpl::setOption(Network::Socket& socket,
                                        Network::Socket::SocketState state) const {
   if (state == Socket::SocketState::PreBind) {
-    return setTcpKeepalive(socket, keepalive_probes_, keepalive_time_, keepalive_interval_);
+    return setTcpKeepalive(socket, keepalive_config_.keepalive_probes_, keepalive_config_.keepalive_time_, keepalive_config_.keepalive_interval_);
   }
   return true;
 }
 
-bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, absl::optional<uint32_t> keepalive_probes,
-                                             absl::optional<uint32_t> keepalive_time,
-                                             absl::optional<uint32_t> keepalive_interval) {
+bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, const absl::optional<uint32_t>& keepalive_probes,
+                                             const absl::optional<uint32_t>& keepalive_time,
+                                             const absl::optional<uint32_t>& keepalive_interval) {
   if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
     ENVOY_LOG(warn, "TCP keepalive not supported on this platform");
     return false;

@@ -135,10 +135,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
         *cluster_options = *options;
       }
     }
-    cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(
-        cluster.tcpKeepaliveSettings().keepalive_probes_,
-        cluster.tcpKeepaliveSettings().keepalive_time_,
-        cluster.tcpKeepaliveSettings().keepalive_interval_));
+    cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(cluster.tcpKeepaliveSettings()));
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
