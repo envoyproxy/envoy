@@ -14,8 +14,7 @@ namespace Common {
 typedef std::vector<uint64_t> RollingStats;
 typedef std::map<const std::string, RollingStats> RollingStatsMap;
 
-class Hystrix {
-
+class Hystrix : public Logger::Loggable<Logger::Id::hystrix> {
 public:
   Hystrix() : current_index_(DEFAULT_NUM_OF_BUCKETS), num_of_buckets_(DEFAULT_NUM_OF_BUCKETS + 1){};
 

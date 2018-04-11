@@ -115,8 +115,7 @@ void Hystrix::updateRollingWindowMap(std::map<std::string, uint64_t> current_sta
   uint64_t total = errors + timeouts + success + rejected;
   pushNewValue(counter_name_lookup[cluster_name]["total"], total);
 
-  // TODO (@trabetti) : why does it fail compilation?
-  // ENVOY_LOG(trace, "{}", printRollingWindow());
+  ENVOY_LOG(trace, "{}", printRollingWindow());
 }
 
 void Hystrix::resetRollingWindow() { rolling_stats_map_.clear(); }
