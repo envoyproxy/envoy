@@ -247,17 +247,16 @@ public:
    * @return Type flip-ordered bytes.
    */
   template <class Type> static Type flipOrder(const Type& bytes, const Type mask) {
-  Type result{0};
-  Type data = bytes;
-  for (Type i = 0; i < sizeof(Type); i++) {
-    result <<= 8;
-    // TODO(dio): infer mask from Type.
-    result |= (data & mask);
-    data >>= 8;
+    Type result{0};
+    Type data = bytes;
+    for (Type i = 0; i < sizeof(Type); i++) {
+      result <<= 8;
+      // TODO(dio): infer mask from Type.
+      result |= (data & mask);
+      data >>= 8;
+    }
+    return result;
   }
-  return result;
-}
-
 };
 
 /**
