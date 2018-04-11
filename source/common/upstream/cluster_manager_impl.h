@@ -183,6 +183,10 @@ public:
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
+  const envoy::api::v2::UpstreamConnectionOptions& connectionOptions() const override {
+    return connection_options_;
+  }
+
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
@@ -309,6 +313,7 @@ private:
   ClusterMap warming_clusters_;
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
   envoy::api::v2::core::BindConfig bind_config_;
+  envoy::api::v2::UpstreamConnectionOptions connection_options_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;

@@ -55,7 +55,8 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
 }
 
 uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
-                       const envoy::api::v2::core::BindConfig bind_config) {
+                       const envoy::api::v2::core::BindConfig bind_config,
+                       const envoy::api::v2::UpstreamConnectionOptions connection_options) {
   uint64_t features = 0;
   if (config.has_http2_protocol_options()) {
     features |= ClusterInfoImpl::Features::HTTP2;
@@ -68,11 +69,9 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
       config.upstream_bind_config().freebind().value()) {
     features |= ClusterInfoImpl::Features::FREEBIND;
   }
-  if ((bind_config.has_tcp_keepalive() && (!bind_config.tcp_keepalive().has_disable() ||
-                                           !bind_config.tcp_keepalive().disable().value())) ||
-      (config.upstream_bind_config().has_tcp_keepalive() &&
-       (!config.upstream_bind_config().tcp_keepalive().has_disable() ||
-        !config.upstream_bind_config().tcp_keepalive().disable().value()))) {
+  if ((connection_options.has_tcp_keepalive() && !connection_options.tcp_keepalive().disable()) ||
+      (config.upstream_connection_options().has_tcp_keepalive() &&
+       !config.upstream_connection_options().tcp_keepalive().disable())) {
     features |= ClusterInfoImpl::Features::USE_TCP_KEEPALIVE;
   }
   return features;
@@ -238,10 +237,10 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
-                                 const envoy::api::v2::core::BindConfig& bind_config,
-                                 Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
+ClusterInfoImpl::ClusterInfoImpl(
+    const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
+    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+    bool added_via_api, const envoy::api::v2::UpstreamConnectionOptions& connection_options)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -254,7 +253,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
           config.alt_stat_name().empty() ? name_ : std::string(config.alt_stat_name())))),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      features_(parseFeatures(config, bind_config)),
+      features_(parseFeatures(config, bind_config, connection_options)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
@@ -263,9 +262,9 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
-      tcp_keepalive_config_(bind_config.has_tcp_keepalive()
-                                ? bind_config.tcp_keepalive()
-                                : config.upstream_bind_config().tcp_keepalive()) {
+      tcp_keepalive_config_(connection_options.has_tcp_keepalive()
+                                ? connection_options.tcp_keepalive()
+                                : config.upstream_connection_options().tcp_keepalive()) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
@@ -407,12 +406,13 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                                 const envoy::api::v2::core::BindConfig& bind_config,
-                                 Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
-                                                   ssl_context_manager, added_via_api)) {
+ClusterImplBase::ClusterImplBase(
+    const envoy::api::v2::Cluster& cluster, const envoy::api::v2::core::BindConfig& bind_config,
+    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+    bool added_via_api, const envoy::api::v2::UpstreamConnectionOptions& connection_options)
+    : runtime_(runtime),
+      info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
+                                added_via_api, connection_options)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -619,7 +619,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
+                      cm.connectionOptions()),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -769,7 +770,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api),
+                             added_via_api, cm.connectionOptions()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {

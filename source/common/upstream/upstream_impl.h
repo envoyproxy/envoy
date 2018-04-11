@@ -296,8 +296,8 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  bool added_via_api);
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                  const envoy::api::v2::UpstreamConnectionOptions& connection_options);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -435,8 +435,8 @@ public:
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  bool added_via_api);
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                  const envoy::api::v2::UpstreamConnectionOptions& connection_options);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);

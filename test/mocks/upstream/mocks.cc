@@ -94,6 +94,7 @@ MockClusterManager::MockClusterManager() {
   ON_CALL(*this, adsMux()).WillByDefault(ReturnRef(ads_mux_));
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
+  ON_CALL(*this, connectionOptions()).WillByDefault(ReturnRef(connection_options_));
 
   // Matches are LIFO so "" will match first.
   ON_CALL(*this, get(_)).WillByDefault(Return(&thread_local_cluster_));

@@ -167,6 +167,7 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
+  MOCK_CONST_METHOD0(connectionOptions, const envoy::api::v2::UpstreamConnectionOptions&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -175,6 +176,8 @@ public:
   NiceMock<Config::MockGrpcMux> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
+
+  envoy::api::v2::UpstreamConnectionOptions connection_options_;
 };
 
 class MockHealthChecker : public HealthChecker {

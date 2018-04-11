@@ -1570,7 +1570,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOnly) {
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      upstream_bind_config:
+      upstream_connection_options:
         tcp_keepalive: {}
   )EOF";
   initialize(yaml);
@@ -1590,7 +1590,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterManagerOnly) {
           address: "127.0.0.1"
           port_value: 11001
   cluster_manager:
-    upstream_bind_config:
+    upstream_connection_options:
       tcp_keepalive: {}
   )EOF";
   initialize(yaml);
@@ -1609,11 +1609,11 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOverride) {
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
-      upstream_bind_config:
+      upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
   cluster_manager:
-    upstream_bind_config:
+    upstream_connection_options:
       tcp_keepalive:
         keepalive_probes: 10
   )EOF";
