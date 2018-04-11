@@ -80,10 +80,10 @@ public:
     store_->addSink(sink_);
   }
 
-  void validateMerge(std::string hist_name, std::vector<uint64_t> h1_cumulative_values,
-                     std::vector<uint64_t> h2_cumulative_values,
-                     std::vector<uint64_t> h1_interval_values,
-                     std::vector<uint64_t> h2_interval_values, bool single_histogram = false) {
+  std::vector<uint64_t> h1_cumulative_values, h2_cumulative_values, h1_interval_values,
+      h2_interval_values;
+
+  int validateMerge() {
 
     std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
     store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
@@ -91,11 +91,7 @@ public:
     EXPECT_TRUE(*merge_called);
 
     std::list<HistogramSharedPtr> histogram_list = store_->histograms();
-    if (single_histogram) {
-      EXPECT_EQ(histogram_list.size(), 1);
-    } else {
-      EXPECT_EQ(histogram_list.size(), 2);
-    }
+
     histogram_t* hist1_cumulative = hist_alloc();
     for (uint64_t value : h1_cumulative_values) {
       hist_insert_intscale(hist1_cumulative, value, 0, 1);
@@ -122,7 +118,7 @@ public:
     HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
 
     for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
-      if (histogram->name().find(hist_name) != std::string::npos) {
+      if (histogram->name().find("h1") != std::string::npos) {
         EXPECT_EQ(histogram->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
         EXPECT_EQ(histogram->intervalStatistics().summary(), h1_interval_statistics.summary());
       } else {
@@ -135,6 +131,24 @@ public:
     hist_free(hist2_cumulative);
     hist_free(hist1_interval);
     hist_free(hist2_interval);
+
+    h1_interval_values.clear();
+    h2_interval_values.clear();
+
+    return histogram_list.size();
+  }
+
+  void expectCallAndAccumulate(Histogram& histogram, uint64_t record_value) {
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), record_value));
+    histogram.recordValue(record_value);
+
+    if (histogram.name().find("h1") != std::string::npos) {
+      h1_cumulative_values.push_back(record_value);
+      h1_interval_values.push_back(record_value);
+    } else {
+      h2_cumulative_values.push_back(record_value);
+      h2_interval_values.push_back(record_value);
+    }
   }
 
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
@@ -253,53 +267,16 @@ TEST_F(StatsThreadLocalStoreTest, BasicSingleHistogramMerge) {
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ("h1", h1.name());
 
-  std::vector<uint64_t> h1_cumulative_values;
-  std::vector<uint64_t> h2_cumulative_values;
-  std::vector<uint64_t> h1_interval_values;
-  std::vector<uint64_t> h2_interval_values;
+  expectCallAndAccumulate(h1, 0);
+  expectCallAndAccumulate(h1, 43);
+  expectCallAndAccumulate(h1, 41);
+  expectCallAndAccumulate(h1, 415);
+  expectCallAndAccumulate(h1, 2201);
+  expectCallAndAccumulate(h1, 3201);
+  expectCallAndAccumulate(h1, 125);
+  expectCallAndAccumulate(h1, 13);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 0));
-  h1.recordValue(0);
-  h1_cumulative_values.push_back(0);
-  h1_interval_values.push_back(0);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 43));
-  h1.recordValue(43);
-  h1_cumulative_values.push_back(43);
-  h1_interval_values.push_back(43);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 41));
-  h1.recordValue(41);
-  h1_cumulative_values.push_back(41);
-  h1_interval_values.push_back(41);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 415));
-  h1.recordValue(415);
-  h1_cumulative_values.push_back(415);
-  h1_interval_values.push_back(415);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2201));
-  h1.recordValue(2201);
-  h1_cumulative_values.push_back(2201);
-  h1_interval_values.push_back(2201);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 3201));
-  h1.recordValue(3201);
-  h1_cumulative_values.push_back(3201);
-  h1_interval_values.push_back(3201);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 125));
-  h1.recordValue(125);
-  h1_cumulative_values.push_back(125);
-  h1_interval_values.push_back(125);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 13));
-  h1.recordValue(13);
-  h1_cumulative_values.push_back(13);
-  h1_interval_values.push_back(13);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values, true);
+  EXPECT_EQ(1, validateMerge());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -317,28 +294,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicMultiHistogramMerge) {
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
 
-  std::vector<uint64_t> h1_cumulative_values;
-  std::vector<uint64_t> h2_cumulative_values;
-  std::vector<uint64_t> h1_interval_values;
-  std::vector<uint64_t> h2_interval_values;
+  expectCallAndAccumulate(h1, 1);
+  expectCallAndAccumulate(h2, 1);
+  expectCallAndAccumulate(h2, 2);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
-  h1.recordValue(1);
-  h1_cumulative_values.push_back(1);
-  h1_interval_values.push_back(1);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 1));
-  h2.recordValue(1);
-  h2_cumulative_values.push_back(1);
-  h2_interval_values.push_back(1);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
-  h2.recordValue(2);
-  h2_cumulative_values.push_back(2);
-  h2_interval_values.push_back(2);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
+  EXPECT_EQ(2, validateMerge());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -356,58 +316,27 @@ TEST_F(StatsThreadLocalStoreTest, MultiHistogramMultipleMerges) {
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("h2", h2.name());
 
-  std::vector<uint64_t> h1_cumulative_values;
-  std::vector<uint64_t> h2_cumulative_values;
-  std::vector<uint64_t> h1_interval_values;
-  std::vector<uint64_t> h2_interval_values;
-
   // Insert one value in to one histogram and validate
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
-  h1.recordValue(1);
-  h1_cumulative_values.push_back(1);
-  h1_interval_values.push_back(1);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
-  h1_interval_values.clear();
-  h2_interval_values.clear();
+  expectCallAndAccumulate(h1, 1);
+  EXPECT_EQ(2, validateMerge());
 
   // Insert value into second histogram and validate that it is merged properly.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 1));
-  h2.recordValue(1);
-  h2_cumulative_values.push_back(1);
-  h2_interval_values.push_back(1);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
-  h1_interval_values.clear();
-  h2_interval_values.clear();
+  expectCallAndAccumulate(h2, 1);
+  EXPECT_EQ(2, validateMerge());
 
   // Insert more values into both the histograms and validate that it is merged properly.
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 2));
-  h1.recordValue(2);
-  h1_cumulative_values.push_back(2);
-  h1_interval_values.push_back(2);
+  expectCallAndAccumulate(h1, 2);
+  EXPECT_EQ(2, validateMerge());
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 3));
-  h2.recordValue(3);
-  h2_cumulative_values.push_back(3);
-  h2_interval_values.push_back(3);
+  expectCallAndAccumulate(h2, 3);
+  EXPECT_EQ(2, validateMerge());
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
-  h2.recordValue(2);
-  h2_cumulative_values.push_back(2);
-  h2_interval_values.push_back(2);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
-  h1_interval_values.clear();
-  h2_interval_values.clear();
+  expectCallAndAccumulate(h2, 2);
+  EXPECT_EQ(2, validateMerge());
 
   // Do not insert any value and validate that intervalSummary is empty for both the histograms and
   // cumulativeSummary has right values.
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
+  EXPECT_EQ(2, validateMerge());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -422,28 +351,14 @@ TEST_F(StatsThreadLocalStoreTest, BasicScopeHistogramMerge) {
 
   ScopePtr scope1 = store_->createScope("scope1.");
 
-  std::vector<uint64_t> h1_cumulative_values;
-  std::vector<uint64_t> h2_cumulative_values;
-  std::vector<uint64_t> h1_interval_values;
-  std::vector<uint64_t> h2_interval_values;
-
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
-  h1.recordValue(1);
-  h1_cumulative_values.push_back(1);
-  h1_interval_values.push_back(1);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
-  h2.recordValue(2);
-  h2_cumulative_values.push_back(2);
-  h2_interval_values.push_back(2);
-
-  validateMerge("h1", h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-                h2_interval_values);
+  expectCallAndAccumulate(h1, 2);
+  expectCallAndAccumulate(h2, 2);
+  EXPECT_EQ(2, validateMerge());
 
   store_->shutdownThreading();
 

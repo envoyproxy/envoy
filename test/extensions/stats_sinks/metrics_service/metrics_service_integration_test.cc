@@ -130,8 +130,8 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   metrics_service_request_->startGrpcStream();
-  envoy::service::metrics::v2::StreamMetricsResponse actual_response_msg;
-  metrics_service_request_->sendGrpcMessage(actual_response_msg);
+  envoy::service::metrics::v2::StreamMetricsResponse response_msg;
+  metrics_service_request_->sendGrpcMessage(response_msg);
   metrics_service_request_->finishGrpcStream(Grpc::Status::Ok);
 
   switch (clientType()) {

@@ -406,7 +406,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
     all_histograms.emplace(histogram->name(),
-                           fmt::format("\n \t Interval:   {} \n \t Cumulative: {}",
+                           fmt::format("\n\t Interval:   {}\n\t Cumulative: {}",
                                        histogram->intervalStatistics().summary(),
                                        histogram->cumulativeStatistics().summary()));
   }

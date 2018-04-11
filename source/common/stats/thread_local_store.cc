@@ -278,5 +278,86 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   return *hist_tls_ptr;
 }
 
+ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name, Store& parent,
+                                                   std::string&& tag_extracted_name,
+                                                   std::vector<Tag>&& tags)
+    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+      current_active_(0), flags_(0) {
+  histograms_[0] = hist_alloc();
+  histograms_[1] = hist_alloc();
+}
+
+ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
+  hist_free(histograms_[0]);
+  hist_free(histograms_[1]);
+}
+
+void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
+  hist_insert_intscale(histograms_[current_active_], value, 0, 1);
+  parent_.deliverHistogramToSinks(*this, value);
+  flags_ |= Flags::Used;
+}
+
+void ThreadLocalHistogramImpl::merge(histogram_t* target) {
+  histogram_t* hist_array[1];
+  hist_array[0] = histograms_[1 - current_active_];
+  hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
+  hist_clear(hist_array[0]);
+}
+
+HistogramParentImpl::HistogramParentImpl(const std::string& name, Store& parent,
+                                         std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
+
+bool HistogramParentImpl::used() const {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  return usedWorker();
+}
+
+HistogramParentImpl::~HistogramParentImpl() {
+  hist_free(interval_histogram_);
+  hist_free(cumulative_histogram_);
+}
+
+/**
+ * This method is called during the main stats flush process for each of the histogram. This
+ * method iterates through the Tls histograms and collects the histogram data of all of them
+ * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
+ * "cumulative_histogram". More details about threading model at
+ * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
+ */
+void HistogramParentImpl::merge() {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  if (usedWorker()) {
+    hist_clear(interval_histogram_);
+    for (TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
+      tls_histogram->merge(interval_histogram_);
+    }
+    histogram_t* hist_array[1];
+    hist_array[0] = interval_histogram_;
+    hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
+    cumulative_statistics_.refresh(cumulative_histogram_);
+    interval_statistics_.refresh(interval_histogram_);
+  }
+}
+
+void HistogramParentImpl::addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  tls_histograms_.emplace_back(hist_ptr);
+}
+
+bool HistogramParentImpl::usedWorker() const {
+  bool any_tls_used = false;
+  for (const TlsHistogramSharedPtr tls_histogram : tls_histograms_) {
+    if (tls_histogram->used()) {
+      any_tls_used = true;
+      break;
+    }
+  }
+  return any_tls_used;
+}
+
 } // namespace Stats
 } // namespace Envoy

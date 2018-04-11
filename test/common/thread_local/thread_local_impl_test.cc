@@ -5,10 +5,10 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Ref;
 using testing::ReturnPointee;
-using testing::_;
 
 namespace Envoy {
 namespace ThreadLocal {
@@ -96,12 +96,13 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreadsWithBarrier) {
   std::shared_ptr<std::atomic<uint64_t>> thread_local_calls =
       std::make_shared<std::atomic<uint64_t>>(0);
 
-  tlsptr->runOnAllThreadsWithBarrier(
-      [thread_local_calls]() -> void { ++*thread_local_calls; },
-      [all_threads_complete]() -> void { *all_threads_complete = true; });
+  tlsptr->runOnAllThreadsWithBarrier([thread_local_calls]() -> void { ++*thread_local_calls; },
+                                     [all_threads_complete, thread_local_calls]() -> void {
+                                       EXPECT_EQ(*thread_local_calls, 1);
+                                       *all_threads_complete = true;
+                                     });
 
   EXPECT_TRUE(*all_threads_complete);
-  EXPECT_EQ(*thread_local_calls, 1);
 
   tls_.shutdownGlobalThreading();
   tls_.shutdownThread();

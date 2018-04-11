@@ -367,37 +367,16 @@ private:
 class HistogramStatisticsImpl : public HistogramStatistics {
 public:
   HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
-
-  HistogramStatisticsImpl(histogram_t* histogram_ptr)
-      : computed_quantiles_(supported_quantiles_.size(), 0.0) {
-    hist_approx_quantile(histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
-                         computed_quantiles_.data());
-  }
+  HistogramStatisticsImpl(histogram_t* histogram_ptr);
 
   HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
   HistogramStatisticsImpl& operator=(HistogramStatisticsImpl const&) = delete;
 
-  std::string summary() const override {
-    std::vector<std::string> summary;
-    for (size_t i = 0; i < supported_quantiles_.size(); ++i) {
-      summary.push_back(
-          fmt::format("P{}: {}", 100 * supported_quantiles_[i], computed_quantiles_[i]));
-    }
-    return absl::StrJoin(summary, ", ");
-  }
-
+  std::string summary() const override;
   const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
-
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
 
-  /**
-   * Clears the old computed values and refreshes it with values computed from passed histogram.
-   */
-  void refresh(histogram_t* new_histogram_ptr) {
-    computed_quantiles_.clear();
-    hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(),
-                         supported_quantiles_.size(), computed_quantiles_.data());
-  }
+  void refresh(histogram_t* new_histogram_ptr);
 
 private:
   const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
@@ -416,7 +395,8 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
-  void merge() override {}
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
+  void merge() override { NOT_IMPLEMENTED; }
 
   bool used() const override { return true; }
 
