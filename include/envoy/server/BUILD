@@ -65,7 +65,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "health_checker_interface",
+    name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = ["//include/envoy/upstream:health_checker_interface"],
 )

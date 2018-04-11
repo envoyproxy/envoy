@@ -29,7 +29,7 @@ envoy_cc_library(
         ":redis",
         ":utility",
         "//include/envoy/registry",
-        "//include/envoy/server:health_checker_interface",
+        "//include/envoy/server:health_checker_config_interface",
         "//source/common/common:assert_lib",
     ],
 )
