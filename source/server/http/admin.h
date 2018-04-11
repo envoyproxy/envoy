@@ -20,10 +20,10 @@
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 
-#include "server/config/network/http_connection_manager.h"
 #include "server/http/config_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -32,7 +32,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Implementation of Server::admin.
+ * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
@@ -76,9 +76,7 @@ public:
   bool generateRequestId() override { return false; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
-  const std::string& serverName() override {
-    return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
-  }
+  const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }

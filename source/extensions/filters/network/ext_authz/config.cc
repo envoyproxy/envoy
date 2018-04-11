@@ -30,7 +30,7 @@ Server::Configuration::NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilte
 
     auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            grpc_service, context.scope(), false);
+            grpc_service, context.scope(), true);
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
         async_client_factory->create(), std::chrono::milliseconds(timeout_ms));

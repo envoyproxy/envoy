@@ -362,8 +362,9 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
     }
     data = &val;
   }
-  std::string json;
-  Protobuf::util::MessageToJsonString(*data, &json);
+  ProtobufTypes::String json;
+  const auto status = Protobuf::util::MessageToJsonString(*data, &json);
+  RELEASE_ASSERT(status.ok());
   if (max_length_ && json.length() > max_length_.value()) {
     return json.substr(0, max_length_.value());
   }

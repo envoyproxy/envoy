@@ -44,7 +44,7 @@ private:
   // one modified because we force trace.
   static const char TRACE_FORCED = 'a';
 
-  // Value of 'a' is chosen randomly to distinguish between freshly generated uuid4 and the
+  // Value of 'b' is chosen randomly to distinguish between freshly generated uuid4 and the
   // one modified because of client trace.
   static const char TRACE_CLIENT = 'b';
 
