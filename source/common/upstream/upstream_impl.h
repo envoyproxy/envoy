@@ -138,8 +138,7 @@ public:
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
-  CreateConnectionData createHealthCheckConnection(
-      Event::Dispatcher& dispatcher) const override;
+  CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
   std::list<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
