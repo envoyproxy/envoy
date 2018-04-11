@@ -128,10 +128,12 @@ envoy_cc_test(
     data = ["//test/common/ssl/test_data:certs"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:resolver_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/network:utility_lib",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/ssl:config",
@@ -139,7 +141,9 @@ envoy_cc_test(
         "//source/server/config/network:http_connection_manager_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

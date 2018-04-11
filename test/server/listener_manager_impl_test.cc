@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -6,6 +8,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/utility.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
@@ -15,6 +18,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -121,6 +125,13 @@ public:
                                                                                     context);
             }));
   }
+};
+
+class MockAddressResolver : public Network::Address::Resolver {
+public:
+  MOCK_METHOD1(resolve, Network::Address::InstanceConstSharedPtr(
+                            const envoy::api::v2::core::SocketAddress&));
+  MOCK_CONST_METHOD0(name, std::string());
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
@@ -1518,11 +1529,19 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: AddressResolverdListener
     address:
-      socket_address: { address: 127.0.0.1, port_value: 1111, resolver_name: envoy.ip }
+      socket_address: { address: 127.0.0.1, port_value: 1111, resolver_name: envoy.mock.resolver }
     filter_chains:
     - filters:
   )EOF",
                                                        Network::Address::IpVersion::v4);
+
+  MockAddressResolver mock_resolver;
+  EXPECT_CALL(mock_resolver, name()).WillRepeatedly(Return("envoy.mock.resolver"));
+
+  EXPECT_CALL(mock_resolver, resolve(_))
+      .WillOnce(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+
+  Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
