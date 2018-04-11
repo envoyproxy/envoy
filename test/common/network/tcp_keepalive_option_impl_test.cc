@@ -55,7 +55,8 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveSuccess) {
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveProbesSuccess) {
-  TcpKeepaliveOptionImpl socket_option{Network::TcpKeepaliveConfig{3, absl::nullopt, absl::nullopt}};
+  TcpKeepaliveOptionImpl socket_option{
+      Network::TcpKeepaliveConfig{3, absl::nullopt, absl::nullopt}};
 #if defined(SO_KEEPALIVE) && defined(TCP_KEEPCNT)
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
   EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
@@ -75,7 +76,8 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveProbesSuccess) {
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveTimeSuccess) {
-  TcpKeepaliveOptionImpl socket_option{Network::TcpKeepaliveConfig{absl::nullopt, 3, absl::nullopt}};
+  TcpKeepaliveOptionImpl socket_option{
+      Network::TcpKeepaliveConfig{absl::nullopt, 3, absl::nullopt}};
 #if defined(SO_KEEPALIVE) && (defined(TCP_KEEPIDLE) || defined(TCP_KEEPALIVE))
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
   EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
