@@ -1,4 +1,4 @@
-#include "common/http/filter/cors_filter.h"
+#include "extensions/filters/http/cors/cors_filter.h"
 
 #include "envoy/http/codes.h"
 
@@ -8,16 +8,18 @@
 #include "common/http/headers.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Cors {
 
 CorsFilter::CorsFilter() : policies_({{nullptr, nullptr}}), is_cors_request_(false) {}
 
 // This handles the CORS preflight request as described in #6.2
 // https://www.w3.org/TR/cors/
-FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (decoder_callbacks_->route() == nullptr ||
       decoder_callbacks_->route()->routeEntry() == nullptr) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   policies_ = {{
@@ -26,32 +28,32 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
   }};
 
   if (!enabled()) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   origin_ = headers.Origin();
   if (origin_ == nullptr || origin_->value().empty()) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!isOriginAllowed(origin_->value())) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   is_cors_request_ = true;
 
   const auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   const auto requestMethod = headers.AccessControlRequestMethod();
   if (requestMethod == nullptr || requestMethod->value().empty()) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
-  HeaderMapPtr response_headers{
-      new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
+  Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
+      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))}}};
 
   response_headers->insertAccessControlAllowOrigin().value(*origin_);
 
@@ -78,14 +80,14 @@ FilterHeadersStatus CorsFilter::decodeHeaders(HeaderMap& headers, bool) {
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true);
 
-  return FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 // This handles simple CORS requests as described in #6.1
 // https://www.w3.org/TR/cors/
-FilterHeadersStatus CorsFilter::encodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (!is_cors_request_) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   headers.insertAccessControlAllowOrigin().value(*origin_);
@@ -93,10 +95,10 @@ FilterHeadersStatus CorsFilter::encodeHeaders(HeaderMap& headers, bool) {
     headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
   }
 
-  return FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::Continue;
 }
 
-void CorsFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
 };
 
@@ -175,5 +177,7 @@ bool CorsFilter::enabled() {
   return false;
 }
 
-} // namespace Http
+} // namespace Cors
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
