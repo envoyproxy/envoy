@@ -71,18 +71,39 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLogSequence;
     LogLevelSetter save_levels(spdlog::level::trace);                                              \
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
-    ASSERT_EQ(expected_log_sequence.size(), log_recorder.messages().size());                       \
-    const auto actual_logs = log_recorder.messages();                                              \
+    std::string expected_log;                                                                      \
+    for (const auto log : expected_log_sequence) {                                                 \
+      absl::StrAppend(&expected_log, "[", log.first, "]", log.second, "\n");                       \
+    }                                                                                              \
+    std::string actual_log;                                                                        \
+    for (const auto message : log_recorder.messages()) {                                           \
+      std::vector<absl::string_view> pieces = absl::StrSplit(message, "][");                       \
+      absl::StrAppend(&actual_log, message);                                                       \
+    }                                                                                              \
+    if (log_recorder.messages().size() != expected_log_sequence.size()) {                          \
+      FAIL() << "\nExpected:\n"                                                                    \
+             << expected_log << "\nTo be subset of:\n"                                             \
+             << (actual_log.size() > 0 ? actual_log : "No messages.");                             \
+    }                                                                                              \
     for (uint64_t i = 0; i < expected_log_sequence.size(); i++) {                                  \
+      const std::string actual_message = log_recorder.messages()[i];                               \
       /* Parse "[2018-04-02 19:06:08.629][15][warn][admin] source/file.cc:691] message ..." */     \
-      std::vector<absl::string_view> pieces = absl::StrSplit(actual_logs[i], "][");                \
+      std::vector<absl::string_view> pieces = absl::StrSplit(actual_message, "][");                \
       ASSERT_LE(3, pieces.size());                                                                 \
-      EXPECT_EQ(expected_log_sequence[i].first, std::string(pieces[2]));                           \
-      const auto message = absl::string_view(actual_logs[i]);                                      \
-      /* TODO(gsagula): improve error message with string diff. */                                 \
-      EXPECT_TRUE(message.find(expected_log_sequence[i].second) != absl::string_view::npos)        \
-          << "\n Actual Log:         " << actual_logs[i]                                           \
-          << "\n Expected Substring: " << expected_log_sequence[i].second;                         \
+      const std::string actual_level{pieces[2]};                                                   \
+      const std::string expected_level = expected_log_sequence[i].first;                           \
+      const std::string expected_substr = expected_log_sequence[i].second;                         \
+      if (expected_level != actual_level) {                                                        \
+        FAIL() << "\nExpected log message:\n"                                                      \
+               << actual_message << "\nTo contain log level:\n"                                    \
+               << expected_level << "\nBut found:\n"                                               \
+               << actual_level;                                                                    \
+      }                                                                                            \
+      if (actual_message.find(expected_substr) == absl::string_view::npos) {                       \
+        FAIL() << "\nActual log message:\n"                                                        \
+               << actual_message << "\nDoes NOT contain the expected substring:\n"                 \
+               << expected_substr;                                                                 \
+      }                                                                                            \
     }                                                                                              \
   } while (false)
 
