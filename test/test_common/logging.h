@@ -72,11 +72,11 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLogSequence;
     LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     std::string expected_log;                                                                      \
-    for (const auto log : expected_log_sequence) {                                                 \
-      absl::StrAppend(&expected_log, "[", log.first, "]", log.second, "\n");                       \
+    for (auto expected : expected_log_sequence) {                                                  \
+      absl::StrAppend(&expected_log, "[", expected.first, "]", expected.second, "\n");             \
     }                                                                                              \
     std::string actual_log;                                                                        \
-    for (const auto message : log_recorder.messages()) {                                           \
+    for (auto message : log_recorder.messages()) {                                                 \
       std::vector<absl::string_view> pieces = absl::StrSplit(message, "][");                       \
       absl::StrAppend(&actual_log, message);                                                       \
     }                                                                                              \
