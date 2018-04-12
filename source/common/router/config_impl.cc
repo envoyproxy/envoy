@@ -11,7 +11,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h" // TODO(rodaine): break dependency on server
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 

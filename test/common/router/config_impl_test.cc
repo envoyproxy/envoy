@@ -16,7 +16,7 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
-#include "server/config/http/buffer.h"
+#include "extensions/filters/http/buffer/config.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -4212,7 +4212,7 @@ virtual_hosts:
 }
 
 TEST(PerFilterConfigsTest, PerFilterConfigs) {
-  Server::Configuration::BufferFilterConfig factory;
+  Extensions::HttpFilters::BufferFilter::BufferFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
       factory);
 
@@ -4271,7 +4271,7 @@ void checkPerFilterConfig(const Protobuf::Message* cfg, uint32_t expected_max_by
 }
 
 TEST(PerFilterConfigsTest, RouteLocalConfig) {
-  Server::Configuration::BufferFilterConfig factory;
+  Extensions::HttpFilters::BufferFilter::BufferFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
       factory);
 
@@ -4301,7 +4301,7 @@ virtual_hosts:
 }
 
 TEST(PerFilterConfigTest, WeightedClusterConfig) {
-  Server::Configuration::BufferFilterConfig factory;
+  Extensions::HttpFilters::BufferFilter::BufferFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
       factory);
 
@@ -4335,7 +4335,7 @@ virtual_hosts:
 }
 
 TEST(PerFilterConfigTest, WeightedClusterFallthroughConfig) {
-  Server::Configuration::BufferFilterConfig factory;
+  Extensions::HttpFilters::BufferFilter::BufferFilterConfigFactory factory;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> register_buffer(
       factory);
 
