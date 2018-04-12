@@ -1376,10 +1376,15 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
 
   Buffer::OwnedImpl fake_input("1234body-sent-early");
   Buffer::OwnedImpl early_data("body-sent-early");
+
+  // This ensures that the amount of early data can't grow unbounded.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+
   conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*upstream_connection, write(_, false));
   EXPECT_CALL(*upstream_connection, write(BufferEqual(&early_data), false));
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();

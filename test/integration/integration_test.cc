@@ -311,7 +311,7 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   // Early data is 5 bytes, so the total is 233 bytes.
   const std::string data = fake_upstream_connection->waitForData(233);
   // We expect to find the early data on the upstream side
-  EXPECT_NE(data.find("hello"), std::string::npos);
+  EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
   // Accept websocket upgrade request
   fake_upstream_connection->write(upgrade_resp_str);
   // Reply also with early data
@@ -320,7 +320,7 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   fake_upstream_connection->close();
   tcp_client->waitForDisconnect();
 
-  EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
+  EXPECT_EQ(upgrade_resp_str + early_data_resp_str, tcp_client->data());
 }
 
 TEST_P(IntegrationTest, TestBind) {
