@@ -11,6 +11,7 @@
 #include "envoy/server/access_log_config.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/router/config_utility.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -148,6 +149,21 @@ private:
   const std::string runtime_key_;
   const envoy::type::FractionalPercent percent_;
   const bool use_independent_randomness_;
+};
+
+/**
+ * Filter requests based on its headers.
+ */
+class HeaderFilter : public Filter {
+public:
+  HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config);
+
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
+
+private:
+  std::vector<Router::ConfigUtility::HeaderData> header_data_;
 };
 
 /**
