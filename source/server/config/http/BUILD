@@ -33,18 +33,3 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "ip_tagging_lib",
-    srcs = ["ip_tagging.cc"],
-    hdrs = ["ip_tagging.h"],
-    deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
-        "//source/common/http/filter:ip_tagging_filter_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
-    ],
-)

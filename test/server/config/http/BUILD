@@ -21,7 +21,6 @@ envoy_cc_test(
         "//source/extensions/filters/http/lua:config",
         "//source/extensions/filters/http/ratelimit:config",
         "//source/server/config/http:fault_lib",
-        "//source/server/config/http:ip_tagging_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
