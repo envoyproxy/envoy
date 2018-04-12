@@ -123,7 +123,8 @@ private:
   const static std::string DELAY_DURATION_KEY;
   const static std::string ABORT_HTTP_STATUS_KEY;
 };
-}
+
+} // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
