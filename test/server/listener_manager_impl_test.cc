@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -15,6 +13,7 @@
 
 #include "extensions/filters/listener/original_dst/original_dst.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
@@ -125,13 +124,6 @@ public:
                                                                                     context);
             }));
   }
-};
-
-class MockAddressResolver : public Network::Address::Resolver {
-public:
-  MOCK_METHOD1(resolve, Network::Address::InstanceConstSharedPtr(
-                            const envoy::api::v2::core::SocketAddress&));
-  MOCK_CONST_METHOD0(name, std::string());
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {
@@ -1535,9 +1527,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  MockAddressResolver mock_resolver;
-  EXPECT_CALL(mock_resolver, name()).WillRepeatedly(Return("envoy.mock.resolver"));
-
+  NiceMock<Network::MockAddressResolver> mock_resolver;
   EXPECT_CALL(mock_resolver, resolve(_))
       .WillOnce(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
 
