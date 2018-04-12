@@ -401,8 +401,8 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls. Currently the
-  // methods related to the actual merge and thread local are mixed together in single interface. It
-  // would be ideal to separate them.
+  // methods related to the parent histogram like merge and thread local histogram are mixed
+  // together in single interface. It would be ideal to separate them.
   void merge() override { NOT_IMPLEMENTED; }
 
   bool used() const override { return true; }
