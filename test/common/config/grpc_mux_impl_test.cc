@@ -313,16 +313,12 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   expectSendMessage("foo", {"x"}, "");
   grpc_mux_->start();
 
-  const ExpectedLogSequence expected_logs = {
-      {"debug", "Received gRPC message for foo at version baz"},
-      {"warning", "Too many sendDiscoveryRequest calls for foo"},
-      {"trace", "Sending DiscoveryRequest for foo: version_info"}};
-
   // Exhausts the limit.
   onReceiveMessage(99);
 
   // API calls go over the limit for the first time.
-  EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
+  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
+                      onReceiveMessage(1));
 
   // Logging limiter waits for 5s, so a second warning message is expected.
   EXPECT_CALL(time_source_, currentTime())
@@ -333,14 +329,12 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(7)}));
 
   // API calls go over the limit for the second time.
-  EXPECT_LOG_SEQ(expected_logs, onReceiveMessage(1));
+  EXPECT_LOG_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
+                      onReceiveMessage(1));
 
-  const ExpectedLogSequence no_rate_limit_log = {
-      {"debug", "Received gRPC message for foo at version baz"},
-      {"trace", "Sending DiscoveryRequest for foo: version_info"}};
-
-  // Without waiting full 5s, no rate limit logs is expected.
-  EXPECT_LOG_SEQ(no_rate_limit_log, onReceiveMessage(1));
+  // Without waiting full 5s, no rate limit log is expected.
+  EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
+                          onReceiveMessage(1));
 }
 
 } // namespace
