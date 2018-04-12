@@ -309,7 +309,7 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
   // Early data is 5 bytes, so the total is 233 bytes.
-  const std::string data = fake_upstream_connection->waitForData(233);
+  const std::string data = fake_upstream_connection->waitForData(228 + early_data_req_str.length());
   // We expect to find the early data on the upstream side
   EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
   // Accept websocket upgrade request
@@ -318,6 +318,7 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   fake_upstream_connection->write(early_data_resp_str);
   // upstream disconnect
   fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(upgrade_resp_str + early_data_resp_str, tcp_client->data());
