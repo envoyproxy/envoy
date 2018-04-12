@@ -31,8 +31,8 @@ maximize the chances of your PR being merged.
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
   conforms to the public interface documentation should continue to compile and work within the
-  deprecation window. We make no guarantees about code or deployments that rely on undocumented
-  behavior.
+  deprecation window. Within this window, a warning of depreciation should be logged. We make no
+  guarantees about code or deployments that rely on undocumented behavior.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
 * All deprecations/breaking changes will be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
