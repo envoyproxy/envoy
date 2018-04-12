@@ -206,6 +206,7 @@ public:
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
                                                             Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr);
 
@@ -217,14 +218,12 @@ public:
   }
 
   template <class Factory>
-  static ProtobufTypes::MessagePtr translateToFactoryRDSConfig(const Protobuf::Message& source,
-                                                               Factory& factory) {
+  static ProtobufTypes::MessagePtr translateToFactoryRouteConfig(const Protobuf::Message& source,
+                                                                 Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
-    if (config == nullptr) {
-      throw EnvoyException(fmt::format(
-          "{} factory returned nullptr instead of empty RDS config message.", factory.name()));
-    }
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr);
 
     MessageUtil::jsonConvert(source, *config);
     return config;

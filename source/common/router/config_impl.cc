@@ -884,7 +884,7 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt:
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
-    configs_[name] = Envoy::Config::Utility::translateToFactoryRDSConfig(struct_config, factory);
+    configs_[name] = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
   }
 }
 
