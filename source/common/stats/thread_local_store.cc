@@ -71,8 +71,9 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
     for (auto histogram : scope->central_cache_.histograms_) {
       const std::string& hist_name = histogram.first;
       const ParentHistogramSharedPtr& parent_hist = histogram.second;
-      ASSERT(names.insert(hist_name).second);
-      ret.push_back(parent_hist);
+      if (names.insert(hist_name).second) {
+        ret.push_back(parent_hist);
+      }
     }
   }
 
