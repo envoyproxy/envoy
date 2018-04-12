@@ -256,7 +256,6 @@ envoy_cc_test_library(
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/http:fault_lib",
         "//source/server/config/http:gzip_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",

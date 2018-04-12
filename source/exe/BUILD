@@ -37,7 +37,6 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-        "//source/server/config/http:fault_lib",
         "//source/server/config/http:gzip_lib",
     ] + envoy_all_extensions(),
 )
