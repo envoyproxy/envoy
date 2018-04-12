@@ -9,42 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "buffer_filter_lib",
-    srcs = ["buffer_filter.cc"],
-    hdrs = ["buffer_filter.h"],
-    deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:codes_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "cors_filter_lib",
-    srcs = ["cors_filter.cc"],
-    hdrs = ["cors_filter.h"],
-    deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
@@ -97,25 +61,5 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/network:lc_trie_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "squash_filter_lib",
-    srcs = ["squash_filter.cc"],
-    hdrs = ["squash_filter.h"],
-    deps = [
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:empty_string",
-        "//source/common/common:enum_to_int",
-        "//source/common/http:headers_lib",
-        "//source/common/http:message_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/squash/v2:squash_cc",
     ],
 )

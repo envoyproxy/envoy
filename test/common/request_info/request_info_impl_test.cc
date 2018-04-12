@@ -155,7 +155,7 @@ TEST(RequestInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(request_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  std::string json;
+  ProtobufTypes::String json;
   const auto test_struct = request_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
   EXPECT_TRUE(status.ok());
