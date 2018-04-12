@@ -48,18 +48,3 @@ envoy_cc_library(
         "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
     ],
 )
-
-envoy_cc_library(
-    name = "ip_tagging_filter_lib",
-    srcs = ["ip_tagging_filter.cc"],
-    hdrs = ["ip_tagging_filter.h"],
-    deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:utility_lib",
-        "//source/common/network:lc_trie_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
-    ],
-)

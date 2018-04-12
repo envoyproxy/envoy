@@ -9,7 +9,6 @@
 #include "common/router/router.h"
 
 #include "server/config/http/fault.h"
-#include "server/config/http/ip_tagging.h"
 
 #include "extensions/filters/http/buffer/config.h"
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
