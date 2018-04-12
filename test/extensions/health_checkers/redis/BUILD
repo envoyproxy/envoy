@@ -31,6 +31,7 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
 )

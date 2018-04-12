@@ -17,13 +17,8 @@ namespace RedisHealthChecker {
 class RedisHealthCheckerFactory : public Server::Configuration::CustomHealthCheckerFactory {
 public:
   Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const Protobuf::Message& config, Upstream::Cluster& cluster,
-                            Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                            Event::Dispatcher& dispatcher) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
-  }
+  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+                            Server::Configuration::HealthCheckerFactoryContext& context) override;
 
   std::string name() override { return Config::HealthCheckerNames::get().REDIS_HEALTH_CHECKER; }
 };

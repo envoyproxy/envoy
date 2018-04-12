@@ -15,6 +15,24 @@
 namespace Envoy {
 namespace Upstream {
 
+class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthCheckerFactoryContext {
+public:
+  HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
+                                  Envoy::Runtime::RandomGenerator& random,
+                                  Event::Dispatcher& dispatcher)
+      : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher) {}
+  Upstream::Cluster& cluster() override { return cluster_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
+  Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+
+private:
+  Upstream::Cluster& cluster_;
+  Envoy::Runtime::Loader& runtime_;
+  Envoy::Runtime::RandomGenerator& random_;
+  Event::Dispatcher& dispatcher_;
+};
+
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
@@ -40,7 +58,9 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
             hc_config.has_redis_health_check()
                 ? Config::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
                 : hc_config.custom_health_check().name());
-    return factory.createCustomHealthChecker(hc_config, cluster, runtime, random, dispatcher);
+    std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
+        new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher));
+    return factory.createCustomHealthChecker(hc_config, *context);
   }
   default:
     // Checked by schema.

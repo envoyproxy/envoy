@@ -1,7 +1,5 @@
 #include "extensions/health_checkers/redis/config.h"
 
-#include "envoy/api/v2/core/health_check.pb.validate.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -14,21 +12,12 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthChecker(
-    const Protobuf::Message& config, Upstream::Cluster& cluster, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
-
-  const envoy::api::v2::core::HealthCheck& hc_config =
-      MessageUtil::downcastAndValidate<const envoy::api::v2::core::HealthCheck&>(config);
+    const envoy::api::v2::core::HealthCheck& config,
+    Server::Configuration::HealthCheckerFactoryContext& context) {
 
   return std::make_shared<RedisHealthChecker>(
-      cluster, hc_config,
-      hc_config.has_redis_health_check()
-          ? translateFromRedisHealthCheck(hc_config.redis_health_check())
-          // TODO(dio): Need to make the following cast mechanism simpler.
-          : MessageUtil::downcastAndValidate<
-                const envoy::config::health_checker::redis::v2::Redis&>(
-                *Config::Utility::translateToFactoryConfig(hc_config.custom_health_check(), *this)),
-      dispatcher, runtime, random,
+      context.cluster(), config, getRedisHealthCheckConfig(config), context.dispatcher(),
+      context.runtime(), context.random(),
       Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
 };
 

@@ -7,6 +7,32 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
+class HealthCheckerFactoryContext {
+public:
+  virtual ~HealthCheckerFactoryContext() {}
+
+  /**
+   * @return Upstream::Cluster& the owning cluster.
+   */
+  virtual Upstream::Cluster& cluster() PURE;
+
+  /**
+   * @return Runtime::Loader& the singleton runtime loader for the server.
+   */
+  virtual Envoy::Runtime::Loader& runtime() PURE;
+
+  /**
+   * @return RandomGenerator& the random generator for the server.
+   */
+  virtual Envoy::Runtime::RandomGenerator& random() PURE;
+
+  /**
+   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
+   *         for all singleton processing.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+};
+
 /**
  * Implemented by each custom health checker and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
@@ -18,26 +44,18 @@ public:
   /**
    * Creates a particular custom health checker factory implementation.
    *
-   * @param config supplies the configuration for the health check, which should contains
-   * custom_health_check.
-   * @param cluster the upstream cluster.
-   * @param runtime supplies the runtime loader.
-   * @param random supplies the random generator.
-   * @param dispatcher supplies the dispatcher.
+   * @param config supplies the configuration as a full envoy::api::v2::core::HealthCheck config.
+   *        The implementation of this method can get the specific configuration for a custom health
+   *        check from custom_health_check().config().
+   * @param context supplies the custom health checker's context.
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const Protobuf::Message& config, Upstream::Cluster& cluster,
-                            Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                            Event::Dispatcher& dispatcher) PURE;
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message which arrives in as an
-   * opaque google.protobuf.Struct message.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+                            HealthCheckerFactoryContext& context) PURE;
 
   /**
-   * @return std::string the identifying name for a particular implementation of an custom health
+   * @return std::string the identifying name for a particular implementation of a custom health
    * checker produced by the factory.
    */
   virtual std::string name() PURE;

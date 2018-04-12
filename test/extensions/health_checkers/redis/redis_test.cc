@@ -22,23 +22,6 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
 
-namespace {
-
-envoy::config::health_checker::redis::v2::Redis
-getRedisConfigFromHealthCheck(const envoy::api::v2::core::HealthCheck& hc) {
-  if (hc.has_redis_health_check()) {
-    return translateFromRedisHealthCheck(hc.redis_health_check());
-  }
-
-  ProtobufTypes::MessagePtr config =
-      ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
-  MessageUtil::jsonConvert(hc.custom_health_check().config(), *config);
-  return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
-      *config);
-}
-
-} // namespace
-
 class RedisHealthCheckerTest
     : public testing::Test,
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
@@ -59,7 +42,7 @@ public:
     )EOF";
 
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
+    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
                                                  runtime_, random_, *this));
@@ -79,7 +62,7 @@ public:
     )EOF";
 
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
+    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
                                                  runtime_, random_, *this));
@@ -100,7 +83,7 @@ public:
     )EOF";
 
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
+    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
                                                  runtime_, random_, *this));
@@ -121,7 +104,7 @@ public:
     )EOF";
 
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisConfigFromHealthCheck(hc_config);
+    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
                                                  runtime_, random_, *this));

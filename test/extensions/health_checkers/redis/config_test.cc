@@ -5,6 +5,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {
@@ -28,17 +29,14 @@ TEST(HealthCheckerFactoryTest, createRedis) {
         key: foo
     )EOF";
 
-  NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
 
   RedisHealthCheckerFactory factory;
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         factory
-                             .createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml),
-                                                        cluster, runtime, random, dispatcher)
-                             .get()));
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+              .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
