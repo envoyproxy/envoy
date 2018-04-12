@@ -122,28 +122,9 @@ public:
   static void checkFilesystemSubscriptionBackingPath(const std::string& path);
 
   /**
-   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config has the wrong number of gRPC
-   * services or cluster names, depending on expectations set by its API type.
-   */
-  static void
-  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
-
-  /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
    * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
-   */
-  static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
-                                  const std::string& cluster_name);
-
-  /**
-   * Potentially calls Utility::validateClusterName, if a cluster name can be found.
-   * @param clusters the clusters currently loaded in the cluster manager.
-   * @param api_config_source the config source to validate.
-   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
@@ -259,9 +240,9 @@ public:
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
-  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                            const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                            Stats::Scope& scope);
 };
 
 } // namespace Config
