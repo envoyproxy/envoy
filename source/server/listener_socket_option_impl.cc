@@ -37,6 +37,7 @@ bool ListenerSocketOptionImpl::setOption(Network::Socket& socket,
         }
       } else {
         ENVOY_LOG(warn, "Unsupported socket option TCP_FASTOPEN");
+        return false;
       }
     }
   }
