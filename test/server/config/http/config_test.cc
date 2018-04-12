@@ -10,7 +10,6 @@
 
 #include "server/config/http/fault.h"
 #include "server/config/http/ip_tagging.h"
-#include "server/config/http/router.h"
 
 #include "extensions/filters/http/buffer/config.h"
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
@@ -110,66 +109,6 @@ TEST(HttpFilterConfigTest, FaultFilterEmptyProto) {
   EXPECT_THROW(
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
       EnvoyException);
-}
-
-TEST(HttpFilterConfigTest, RouterFilterInJson) {
-  std::string json_string = R"EOF(
-  {
-    "dynamic_stats" : true,
-    "start_child_span" : true
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RouterFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, BadRouterFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "dynamic_stats" : true,
-    "route" : {}
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<MockFactoryContext> context;
-  RouterFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
-}
-
-TEST(HttpFilterConigTest, RouterV2Filter) {
-  envoy::config::filter::http::router::v2::Router router_config;
-  router_config.mutable_dynamic_stats()->set_value(true);
-
-  NiceMock<MockFactoryContext> context;
-  RouterFilterConfig factory;
-  HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
-  NiceMock<MockFactoryContext> context;
-  RouterFilterConfig factory;
-  HttpFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
-  cb(filter_callback);
-}
-
-TEST(HttpFilterConfigTest, DoubleRegistrationTest) {
-  EXPECT_THROW_WITH_MESSAGE(
-      (Registry::RegisterFactory<RouterFilterConfig, NamedHttpFilterConfigFactory>()),
-      EnvoyException,
-      fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
 }
 
 } // namespace Configuration

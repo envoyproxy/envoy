@@ -14,7 +14,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-TEST(HttpFilterConfigTest, RateLimitFilterCorrectJson) {
+TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
     "domain" : "test",
@@ -32,7 +32,7 @@ TEST(HttpFilterConfigTest, RateLimitFilterCorrectJson) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, RateLimitFilterCorrectProto) {
+TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
   std::string json_string = R"EOF(
   {
     "domain" : "test",
@@ -53,7 +53,7 @@ TEST(HttpFilterConfigTest, RateLimitFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, RateLimitFilterEmptyProto) {
+TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
   std::string json_string = R"EOF(
   {
     "domain" : "test",
@@ -77,7 +77,7 @@ TEST(HttpFilterConfigTest, RateLimitFilterEmptyProto) {
   cb(filter_callback);
 }
 
-TEST(HttpFilterConfigTest, BadRateLimitFilterConfig) {
+TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   std::string json_string = R"EOF(
   {
     "domain" : "test",

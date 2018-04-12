@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-TEST(HttpFilterConfigTest, LuaFilterInJson) {
+TEST(LuaFilterConfigTest, LuaFilterInJson) {
   std::string json_string = R"EOF(
   {
     "inline_code" : "print(5)"
