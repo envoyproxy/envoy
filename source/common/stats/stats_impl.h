@@ -367,6 +367,11 @@ private:
 class HistogramStatisticsImpl : public HistogramStatistics {
 public:
   HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
+  /**
+   * HistogramStatisticsImpl object is constructed using the passed in histogram.
+   * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
+   * will not be retained.
+   */
   HistogramStatisticsImpl(histogram_t* histogram_ptr);
 
   HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
@@ -395,7 +400,9 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
-  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
+  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls. Currently the
+  // methods related to the actual merge and thread local are mixed together in single interface. It
+  // would be ideal to separate them.
   void merge() override { NOT_IMPLEMENTED; }
 
   bool used() const override { return true; }
@@ -406,6 +413,8 @@ public:
     return cumulative_statistics_;
   }
 
+  // TODO(ramaraochavali): Make this private.
+  // This is used for delivering the histogram data to sinks.
   Store& parent_;
 
 private:

@@ -28,7 +28,7 @@ public:
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
-  void runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) {
+  void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
     cb();
     main_callback();
   }
@@ -58,8 +58,8 @@ public:
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreadsWithBarrier(Event::PostCb cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreadsWithBarrier(cb, main_callback);
+    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
+      parent_.runOnAllThreads(cb, main_callback);
     }
     void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
 

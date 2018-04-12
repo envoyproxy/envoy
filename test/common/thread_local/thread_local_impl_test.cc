@@ -96,11 +96,11 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreadsWithBarrier) {
   std::shared_ptr<std::atomic<uint64_t>> thread_local_calls =
       std::make_shared<std::atomic<uint64_t>>(0);
 
-  tlsptr->runOnAllThreadsWithBarrier([thread_local_calls]() -> void { ++*thread_local_calls; },
-                                     [all_threads_complete, thread_local_calls]() -> void {
-                                       EXPECT_EQ(*thread_local_calls, 1);
-                                       *all_threads_complete = true;
-                                     });
+  tlsptr->runOnAllThreads([thread_local_calls]() -> void { ++*thread_local_calls; },
+                          [all_threads_complete, thread_local_calls]() -> void {
+                            EXPECT_EQ(*thread_local_calls, 1);
+                            *all_threads_complete = true;
+                          });
 
   EXPECT_TRUE(*all_threads_complete);
 

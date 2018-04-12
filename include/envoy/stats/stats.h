@@ -117,7 +117,7 @@ public:
   virtual const std::string& tagExtractedName() const PURE;
 
   /**
-   * Indicates whether a metric has been used.
+   * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
 };

@@ -53,8 +53,7 @@ public:
    * @param all_threads_complete_cb supplies the callback to run on main thread after threads are
    * done.
    */
-  virtual void runOnAllThreadsWithBarrier(Event::PostCb cb,
-                                          Event::PostCb all_threads_complete_cb) PURE;
+  virtual void runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) PURE;
 
   /**
    * Set thread local data on all threads previously registered via registerThread().

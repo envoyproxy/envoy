@@ -71,9 +71,8 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
     for (auto histogram : scope->central_cache_.histograms_) {
       const std::string& hist_name = histogram.first;
       const ParentHistogramSharedPtr& parent_hist = histogram.second;
-      if (names.insert(hist_name).second) {
-        ret.push_back(parent_hist);
-      }
+      ASSERT(names.insert(hist_name).second);
+      ret.push_back(parent_hist);
     }
   }
 
@@ -96,7 +95,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    tls_->runOnAllThreadsWithBarrier(
+    tls_->runOnAllThreads(
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
             for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
