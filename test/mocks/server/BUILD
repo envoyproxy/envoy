@@ -18,6 +18,7 @@ envoy_cc_mock(
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:guarddog_interface",
+        "//include/envoy/server:health_checker_config_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/server:worker_interface",
