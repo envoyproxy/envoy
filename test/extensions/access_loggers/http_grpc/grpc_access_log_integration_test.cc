@@ -118,6 +118,7 @@ http_logs:
       authority: host
       path: /notfound
       request_headers_bytes: 122
+      request_method: GET
     response:
       response_code:
         value: 404
@@ -140,6 +141,7 @@ http_logs:
       authority: host
       path: /notfound
       request_headers_bytes: 122
+      request_method: GET
     response:
       response_code:
         value: 404
@@ -186,6 +188,7 @@ http_logs:
       authority: host
       path: /notfound
       request_headers_bytes: 122
+      request_method: GET
     response:
       response_code:
         value: 404

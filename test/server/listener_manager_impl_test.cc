@@ -6,15 +6,18 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
+#include "common/network/utility.h"
 
 #include "server/configuration_impl.h"
 #include "server/listener_manager_impl.h"
 
 #include "extensions/filters/listener/original_dst/original_dst.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -1510,6 +1513,29 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                               "MockListenerComponentFactory: Setting socket options failed");
     EXPECT_EQ(0U, manager_->listeners().size());
   }
+}
+
+// Set the resolver to the default IP resolver. The address resolver logic is unit tested in
+// resolver_impl_test.cc.
+TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: AddressResolverdListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111, resolver_name: envoy.mock.resolver }
+    filter_chains:
+    - filters:
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  NiceMock<Network::MockAddressResolver> mock_resolver;
+  EXPECT_CALL(mock_resolver, resolve(_))
+      .WillOnce(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
+
+  Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
+  EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {

@@ -35,7 +35,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_grpc_grpc = dict(
-        commit = "474c5950686e3962bd339c93d27e369bf64f568f", # v1.10.0
+        commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
@@ -51,7 +51,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "dd74753cf5cf8944438d6f49ddf46f9659993dfb",  # v2.8.0
+        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -84,7 +84,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.10.1",
+        commit = "0.10.3",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
