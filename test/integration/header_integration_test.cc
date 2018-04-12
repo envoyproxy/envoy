@@ -138,10 +138,8 @@ public:
                   eds_cluster_config:
                     eds_config:
                       api_config_source:
+                        cluster_names: "eds-cluster"
                         api_type: GRPC
-                        grpc_services:
-                          envoy_grpc:
-                            cluster_name: "eds-cluster"
               )EOF"));
 
       // TODO(zuercher): Make ConfigHelper EDS-aware and get rid of this hack:
