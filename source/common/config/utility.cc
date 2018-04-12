@@ -218,8 +218,14 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     const envoy::api::v2::core::ApiConfigSource& api_config_source, Stats::Scope& scope) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
-  return async_client_manager.factoryForGrpcService(api_config_source.grpc_services(0), scope,
-                                                    false);
+  envoy::api::v2::core::GrpcService grpc_service;
+  if (api_config_source.cluster_names().empty()) {
+    grpc_service.MergeFrom(api_config_source.grpc_services(0));
+  } else {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
+  }
+
+  return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
 } // namespace Config

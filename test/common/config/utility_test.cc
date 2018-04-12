@@ -191,7 +191,7 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
 // API configs along the dimension of ApiConfigSource type.
 TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
-  Grpc::MockAsyncClientManager async_client_manager;
+  NiceMock<Grpc::MockAsyncClientManager> async_client_manager;
   Stats::MockStore scope;
 
   {
@@ -211,6 +211,15 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
         "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+  }
+
+  {
+    envoy::api::v2::core::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+    api_config_source.add_cluster_names();
+    // this also logs a warning for setting REST cluster names for a gRPC API config.
+    EXPECT_NO_THROW(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope));
   }
 
   {
