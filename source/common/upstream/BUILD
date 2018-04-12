@@ -112,6 +112,7 @@ envoy_cc_library(
     ],
     deps = [
         ":health_checker_base_lib",
+        # TODO(dio): Remove dependency to server.
         "//include/envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
