@@ -308,7 +308,7 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
-  // Early data is 5 bytes, so the total is 233 bytes.
+  // and we add the early data to that.
   const std::string data = fake_upstream_connection->waitForData(228 + early_data_req_str.length());
   // We expect to find the early data on the upstream side
   EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
