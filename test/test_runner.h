@@ -39,8 +39,7 @@ public:
     // Redirect all logs to fake file when --log-path arg is specified in command line.
     if (!TestEnvironment::getOptions().logPath().empty()) {
       file_logger = std::make_unique<Logger::FileSinkDelegate>(
-          TestEnvironment::getOptions().logPath(), access_log_manager,
-          Logger::Registry::getSink());
+          TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
     }
     return RUN_ALL_TESTS();
   }
