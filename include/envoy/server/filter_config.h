@@ -302,7 +302,9 @@ public:
    *         empty proto. By default, this method returns the same value as createEmptyConfigProto,
    *         and can be optionally overridden in implementations.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() { return createEmptyConfigProto(); }
+  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
+    return createEmptyConfigProto();
+  }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter
