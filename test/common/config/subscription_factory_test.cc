@@ -69,7 +69,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+      "API configs must have either a gRPC service or a cluster name defined");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
@@ -81,7 +81,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+      "API configs must have either a gRPC service or a cluster name defined");
 }
 
 TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {

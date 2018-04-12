@@ -149,6 +149,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

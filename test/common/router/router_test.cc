@@ -6,6 +6,7 @@
 #include "common/common/empty_string.h"
 #include "common/network/utility.h"
 #include "common/router/router.h"
+#include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"

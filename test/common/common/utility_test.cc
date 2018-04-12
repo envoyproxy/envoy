@@ -374,6 +374,17 @@ TEST(StringUtil, removeCharacters) {
   EXPECT_EQ("1256x", StringUtil::removeCharacters("0123456789x", removals));
 }
 
+TEST(AccessLogDateTimeFormatter, fromTime) {
+  SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z", AccessLogDateTimeFormatter::fromTime(time1));
+  SystemTime time2(std::chrono::milliseconds(1522796769123));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", AccessLogDateTimeFormatter::fromTime(time2));
+  SystemTime time3(std::chrono::milliseconds(1522796769999));
+  EXPECT_EQ("2018-04-03T23:06:09.999Z", AccessLogDateTimeFormatter::fromTime(time3));
+  SystemTime time4(std::chrono::milliseconds(1522796768999));
+  EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4));
+}
+
 TEST(Primes, isPrime) {
   EXPECT_TRUE(Primes::isPrime(67));
   EXPECT_FALSE(Primes::isPrime(49));
