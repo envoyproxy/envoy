@@ -43,18 +43,18 @@ TEST_F(SocketOptionImplTest, SetOptionEmptyNop) {
 TEST_F(SocketOptionImplTest, SetOptionTransparentFailure) {
   SocketOptionImpl socket_option{true, {}};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-  EXPECT_LOG_CONTAINS("warning",
-                      "Failed to set IP socket option on non-IP socket",
-                      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
-    }
+  EXPECT_LOG_CONTAINS(
+      "warning", "Failed to set IP socket option on non-IP socket",
+      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+}
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
   SocketOptionImpl socket_option{{}, true};
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-  EXPECT_LOG_CONTAINS("warning",
-                      "Failed to set IP socket option on non-IP socket",
-                      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+  EXPECT_LOG_CONTAINS(
+      "warning", "Failed to set IP socket option on non-IP socket",
+      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
 }
 
 // The happy path for setOption(); IP_TRANSPARENT is set to true.
@@ -150,9 +150,9 @@ TEST_F(SocketOptionImplTest, V4EmptyOptionNames) {
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
   EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
   EXPECT_EQ(ENOTSUP, errno);
-  EXPECT_LOG_CONTAINS("warning",
-                      "Unsupported IPv4 socket option",
-                      EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+  EXPECT_LOG_CONTAINS(
+      "warning", "Unsupported IPv4 socket option",
+      EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
 }
 
 // If a platform doesn't suppport IPv4 and IPv6 socket option variants for an IPv4 address, we fail
@@ -163,9 +163,9 @@ TEST_F(SocketOptionImplTest, V6EmptyOptionNames) {
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
   EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0));
   EXPECT_EQ(ENOTSUP, errno);
-  EXPECT_LOG_CONTAINS("warning",
-                      "Unsupported IPv6 socket option",
-                      EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+  EXPECT_LOG_CONTAINS(
+      "warning", "Unsupported IPv6 socket option",
+      EXPECT_EQ(-1, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
 }
 
 // If a platform suppports IPv4 socket option variant for an IPv4 address,
