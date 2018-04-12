@@ -82,8 +82,8 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
-// Validate ThreadLocal::runOnAllThreadsWithBarrier's behavior.
-TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreadsWithBarrier) {
+// Validate ThreadLocal::runOnAllThreads behavior with all_thread_complete call back.
+TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 
   SlotPtr tlsptr = tls_.allocateSlot();
 
