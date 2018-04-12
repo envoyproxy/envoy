@@ -90,27 +90,15 @@ public:
   }
   bool localAddressRestored() const override { return local_address_restored_; }
 
-  void setDetectedTransportProtocol(const std::string& protocol) override {
-    transport_protocol_ = protocol;
+  void setRequestedServerName(absl::string_view server_name) override {
+    server_name_ = std::string(server_name);
   }
-  const std::string& detectedTransportProtocol() const override { return transport_protocol_; }
-
-  void setRequestedServerName(const std::string& server_name) override {
-    server_name_ = server_name;
-  }
-  const std::string& requestedServerName() const override { return server_name_; }
-
-  void setRequestedNextProtocol(const std::vector<std::string>& protocols) override {
-    next_protocols_ = protocols;
-  }
-  const std::vector<std::string>& requestedNextProtocol() const override { return next_protocols_; }
+  absl::string_view requestedServerName() const override { return server_name_; }
 
 protected:
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};
-  std::string transport_protocol_;
   std::string server_name_;
-  std::vector<std::string> next_protocols_;
 };
 
 // ConnectionSocket used with server connections.

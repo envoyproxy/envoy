@@ -292,12 +292,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD1(setDetectedTransportProtocol, void(const std::string&));
-  MOCK_CONST_METHOD0(detectedTransportProtocol, const std::string&());
-  MOCK_METHOD1(setRequestedServerName, void(const std::string&));
-  MOCK_CONST_METHOD0(requestedServerName, const std::string&());
-  MOCK_METHOD1(setRequestedNextProtocol, void(const std::vector<std::string>&));
-  MOCK_CONST_METHOD0(requestedNextProtocol, const std::vector<std::string>&());
+  MOCK_METHOD1(setRequestedServerName, void(absl::string_view));
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());

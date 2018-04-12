@@ -6,6 +6,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -116,34 +118,14 @@ public:
   virtual bool localAddressRestored() const PURE;
 
   /**
-   * Set detected transport protocol (e.g. RAW_BUFFER, TLS).
-   */
-  virtual void setDetectedTransportProtocol(const std::string& protocol) PURE;
-
-  /**
-   * @return detected transport protocol (e.g. RAW_BUFFER, TLS), if any.
-   */
-  virtual const std::string& detectedTransportProtocol() const PURE;
-
-  /**
    * Set requested server name (e.g. SNI in TLS).
    */
-  virtual void setRequestedServerName(const std::string& server_name) PURE;
+  virtual void setRequestedServerName(absl::string_view server_name) PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.
    */
-  virtual const std::string& requestedServerName() const PURE;
-
-  /**
-   * Set requested next protocol(s) (e.g. ALPN in TLS).
-   */
-  virtual void setRequestedNextProtocol(const std::vector<std::string>& protocols) PURE;
-
-  /**
-   * @return requested next protocol(s) (e.g. ALPN in TLS), if any.
-   */
-  virtual const std::vector<std::string>& requestedNextProtocol() const PURE;
+  virtual absl::string_view requestedServerName() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
