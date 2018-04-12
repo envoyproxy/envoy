@@ -10,13 +10,9 @@ The following features have been DEPRECATED and will be removed in the specified
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for
   admin mutations, but a warning is logged.
-* Rate limit service configuration via the `cluster_name` field is deprecated. Use `grpc_service`
-  instead.
-* gRPC service configuration via the `cluster_names` field in `ApiConfigSource` is deprecated. Use
-  `grpc_services` instead. Prior to 1.7, a warning is logged.
 * Redis health checker configuration via the `redis_health_check` field in `HealthCheck` is
-  deprecated. Use `custom_health_check` with name `envoy.health_checker.redis` instead. 
-  Prior to 1.7, `redis_health_check` can be used, but warning is logged.
+  deprecated. Use `custom_health_check` with name `envoy.health_checker.redis` instead. Prior
+  to 1.7, `redis_health_check` can be used, but warning is logged.
 
 ## Version 1.6.0 (March 20, 2018)
 
