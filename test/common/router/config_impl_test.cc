@@ -4229,19 +4229,19 @@ max_request_time:
   proto_cfgs[factory.name()] = buffer_cfg;
   PerFilterConfigs configs{proto_cfgs};
 
-  ASSERT_EQ(nullptr, configs.get("unknown.filter"))
+  EXPECT_EQ(nullptr, configs.get("unknown.filter"))
       << "filter configs that aren't present should return nullptr";
 
   const Protobuf::Message* processed = configs.get(factory.name());
-  ASSERT_NE(nullptr, processed) << "filter configs present should return a concrete Message";
+  EXPECT_NE(nullptr, processed) << "filter configs present should return a concrete Message";
 
-  ASSERT_NO_THROW({
+  EXPECT_NO_THROW({
     const envoy::config::filter::http::buffer::v2::Buffer* buf =
         dynamic_cast<const envoy::config::filter::http::buffer::v2::Buffer*>(processed);
 
-    ASSERT_EQ(123, buf->max_request_bytes().value());
-    ASSERT_EQ(456, buf->max_request_time().seconds());
-    ASSERT_EQ(789, buf->max_request_time().nanos());
+    EXPECT_EQ(123, buf->max_request_bytes().value());
+    EXPECT_EQ(456, buf->max_request_time().seconds());
+    EXPECT_EQ(789, buf->max_request_time().nanos());
   }) << "returned message should be castable to known type";
 }
 
@@ -4255,16 +4255,16 @@ foo: "bar"
   Protobuf::Map<std::string, ProtobufWkt::Struct> proto_cfgs;
   proto_cfgs["unknown.filter"] = some_cfg;
 
-  ASSERT_THROW(PerFilterConfigs{proto_cfgs}, EnvoyException)
+  EXPECT_THROW(PerFilterConfigs{proto_cfgs}, EnvoyException)
       << "should throw on unrecognized filter";
 }
 
 void checkPerFilterConfig(const Protobuf::Message* cfg, uint32_t expected_max_bytes,
                           std::string source) {
-  ASSERT_NE(nullptr, cfg) << "config should not be null for source: " << source;
-  ASSERT_NO_THROW({
+  EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
+  EXPECT_NO_THROW({
     const auto buffer = dynamic_cast<const envoy::config::filter::http::buffer::v2::Buffer*>(cfg);
-    ASSERT_EQ(expected_max_bytes, buffer->max_request_bytes().value())
+    EXPECT_EQ(expected_max_bytes, buffer->max_request_bytes().value())
         << "config value does not match expected for source: " << source;
   }) << "config should properly dynamic_cast to the appropriate type for source: "
      << source;
