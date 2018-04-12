@@ -39,20 +39,3 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "ip_tagging_filter_test",
-    srcs = ["ip_tagging_filter_test.cc"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http/filter:ip_tagging_filter_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:utility_lib",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/stats:stats_mocks",
-        "//test/test_common:utility_lib",
-    ],
-)

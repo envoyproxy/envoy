@@ -14,7 +14,9 @@
 #include "common/network/lc_trie.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace IpTagging {
 
 /**
  * Type of requests the filter should apply to.
@@ -101,7 +103,7 @@ typedef std::shared_ptr<IpTaggingFilterConfig> IpTaggingFilterConfigSharedPtr;
  * A filter that gets all tags associated with a request's downstream remote address and
  * sets a header `x-envoy-ip-tags` with those values.
  */
-class IpTaggingFilter : public StreamDecoderFilter {
+class IpTaggingFilter : public Http::StreamDecoderFilter {
 public:
   IpTaggingFilter(IpTaggingFilterConfigSharedPtr config);
   ~IpTaggingFilter();
@@ -110,15 +112,17 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   IpTaggingFilterConfigSharedPtr config_;
-  StreamDecoderFilterCallbacks* callbacks_{};
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 
-} // namespace Http
+} // namespace IpTagging
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
