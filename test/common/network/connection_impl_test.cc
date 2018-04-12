@@ -41,6 +41,13 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
+TEST(RawBufferSocket, TestBasics) {
+  TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
+  EXPECT_FALSE(raw_buffer_socket->ssl());
+  EXPECT_TRUE(raw_buffer_socket->canFlushClose());
+  EXPECT_EQ("", raw_buffer_socket->protocol());
+}
+
 TEST(ConnectionImplUtility, updateBufferStats) {
   StrictMock<Stats::MockCounter> counter;
   StrictMock<Stats::MockGauge> gauge;
@@ -178,6 +185,15 @@ protected:
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
+
+TEST_P(ConnectionImplTest, UniqueId) {
+  setUpBasicConnection();
+  disconnect(false);
+  uint64_t first_id = client_connection_->id();
+  setUpBasicConnection();
+  EXPECT_NE(first_id, client_connection_->id());
+  disconnect(false);
+}
 
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   setUpBasicConnection();

@@ -39,6 +39,14 @@ public:
   Stats::IsolatedStoreImpl cluster_scope_;
 };
 
+TEST_F(CodeUtilityTest, GroupStrings) {
+  EXPECT_EQ("2xx", CodeUtility::groupStringForResponseCode(Code::OK));
+  EXPECT_EQ("3xx", CodeUtility::groupStringForResponseCode(Code::Found));
+  EXPECT_EQ("4xx", CodeUtility::groupStringForResponseCode(Code::NotFound));
+  EXPECT_EQ("5xx", CodeUtility::groupStringForResponseCode(Code::NotImplemented));
+  EXPECT_EQ("", CodeUtility::groupStringForResponseCode(static_cast<Code>(600)));
+}
+
 TEST_F(CodeUtilityTest, NoCanary) {
   addResponse(201, false, false);
   addResponse(301, false, true);
