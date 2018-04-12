@@ -33,13 +33,13 @@ public:
                                  TestEnvironment::getOptions().logFormat(), lock);
 
     // Allocate fake log access manager.
-    testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
-    std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
+    testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
+    std::unique_ptr<Logger::FileSinkDelegate> file_logger;
 
     // Redirect all logs to fake file when --log-path arg is specified in command line.
     if (!TestEnvironment::getOptions().logPath().empty()) {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          TestEnvironment::getOptions().logPath(), access_log_manager_,
+      file_logger = std::make_unique<Logger::FileSinkDelegate>(
+          TestEnvironment::getOptions().logPath(), access_log_manager,
           Logger::Registry::getSink());
     }
     return RUN_ALL_TESTS();
