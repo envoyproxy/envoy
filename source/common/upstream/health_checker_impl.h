@@ -18,7 +18,7 @@ namespace Upstream {
 /**
  * Factory for creating health checker implementations.
  */
-class HealthCheckerFactory {
+class HealthCheckerFactory : public Logger::Loggable<Logger::Id::health_checker> {
 public:
   /**
    * Create a health checker.

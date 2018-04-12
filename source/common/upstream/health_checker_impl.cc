@@ -50,8 +50,9 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
-  // Deprecates redis_health_check.
+  // Deprecated redis_health_check, preserving using old config until it's removed.
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
+    ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
