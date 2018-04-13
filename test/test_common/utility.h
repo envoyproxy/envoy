@@ -58,6 +58,17 @@ namespace Envoy {
     ADD_FAILURE() << "Unexpected exception: " << std::string(e.what());                            \
   }
 
+/*
+  Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
+  It temporarily installs stderr sink and restores the original logger sink after the test
+  completes and sdterrSink object goes of of scope.
+*/
+#define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
+  do {                                                                                             \
+    Logger::StderrSinkDelegate stderrSink(Logger::Registry::getSink());                            \
+    EXPECT_DEATH(statement, message);                                                              \
+  } while (0)
+
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
 class TestRandomGenerator {

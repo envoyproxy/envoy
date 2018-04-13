@@ -3,6 +3,8 @@
 
 #include "exe/signal_action.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -23,7 +25,7 @@ namespace Envoy {
 #ifndef ASANITIZED
 TEST(Signals, InvalidAddressDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH(
+  EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // Oooooops!
         volatile int* nasty_ptr = reinterpret_cast<int*>(0x0);
@@ -34,7 +36,7 @@ TEST(Signals, InvalidAddressDeathTest) {
 
 TEST(Signals, BusDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH(
+  EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // Bus error is tricky. There's one way that can work on POSIX systems
         // described below but it depends on mmaping a file. Just make it easy and
@@ -50,7 +52,7 @@ TEST(Signals, BusDeathTest) {
 
 TEST(Signals, BadMathDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH(
+  EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // It turns out to be really hard to not have the optimizer get rid of a
         // division by zero. Just raise the signal for this test.
@@ -63,7 +65,7 @@ TEST(Signals, BadMathDeathTest) {
 // Unfortunately we don't have a reliable way to do this on other platforms
 TEST(Signals, IllegalInstructionDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH(
+  EXPECT_DEATH_LOG_TO_STDERR(
       []() -> void {
         // Intel defines the "ud2" opcode to be an invalid instruction:
         __asm__("ud2");
@@ -74,7 +76,7 @@ TEST(Signals, IllegalInstructionDeathTest) {
 
 TEST(Signals, AbortDeathTest) {
   SignalAction actions;
-  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
+  EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 
 TEST(Signals, RestoredPreviousHandlerDeathTest) {
@@ -86,7 +88,7 @@ TEST(Signals, RestoredPreviousHandlerDeathTest) {
     // goes out of scope, NOT the default.
   }
   // Outer SignalAction should be active again:
-  EXPECT_DEATH([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
+  EXPECT_DEATH_LOG_TO_STDERR([]() -> void { abort(); }(), "backtrace.*Abort(ed)?");
 }
 #endif
 

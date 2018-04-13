@@ -59,7 +59,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
-  EXPECT_DEATH(errorCallbackTest(GetParam()), ".*listener accept failure.*");
+  EXPECT_DEATH_LOG_TO_STDERR(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
 
 class TestListenerImpl : public ListenerImpl {
