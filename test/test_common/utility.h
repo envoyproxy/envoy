@@ -67,7 +67,7 @@ namespace Envoy {
   do {                                                                                             \
     Logger::StderrSinkDelegate stderrSink(Logger::Registry::getSink());                            \
     EXPECT_DEATH(statement, message);                                                              \
-  } while (0)
+  } while (false)
 
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
