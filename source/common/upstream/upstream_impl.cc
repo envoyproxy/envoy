@@ -33,6 +33,8 @@
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
 
+#include "extensions/transport_sockets/well_known_names.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -247,10 +249,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
-      transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().SSL);
       MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
     } else {
-      transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
+      transport_socket.set_name(
+          Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
     }
   }
 

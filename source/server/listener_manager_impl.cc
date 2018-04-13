@@ -7,7 +7,6 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -16,6 +15,9 @@
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
+
+#include "extensions/filters/listener/well_known_names.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -150,7 +152,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            Config::ListenerFilterNames::get().ORIGINAL_DST);
+            Extensions::ListenerFilters::ListenerFilterNames::get().ORIGINAL_DST);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
@@ -161,7 +163,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            Config::ListenerFilterNames::get().PROXY_PROTOCOL);
+            Extensions::ListenerFilters::ListenerFilterNames::get().PROXY_PROTOCOL);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
@@ -194,7 +196,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
     auto transport_socket = filter_chain.transport_socket();
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
-        transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().SSL);
         MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
 
         has_tls++;
@@ -202,7 +204,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           has_stk++;
         }
       } else {
-        transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
+        transport_socket.set_name(
+            Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
       }
     }
 

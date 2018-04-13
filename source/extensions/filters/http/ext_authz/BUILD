@@ -34,7 +34,7 @@ envoy_cc_library(
         ":ext_authz",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http:well_known_names",
     ],
 )

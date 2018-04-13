@@ -74,7 +74,7 @@ TEST(RouterFilterConfigTest, DoubleRegistrationTest) {
       (Registry::RegisterFactory<RouterFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>()),
       EnvoyException,
-      fmt::format("Double registration for name: '{}'", Config::HttpFilterNames::get().ROUTER));
+      fmt::format("Double registration for name: '{}'", HttpFilterNames::get().ROUTER));
 }
 
 } // namespace RouterFilter

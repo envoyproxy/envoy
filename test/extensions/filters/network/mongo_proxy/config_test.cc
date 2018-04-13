@@ -12,6 +12,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
+TEST(MongoFilterConfigTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(MongoProxyFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::mongo_proxy::v2::MongoProxy(), context),
+               ProtoValidationException);
+}
+
 TEST(MongoFilterConfigTest, CorrectConfigurationNoFaults) {
   std::string json_string = R"EOF(
   {

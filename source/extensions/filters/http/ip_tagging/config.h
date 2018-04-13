@@ -5,7 +5,7 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +30,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::ip_tagging::v2::IPTagging()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().IP_TAGGING; }
+  std::string name() override { return HttpFilterNames::get().IP_TAGGING; }
 };
 
 } // namespace IpTagging

@@ -36,8 +36,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf",
+        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/http_grpc:grpc_access_log_lib",
     ],
 )
