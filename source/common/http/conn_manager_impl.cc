@@ -705,7 +705,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
   if (connection_manager_.isWebSocketConnection()) {
-    connection_manager_.ws_connection_->onData(data, end_stream);
+    if (data.length() > 0) {
+      connection_manager_.ws_connection_->onData(data, false);
+    }
     return;
   }
 

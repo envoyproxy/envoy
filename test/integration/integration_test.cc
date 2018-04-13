@@ -294,17 +294,17 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   // WebSocket upgrade with early data (HTTP body)
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
   const std::string early_data_req_str = "hello";
+  const std::string early_data_resp_str = "world";
+  const std::string upgrade_req_str =
+      fmt::format("GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                  "keep-alive, Upgrade\r\nUpgrade: websocket\r\nContent-Length: {}\r\n\r\n",
+                  early_data_req_str.length());
   const std::string upgrade_resp_str =
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string early_data_resp_str = "world";
   tcp_client = makeTcpConnection(lookupPort("http"));
-  // Send websocket upgrade request
-  tcp_client->write(upgrade_req_str);
   // Send early data alongside websocket upgrade request
-  tcp_client->write(early_data_req_str);
+  tcp_client->write(upgrade_req_str + early_data_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes

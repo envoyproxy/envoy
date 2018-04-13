@@ -43,7 +43,8 @@ void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
 }
 
 Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "WsHandlerImpl::onData with buffer length {}", static_cast<int>(data.length()));
+  ENVOY_LOG(debug, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
+            end_stream);
 
   // If we are connected to upstream, then data should have been drained already.
   // And if we're not connected yet, it is expected that TcpProxy will readDisable(true)
