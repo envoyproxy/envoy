@@ -362,7 +362,12 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("2018/03/28|1522280158|bad_format|2018-03-28T23:35:58.000Z",
+    // Needed to take into account the behavior in non-GMT timezones.
+    struct tm time_val;
+    gmtime_r(&test_epoch, &time_val);
+    time_t expected_time_t = mktime(&time_val);
+
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z", expected_time_t),
               formatter.format(request_header, response_header, request_info));
   }
 }
