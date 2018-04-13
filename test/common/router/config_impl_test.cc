@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/server/filter_config.h"
+
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/config/well_known_names.h"
@@ -13,10 +15,13 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -4203,6 +4208,148 @@ virtual_hosts:
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
+}
+
+class PerFilterConfigsTest : public testing::Test,
+                             public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  void SetUp() override {
+    registered_factory_.reset(
+        new Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>(*this));
+  }
+
+  // EmptyHttpFilterConfig
+  Server::Configuration::HttpFilterFactoryCb
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED;
+  }
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+  }
+  std::string name() override { return "test.filter"; }
+
+  void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
+                 uint32_t expected_vhost) {
+    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime_, cm_, true);
+
+    const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+    const auto* route_entry = route->routeEntry();
+    const auto& vhost = route_entry->virtualHost();
+
+    check(route_entry->perFilterConfig(name()), expected_entry, "route entry");
+    check(route->perFilterConfig(name()), expected_route, "route");
+    check(vhost.perFilterConfig(name()), expected_vhost, "virtual host");
+  }
+
+  void check(const Protobuf::Message* cfg, uint32_t expected_seconds, std::string source) {
+    EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
+    EXPECT_NO_THROW({
+      const auto ts = dynamic_cast<const ProtobufWkt::Timestamp*>(cfg);
+      EXPECT_EQ(expected_seconds, ts->seconds())
+          << "config value does not match expected for source: " << source;
+    }) << "config should properly dynamic_cast to the appropriate type for source: "
+       << source;
+  }
+
+  std::unique_ptr<Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>>
+      registered_factory_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+};
+
+TEST_F(PerFilterConfigsTest, PerFilterConfigs) {
+  std::string yaml = R"EOF(
+seconds: 123
+nanos: 456
+)EOF";
+
+  ProtobufWkt::Struct struct_cfg;
+  MessageUtil::loadFromYaml(yaml, struct_cfg);
+  Protobuf::Map<std::string, ProtobufWkt::Struct> proto_cfgs;
+  proto_cfgs[name()] = struct_cfg;
+  PerFilterConfigs configs{proto_cfgs};
+
+  EXPECT_EQ(nullptr, configs.get("unknown.filter"))
+      << "filter configs that aren't present should return nullptr";
+
+  const Protobuf::Message* processed = configs.get(name());
+  EXPECT_NE(nullptr, processed) << "filter configs present should return a concrete Message";
+
+  EXPECT_NO_THROW({
+    const ProtobufWkt::Timestamp* cfg = dynamic_cast<const ProtobufWkt::Timestamp*>(processed);
+    EXPECT_EQ(123, cfg->seconds());
+    EXPECT_EQ(456, cfg->nanos());
+  }) << "returned message should be castable to known type";
+}
+
+TEST_F(PerFilterConfigsTest, UnknownFilter) {
+  std::string yaml = R"EOF(
+foo: "bar"
+)EOF";
+
+  ProtobufWkt::Struct some_cfg;
+  MessageUtil::loadFromYaml(yaml, some_cfg);
+  Protobuf::Map<std::string, ProtobufWkt::Struct> proto_cfgs;
+  proto_cfgs["unknown.filter"] = some_cfg;
+
+  EXPECT_THROW(PerFilterConfigs{proto_cfgs}, EnvoyException)
+      << "should throw on unrecognized filter";
+}
+
+TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        per_filter_config: { test.filter: { seconds: 123 } }
+    per_filter_config: { test.filter: { seconds: 456 } }
+)EOF";
+
+  checkEach(yaml, 123, 123, 456);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                per_filter_config: { test.filter: { seconds: 789 } }
+    per_filter_config: { test.filter: { seconds: 1011 } }
+)EOF";
+
+  checkEach(yaml, 789, 789, 1011);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+        per_filter_config: { test.filter: { seconds: 1213 } }
+    per_filter_config: { test.filter: { seconds: 1415 } }
+)EOF";
+
+  checkEach(yaml, 1213, 1213, 1415);
 }
 } // namespace
 } // namespace Router
