@@ -3,10 +3,9 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/config/well_known_names.h"
-
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,8 +18,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     return ProtobufWkt::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it =
-      metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().LUA);
+  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().LUA);
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Struct::default_instance();
   }

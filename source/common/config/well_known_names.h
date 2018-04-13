@@ -7,7 +7,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -45,55 +44,6 @@ private:
 };
 
 /**
- * Well-known listener filter names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New filters should use the well known name: envoy.filters.listener.name.
- */
-class ListenerFilterNameValues {
-public:
-  // Original destination listener filter
-  const std::string ORIGINAL_DST = "envoy.listener.original_dst";
-  // Proxy Protocol listener filter
-  const std::string PROXY_PROTOCOL = "envoy.listener.proxy_protocol";
-};
-
-typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
-
-/**
- * Well-known network filter names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New filters should use the well known name: envoy.filters.network.name.
- */
-class NetworkFilterNameValues {
-public:
-  // Client ssl auth filter
-  const std::string CLIENT_SSL_AUTH = "envoy.client_ssl_auth";
-  // Echo filter
-  const std::string ECHO = "envoy.echo";
-  // HTTP connection manager filter
-  const std::string HTTP_CONNECTION_MANAGER = "envoy.http_connection_manager";
-  // Mongo proxy filter
-  const std::string MONGO_PROXY = "envoy.mongo_proxy";
-  // Rate limit filter
-  const std::string RATE_LIMIT = "envoy.ratelimit";
-  // Redis proxy filter
-  const std::string REDIS_PROXY = "envoy.redis_proxy";
-  // IP tagging filter
-  const std::string TCP_PROXY = "envoy.tcp_proxy";
-  // Authorization filter
-  const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
-
-  // Converts names from v1 to v2
-  const V1Converter v1_converter_;
-
-  NetworkFilterNameValues()
-      : v1_converter_({CLIENT_SSL_AUTH, ECHO, HTTP_CONNECTION_MANAGER, MONGO_PROXY, RATE_LIMIT,
-                       REDIS_PROXY, TCP_PROXY, EXT_AUTHORIZATION}) {}
-};
-
-typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
-
-/**
  * Well-known address resolver names.
  */
 class AddressResolverNameValues {
@@ -103,105 +53,6 @@ public:
 };
 
 typedef ConstSingleton<AddressResolverNameValues> AddressResolverNames;
-
-/**
- * Well-known http filter names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New filters should use the well known name: envoy.filters.http.name.
- */
-class HttpFilterNameValues {
-public:
-  // Buffer filter
-  const std::string BUFFER = "envoy.buffer";
-  // CORS filter
-  const std::string CORS = "envoy.cors";
-  // Dynamo filter
-  const std::string DYNAMO = "envoy.http_dynamo_filter";
-  // Fault filter
-  const std::string FAULT = "envoy.fault";
-  // GRPC http1 bridge filter
-  const std::string GRPC_HTTP1_BRIDGE = "envoy.grpc_http1_bridge";
-  // GRPC json transcoder filter
-  const std::string GRPC_JSON_TRANSCODER = "envoy.grpc_json_transcoder";
-  // GRPC web filter
-  const std::string GRPC_WEB = "envoy.grpc_web";
-  // Gzip filter
-  const std::string ENVOY_GZIP = "envoy.gzip";
-  // IP tagging filter
-  const std::string IP_TAGGING = "envoy.ip_tagging";
-  // Rate limit filter
-  const std::string RATE_LIMIT = "envoy.rate_limit";
-  // Router filter
-  const std::string ROUTER = "envoy.router";
-  // Health checking filter
-  const std::string HEALTH_CHECK = "envoy.health_check";
-  // Lua filter
-  const std::string LUA = "envoy.lua";
-  // Squash filter
-  const std::string SQUASH = "envoy.squash";
-  // External Authorization filter
-  const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
-
-  // Converts names from v1 to v2
-  const V1Converter v1_converter_;
-
-  HttpFilterNameValues()
-      : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
-                       EXT_AUTHORIZATION}) {}
-};
-
-typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;
-
-/**
- * Well-known tracer names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New tracers should use the well known name: envoy.tracers.name.
- */
-class TracerNameValues {
-public:
-  // Lightstep tracer
-  const std::string LIGHTSTEP = "envoy.lightstep";
-  // Zipkin tracer
-  const std::string ZIPKIN = "envoy.zipkin";
-  // Dynamic tracer
-  const std::string DYNAMIC_OT = "envoy.dynamic.ot";
-};
-
-typedef ConstSingleton<TracerNameValues> TracerNames;
-
-/**
- * Well-known stats sink names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New sinks should use the well known name: envoy.stat_sinks.name.
- */
-class StatsSinkNameValues {
-public:
-  // Statsd sink
-  const std::string STATSD = "envoy.statsd";
-  // DogStatsD compatible stastsd sink
-  const std::string DOG_STATSD = "envoy.dog_statsd";
-  // MetricsService sink
-  const std::string METRICS_SERVICE = "envoy.metrics_service";
-};
-
-typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
-
-/**
- * Well-known access logger names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New access loggers should use the well known name:
- * envoy.access_loggers.name.
- */
-class AccessLogNameValues {
-public:
-  // File access log
-  const std::string FILE = "envoy.file_access_log";
-  // HTTP gRPC access log
-  const std::string HTTP_GRPC = "envoy.http_grpc_access_log";
-};
-
-typedef ConstSingleton<AccessLogNameValues> AccessLogNames;
 
 /**
  * Well-known metadata filter namespaces.
@@ -309,20 +160,6 @@ private:
 };
 
 typedef ConstSingleton<TagNameValues> TagNames;
-
-/**
- * Well-known transport socket names.
- * TODO(mattklein123): Move this to extensions directory when the migration is complete.
- * TODO(mattklein123): New transport sockets should use the well known name:
- * envoy.transport_sockets.name.
- */
-class TransportSocketNameValues {
-public:
-  const std::string RAW_BUFFER = "raw_buffer";
-  const std::string SSL = "ssl";
-};
-
-typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;
 
 } // namespace Config
 } // namespace Envoy

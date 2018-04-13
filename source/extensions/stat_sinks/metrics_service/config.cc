@@ -4,11 +4,11 @@
 #include "envoy/config/metrics/v2/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,9 +37,7 @@ ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
       std::make_unique<envoy::config::metrics::v2::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() {
-  return Config::StatsSinkNames::get().METRICS_SERVICE;
-}
+std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().METRICS_SERVICE; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

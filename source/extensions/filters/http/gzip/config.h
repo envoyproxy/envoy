@@ -3,7 +3,7 @@
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +26,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::gzip::v2::Gzip()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().ENVOY_GZIP; }
+  std::string name() override { return HttpFilterNames::get().ENVOY_GZIP; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb

@@ -321,7 +321,6 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:well_known_names",
         "//source/common/http:codec_client_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//test/test_common:utility_lib",

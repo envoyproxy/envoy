@@ -14,7 +14,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-TEST(NetworkFilterConfigTest, RatelimitCorrectJson) {
+TEST(RateLimitFilterConfigTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(RateLimitConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::rate_limit::v2::RateLimit(), context),
+               ProtoValidationException);
+}
+
+TEST(RateLimitFilterConfigTest, RatelimitCorrectJson) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -34,7 +41,7 @@ TEST(NetworkFilterConfigTest, RatelimitCorrectJson) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, RatelimitCorrectProto) {
+TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
@@ -57,7 +64,7 @@ TEST(NetworkFilterConfigTest, RatelimitCorrectProto) {
   cb(connection);
 }
 
-TEST(NetworkFilterConfigTest, RatelimitEmptyProto) {
+TEST(RateLimitFilterConfigTest, RatelimitEmptyProto) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
