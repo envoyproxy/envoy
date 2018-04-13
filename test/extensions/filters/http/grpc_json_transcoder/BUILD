@@ -58,3 +58,13 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.http.grpc_json_transcoder",
+    deps = [
+        "//source/extensions/filters/http/grpc_json_transcoder:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)

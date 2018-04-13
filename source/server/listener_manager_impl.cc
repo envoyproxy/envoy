@@ -9,6 +9,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/resolver_impl.h"
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -120,7 +121,7 @@ public:
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), address_(Network::Utility::protobufAddressToAddress(config.address())),
+    : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),

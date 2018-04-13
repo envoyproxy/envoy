@@ -160,6 +160,7 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

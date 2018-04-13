@@ -4,6 +4,7 @@ As of release 1.3.0, Envoy will follow a
 [Breaking Change Policy](https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy).
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
+A logged warning is expected for each deprecated item that is in deprecation window.
 
 ## Version 1.7.0 (pending)
 
