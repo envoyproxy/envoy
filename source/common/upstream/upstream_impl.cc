@@ -68,45 +68,36 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config) {
 // Socket::Option implementation for API-defined upstream options. This same
 // object can be extended to handle additional upstream socket options.
 class UpstreamSocketOption : public Network::SocketOptionImpl {
- public:
+public:
   UpstreamSocketOption(const bool use_freebind)
-      : Network::SocketOptionImpl({}, use_freebind
-                                      ? true
-                                      : absl::optional<bool>{}) {}
+      : Network::SocketOptionImpl({}, use_freebind ? true : absl::optional<bool>{}) {}
 };
 
-Network::TcpKeepaliveConfig
-parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config,
-                        const envoy::api::v2::UpstreamConnectionOptions connection_options) {
-  envoy::api::v2::core::TcpKeepalive options;
-  if (connection_options.has_tcp_keepalive()) {
-    options = connection_options.tcp_keepalive();
-  } else if (config.upstream_connection_options().has_tcp_keepalive()) {
-    options = config.upstream_connection_options().tcp_keepalive();
-  }
+Network::TcpKeepaliveConfig parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config) {
+  const envoy::api::v2::core::TcpKeepalive& options =
+      config.upstream_connection_options().tcp_keepalive();
   return Network::TcpKeepaliveConfig{
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
-const Network::ConnectionSocket::OptionsSharedPtr parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
-                          const envoy::api::v2::core::BindConfig bind_config,
-                          const envoy::api::v2::UpstreamConnectionOptions connection_options) {
-  Network::ConnectionSocket::OptionsSharedPtr cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
+const Network::ConnectionSocket::OptionsSharedPtr
+parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
+                          const envoy::api::v2::core::BindConfig bind_config) {
+  Network::ConnectionSocket::OptionsSharedPtr cluster_options =
+      std::make_shared<Network::ConnectionSocket::Options>();
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
     cluster_options->emplace_back(new UpstreamSocketOption(true));
   }
-  if ((connection_options.has_tcp_keepalive() && !connection_options.tcp_keepalive().disable()) ||
-      (config.upstream_connection_options().has_tcp_keepalive() &&
-          !config.upstream_connection_options().tcp_keepalive().disable())) {
-    cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(parseTcpKeepaliveConfig(config, connection_options)));
+  if (config.upstream_connection_options().has_tcp_keepalive()) {
+    cluster_options->emplace_back(
+        new Network::TcpKeepaliveOptionImpl(parseTcpKeepaliveConfig(config)));
   }
   return cluster_options;
 }
-
 
 } // namespace
 
@@ -125,7 +116,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     if (options) {
       connection_options = std::make_shared<Network::ConnectionSocket::Options>();
       *connection_options = *options;
-      copy(cluster.clusterSocketOptions().get()->begin(), cluster.clusterSocketOptions().get()->end(), back_inserter(*connection_options.get()));
+      copy(cluster.clusterSocketOptions().get()->begin(),
+           cluster.clusterSocketOptions().get()->end(), back_inserter(*connection_options.get()));
     } else {
       connection_options = cluster.clusterSocketOptions();
     }
@@ -245,10 +237,10 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
-ClusterInfoImpl::ClusterInfoImpl(
-    const envoy::api::v2::Cluster& config, const envoy::api::v2::core::BindConfig& bind_config,
-    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-    bool added_via_api, const envoy::api::v2::UpstreamConnectionOptions& connection_options)
+ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
+                                 const envoy::api::v2::core::BindConfig& bind_config,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -270,7 +262,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
-      cluster_socket_options_(parseClusterSocketOptions(config, bind_config, connection_options)) {
+      cluster_socket_options_(parseClusterSocketOptions(config, bind_config)) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
@@ -412,13 +404,12 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   return std::move(new_cluster);
 }
 
-ClusterImplBase::ClusterImplBase(
-    const envoy::api::v2::Cluster& cluster, const envoy::api::v2::core::BindConfig& bind_config,
-    Runtime::Loader& runtime, Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-    bool added_via_api, const envoy::api::v2::UpstreamConnectionOptions& connection_options)
-    : runtime_(runtime),
-      info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
-                                added_via_api, connection_options)) {
+ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
+                                 const envoy::api::v2::core::BindConfig& bind_config,
+                                 Runtime::Loader& runtime, Stats::Store& stats,
+                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
+    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
+                                                   ssl_context_manager, added_via_api)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -625,8 +616,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
-                      cm.connectionOptions()),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -776,7 +766,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api, cm.connectionOptions()),
+                             added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {

@@ -171,7 +171,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        Event::Dispatcher& main_thread_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
-      connection_options_(bootstrap.cluster_manager().upstream_connection_options()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);

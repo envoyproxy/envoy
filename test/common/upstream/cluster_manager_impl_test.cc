@@ -1442,7 +1442,7 @@ TEST_F(FreebindTest, FreebindClusterOverride) {
   expectSetsockoptFreebind();
 }
 
-// Validate that when tcp keepalives are set in the ClusterManager and/or Cluster, we see the socket
+// Validate that when tcp keepalives are set in the Cluster, we see the socket
 // option propagated to setsockopt(). This is as close to an end-to-end test as we have for this
 // feature, due to the complexity of creating an integration test involving the network stack. We
 // only test the IPv4 case here, as the logic around IPv4/IPv6 handling is tested generically in
@@ -1558,7 +1558,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
   expectNoSocketOptions();
 }
 
-TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOnly) {
+TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -1577,27 +1577,7 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOnly) {
   expectSetsockoptSoKeepalive({}, {}, {});
 }
 
-TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterManagerOnly) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: TcpKeepaliveCluster
-      connect_timeout: 0.250s
-      lb_policy: ROUND_ROBIN
-      type: STATIC
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-  cluster_manager:
-    upstream_connection_options:
-      tcp_keepalive: {}
-  )EOF";
-  initialize(yaml);
-  expectSetsockoptSoKeepalive({}, {}, {});
-}
-
-TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOverride) {
+TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -1612,13 +1592,9 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterOverride) {
       upstream_connection_options:
         tcp_keepalive:
           keepalive_probes: 7
-  cluster_manager:
-    upstream_connection_options:
-      tcp_keepalive:
-        keepalive_probes: 10
   )EOF";
   initialize(yaml);
-  expectSetsockoptSoKeepalive(10, {}, {});
+  expectSetsockoptSoKeepalive(7, {}, {});
 }
 
 } // namespace

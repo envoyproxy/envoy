@@ -151,12 +151,6 @@ public:
   virtual const envoy::api::v2::core::BindConfig& bindConfig() const PURE;
 
   /**
-   * @return const envoy::api::v2::UpstreamConnectionOptions& cluster manager wide connection
-   * options for new upstream connections.
-   */
-  virtual const envoy::api::v2::UpstreamConnectionOptions& connectionOptions() const PURE;
-
-  /**
    * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
    * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
    * the management of clusters but instead is required early in ClusterManager/server

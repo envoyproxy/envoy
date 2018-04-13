@@ -296,8 +296,8 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                  const envoy::api::v2::UpstreamConnectionOptions& connection_options);
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -341,9 +341,11 @@ public:
   // Server::Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
 
-  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override { return cluster_socket_options_; };
+  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
+    return cluster_socket_options_;
+  };
 
- private:
+private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
                      const std::string& cluster_name);
@@ -433,8 +435,8 @@ public:
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                  const envoy::api::v2::UpstreamConnectionOptions& connection_options);
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
