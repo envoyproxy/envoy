@@ -45,7 +45,7 @@ TEST_F(SocketOptionImplTest, SetOptionTransparentFailure) {
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
   EXPECT_LOG_CONTAINS(
       "warning", "Failed to set IP socket option on non-IP socket",
-      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+      EXPECT_EQ(ENOTSUP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
 }
 
 // We fail to set the option when the underlying setsockopt syscall fails.
@@ -54,7 +54,7 @@ TEST_F(SocketOptionImplTest, SetOptionFreebindFailure) {
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
   EXPECT_LOG_CONTAINS(
       "warning", "Failed to set IP socket option on non-IP socket",
-      EXPECT_EQ(EOPNOTSUPP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
+      EXPECT_EQ(ENOTSUP, SocketOptionImpl::setIpSocketOption(socket_, {}, {}, nullptr, 0)));
 }
 
 // The happy path for setOption(); IP_TRANSPARENT is set to true.
