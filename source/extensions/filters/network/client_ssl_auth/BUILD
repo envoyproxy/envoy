@@ -44,6 +44,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )

@@ -14,7 +14,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf",
     ],
 )

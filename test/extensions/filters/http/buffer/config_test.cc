@@ -13,6 +13,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
+TEST(BufferFilterConfigFactoryTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(BufferFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::http::buffer::v2::Buffer(), "stats", context),
+               ProtoValidationException);
+}
+
 TEST(BufferFilterConfigFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {

@@ -28,7 +28,6 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/config:filter_json_lib",
         "//source/common/config:utility_lib",
-        "//source/common/config:well_known_names",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:utility_lib",
@@ -37,5 +36,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )

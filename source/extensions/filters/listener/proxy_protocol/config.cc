@@ -1,11 +1,8 @@
-#include <string>
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
-
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +28,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return Envoy::Config::ListenerFilterNames::get().PROXY_PROTOCOL; }
+  std::string name() override { return ListenerFilterNames::get().PROXY_PROTOCOL; }
 };
 
 /**

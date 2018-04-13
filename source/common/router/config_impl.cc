@@ -29,6 +29,8 @@
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -413,8 +415,8 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
-    const auto filter_metadata =
-        route.metadata().filter_metadata().find(Envoy::Config::HttpFilterNames::get().ROUTER);
+    const auto filter_metadata = route.metadata().filter_metadata().find(
+        Extensions::HttpFilters::HttpFilterNames::get().ROUTER);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }

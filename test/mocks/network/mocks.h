@@ -4,9 +4,11 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/stats/stats_impl.h"
@@ -145,6 +147,16 @@ public:
                                         DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
+};
+
+class MockAddressResolver : public Address::Resolver {
+public:
+  MockAddressResolver();
+  ~MockAddressResolver();
+
+  MOCK_METHOD1(resolve,
+               Address::InstanceConstSharedPtr(const envoy::api::v2::core::SocketAddress&));
+  MOCK_CONST_METHOD0(name, std::string());
 };
 
 class MockReadFilterCallbacks : public ReadFilterCallbacks {

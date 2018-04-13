@@ -3,7 +3,7 @@
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +25,7 @@ public:
         new envoy::config::filter::http::health_check::v2::HealthCheck()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().HEALTH_CHECK; }
+  std::string name() override { return HttpFilterNames::get().HEALTH_CHECK; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb
