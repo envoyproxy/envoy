@@ -1,4 +1,4 @@
-#include "common/http/filter/gzip_filter.h"
+#include "extensions/filters/http/gzip/gzip_filter.h"
 
 #include "common/common/macros.h"
 
@@ -7,7 +7,9 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Gzip {
 
 namespace {
 // Default zlib memory level.
@@ -98,7 +100,7 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
 
-FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (isAcceptEncodingAllowed(headers)) {
     skip_compression_ = false;
     if (config_->removeAcceptEncodingHeader()) {
@@ -106,10 +108,10 @@ FilterHeadersStatus GzipFilter::decodeHeaders(HeaderMap& headers, bool) {
     }
   }
 
-  return FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::Continue;
 }
 
-FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_stream) {
+Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   if (!end_stream && !skip_compression_ && isMinimumContentLength(headers) &&
       isContentTypeAllowed(headers) && !hasCacheControlNoTransform(headers) &&
       isEtagAllowed(headers) && isTransferEncodingAllowed(headers) && !headers.ContentEncoding()) {
@@ -126,7 +128,7 @@ FilterHeadersStatus GzipFilter::encodeHeaders(HeaderMap& headers, bool end_strea
   return Http::FilterHeadersStatus::Continue;
 }
 
-FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (skip_compression_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -150,7 +152,7 @@ FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream)
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
-bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
+bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
     return StringUtil::caseFindToken(cache_control->value().c_str(), ",",
@@ -165,7 +167,7 @@ bool GzipFilter::hasCacheControlNoTransform(HeaderMap& headers) const {
 // with a data structure that parses Accept-Encoding values and allows fast lookup of
 // key/priority. Also, this should be part of some utility library.
 // https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
+bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
 
   if (accept_encoding) {
@@ -193,7 +195,7 @@ bool GzipFilter::isAcceptEncodingAllowed(HeaderMap& headers) const {
   return false;
 }
 
-bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
+bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
     std::string value{StringUtil::trim(StringUtil::cropRight(content_type->value().c_str(), ";"))};
@@ -203,11 +205,11 @@ bool GzipFilter::isContentTypeAllowed(HeaderMap& headers) const {
   return true;
 }
 
-bool GzipFilter::isEtagAllowed(HeaderMap& headers) const {
+bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
   return !(config_->disableOnEtagHeader() && headers.Etag());
 }
 
-bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
+bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
@@ -221,12 +223,12 @@ bool GzipFilter::isMinimumContentLength(HeaderMap& headers) const {
                                     Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
 }
 
-bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
+bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   if (transfer_encoding) {
     for (auto header_value :
-         // TODO(gsagula): add HeaderMap::string_view() so string length doesn't need to be computed
-         // twice. Find all other sites where this can be improved.
+         // TODO(gsagula): add Http::HeaderMap::string_view() so string length doesn't need to be
+         // computed twice. Find all other sites where this can be improved.
          StringUtil::splitToken(transfer_encoding->value().c_str(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
       if (StringUtil::caseCompare(trimmed_value,
@@ -241,7 +243,7 @@ bool GzipFilter::isTransferEncodingAllowed(HeaderMap& headers) const {
   return true;
 }
 
-void GzipFilter::insertVaryHeader(HeaderMap& headers) {
+void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
   if (vary) {
     if (!StringUtil::findToken(vary->value().c_str(), ",",
@@ -261,7 +263,7 @@ void GzipFilter::insertVaryHeader(HeaderMap& headers) {
 // https://bz.apache.org/bugzilla/show_bug.cgi?id=45023
 // This design attempts to stay more on the safe side by preserving weak etags and removing
 // the strong ones when disable_on_etag_header is false. Envoy does NOT re-write entity tags.
-void GzipFilter::sanitizeEtagHeader(HeaderMap& headers) {
+void GzipFilter::sanitizeEtagHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.Etag();
   if (etag) {
     absl::string_view value(etag->value().c_str());
@@ -271,5 +273,7 @@ void GzipFilter::sanitizeEtagHeader(HeaderMap& headers) {
   }
 }
 
-} // namespace Http
+} // namespace Gzip
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
