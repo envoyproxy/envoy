@@ -1,4 +1,4 @@
-#include "common/http/filter/fault_filter.h"
+#include "extensions/filters/http/fault/fault_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -21,7 +21,9 @@
 #include "common/router/config_impl.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Fault {
 
 const std::string FaultFilter::DELAY_PERCENT_KEY = "fault.http.delay.fixed_delay_percent";
 const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_percent";
@@ -68,18 +70,18 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // followed by an abort or inject just a delay or abort. In this callback,
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
-FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
+Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (!matchesTargetUpstreamCluster()) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!matchesDownstreamNodes(headers)) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // Check for header matches
   if (!Router::ConfigUtility::matchHeaders(headers, config_->filterHeaders())) {
-    return FilterHeadersStatus::Continue;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (headers.EnvoyDownstreamServiceCluster()) {
@@ -101,15 +103,15 @@ FilterHeadersStatus FaultFilter::decodeHeaders(HeaderMap& headers, bool) {
     delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
     recordDelaysInjectedStats();
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::DelayInjected);
-    return FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   if (isAbortEnabled()) {
     abortWithHTTPStatus();
-    return FilterHeadersStatus::StopIteration;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
-  return FilterHeadersStatus::Continue;
+  return Http::FilterHeadersStatus::Continue;
 }
 
 bool FaultFilter::isDelayEnabled() {
@@ -197,17 +199,17 @@ void FaultFilter::recordAbortsInjectedStats() {
   config_->stats().aborts_injected_.inc();
 }
 
-FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
+Http::FilterDataStatus FaultFilter::decodeData(Buffer::Instance&, bool) {
   if (delay_timer_ == nullptr) {
-    return FilterDataStatus::Continue;
+    return Http::FilterDataStatus::Continue;
   }
   // If the request is too large, stop reading new data until the buffer drains.
-  return FilterDataStatus::StopIterationAndWatermark;
+  return Http::FilterDataStatus::StopIterationAndWatermark;
 }
 
-FilterTrailersStatus FaultFilter::decodeTrailers(HeaderMap&) {
-  return delay_timer_ == nullptr ? FilterTrailersStatus::Continue
-                                 : FilterTrailersStatus::StopIteration;
+Http::FilterTrailersStatus FaultFilter::decodeTrailers(Http::HeaderMap&) {
+  return delay_timer_ == nullptr ? Http::FilterTrailersStatus::Continue
+                                 : Http::FilterTrailersStatus::StopIteration;
 }
 
 FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -251,7 +253,7 @@ bool FaultFilter::matchesTargetUpstreamCluster() {
   return matches;
 }
 
-bool FaultFilter::matchesDownstreamNodes(const HeaderMap& headers) {
+bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
   if (config_->downstreamNodes().empty()) {
     return true;
   }
@@ -271,9 +273,11 @@ void FaultFilter::resetTimerState() {
   }
 }
 
-void FaultFilter::setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) {
+void FaultFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
-} // namespace Http
+} // namespace Fault
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

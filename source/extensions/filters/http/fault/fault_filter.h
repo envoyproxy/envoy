@@ -15,7 +15,9 @@
 #include "common/router/config_impl.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Fault {
 
 /**
  * All stats for the fault filter. @see stats_macros.h
@@ -77,7 +79,7 @@ typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
  */
-class FaultFilter : public StreamDecoderFilter {
+class FaultFilter : public Http::StreamDecoderFilter {
 public:
   FaultFilter(FaultFilterConfigSharedPtr config);
   ~FaultFilter();
@@ -86,10 +88,10 @@ public:
   void onDestroy() override;
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  FilterTrailersStatus decodeTrailers(HeaderMap& trailers) override;
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
   void recordAbortsInjectedStats();
@@ -98,7 +100,7 @@ private:
   void postDelayInjection();
   void abortWithHTTPStatus();
   bool matchesTargetUpstreamCluster();
-  bool matchesDownstreamNodes(const HeaderMap& headers);
+  bool matchesDownstreamNodes(const Http::HeaderMap& headers);
 
   bool isAbortEnabled();
   bool isDelayEnabled();
@@ -106,7 +108,7 @@ private:
   uint64_t abortHttpStatus();
 
   FaultFilterConfigSharedPtr config_;
-  StreamDecoderFilterCallbacks* callbacks_{};
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
   bool stream_destroyed_{};
@@ -121,6 +123,7 @@ private:
   const static std::string DELAY_DURATION_KEY;
   const static std::string ABORT_HTTP_STATUS_KEY;
 };
-
-} // Http
+}
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
