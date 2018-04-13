@@ -26,7 +26,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
 std::string DateFormatter::fromTime(time_t time) const {
   tm current_tm;
-  localtime_r(&time, &current_tm);
+  gmtime_r(&time, &current_tm);
 
   std::array<char, 1024> buf;
   strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
@@ -267,7 +267,7 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
       cached_time.epoch_time_seconds != epoch_time_seconds) {
     time_t time = static_cast<time_t>(epoch_time_seconds.count());
     tm date_time;
-    localtime_r(&time, &date_time);
+    gmtime_r(&time, &date_time);
     cached_time.formatted_time_length =
         strftime(cached_time.formatted_time, sizeof(cached_time.formatted_time), DefaultDateFormat,
                  &date_time);
