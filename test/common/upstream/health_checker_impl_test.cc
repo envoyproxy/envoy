@@ -282,7 +282,7 @@ public:
     });
   }
 
-  void expectSessionCreate(const HostWithHealthCheckMap& health_check_map = health_checker_map_) {
+  void expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
     test_sessions_.emplace_back(std::move(new_test_session));
@@ -292,8 +292,7 @@ public:
     expectClientCreate(test_sessions_.size() - 1, health_check_map);
   }
 
-  void expectClientCreate(size_t index,
-                          const HostWithHealthCheckMap& health_check_map = health_checker_map_) {
+  void expectClientCreate(size_t index, const HostWithHealthCheckMap& health_check_map) {
     TestSession& test_session = *test_sessions_[index];
     test_session.codec_ = new NiceMock<Http::MockClientConnection>();
     test_session.client_connection_ = new NiceMock<Network::MockClientConnection>();
@@ -362,6 +361,9 @@ public:
     }
   }
 
+  void expectSessionCreate() { expectSessionCreate(health_checker_map_); }
+  void expectClientCreate(size_t index) { expectClientCreate(index, health_checker_map_); }
+
   MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, bool changed_state));
 
   std::shared_ptr<MockCluster> cluster_;
@@ -372,11 +374,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   std::list<uint32_t> connection_index_{};
   std::list<uint32_t> codec_index_{};
-  const static HostWithHealthCheckMap health_checker_map_;
+  const HostWithHealthCheckMap health_checker_map_{};
 };
-
-const HttpHealthCheckerImplTest::HostWithHealthCheckMap
-    HttpHealthCheckerImplTest::health_checker_map_ = {};
 
 TEST_F(HttpHealthCheckerImplTest, Success) {
   setupNoServiceValidationHC();
