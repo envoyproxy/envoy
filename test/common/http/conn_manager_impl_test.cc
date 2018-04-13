@@ -1427,11 +1427,10 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   }));
 
   Buffer::OwnedImpl fake_input("1234");
-  Buffer::OwnedImpl empty;
   conn_manager_->onData(fake_input, true);
 
   EXPECT_CALL(*upstream_connection, write(_, false));
-  EXPECT_CALL(*upstream_connection, write(BufferEqual(&empty), true));
+  EXPECT_CALL(*upstream_connection, write(_, true)).Times(0);
   upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
