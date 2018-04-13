@@ -2,7 +2,7 @@
 
 #include "envoy/server/health_checker_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/health_checkers/well_known_names.h"
 
 #include "extensions/health_checkers/redis/redis.h"
 
@@ -20,7 +20,7 @@ public:
   createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
                             Server::Configuration::HealthCheckerFactoryContext& context) override;
 
-  std::string name() override { return Config::HealthCheckerNames::get().REDIS_HEALTH_CHECKER; }
+  std::string name() override { return HealthCheckerNames::get().REDIS_HEALTH_CHECKER; }
 };
 
 } // namespace RedisHealthChecker

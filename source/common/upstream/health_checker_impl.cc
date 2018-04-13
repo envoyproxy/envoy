@@ -12,6 +12,9 @@
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
+// TODO(dio): Remove dependency to extension health checkers when redis_health_check is removed.
+#include "extensions/health_checkers/well_known_names.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -50,14 +53,14 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random);
-  // Deprecated redis_health_check, preserving using old config until it's removed.
+  // Deprecated redis_health_check, preserving using old config until it is removed.
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
             hc_config.has_redis_health_check()
-                ? Config::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
+                ? Extensions::HealthCheckers::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
                 : hc_config.custom_health_check().name());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher));

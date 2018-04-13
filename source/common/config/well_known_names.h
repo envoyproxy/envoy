@@ -324,16 +324,5 @@ public:
 
 typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;
 
-/**
- * Well-known extension health checker names.
- */
-class HealthCheckerNameValues {
-public:
-  // Redis health checker.
-  const std::string REDIS_HEALTH_CHECKER = "envoy.health_checker.redis";
-};
-
-typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;
-
 } // namespace Config
 } // namespace Envoy
