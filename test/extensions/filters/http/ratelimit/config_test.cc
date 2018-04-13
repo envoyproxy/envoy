@@ -14,6 +14,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
+TEST(RateLimitFilterConfigTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
+                   envoy::config::filter::http::rate_limit::v2::RateLimit(), "stats", context),
+               ProtoValidationException);
+}
+
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
   std::string json_string = R"EOF(
   {

@@ -8,10 +8,11 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
-#include "common/http/filter/fault_filter.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/stats/stats_impl.h"
+
+#include "extensions/filters/http/fault/fault_filter.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
@@ -31,7 +32,9 @@ using testing::WithArgs;
 using testing::_;
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Fault {
 
 class FaultFilterTest : public testing::Test {
 public:
@@ -130,8 +133,8 @@ public:
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
-  NiceMock<MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  TestHeaderMapImpl request_headers_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
+  Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -266,9 +269,10 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::FaultInjected));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
@@ -295,9 +299,9 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   // Expect filter to continue execution when delay is 0ms
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -318,7 +322,8 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
 
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
@@ -332,8 +337,8 @@ TEST_F(FaultFilterTest, FixedDelayNonZeroDuration) {
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   timer_->callback_();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
@@ -360,7 +365,8 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
@@ -376,11 +382,11 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
               setResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding());
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
   timer_->callback_();
 
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -409,7 +415,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -434,8 +441,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
@@ -459,7 +466,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -480,8 +488,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
@@ -502,7 +510,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
   request_headers_.addCopy("x-envoy-downstream-service-node", "canary");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -522,11 +531,11 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   request_headers_.removeEnvoyDownstreamServiceNode();
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
 }
@@ -549,7 +558,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100))
@@ -569,8 +579,8 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
@@ -591,9 +601,9 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
   // Expect filter to continue execution when headers don't match
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -617,7 +627,8 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
 
   // delay timer should have been fired by now. If caller resets the stream while we are waiting
@@ -634,7 +645,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
 
   filter_->onDestroy();
 }
@@ -658,7 +669,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
@@ -673,8 +685,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   timer_->callback_();
 
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -695,9 +707,9 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
   EXPECT_CALL(filter_callbacks_.request_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
@@ -717,13 +729,15 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_CALL(filter_callbacks_.request_info_, setResponseFlag(_)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data_, false));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-} // namespace Http
+} // namespace Fault
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
