@@ -116,7 +116,7 @@ typedef std::shared_ptr<HistogramParentImpl> ParentHistogramSharedPtr;
  *   the same backing store. This is to keep things simple, it could be done in the future if
  *   needed.
  */
-class ThreadLocalStoreImpl : public StoreRoot {
+class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
   ThreadLocalStoreImpl(RawStatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();

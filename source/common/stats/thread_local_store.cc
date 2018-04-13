@@ -73,6 +73,8 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
       const ParentHistogramSharedPtr& parent_hist = histogram.second;
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
+      } else {
+        ENVOY_LOG(warn, "duplicate histogram name '{}'", hist_name);
       }
     }
   }
