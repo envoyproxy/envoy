@@ -55,12 +55,16 @@ public:
   // The tcp keepalive options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
-  static bool setTcpKeepalive(Socket& socket, const absl::optional<uint32_t>& keepalive_probes,
-                              const absl::optional<uint32_t>& keepalive_time,
-                              const absl::optional<uint32_t>& keepalive_interval);
+  static bool setTcpKeepalive(Socket& socket, absl::optional<uint32_t> keepalive_probes,
+                              absl::optional<uint32_t> keepalive_time,
+                              absl::optional<uint32_t> keepalive_interval);
 
 private:
   Network::TcpKeepaliveConfig keepalive_config_;
+  static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
+                             absl::optional<uint32_t> value);
+  static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
+                             uint32_t value);
 };
 } // namespace Network
 } // namespace Envoy

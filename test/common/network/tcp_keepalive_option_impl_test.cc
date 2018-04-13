@@ -28,100 +28,100 @@ public:
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveFailure) {
   TcpKeepaliveOptionImpl socket_option{{}};
-#ifdef SO_KEEPALIVE
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return -1;
-      }));
-#endif // SO_KEEPALIVE
+  if (ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return -1;
+        }));
+  }
   EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveSuccess) {
   TcpKeepaliveOptionImpl socket_option{{}};
-#ifdef SO_KEEPALIVE
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#else
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#endif // SO_KEEPALIVE
+  if (ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  }
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveProbesSuccess) {
   TcpKeepaliveOptionImpl socket_option{
       Network::TcpKeepaliveConfig{3, absl::nullopt, absl::nullopt}};
-#if defined(SO_KEEPALIVE) && defined(TCP_KEEPCNT)
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, TCP_KEEPCNT, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(3, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#else
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#endif // defined(SO_KEEPALIVE) && defined(TCP_KEEPCNT)
+  if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPCNT.has_value()) {
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPCNT.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(3, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  }
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveTimeSuccess) {
   TcpKeepaliveOptionImpl socket_option{
       Network::TcpKeepaliveConfig{absl::nullopt, 3, absl::nullopt}};
-#if defined(SO_KEEPALIVE) && (defined(TCP_KEEPIDLE) || defined(TCP_KEEPALIVE))
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-#ifdef TCP_KEEPIDLE
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, TCP_KEEPIDLE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(3, *static_cast<const int*>(optval));
-        return 0;
-      }));
-#else
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, TCP_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(3, *static_cast<const int*>(optval));
-        return 0;
-      }));
-#endif // TCP_KEEPIDLE
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#else
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#endif // defined(SO_KEEPALIVE) && (defined(TCP_KEEPIDLE) || defined(TCP_KEEPALIVE))
+  if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPIDLE.has_value()) {
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPIDLE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(3, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  }
 }
 
 TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveIntervalSuccess) {
   TcpKeepaliveOptionImpl socket_option{{absl::nullopt, absl::nullopt, 3}};
-#if defined(SO_KEEPALIVE) && defined(TCP_KEEPINTVL)
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, SO_KEEPALIVE, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(1, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, TCP_KEEPINTVL, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-        EXPECT_EQ(3, *static_cast<const int*>(optval));
-        return 0;
-      }));
-  EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#else
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-#endif // defined(SO_KEEPALIVE) && defined(TCP_KEEPINTVL)
+  if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPINTVL.has_value()) {
+    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_CALL(os_sys_calls_,
+                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPINTVL.value(), _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(3, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    EXPECT_TRUE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  } else {
+    EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
+  }
 }
 
 } // namespace

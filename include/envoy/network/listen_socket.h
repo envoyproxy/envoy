@@ -121,9 +121,9 @@ public:
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;
 
 struct TcpKeepaliveConfig {
-  absl::optional<uint32_t> keepalive_probes_ = absl::nullopt;
-  absl::optional<uint32_t> keepalive_time_ = absl::nullopt;
-  absl::optional<uint32_t> keepalive_interval_ = absl::nullopt;
+  absl::optional<uint32_t> keepalive_probes_;
+  absl::optional<uint32_t> keepalive_time_;
+  absl::optional<uint32_t> keepalive_interval_;
 };
 
 } // namespace Network

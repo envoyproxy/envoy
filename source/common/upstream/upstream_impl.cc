@@ -80,25 +80,16 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config,
                         const envoy::api::v2::UpstreamConnectionOptions connection_options) {
+  envoy::api::v2::core::TcpKeepalive options;
   if (connection_options.has_tcp_keepalive()) {
-    return Network::TcpKeepaliveConfig{
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_probes,
-                                        absl::optional<uint32_t>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_time,
-                                        absl::optional<uint32_t>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(connection_options.tcp_keepalive(), keepalive_interval,
-                                        absl::optional<uint32_t>())};
+    options = connection_options.tcp_keepalive();
   } else if (config.upstream_connection_options().has_tcp_keepalive()) {
-    return Network::TcpKeepaliveConfig{
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(),
-                                        keepalive_probes, absl::optional<uint32_t>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(),
-                                        keepalive_time, absl::optional<uint32_t>()),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.upstream_connection_options().tcp_keepalive(),
-                                        keepalive_interval, absl::optional<uint32_t>())};
-  } else {
-    return Network::TcpKeepaliveConfig{};
+    options = config.upstream_connection_options().tcp_keepalive();
   }
+  return Network::TcpKeepaliveConfig{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_probes, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_time, absl::optional<uint32_t>()),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
 // Socket::Option implementation for API-defined upstream options. This same
@@ -124,24 +115,21 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
                            Network::Address::InstanceConstSharedPtr address,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options;
-  if (cluster.features() & ClusterInfo::Features::FREEBIND) {
+  if (cluster.features() &
+      (ClusterInfo::Features::FREEBIND | ClusterInfo::Features::USE_TCP_KEEPALIVE)) {
     cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
     if (options) {
       *cluster_options = *options;
     }
-    cluster_options->emplace_back(new UpstreamSocketOption(cluster));
+    if (cluster.features() & ClusterInfo::Features::FREEBIND) {
+      cluster_options->emplace_back(new UpstreamSocketOption(cluster));
+    }
+    if (cluster.features() & ClusterInfo::Features::USE_TCP_KEEPALIVE) {
+      cluster_options->emplace_back(
+          new Network::TcpKeepaliveOptionImpl(cluster.tcpKeepaliveSettings()));
+    }
   } else {
     cluster_options = options;
-  }
-  if (cluster.features() & ClusterInfo::Features::USE_TCP_KEEPALIVE) {
-    if (!cluster_options) {
-      cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
-      if (options) {
-        *cluster_options = *options;
-      }
-    }
-    cluster_options->emplace_back(
-        new Network::TcpKeepaliveOptionImpl(cluster.tcpKeepaliveSettings()));
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
