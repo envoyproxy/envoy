@@ -54,9 +54,7 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
   return nullptr;
 }
 
-uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
-                       const envoy::api::v2::core::BindConfig bind_config,
-                       const envoy::api::v2::UpstreamConnectionOptions connection_options) {
+uint64_t parseFeatures(const envoy::api::v2::Cluster& config) {
   uint64_t features = 0;
   if (config.has_http2_protocol_options()) {
     features |= ClusterInfoImpl::Features::HTTP2;
@@ -64,18 +62,18 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
   if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
     features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
   }
-  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
-  if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
-      config.upstream_bind_config().freebind().value()) {
-    features |= ClusterInfoImpl::Features::FREEBIND;
-  }
-  if ((connection_options.has_tcp_keepalive() && !connection_options.tcp_keepalive().disable()) ||
-      (config.upstream_connection_options().has_tcp_keepalive() &&
-       !config.upstream_connection_options().tcp_keepalive().disable())) {
-    features |= ClusterInfoImpl::Features::USE_TCP_KEEPALIVE;
-  }
   return features;
 }
+
+// Socket::Option implementation for API-defined upstream options. This same
+// object can be extended to handle additional upstream socket options.
+class UpstreamSocketOption : public Network::SocketOptionImpl {
+ public:
+  UpstreamSocketOption(const bool use_freebind)
+      : Network::SocketOptionImpl({}, use_freebind
+                                      ? true
+                                      : absl::optional<bool>{}) {}
+};
 
 Network::TcpKeepaliveConfig
 parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config,
@@ -92,15 +90,23 @@ parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, keepalive_interval, absl::optional<uint32_t>())};
 }
 
-// Socket::Option implementation for API-defined upstream options. This same
-// object can be extended to handle additional upstream socket options.
-class UpstreamSocketOption : public Network::SocketOptionImpl {
-public:
-  UpstreamSocketOption(const ClusterInfo& cluster_info)
-      : Network::SocketOptionImpl({}, cluster_info.features() & ClusterInfo::Features::FREEBIND
-                                          ? true
-                                          : absl::optional<bool>{}) {}
-};
+const Network::ConnectionSocket::OptionsSharedPtr parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
+                          const envoy::api::v2::core::BindConfig bind_config,
+                          const envoy::api::v2::UpstreamConnectionOptions connection_options) {
+  Network::ConnectionSocket::OptionsSharedPtr cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
+  // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
+  if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
+      config.upstream_bind_config().freebind().value()) {
+    cluster_options->emplace_back(new UpstreamSocketOption(true));
+  }
+  if ((connection_options.has_tcp_keepalive() && !connection_options.tcp_keepalive().disable()) ||
+      (config.upstream_connection_options().has_tcp_keepalive() &&
+          !config.upstream_connection_options().tcp_keepalive().disable())) {
+    cluster_options->emplace_back(new Network::TcpKeepaliveOptionImpl(parseTcpKeepaliveConfig(config, connection_options)));
+  }
+  return cluster_options;
+}
+
 
 } // namespace
 
@@ -114,26 +120,21 @@ Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  Network::ConnectionSocket::OptionsSharedPtr cluster_options;
-  if (cluster.features() &
-      (ClusterInfo::Features::FREEBIND | ClusterInfo::Features::USE_TCP_KEEPALIVE)) {
-    cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
+  Network::ConnectionSocket::OptionsSharedPtr connection_options;
+  if (cluster.clusterSocketOptions() && !cluster.clusterSocketOptions().get()->empty()) {
     if (options) {
-      *cluster_options = *options;
-    }
-    if (cluster.features() & ClusterInfo::Features::FREEBIND) {
-      cluster_options->emplace_back(new UpstreamSocketOption(cluster));
-    }
-    if (cluster.features() & ClusterInfo::Features::USE_TCP_KEEPALIVE) {
-      cluster_options->emplace_back(
-          new Network::TcpKeepaliveOptionImpl(cluster.tcpKeepaliveSettings()));
+      connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+      *connection_options = *options;
+      copy(cluster.clusterSocketOptions().get()->begin(), cluster.clusterSocketOptions().get()->end(), back_inserter(*connection_options.get()));
+    } else {
+      connection_options = cluster.clusterSocketOptions();
     }
   } else {
-    cluster_options = options;
+    connection_options = options;
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      cluster_options);
+      connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -260,7 +261,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.alt_stat_name().empty() ? name_ : std::string(config.alt_stat_name())))),
       stats_(generateStats(*stats_scope_)),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      features_(parseFeatures(config, bind_config, connection_options)),
+      features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
@@ -269,7 +270,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
-      tcp_keepalive_config_(parseTcpKeepaliveConfig(config, connection_options)) {
+      cluster_socket_options_(parseClusterSocketOptions(config, bind_config, connection_options)) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
