@@ -60,7 +60,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
 
   TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4096);
   compressor.compress(compressor_input_buffer, compressor_output_buffer);
-  compressor.finish(compressor_output_buffer);
+  compressor.flush(compressor_output_buffer);
   compressor_input_buffer.drain(4096);
   ASSERT_TRUE(compressor.checksum() > 0);
 
@@ -95,7 +95,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
     compressor_input_buffer.drain(default_input_size * i);
   }
 
-  compressor.finish(compressor_output_buffer);
+  compressor.flush(compressor_output_buffer);
 
   ZlibDecompressorImpl decompressor;
   decompressor.init(gzip_window_bits);
@@ -131,7 +131,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(default_input_size * i);
   }
-  compressor.finish(output_buffer);
+  compressor.flush(output_buffer);
 
   ZlibDecompressorImpl decompressor(16);
   decompressor.init(gzip_window_bits);
@@ -163,7 +163,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
     original_text.append(TestUtility::bufferToString(input_buffer));
     input_buffer.drain(default_input_size * i);
   }
-  compressor.finish(output_buffer);
+  compressor.flush(output_buffer);
 
   ZlibDecompressorImpl decompressor;
   decompressor.init(15);

@@ -71,6 +71,12 @@ private:
   std::ranlux48 generator_;
 };
 
+template <typename T> class Mask {};
+template <> class Mask<uint32_t> {
+public:
+  static const uint32_t value = 0x000000FF;
+};
+
 class TestUtility {
 public:
   /**
@@ -243,16 +249,14 @@ public:
   /**
    * Return flip-ordered bytes.
    * @param bytes input bytes.
-   * @param mask bit mask
    * @return Type flip-ordered bytes.
    */
-  template <class Type> static Type flipOrder(const Type& bytes, const Type mask) {
+  template <class Type> static Type flipOrder(const Type& bytes) {
     Type result{0};
     Type data = bytes;
     for (Type i = 0; i < sizeof(Type); i++) {
       result <<= 8;
-      // TODO(dio): infer mask from Type.
-      result |= (data & mask);
+      result |= (data & Mask<Type>::value);
       data >>= 8;
     }
     return result;

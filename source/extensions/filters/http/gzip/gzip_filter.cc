@@ -134,17 +134,17 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
   }
 
   const uint64_t n_data = data.length();
-
-  if (n_data) {
+  if (n_data > 0) {
     compressor_.compress(data, compressed_data_);
+  } else {
+    compressor_.flush(compressed_data_);
   }
 
   if (end_stream) {
     compressor_.finish(compressed_data_);
-    compressor_.reset();
   }
 
-  if (compressed_data_.length()) {
+  if (compressed_data_.length() > 0) {
     data.drain(n_data);
     data.move(compressed_data_);
     return Http::FilterDataStatus::Continue;

@@ -31,6 +31,19 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
   initialized_ = true;
 }
 
+void ZlibCompressorImpl::flush(Buffer::Instance& output_buffer) {
+  process(output_buffer, Z_SYNC_FLUSH);
+}
+
+void ZlibCompressorImpl::finish(Buffer::Instance& output_buffer) {
+  int result = Z_OK;
+  do {
+    result = deflate(zstream_ptr_.get(), Z_FINISH);
+    updateOutput(output_buffer);
+  } while (result == Z_OK);
+  RELEASE_ASSERT(result == Z_STREAM_END);
+}
+
 uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
 void ZlibCompressorImpl::compress(const Buffer::Instance& input_buffer,
@@ -62,6 +75,10 @@ void ZlibCompressorImpl::process(Buffer::Instance& output_buffer, int64_t flush_
       updateOutput(output_buffer);
     }
   }
+
+  if (flush_state == Z_SYNC_FLUSH) {
+    updateOutput(output_buffer);
+  }
 }
 
 void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
@@ -77,20 +94,6 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
 void ZlibCompressorImpl::reset() {
   const bool result = deflateReset(zstream_ptr_.get());
   RELEASE_ASSERT(result == Z_OK);
-}
-
-void ZlibCompressorImpl::finish(Buffer::Instance& output_buffer) {
-  // Once the Z_FINISH parameter is provided, deflate() will begin to complete the compressed output
-  // stream. However depending on how much output space is provided, deflate() may have to be called
-  // several times until it has provided the complete compressed stream, even after it has consumed
-  // all of the input. The flush parameter must continue to be Z_FINISH for those subsequent calls.
-  // Ref: https://zlib.net/zlib_how.html.
-  int result = Z_OK;
-  while (result == Z_OK || result == Z_BUF_ERROR) {
-    result = deflate(zstream_ptr_.get(), Z_FINISH);
-    updateOutput(output_buffer);
-  }
-  RELEASE_ASSERT(result == Z_STREAM_END);
 }
 
 } // namespace Compressor

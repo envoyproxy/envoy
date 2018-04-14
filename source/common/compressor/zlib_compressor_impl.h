@@ -80,11 +80,19 @@ public:
   void reset();
 
   /**
-   * Completes the compressed output stream. To indicate that the currently pointed data is the last
-   * chunk of input data to compress.
+   * It writes gzip trailer to the end of output buffer.
    * @param output_buffer supplies the buffer to output compressed data.
    */
   void finish(Buffer::Instance& output_buffer);
+
+  /**
+   * Flush should be called when no more data needs to be compressed. It will compress
+   * any remaining input available in the compressor and flush the compressed data to the output
+   * buffer. Note that forcing flush frequently degrades the compression ratio, so this should only
+   * be called when necessary.
+   * @param output_buffer supplies the buffer to output compressed data.
+   */
+  void flush(Buffer::Instance& output_buffer);
 
   // Compressor
   void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
