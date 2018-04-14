@@ -372,7 +372,7 @@ public:
    * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
    * will not be retained.
    */
-  HistogramStatisticsImpl(histogram_t* histogram_ptr);
+  HistogramStatisticsImpl(const histogram_t* histogram_ptr);
 
   HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
   HistogramStatisticsImpl& operator=(HistogramStatisticsImpl const&) = delete;
@@ -381,7 +381,7 @@ public:
   const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
 
-  void refresh(histogram_t* new_histogram_ptr);
+  void refresh(const histogram_t* new_histogram_ptr);
 
 private:
   const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};

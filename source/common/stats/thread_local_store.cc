@@ -71,7 +71,6 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   // TODO(ramaraochavali): incorporate the scopes into the histogram names.
-  // TODO(ramaraochavali): datamodel during hot restarts.
   for (ScopeImpl* scope : scopes_) {
     for (auto name_histogram_pair : scope->central_cache_.histograms_) {
       const std::string& hist_name = name_histogram_pair.first;
