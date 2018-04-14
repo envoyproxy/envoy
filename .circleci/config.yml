@@ -41,6 +41,7 @@ jobs:
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.api
+       - run: ci/api_mirror.sh
    ipv6_tests:
      machine: true
      steps:
