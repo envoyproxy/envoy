@@ -61,7 +61,9 @@ private:
   std::vector<std::string> messages_;
 };
 
-typedef std::vector<std::pair<std::string, std::string>> ExpectedLogMessages;
+typedef std::pair<std::string, std::string> StringPair;
+
+typedef std::vector<StringPair> ExpectedLogMessages;
 
 // Validates that when stmt is executed, log messages containing substr and loglevel will be
 // emitted. Failure message e.g.,
@@ -83,7 +85,7 @@ typedef std::vector<std::pair<std::string, std::string>> ExpectedLogMessages;
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
     ExpectedLogMessages failed_expectations;                                                       \
-    for (const std::pair<std::string, std::string>& expected : expected_messages) {                \
+    for (const StringPair& expected : expected_messages) {                                         \
       const auto log_message =                                                                     \
           std::find_if(log_recorder.messages().begin(), log_recorder.messages().end(),             \
                        [&expected](const std::string& message) {                                   \
