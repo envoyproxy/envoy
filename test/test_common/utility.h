@@ -71,12 +71,6 @@ private:
   std::ranlux48 generator_;
 };
 
-template <typename T> class Mask {};
-template <> class Mask<uint32_t> {
-public:
-  static const uint32_t value = 0x000000FF;
-};
-
 class TestUtility {
 public:
   /**
@@ -256,7 +250,7 @@ public:
     Type data = bytes;
     for (Type i = 0; i < sizeof(Type); i++) {
       result <<= 8;
-      result |= (data & Mask<Type>::value);
+      result |= (data & Type(0xFF));
       data >>= 8;
     }
     return result;
