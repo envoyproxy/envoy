@@ -31,6 +31,8 @@ std::list<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
     for (auto counter : scope->central_cache_.counters_) {
       if (names.insert(counter.first).second) {
         ret.push_back(counter.second);
+      } else {
+        ENVOY_LOG(warn, "duplicate counter '{}.{}'", scope->prefix_, counter.second);
       }
     }
   }
@@ -54,6 +56,8 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
     for (auto gauge : scope->central_cache_.gauges_) {
       if (names.insert(gauge.first).second) {
         ret.push_back(gauge.second);
+      } else {
+        ENVOY_LOG(warn, "duplicate guage '{}.{}'", scope->prefix_, gauge.second);
       }
     }
   }
@@ -67,14 +71,15 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   // TODO(ramaraochavali): incorporate the scopes into the histogram names.
+  // TODO(ramaraochavali): datamodel during hot restarts.
   for (ScopeImpl* scope : scopes_) {
-    for (auto histogram : scope->central_cache_.histograms_) {
-      const std::string& hist_name = histogram.first;
-      const ParentHistogramSharedPtr& parent_hist = histogram.second;
+    for (auto name_histogram_pair : scope->central_cache_.histograms_) {
+      const std::string& hist_name = name_histogram_pair.first;
+      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
       } else {
-        ENVOY_LOG(warn, "duplicate histogram name '{}'", hist_name);
+        ENVOY_LOG(warn, "duplicate histogram '{}.{}'", scope->prefix_, hist_name);
       }
     }
   }
@@ -101,8 +106,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     tls_->runOnAllThreads(
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
-            for (auto histogram : tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
-              const TlsHistogramSharedPtr& tls_hist = histogram.second;
+            for (auto name_histogram_pair :
+                 tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
+              const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
               tls_hist->beginMerge();
             }
           }
@@ -323,13 +329,6 @@ HistogramParentImpl::~HistogramParentImpl() {
   hist_free(cumulative_histogram_);
 }
 
-/**
- * This method is called during the main stats flush process for each of the histogram. This
- * method iterates through the Tls histograms and collects the histogram data of all of them
- * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
- * "cumulative_histogram". More details about threading model at
- * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
- */
 void HistogramParentImpl::merge() {
   std::unique_lock<std::mutex> lock(merge_lock_);
   if (usedWorker()) {

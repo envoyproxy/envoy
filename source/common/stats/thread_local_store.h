@@ -64,7 +64,16 @@ public:
   // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls.
   void recordValue(uint64_t) override { NOT_IMPLEMENTED; }
   bool used() const override;
+
+  /**
+   * This method is called during the main stats flush process for each of the histogram. This
+   * method iterates through the Tls histograms and collects the histogram data of all of them
+   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
+   * "cumulative_histogram". More details about threading model at
+   * https://github.com/envoyproxy/envoy/issues/1965#issuecomment-376672282.
+   */
   void merge() override;
+
   const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
