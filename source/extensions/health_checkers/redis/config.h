@@ -2,9 +2,8 @@
 
 #include "envoy/server/health_checker_config.h"
 
-#include "extensions/health_checkers/well_known_names.h"
-
 #include "extensions/health_checkers/redis/redis.h"
+#include "extensions/health_checkers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
