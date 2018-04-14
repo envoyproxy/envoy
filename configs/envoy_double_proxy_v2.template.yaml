@@ -1,0 +1,102 @@
+{%- macro listener(address,port_value,proxy_proto) -%}
+- name: listener_created_from_configgen
+  address:
+    socket_address:
+      address:  {{address}}
+      port_value: {{port_value}}
+  filter_chains:
+    - filter_chain_match:
+        sni_domains:  example.com
+      filters:
+        name: envoy.http_connection_manager
+        config:
+          codec_type: AUTO
+          stat_prefix:  router
+          route_config:
+            name: route_configuration_for_http_connection_manager
+            virtual_hosts:
+              - name: all
+                domains:
+                  - *
+                routes:
+                  - match:
+                      prefix: "/"
+                    route:
+                      cluster:  backhaul
+                      timeout:  20s
+          http_filters:
+            - name: envoy.health_check
+              config:
+                pass_through_mode: false
+                endpoint: /healthcheck
+            - name: envoy.buffer
+              config: 
+                max_request_bytes: 5242880
+                max_request_time: 120
+            - name: envoy.router
+              config: {}
+          access_log:
+            - name: envoy.file_access_log
+              config:
+          {% if proxy_proto %}
+          use_remote_address: true
+          {%endif -%}
+     {% if proxy_proto %}
+      use_proxy_proto: true
+     {%endif -%}
+{% endmacro -%}
+admin:
+  access_log_path:  "var/log/envoy/admin_access.log"
+  address:
+    socket_address:
+      protocol:
+      address:  tcp://127.0.0.1
+      port_value: 9901
+      named_port:
+      resolver_name:
+      ipv4_compat:    
+flags_path: /etc/envoy/flags
+stats_sinks:
+  name: envoy.statsd
+  config: 
+    tcp_cluster_name: statsd
+tracing:
+  http:
+    name: envoy.lightstep
+    config:
+      collector_cluster:  etc/envoy/lightstep_access_token
+      access_token_file:  lightstep_saas
+runtime:
+  symlink_root: /srv/runtime_data/current
+  subdirectory: envoy
+  override_subdirectory:  envoy_override
+static_resources:
+  clusters:
+    - name: statsd
+      type: STATIC
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      hosts:
+        socket_address:
+          address: tcp://127.0.0.1
+          port: 8125
+    - name: backhaul
+      type: STRICT_DNS
+      connect_timeout: 1s
+      lb_policy: ROUND_ROBIN
+      hosts:
+        socket_address:
+          address:  tcp://front-proxy.yourcompany.net
+          port: 9400
+      max_requests_per_connection: 25000
+    - name: lightstep_saas
+      type: LOGICAL_DNS
+      connect_timeout: 1s
+      lb_policy: ROUND_ROBIN
+      hosts:
+        socket_address:
+          address: tcp://collector-grpc.lightstep.com
+          port: 443
+  listeners:
+    {{ listener("tcp://0.0.0.0",9300,True)|indent(4) }}
+    {{ listener("tcp://0.0.0.0",9301,True)|indent(4) }}    
