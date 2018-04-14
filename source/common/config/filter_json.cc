@@ -7,10 +7,12 @@
 #include "common/config/protocol_json.h"
 #include "common/config/rds_json.h"
 #include "common/config/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/access_loggers/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Config {
@@ -112,7 +114,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_config,
 
   // Statically registered access logs are a v2-only feature, so use the standard internal file
   // access log for json config conversion.
-  proto_config.set_name(Config::AccessLogNames::get().FILE);
+  proto_config.set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
 
   if (json_config.hasObject("filter")) {
     translateAccessLogFilter(*json_config.getObject("filter"), *proto_config.mutable_filter());
@@ -150,8 +152,8 @@ void FilterJson::translateHttpConnectionManager(
     JSON_UTIL_SET_STRING(*json_filter, *filter, name);
 
     // Translate v1 name to v2 name.
-    filter->set_name(
-        Config::HttpFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
+    filter->set_name(Extensions::HttpFilters::HttpFilterNames::get().v1_converter_.getV2Name(
+        json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string deprecated_config = "{\"deprecated_v1\": true, \"value\": " +

@@ -13,7 +13,9 @@
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Gzip {
 
 /**
  * Configuration for the gzip filter.
@@ -74,14 +76,14 @@ public:
   void onDestroy() override{};
 
   // Http::StreamDecoderFilter
-  FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return FilterDataStatus::Continue;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
   }
-  FilterTrailersStatus decodeTrailers(HeaderMap&) override {
-    return FilterTrailersStatus::Continue;
+  Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+    return Http::FilterTrailersStatus::Continue;
   }
-  void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
   };
 
@@ -89,12 +91,12 @@ public:
   Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override;
-  FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
-  FilterTrailersStatus encodeTrailers(HeaderMap&) override {
-    return FilterTrailersStatus::Continue;
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
+    return Http::FilterTrailersStatus::Continue;
   }
-  void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) override {
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
 
@@ -103,24 +105,26 @@ private:
   // the logic in these private member functions would be availale in another class.
   friend class GzipFilterTest;
 
-  bool hasCacheControlNoTransform(HeaderMap& headers) const;
-  bool isAcceptEncodingAllowed(HeaderMap& headers) const;
-  bool isContentTypeAllowed(HeaderMap& headers) const;
-  bool isEtagAllowed(HeaderMap& headers) const;
-  bool isMinimumContentLength(HeaderMap& headers) const;
-  bool isTransferEncodingAllowed(HeaderMap& headers) const;
+  bool hasCacheControlNoTransform(Http::HeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(Http::HeaderMap& headers) const;
+  bool isContentTypeAllowed(Http::HeaderMap& headers) const;
+  bool isEtagAllowed(Http::HeaderMap& headers) const;
+  bool isMinimumContentLength(Http::HeaderMap& headers) const;
+  bool isTransferEncodingAllowed(Http::HeaderMap& headers) const;
 
-  void sanitizeEtagHeader(HeaderMap& headers);
-  void insertVaryHeader(HeaderMap& headers);
+  void sanitizeEtagHeader(Http::HeaderMap& headers);
+  void insertVaryHeader(Http::HeaderMap& headers);
 
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
   Compressor::ZlibCompressorImpl compressor_;
   GzipFilterConfigSharedPtr config_;
 
-  StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
-  StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
 };
 
-} // namespace Http
+} // namespace Gzip
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy

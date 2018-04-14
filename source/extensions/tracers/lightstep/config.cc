@@ -3,10 +3,10 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
+#include "extensions/tracers/well_known_names.h"
 
 #include "lightstep/tracer.h"
 
@@ -31,7 +31,7 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracer(const Json::Obje
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver), server.localInfo());
 }
 
-std::string LightstepTracerFactory::name() { return Config::TracerNames::get().LIGHTSTEP; }
+std::string LightstepTracerFactory::name() { return TracerNames::get().LIGHTSTEP; }
 
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.

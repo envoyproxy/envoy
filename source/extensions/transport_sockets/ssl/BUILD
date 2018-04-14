@@ -17,7 +17,7 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/ssl:ssl_socket_lib",
+        "//source/extensions/transport_sockets:well_known_names",
     ],
 )

@@ -1,4 +1,6 @@
 licenses(["notice"])  # Apache 2
+# HTTP L7 filter that injects faults into the request flow
+# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/http_filters/fault_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -32,19 +34,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "gzip_filter_lib",
-    srcs = ["gzip_filter.cc"],
-    hdrs = ["gzip_filter.h"],
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/json:json_object_interface",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/compressor:compressor_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_validator_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/common/config:filter_json_lib",
+        "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/fault:fault_filter_lib",
     ],
 )

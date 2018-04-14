@@ -21,7 +21,6 @@ envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
     deps = [
-        "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",

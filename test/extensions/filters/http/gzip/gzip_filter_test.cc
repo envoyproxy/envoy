@@ -1,14 +1,17 @@
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
-#include "common/http/filter/gzip_filter.h"
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/gzip/gzip_filter.h"
 
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace Http {
+namespace Extensions {
+namespace HttpFilters {
+namespace Gzip {
 
 class GzipFilterTest : public testing::Test {
 protected:
@@ -20,27 +23,29 @@ protected:
   }
 
   // GzipFilter private member functions
-  void sanitizeEtagHeader(HeaderMap& headers) { filter_->sanitizeEtagHeader(headers); }
+  void sanitizeEtagHeader(Http::HeaderMap& headers) { filter_->sanitizeEtagHeader(headers); }
 
-  void insertVaryHeader(HeaderMap& headers) { filter_->insertVaryHeader(headers); }
+  void insertVaryHeader(Http::HeaderMap& headers) { filter_->insertVaryHeader(headers); }
 
-  bool isContentTypeAllowed(HeaderMap& headers) { return filter_->isContentTypeAllowed(headers); }
+  bool isContentTypeAllowed(Http::HeaderMap& headers) {
+    return filter_->isContentTypeAllowed(headers);
+  }
 
-  bool isEtagAllowed(HeaderMap& headers) { return filter_->isEtagAllowed(headers); }
+  bool isEtagAllowed(Http::HeaderMap& headers) { return filter_->isEtagAllowed(headers); }
 
-  bool hasCacheControlNoTransform(HeaderMap& headers) {
+  bool hasCacheControlNoTransform(Http::HeaderMap& headers) {
     return filter_->hasCacheControlNoTransform(headers);
   }
 
-  bool isAcceptEncodingAllowed(HeaderMap& headers) {
+  bool isAcceptEncodingAllowed(Http::HeaderMap& headers) {
     return filter_->isAcceptEncodingAllowed(headers);
   }
 
-  bool isMinimumContentLength(HeaderMap& headers) {
+  bool isMinimumContentLength(Http::HeaderMap& headers) {
     return filter_->isMinimumContentLength(headers);
   }
 
-  bool isTransferEncodingAllowed(HeaderMap& headers) {
+  bool isTransferEncodingAllowed(Http::HeaderMap& headers) {
     return filter_->isTransferEncodingAllowed(headers);
   }
 
@@ -71,19 +76,19 @@ protected:
   }
 
   void doRequest(Http::TestHeaderMapImpl&& headers, bool end_stream) {
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, end_stream));
   }
 
   void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
     ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
-    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data_, false));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data_, false));
     drainBuffer();
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
     verifyCompressedData();
   }
 
@@ -92,12 +97,13 @@ protected:
     ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     Http::TestHeaderMapImpl continue_headers;
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(continue_headers));
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+              filter_->encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
     Http::TestHeaderMapImpl trailers;
-    EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
   }
 
   GzipFilterConfigSharedPtr config_;
@@ -127,24 +133,24 @@ TEST_F(GzipFilterTest, DefaultConfigValues) {
 TEST_F(GzipFilterTest, AcceptanceGzipEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   Http::TestHeaderMapImpl trailers;
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   doResponseCompression({{":method", "get"}, {"content-length", "256"}});
 }
 
 // Verifies isAcceptEncodingAllowed function.
 TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
   {
-    TestHeaderMapImpl headers = {{"cache-control", "no-cache"}};
+    Http::TestHeaderMapImpl headers = {{"cache-control", "no-cache"}};
     EXPECT_FALSE(hasCacheControlNoTransform(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"cache-control", "no-transform"}};
+    Http::TestHeaderMapImpl headers = {{"cache-control", "no-transform"}};
     EXPECT_TRUE(hasCacheControlNoTransform(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"cache-control", "No-Transform"}};
+    Http::TestHeaderMapImpl headers = {{"cache-control", "No-Transform"}};
     EXPECT_TRUE(hasCacheControlNoTransform(headers));
   }
 }
@@ -167,88 +173,88 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransformCompression) {
 // Verifies isAcceptEncodingAllowed function.
 TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=1.0, *;q=0.5"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=1.0, *;q=0.5"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {
+    Http::TestHeaderMapImpl headers = {
         {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate,gzip;q=1.0,*;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate,gzip;q=1.0,*;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=0.2, br;q=1"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=0.2, br;q=1"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "*"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "*"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "*;q=1"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "*;q=1"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0,*;q=1"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0,*;q=1"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0.5, *;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0.5, *;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0, *;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0, *;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=1"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=1"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;Q=.5, br"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;Q=.5, br"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "identity;Q=0"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;Q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
   }
 }
@@ -268,33 +274,33 @@ TEST_F(GzipFilterTest, AcceptEncodingCompression) {
 // Verifies isMinimumContentLength function.
 TEST_F(GzipFilterTest, isMinimumContentLength) {
   {
-    TestHeaderMapImpl headers = {{"content-length", "31"}};
+    Http::TestHeaderMapImpl headers = {{"content-length", "31"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-length", "29"}};
+    Http::TestHeaderMapImpl headers = {{"content-length", "29"}};
     EXPECT_FALSE(isMinimumContentLength(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
 
   setUpFilter(R"EOF({"content_length": 500})EOF");
   {
-    TestHeaderMapImpl headers = {{"content-length", "501"}};
+    Http::TestHeaderMapImpl headers = {{"content-length", "501"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
     EXPECT_TRUE(isMinimumContentLength(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-length", "499"}};
+    Http::TestHeaderMapImpl headers = {{"content-length", "499"}};
     EXPECT_FALSE(isMinimumContentLength(headers));
   }
 }
@@ -315,51 +321,51 @@ TEST_F(GzipFilterTest, ContentLengthCompression) {
 // Verifies isContentTypeAllowed function.
 TEST_F(GzipFilterTest, isContentTypeAllowed) {
   {
-    TestHeaderMapImpl headers = {{"content-type", "text/html"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "text/html"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "text/xml"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "text/xml"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "text/plain"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "text/plain"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "application/javascript"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "application/javascript"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "image/svg+xml"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "image/svg+xml"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "application/json;charset=utf-8"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "application/json;charset=utf-8"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "application/json"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "application/json"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "application/xhtml+xml"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "application/xhtml+xml"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "Application/XHTML+XML"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "Application/XHTML+XML"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
     EXPECT_FALSE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 
@@ -374,23 +380,23 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
   )EOF");
 
   {
-    TestHeaderMapImpl headers = {{"content-type", "xyz/svg+xml"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "xyz/svg+xml"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "xyz/false"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "xyz/false"}};
     EXPECT_FALSE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "image/jpeg"}};
     EXPECT_FALSE(isContentTypeAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"content-type", "test/insensitive"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "test/insensitive"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 }
@@ -427,18 +433,18 @@ TEST_F(GzipFilterTest, ContentTypeCompression) {
 TEST_F(GzipFilterTest, sanitizeEtagHeader) {
   {
     std::string etag_header{R"EOF(W/"686897696a7c876b7e")EOF"};
-    TestHeaderMapImpl headers = {{"etag", etag_header}};
+    Http::TestHeaderMapImpl headers = {{"etag", etag_header}};
     sanitizeEtagHeader(headers);
     EXPECT_EQ(etag_header, headers.get_("etag"));
   }
   {
     std::string etag_header{R"EOF(w/"686897696a7c876b7e")EOF"};
-    TestHeaderMapImpl headers = {{"etag", etag_header}};
+    Http::TestHeaderMapImpl headers = {{"etag", etag_header}};
     sanitizeEtagHeader(headers);
     EXPECT_EQ(etag_header, headers.get_("etag"));
   }
   {
-    TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
+    Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     sanitizeEtagHeader(headers);
     EXPECT_FALSE(headers.has("etag"));
   }
@@ -447,29 +453,29 @@ TEST_F(GzipFilterTest, sanitizeEtagHeader) {
 // Verifies isEtagAllowed function.
 TEST_F(GzipFilterTest, isEtagAllowed) {
   {
-    TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
+    Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_TRUE(isEtagAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
+    Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_TRUE(isEtagAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
   }
 
   setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
   {
-    TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
+    Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_FALSE(isEtagAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
+    Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_FALSE(isEtagAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
   }
 }
@@ -485,10 +491,10 @@ TEST_F(GzipFilterTest, EtagNoCompression) {
 // Verifies that compression is skipped when etag header is NOT allowed.
 TEST_F(GzipFilterTest, EtagCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{
+  Http::TestHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"etag", "686897696a7c876b7e"}};
   feedBuffer(256);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_FALSE(headers.has("etag"));
   EXPECT_EQ("gzip", headers.get_("content-encoding"));
 }
@@ -496,35 +502,35 @@ TEST_F(GzipFilterTest, EtagCompression) {
 // Verifies isTransferEncodingAllowed function.
 TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "chunked"}};
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "Chunked"}};
     EXPECT_TRUE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "deflate"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "deflate"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "Deflate"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "Deflate"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "gzip"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "gzip"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", "gzip, chunked"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", "gzip, chunked"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
 }
@@ -547,49 +553,49 @@ TEST_F(GzipFilterTest, AcceptanceTransferEncodingGzip) {
 // Content-Encoding: upstream response is already encoded.
 TEST_F(GzipFilterTest, ContentEncodingAlreadyEncoded) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl response_headers{
+  Http::TestHeaderMapImpl response_headers{
       {":method", "get"}, {"content-length", "256"}, {"content-encoding", "deflate, gzip"}};
   feedBuffer(256);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_TRUE(response_headers.has("content-length"));
   EXPECT_FALSE(response_headers.has("transfer-encoding"));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
 }
 
 // No compression when upstream response is empty.
 TEST_F(GzipFilterTest, EmptyResponse) {
 
   Http::TestHeaderMapImpl headers{{":method", "get"}, {":status", "204"}};
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, true));
   EXPECT_EQ("", headers.get_("content-length"));
   EXPECT_EQ("", headers.get_("content-encoding"));
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(data_, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
 }
 
 // Verifies insertVaryHeader function.
 TEST_F(GzipFilterTest, insertVaryHeader) {
   {
-    TestHeaderMapImpl headers = {};
+    Http::TestHeaderMapImpl headers = {};
     insertVaryHeader(headers);
     EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
   }
   {
-    TestHeaderMapImpl headers = {{"vary", "Cookie"}};
+    Http::TestHeaderMapImpl headers = {{"vary", "Cookie"}};
     insertVaryHeader(headers);
     EXPECT_EQ("Cookie, Accept-Encoding", headers.get_("vary"));
   }
   {
-    TestHeaderMapImpl headers = {{"vary", "accept-encoding"}};
+    Http::TestHeaderMapImpl headers = {{"vary", "accept-encoding"}};
     insertVaryHeader(headers);
     EXPECT_EQ("accept-encoding, Accept-Encoding", headers.get_("vary"));
   }
   {
-    TestHeaderMapImpl headers = {{"vary", "Accept-Encoding, Cookie"}};
+    Http::TestHeaderMapImpl headers = {{"vary", "Accept-Encoding, Cookie"}};
     insertVaryHeader(headers);
     EXPECT_EQ("Accept-Encoding, Cookie", headers.get_("vary"));
   }
   {
-    TestHeaderMapImpl headers = {{"vary", "Accept-Encoding"}};
+    Http::TestHeaderMapImpl headers = {{"vary", "Accept-Encoding"}};
     insertVaryHeader(headers);
     EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
   }
@@ -598,9 +604,9 @@ TEST_F(GzipFilterTest, insertVaryHeader) {
 // Filter should set Vary header value with `accept-encoding`.
 TEST_F(GzipFilterTest, NoVaryHeader) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  Http::TestHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
   feedBuffer(256);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
 }
@@ -608,10 +614,10 @@ TEST_F(GzipFilterTest, NoVaryHeader) {
 // Filter should set Vary header value with `accept-encoding` and preserve other values.
 TEST_F(GzipFilterTest, VaryOtherValues) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{
+  Http::TestHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "User-Agent, Cookie"}};
   feedBuffer(256);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("User-Agent, Cookie, Accept-Encoding", headers.get_("vary"));
 }
@@ -619,10 +625,10 @@ TEST_F(GzipFilterTest, VaryOtherValues) {
 // Vary header should have only one `accept-encoding`value.
 TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
-  TestHeaderMapImpl headers{
+  Http::TestHeaderMapImpl headers{
       {":method", "get"}, {"content-length", "256"}, {"vary", "accept-encoding"}};
   feedBuffer(256);
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_TRUE(headers.has("vary"));
   EXPECT_EQ("accept-encoding, Accept-Encoding", headers.get_("vary"));
 }
@@ -630,19 +636,21 @@ TEST_F(GzipFilterTest, VaryAlreadyHasAcceptEncoding) {
 // Verify removeAcceptEncoding header.
 TEST_F(GzipFilterTest, RemoveAcceptEncodingHeader) {
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     setUpFilter(R"EOF({"remove_accept_encoding_header": true})EOF");
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
   {
-    TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
+    Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     setUpFilter("{}");
-    EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, gzip, br", headers.get_("accept-encoding"));
   }
 }
 
-} // namespace Http
+} // namespace Gzip
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
