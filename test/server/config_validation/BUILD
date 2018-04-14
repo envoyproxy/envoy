@@ -45,6 +45,7 @@ envoy_cc_test(
         "//test/config_test:example_configs_test_setup.sh",
     ],
     deps = [
+        "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//source/server/config_validation:server_lib",

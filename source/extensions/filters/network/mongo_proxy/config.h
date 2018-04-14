@@ -5,7 +5,7 @@
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +31,7 @@ public:
         new envoy::config::filter::network::mongo_proxy::v2::MongoProxy()};
   }
 
-  std::string name() override { return Config::NetworkFilterNames::get().MONGO_PROXY; }
+  std::string name() override { return NetworkFilterNames::get().MONGO_PROXY; }
 
 private:
   Server::Configuration::NetworkFilterFactoryCb

@@ -16,7 +16,7 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
         setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
                           &should_transparent, sizeof(should_transparent));
     if (error != 0) {
-      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
+      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(errno));
       return false;
     }
   }
@@ -28,7 +28,7 @@ bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) cons
           setIpSocketOption(socket, ENVOY_SOCKET_IP_FREEBIND, ENVOY_SOCKET_IPV6_FREEBIND,
                             &should_freebind, sizeof(should_freebind));
       if (error != 0) {
-        ENVOY_LOG(warn, "Setting IP_FREEBIND on listener socket failed: {}", strerror(error));
+        ENVOY_LOG(warn, "Setting IP_FREEBIND on listener socket failed: {}", strerror(errno));
         return false;
       }
     }
@@ -69,7 +69,8 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
   if (ip->version() == Network::Address::IpVersion::v4) {
     if (!ipv4_optname) {
       ENVOY_LOG(warn, "Unsupported IPv4 socket option");
-      return ENOTSUP;
+      errno = ENOTSUP;
+      return -1;
     }
     return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
   }
@@ -84,7 +85,8 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
     return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
   }
   ENVOY_LOG(warn, "Unsupported IPv6 socket option");
-  return ENOTSUP;
+  errno = ENOTSUP;
+  return -1;
 }
 
 } // namespace Network

@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:logger_lib",
-        "//source/common/config:well_known_names",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
@@ -51,6 +50,6 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
+        "//source/extensions/filters/network:well_known_names",
     ],
 )

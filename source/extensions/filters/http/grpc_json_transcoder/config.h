@@ -3,7 +3,7 @@
 #include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +28,7 @@ public:
         new envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
+  std::string name() override { return HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
 
 private:
   Server::Configuration::HttpFilterFactoryCb

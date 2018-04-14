@@ -17,10 +17,12 @@ envoy_cc_mock(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/network:filter_interface",
+        "//include/envoy/network:resolver_interface",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/event:event_mocks",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

@@ -39,6 +39,14 @@ public:
       context_.localInfo(), context_.threadLocal(), context_.admin()};
 };
 
+TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
+  EXPECT_THROW(
+      HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
+          context_),
+      ProtoValidationException);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
   const std::string json_string = R"EOF(
   {

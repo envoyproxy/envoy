@@ -16,7 +16,6 @@ envoy_extension_cc_test(
     srcs = ["grpc_metrics_service_impl_test.cc"],
     extension_name = "envoy.stat_sinks.metrics_service",
     deps = [
-        "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",

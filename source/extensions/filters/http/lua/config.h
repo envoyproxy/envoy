@@ -5,7 +5,7 @@
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +30,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::lua::v2::Lua()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().LUA; }
+  std::string name() override { return HttpFilterNames::get().LUA; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb
