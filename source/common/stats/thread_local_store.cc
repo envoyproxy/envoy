@@ -32,7 +32,7 @@ std::list<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
       if (names.insert(counter.first).second) {
         ret.push_back(counter.second);
       } else {
-        ENVOY_LOG(warn, "duplicate counter '{}.{}'", scope->prefix_, counter.second);
+        ENVOY_LOG(warn, "duplicate counter {}.{}", scope->prefix_, counter.first);
       }
     }
   }
@@ -57,7 +57,7 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
       if (names.insert(gauge.first).second) {
         ret.push_back(gauge.second);
       } else {
-        ENVOY_LOG(warn, "duplicate guage '{}.{}'", scope->prefix_, gauge.second);
+        ENVOY_LOG(warn, "duplicate guage {}.{}", scope->prefix_, gauge.first);
       }
     }
   }
@@ -79,7 +79,7 @@ std::list<HistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
       } else {
-        ENVOY_LOG(warn, "duplicate histogram '{}.{}'", scope->prefix_, hist_name);
+        ENVOY_LOG(warn, "duplicate histogram {}.{}", scope->prefix_, hist_name);
       }
     }
   }
