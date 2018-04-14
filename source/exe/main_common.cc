@@ -15,6 +15,7 @@
 #include "server/options_impl.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
+#include "server/terminate_handler.h"
 #include "server/test_hooks.h"
 
 #ifdef ENVOY_HOT_RESTART
@@ -42,6 +43,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
+  Envoy::Server::logOnTerminate();
 
   Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
