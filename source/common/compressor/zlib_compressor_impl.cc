@@ -88,10 +88,5 @@ void ZlibCompressorImpl::updateOutput(Buffer::Instance& output_buffer) {
   zstream_ptr_->next_out = chunk_char_ptr_.get();
 }
 
-void ZlibCompressorImpl::reset() {
-  const bool result = deflateReset(zstream_ptr_.get());
-  RELEASE_ASSERT(result == Z_OK);
-}
-
 } // namespace Compressor
 } // namespace Envoy

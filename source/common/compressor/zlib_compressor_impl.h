@@ -72,13 +72,6 @@ public:
    */
   uint64_t checksum();
 
-  /**
-   * This function is equivalent to deflateEnd followed by deflateInit, but does not free and
-   * reallocate the internal compression state. The stream will leave the compression level and any
-   * other attributes that may have been set unchanged.
-   */
-  void reset();
-
   // Compressor
   void compress(Buffer::Instance& buffer, bool trailer) override;
 
