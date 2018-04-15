@@ -296,7 +296,7 @@ std::string HistogramStatisticsImpl::summary() const {
  */
 void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   for (size_t i = 0; i < computed_quantiles_.size(); ++i) {
-   computed_quantiles_[i] = 0;
+    computed_quantiles_[i] = 0;
   }
   hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
                        computed_quantiles_.data());
