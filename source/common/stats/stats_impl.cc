@@ -295,7 +295,9 @@ std::string HistogramStatisticsImpl::summary() const {
  * Clears the old computed values and refreshes it with values computed from passed histogram.
  */
 void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
-  computed_quantiles_.clear();
+  for (size_t i = 0; i < computed_quantiles_.size(); ++i) {
+   computed_quantiles_[i] = 0;
+  }
   hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
                        computed_quantiles_.data());
 }
