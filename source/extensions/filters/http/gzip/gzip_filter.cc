@@ -136,7 +136,6 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
   const uint64_t n_data = data.length();
   if (n_data > 0) {
     compressor_.compress(data, compressed_data_);
-  } else {
     compressor_.flush(compressed_data_);
   }
 
