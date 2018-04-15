@@ -13,11 +13,11 @@ public:
   virtual ~Compressor() {}
 
   /**
-   * Compresses data from one buffer into another buffer.
-   * @param input_buffer supplies the buffer with data to be compressed.
-   * @param output_buffer supplies the buffer to output compressed data.
+   * Compresses data buffer.
+   * @param buffer supplies the reference to data to be compressed.
+   * @param trailer supplies the indication to write trailer at the end of compressed buffer.
    */
-  virtual void compress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) PURE;
+  virtual void compress(Buffer::Instance& buffer, bool trailer) PURE;
 };
 
 } // namespace Compressor

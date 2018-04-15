@@ -129,27 +129,10 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
 }
 
 Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skip_compression_) {
-    return Http::FilterDataStatus::Continue;
+  if (!skip_compression_) {
+    compressor_.compress(data, end_stream);
   }
-
-  const uint64_t n_data = data.length();
-  if (n_data > 0) {
-    compressor_.compress(data, compressed_data_);
-    compressor_.flush(compressed_data_);
-  }
-
-  if (end_stream) {
-    compressor_.finish(compressed_data_);
-  }
-
-  if (compressed_data_.length() > 0) {
-    data.drain(n_data);
-    data.move(compressed_data_);
-    return Http::FilterDataStatus::Continue;
-  }
-
-  return Http::FilterDataStatus::StopIterationNoBuffer;
+  return Http::FilterDataStatus::Continue;
 }
 
 bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
