@@ -11,9 +11,10 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
-#include "common/config/well_known_names.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
+
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,7 +41,7 @@ public:
         envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
         new envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager());
   }
-  std::string name() override { return Config::NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
+  std::string name() override { return NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
   Server::Configuration::NetworkFilterFactoryCb createFilter(

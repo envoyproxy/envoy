@@ -3,9 +3,9 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "extensions/tracers/well_known_names.h"
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 namespace Envoy {
@@ -26,7 +26,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracer(const Json::Object&
       new Tracing::HttpTracerImpl(std::move(zipkin_driver), server.localInfo()));
 }
 
-std::string ZipkinTracerFactory::name() { return Config::TracerNames::get().ZIPKIN; }
+std::string ZipkinTracerFactory::name() { return TracerNames::get().ZIPKIN; }
 
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.

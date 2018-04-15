@@ -52,22 +52,21 @@ public:
     case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
       const envoy::api::v2::core::ApiConfigSource& api_config_source = config.api_config_source();
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
-      const std::string& cluster_name = api_config_source.cluster_names()[0];
       switch (api_config_source.api_type()) {
       case envoy::api::v2::core::ApiConfigSource::REST_LEGACY:
         result.reset(rest_legacy_constructor());
         break;
       case envoy::api::v2::core::ApiConfigSource::REST:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
-            node, cm, cluster_name, dispatcher, random,
+            node, cm, api_config_source.cluster_names()[0], dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC: {
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             node,
-            Config::Utility::factoryForApiConfigSource(cm.grpcAsyncClientManager(),
-                                                       config.api_config_source(), scope)
+            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
+                                                           config.api_config_source(), scope)
                 ->create(),
             dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
             stats));
