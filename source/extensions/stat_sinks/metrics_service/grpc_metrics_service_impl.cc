@@ -80,7 +80,7 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(value);
 }
-void MetricsServiceSink::flushHistogram(const Stats::Histogram& histogram) {
+void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   metrics_family->set_name(histogram.name());

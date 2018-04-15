@@ -83,6 +83,10 @@ public:
   std::vector<uint64_t> h1_cumulative_values, h2_cumulative_values, h1_interval_values,
       h2_interval_values;
 
+  /**
+   * Validates taht Histogram merge happens as desired and returns the processed histogram count
+   * that can be asserted later.
+   */
   int validateMerge() {
 
     std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
@@ -90,7 +94,7 @@ public:
 
     EXPECT_TRUE(*merge_called);
 
-    std::list<HistogramSharedPtr> histogram_list = store_->histograms();
+    std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
     histogram_t* hist1_cumulative = hist_alloc();
     for (uint64_t value : h1_cumulative_values) {
@@ -117,8 +121,8 @@ public:
     HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
     HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
 
-    for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
-      if (histogram->name().find("h1") != std::string::npos) {
+    for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
+      if (histogram->name() == "h1") {
         EXPECT_EQ(histogram->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
         EXPECT_EQ(histogram->intervalStatistics().summary(), h1_interval_statistics.summary());
       } else {
@@ -172,7 +176,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
   Histogram& h1 = store_->histogram("h1");
-  // EXPECT_EQ(&h1, &store_->histogram("h1"));
+
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -278,6 +282,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicSingleHistogramMerge) {
 
   EXPECT_EQ(1, validateMerge());
 
+  // Validate the summary format is as expected.
+  std::string expected_summary = "P0: 0, P25: 14, P50: 44, P75: 420, P90: 3220, P95: 3260, P99: "
+                                 "3292, P99.9: 3299.2, P100: 3300";
+  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
+
   store_->shutdownThreading();
   tls_.shutdownThread();
 
@@ -382,10 +391,10 @@ TEST_F(StatsThreadLocalStoreTest, BasicHistogramUsed) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
   h1.recordValue(1);
 
-  std::list<HistogramSharedPtr> histogram_list = store_->histograms();
+  std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
-  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
-    if (histogram->name().find("h1") != std::string::npos) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name() == "h1") {
       EXPECT_TRUE(histogram->used());
     } else {
       EXPECT_FALSE(histogram->used());
@@ -395,7 +404,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicHistogramUsed) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
   h2.recordValue(2);
 
-  for (const Stats::HistogramSharedPtr& histogram : histogram_list) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
     EXPECT_TRUE(histogram->used());
   }
 

@@ -273,6 +273,9 @@ void RawStatData::initialize(absl::string_view key) {
   name_[xfer_size] = '\0';
 }
 
+const std::vector<double> HistogramStatisticsImpl::supported_quantiles_ = {
+    0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
     : computed_quantiles_(supported_quantiles_.size(), 0.0) {
   hist_approx_quantile(histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),

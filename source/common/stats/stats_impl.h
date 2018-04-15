@@ -18,6 +18,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/non_copyable.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -364,7 +365,7 @@ private:
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
-class HistogramStatisticsImpl : public HistogramStatistics {
+class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
 public:
   HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
   /**
@@ -374,9 +375,6 @@ public:
    */
   HistogramStatisticsImpl(const histogram_t* histogram_ptr);
 
-  HistogramStatisticsImpl(const HistogramStatisticsImpl&) = delete;
-  HistogramStatisticsImpl& operator=(HistogramStatisticsImpl const&) = delete;
-
   std::string summary() const override;
   const std::vector<double>& supportedQuantiles() const override { return supported_quantiles_; }
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
@@ -384,7 +382,7 @@ public:
   void refresh(const histogram_t* new_histogram_ptr);
 
 private:
-  const std::vector<double> supported_quantiles_ = {0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  static const std::vector<double> supported_quantiles_;
   std::vector<double> computed_quantiles_;
 };
 
@@ -400,26 +398,11 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
-  // TODO(ramaraochavali): split the Histogram interface in to two - parent and tls. Currently the
-  // methods related to the parent histogram like merge and thread local histogram are mixed
-  // together in single interface. It would be ideal to separate them.
-  void merge() override { NOT_IMPLEMENTED; }
-
   bool used() const override { return true; }
 
-  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
-
-  const HistogramStatistics& cumulativeStatistics() const override {
-    return cumulative_statistics_;
-  }
-
-  // TODO(ramaraochavali): Make this private.
+private:
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
-
-private:
-  HistogramStatisticsImpl interval_statistics_;
-  HistogramStatisticsImpl cumulative_statistics_;
 };
 
 /**
@@ -499,7 +482,7 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
   std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
-  std::list<HistogramSharedPtr> histograms() const override { return histograms_.toList(); }
+  std::list<ParentHistogramSharedPtr> histograms() const override { return parent_histograms_; }
 
 private:
   struct ScopeImpl : public Scope {
@@ -525,6 +508,7 @@ private:
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
   IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
+  std::list<ParentHistogramSharedPtr> parent_histograms_;
 };
 
 } // namespace Stats

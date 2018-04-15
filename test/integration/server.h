@@ -176,7 +176,7 @@ public:
     return store_.gauges();
   }
 
-  std::list<HistogramSharedPtr> histograms() const override {
+  std::list<ParentHistogramSharedPtr> histograms() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.histograms();
   }

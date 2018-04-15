@@ -114,7 +114,7 @@ public:
 
   void flushCounter(const Stats::Counter& counter, uint64_t) override;
   void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
-  void flushHistogram(const Stats::Histogram& histogram) override;
+  void flushHistogram(const Stats::ParentHistogram& histogram) override;
 
   void endFlush() override {
     grpc_metrics_streamer_->send(message_);

@@ -403,8 +403,8 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     all_stats.emplace(gauge->name(), gauge->value());
   }
-
-  for (const Stats::HistogramSharedPtr& histogram : server_.stats().histograms()) {
+  const std::list<Stats::ParentHistogramSharedPtr>& histograms = server_.stats().histograms();
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
     all_histograms.emplace(histogram->name(),
                            fmt::format("\n\t Interval:   {}\n\t Cumulative: {}",
                                        histogram->intervalStatistics().summary(),
@@ -425,7 +425,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_key == "format" && format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats));
+      response.add(AdminImpl::statsAsJson(all_stats, histograms));
     } else if (format_key == "format" && format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response);
     } else {
@@ -493,7 +493,9 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
+std::string
+AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                       const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -509,6 +511,38 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
     stat_obj.AddMember("value", stat_value, allocator);
     stats_array.PushBack(stat_obj, allocator);
   }
+
+  for (Stats::ParentHistogramSharedPtr histogram : all_histograms) {
+    Value histogram_obj;
+    histogram_obj.SetObject();
+    Value histogram_name;
+    histogram_name.SetString(histogram->name().c_str(), allocator);
+    histogram_obj.AddMember("name", histogram_name, allocator);
+
+    rapidjson::Value quantile_array(rapidjson::kArrayType);
+
+    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      Value quantile_obj;
+      quantile_obj.SetObject();
+      Value quantile_type;
+      quantile_type.SetDouble(histogram->intervalStatistics().supportedQuantiles()[i] * 100);
+      quantile_obj.AddMember("quantile", quantile_type, allocator);
+      Value interval_value;
+      if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
+        interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
+      }
+      quantile_obj.AddMember("interval_value", interval_value, allocator);
+      Value cumulative_value;
+      if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
+        cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
+      }
+      quantile_obj.AddMember("cumulative_value", cumulative_value, allocator);
+      quantile_array.PushBack(quantile_obj, allocator);
+    }
+    histogram_obj.AddMember("quantiles", quantile_array, allocator);
+    stats_array.PushBack(histogram_obj, allocator);
+  }
+
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
   rapidjson::PrettyWriter<StringBuffer> writer(strbuf);

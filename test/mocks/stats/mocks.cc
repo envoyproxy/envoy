@@ -34,10 +34,18 @@ MockHistogram::MockHistogram() {
   }));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
+}
+
+MockHistogram::~MockHistogram() {}
+
+MockParentHistogram::MockParentHistogram() {
+  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
 }
-MockHistogram::~MockHistogram() {}
+
+MockParentHistogram::~MockParentHistogram() {}
 
 MockSink::MockSink() {}
 MockSink::~MockSink() {}
