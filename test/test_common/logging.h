@@ -130,7 +130,7 @@ typedef std::vector<StringPair> ExpectedLogMessages;
     }                                                                                              \
   } while (false)
 
-// Validates that when stmt is executed, exactly one log message containing substr will be emitted.
+// Validates that when stmt is executed, the supplied substring matches at least one log message.
 // Failure message e.g.,
 //
 // Logs:
