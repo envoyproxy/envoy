@@ -333,7 +333,6 @@ void ParentHistogramImpl::merge() {
     for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
       tls_histogram->merge(interval_histogram_);
     }
-    merge_lock_.unlock();
     histogram_t* hist_array[1];
     hist_array[0] = interval_histogram_;
     hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
