@@ -26,7 +26,7 @@ The documentation can be built locally in the root of https://github.com/envoypr
 docs/build.sh
 ```
 
-Or to use a hermetic docker container:
+Or to use a hermetic Docker container:
 
 ```
 ./ci/run_envoy_docker.sh './ci/do_ci.sh docs'
