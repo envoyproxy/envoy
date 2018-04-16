@@ -20,7 +20,6 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/stats:stats_lib",

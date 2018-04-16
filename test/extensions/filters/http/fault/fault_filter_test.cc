@@ -8,7 +8,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
-#include "common/config/well_known_names.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/stats/stats_impl.h"
@@ -756,10 +755,10 @@ void FaultFilterTest::TestPerFilterConfigFault(
     envoy::config::filter::http::fault::v2::HTTPFault* vhost_fault) {
 
   ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().ROUTER))
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
       .WillByDefault(Return(route_fault));
   ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().ROUTER))
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
       .WillByDefault(Return(vhost_fault));
 
   const std::string upstream_cluster("www1");
