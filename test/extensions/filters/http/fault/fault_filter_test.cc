@@ -105,7 +105,7 @@ public:
     }
     )EOF";
 
-  const std::string fault_with_target_cluster_json = R"EOF(
+  const std::string delay_with_upstream_cluster_json = R"EOF(
     {
       "delay" : {
         "type" : "fixed",
@@ -116,27 +116,21 @@ public:
     }
     )EOF";
 
-  const std::string v2_fault_in_route_metadata_json = R"EOF(
-    {
-      "delay" : {
-        "type" : "FIXED",
-        "percent" : 100,
-        "fixedDelay" : "5s"
-      },
-      "upstreamCluster" : "www1"
-    }
-    )EOF";
-
-  const std::string empty_listener_level_fault_json = R"EOF(
+  const std::string v2_empty_fault_config_json = R"EOF(
     {
     }
     )EOF";
 
-  void SetUpTest(const std::string json) {
+  envoy::config::filter::http::fault::v2::HTTPFault
+  convertJsonStrToProtoConfig(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::fault::v2::HTTPFault fault;
-
     Config::FilterJson::translateFaultFilter(*config, fault);
+    return fault;
+  }
+
+  void SetUpTest(const std::string json) {
+    envoy::config::filter::http::fault::v2::HTTPFault fault = convertJsonStrToProtoConfig(json);
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -148,7 +142,8 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
-  void TestRouteLevelFault(); // utility function
+  void TestPerFilterConfigFault(envoy::config::filter::http::fault::v2::HTTPFault* route_fault,
+                                envoy::config::filter::http::fault::v2::HTTPFault* vhost_fault);
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -670,7 +665,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
@@ -712,7 +707,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
@@ -735,7 +730,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
@@ -756,14 +751,16 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-void FaultFilterTest::TestRouteLevelFault() {
-  Envoy::ProtobufWkt::Struct route_level_fault;
-  MessageUtil::loadFromJson(v2_fault_in_route_metadata_json, route_level_fault);
-  envoy::api::v2::core::Metadata metadata;
-  (*metadata.mutable_filter_metadata())[Envoy::Config::HttpFilterNames::get().FAULT] =
-      route_level_fault;
+void FaultFilterTest::TestPerFilterConfigFault(
+    envoy::config::filter::http::fault::v2::HTTPFault* route_fault,
+    envoy::config::filter::http::fault::v2::HTTPFault* vhost_fault) {
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_, metadata()).WillOnce(ReturnRef(metadata));
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Envoy::Config::HttpFilterNames::get().FAULT))
+      .WillByDefault(Return(route_fault));
+  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+          perFilterConfig(Envoy::Config::HttpFilterNames::get().FAULT))
+      .WillByDefault(Return(vhost_fault));
 
   const std::string upstream_cluster("www1");
 
@@ -777,7 +774,7 @@ void FaultFilterTest::TestRouteLevelFault() {
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(5000UL));
 
-  SCOPED_TRACE("RouteLevelFault");
+  SCOPED_TRACE("PerFilterConfigFault");
   expectDelayTimer(5000UL);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
@@ -799,14 +796,34 @@ void FaultFilterTest::TestRouteLevelFault() {
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 
-TEST_F(FaultFilterTest, OnlyRouteLevelFault) {
-  SetUpTest(empty_listener_level_fault_json);
-  TestRouteLevelFault();
-}
+TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
-TEST_F(FaultFilterTest, RouteLevelFaultOverridesListenerLevelFault) {
-  SetUpTest(abort_only_json); // This is a valid listener level fault
-  TestRouteLevelFault();
+  envoy::config::filter::http::fault::v2::HTTPFault abort_fault =
+      convertJsonStrToProtoConfig(abort_only_json);
+  envoy::config::filter::http::fault::v2::HTTPFault delay_fault =
+      convertJsonStrToProtoConfig(delay_with_upstream_cluster_json);
+
+  // route-level fault overrides listener-level fault
+  {
+    SetUpTest(v2_empty_fault_config_json); // This is a valid listener level fault
+    TestPerFilterConfigFault(&delay_fault, nullptr);
+  }
+
+  // virtual-host-level fault overrides listener-level fault
+  {
+    config_->stats().aborts_injected_.reset();
+    config_->stats().delays_injected_.reset();
+    SetUpTest(v2_empty_fault_config_json);
+    TestPerFilterConfigFault(nullptr, &delay_fault);
+  }
+
+  // route-level fault overrides virtual-host-level fault
+  {
+    config_->stats().aborts_injected_.reset();
+    config_->stats().delays_injected_.reset();
+    SetUpTest(v2_empty_fault_config_json);
+    TestPerFilterConfigFault(&delay_fault, &abort_fault);
+  }
 }
 
 } // namespace Fault

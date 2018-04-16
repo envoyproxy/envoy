@@ -74,14 +74,20 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   // Its okay for the moment, since the only use case of faults with runtimes is
   // by folks using filter level configuration in the fault filter (mainly Lyft folks).
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
-    const auto metadata = callbacks_->route()->routeEntry()->metadata();
-    const auto filter_it =
-        metadata.filter_metadata().find(Envoy::Config::HttpFilterNames::get().FAULT);
-    if (filter_it != metadata.filter_metadata().end()) {
-      envoy::config::filter::http::fault::v2::HTTPFault proto_config;
-      MessageUtil::jsonConvert(filter_it->second, proto_config);
-      config_.reset(new FaultFilterConfig(proto_config, config_->runtime(), config_->statsPrefix(),
-                                          config_->scope()));
+    auto proto_config = callbacks_->route()->routeEntry()->perFilterConfig(
+        Envoy::Config::HttpFilterNames::get().FAULT);
+    if (!proto_config) {
+      // See if the virtual host has any fault filter config
+      proto_config = callbacks_->route()->routeEntry()->virtualHost().perFilterConfig(
+          Envoy::Config::HttpFilterNames::get().FAULT);
+    }
+
+    if (proto_config) {
+      const envoy::config::filter::http::fault::v2::HTTPFault per_filter_config =
+          dynamic_cast<const envoy::config::filter::http::fault::v2::HTTPFault&>(*proto_config);
+
+      config_.reset(new FaultFilterConfig(per_filter_config, config_->runtime(),
+                                          config_->statsPrefix(), config_->scope()));
     }
   }
 
