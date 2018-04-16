@@ -273,20 +273,23 @@ void RawStatData::initialize(absl::string_view key) {
   name_[xfer_size] = '\0';
 }
 
-const std::vector<double> HistogramStatisticsImpl::supported_quantiles_ = {
-    0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
-
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
-    : computed_quantiles_(supported_quantiles_.size(), 0.0) {
-  hist_approx_quantile(histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
+    : computed_quantiles_(supportedQuantiles().size(), 0.0) {
+  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
+}
+
+const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const { 
+  static const std::vector<double> supported_quantiles_ = {
+    0, 0.25, 0.5, 0.75, 0.90, 0.95, 0.99, 0.999, 1};
+  return supported_quantiles_; 
 }
 
 std::string HistogramStatisticsImpl::summary() const {
   std::vector<std::string> summary;
-  for (size_t i = 0; i < supported_quantiles_.size(); ++i) {
+  for (size_t i = 0; i < supportedQuantiles().size(); ++i) {
     summary.push_back(
-        fmt::format("P{}: {}", 100 * supported_quantiles_[i], computed_quantiles_[i]));
+        fmt::format("P{}: {}", 100 * supportedQuantiles()[i], computed_quantiles_[i]));
   }
   return absl::StrJoin(summary, ", ");
 }
@@ -295,10 +298,9 @@ std::string HistogramStatisticsImpl::summary() const {
  * Clears the old computed values and refreshes it with values computed from passed histogram.
  */
 void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
-  for (size_t i = 0; i < computed_quantiles_.size(); ++i) {
-    computed_quantiles_[i] = 0;
-  }
-  hist_approx_quantile(new_histogram_ptr, supported_quantiles_.data(), supported_quantiles_.size(),
+  std::fill(computed_quantiles_.begin(), computed_quantiles_.end(), 0.0);
+  ASSERT(supportedQuantiles().size() == computed_quantiles_.size());
+  hist_approx_quantile(new_histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
 }
 
