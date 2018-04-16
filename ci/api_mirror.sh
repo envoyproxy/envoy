@@ -42,7 +42,6 @@ then
     git -C "$CHECKOUT_DIR" add .
     git -C "$CHECKOUT_DIR" commit -m "$QUALIFIED_COMMIT_MSG"
   done
-  git worktree remove --force "$API_WORKING_DIR"
 
   echo "Pushing..."
   git -C "$CHECKOUT_DIR" push origin master
