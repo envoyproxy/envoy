@@ -23,10 +23,10 @@ jobs:
      working_directory: /source
      steps:
        - run: echo $CIRCLE_SHA1
-       - run: echo $CI_PULL_REQUEST
-       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CI_PULL_REQUEST/commits
+       - run: echo $CIRCLE_PR_NUMBER
+       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
        - run: sleep 30 # workaround GH sync issue
-       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CI_PULL_REQUEST/commits
+       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
    tsan:
