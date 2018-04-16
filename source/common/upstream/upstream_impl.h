@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -29,6 +30,7 @@
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/locality.h"
@@ -52,11 +54,17 @@ public:
  */
 class HostDescriptionImpl : virtual public HostDescription {
 public:
-  HostDescriptionImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-                      Network::Address::InstanceConstSharedPtr dest_address,
-                      const envoy::api::v2::core::Metadata& metadata,
-                      const envoy::api::v2::core::Locality& locality)
+  HostDescriptionImpl(
+      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address,
+      const envoy::api::v2::core::Metadata& metadata,
+      const envoy::api::v2::core::Locality& locality,
+      const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
+        health_check_address_(health_check_config.port_value() == 0
+                                  ? dest_address
+                                  : Network::Utility::getAddressWithPort(
+                                        *dest_address, health_check_config.port_value())),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
@@ -89,12 +97,16 @@ public:
   const HostStats& stats() const override { return stats_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+    return health_check_address_;
+  }
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
+  Network::Address::InstanceConstSharedPtr health_check_address_;
   const bool canary_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::core::Locality locality_;
@@ -114,8 +126,10 @@ public:
   HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
-           const envoy::api::v2::core::Locality& locality)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality), used_(true) {
+           const envoy::api::v2::core::Locality& locality,
+           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config),
+        used_(true) {
     weight(initial_weight);
   }
 
@@ -124,6 +138,7 @@ public:
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+  CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
   std::list<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }

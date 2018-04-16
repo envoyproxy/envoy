@@ -9,6 +9,8 @@
 #include "envoy/router/router.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/buffer/buffer_impl.h"
+
 // TODO(mattklein123): Common code reaching into extensions is not right. Sort this out when the
 // HTTP connection manager is moved.
 #include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
@@ -37,6 +39,9 @@ public:
     return route_entry_.metadataMatchCriteria();
   }
 
+  // Network::ReadFilter
+  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
+
 protected:
   // Extensions::NetworkFilters::TcpProxy::TcpProxyFilter
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
@@ -54,6 +59,9 @@ private:
   const Router::RouteEntry& route_entry_;
   WsHandlerCallbacks& ws_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
+  Buffer::OwnedImpl queued_data_;
+  bool queued_end_stream_{false};
+  bool is_connected_{false};
 };
 
 typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;

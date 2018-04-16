@@ -1,5 +1,5 @@
 licenses(["notice"])  # Apache 2
-# Stats sink for the gRPC metrics service: https://github.com/envoyproxy/data-plane-api/blob/master/envoy/service/metrics/v2/metrics_service.proto
+# Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
 
 load(
     "//bazel:envoy_build_system.bzl",

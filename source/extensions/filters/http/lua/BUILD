@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # Lua scripting L7 HTTP filter (https://www.lua.org/, http://luajit.org/)
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/http_filters/lua_filter.rst
+# Public docs: docs/root/configuration/http_filters/lua_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

@@ -142,6 +142,7 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf",
     ],
 )

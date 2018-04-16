@@ -111,6 +111,14 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   cd "${ENVOY_CI_DIR}"
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
   exit 0
+elif [[ "$1" == "bazel.api" ]]; then
+  setup_clang_toolchain
+  cd "${ENVOY_CI_DIR}"
+  echo "Building API..."
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
+  echo "Testing API..."
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/...
+  exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
   echo "bazel coverage build with tests..."
@@ -165,7 +173,8 @@ elif [[ "$1" == "check_format" ]]; then
   ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then
-  docs/publish.sh
+  echo "generating docs..."
+  docs/build.sh
   exit 0
 else
   echo "Invalid do_ci.sh target, see ci/README.md for valid targets."

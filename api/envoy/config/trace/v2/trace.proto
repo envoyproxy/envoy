@@ -1,0 +1,77 @@
+// [#protodoc-title: Tracing]
+// Tracing :ref:`architecture overview <arch_overview_tracing>`.
+
+syntax = "proto3";
+
+package envoy.config.trace.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/grpc_service.proto";
+
+import "google/protobuf/struct.proto";
+
+import "validate/validate.proto";
+
+// The tracing configuration specifies global
+// settings for the HTTP tracer used by Envoy. The configuration is defined by
+// the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` :ref:`tracing
+// <envoy_api_field_config.bootstrap.v2.Bootstrap.tracing>` field. Envoy may support other tracers
+// in the future, but right now the HTTP tracer is the only one supported.
+message Tracing {
+  message Http {
+    // The name of the HTTP trace driver to instantiate. The name must match a
+    // supported HTTP trace driver. *envoy.lightstep*, *envoy.zipkin*, and
+    // *envoy.dynamic.ot* are built-in trace drivers.
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+
+    // Trace driver specific configuration which depends on the driver being
+    // instantiated. See the :ref:`LightstepConfig
+    // <envoy_api_msg_config.trace.v2.LightstepConfig>`, :ref:`ZipkinConfig
+    // <envoy_api_msg_config.trace.v2.ZipkinConfig>`, and :ref:`DynamicOtConfig
+    // <envoy_api_msg_config.trace.v2.DynamicOtConfig>` trace drivers for examples.
+    google.protobuf.Struct config = 2;
+  }
+  // Provides configuration for the HTTP tracer.
+  Http http = 1;
+}
+
+// Configuration for the LightStep tracer.
+message LightstepConfig {
+  // The cluster manager cluster that hosts the LightStep collectors.
+  string collector_cluster = 1 [(validate.rules).string.min_bytes = 1];
+
+  // File containing the access token to the `LightStep
+  // <http://lightstep.com/>`_ API.
+  string access_token_file = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+message ZipkinConfig {
+  // The cluster manager cluster that hosts the Zipkin collectors. Note that the
+  // Zipkin cluster must be defined in the :ref:`Bootstrap static cluster
+  // resources <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.clusters>`.
+  string collector_cluster = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The API endpoint of the Zipkin service where the spans will be sent. When
+  // using a standard Zipkin installation, the API endpoint is typically
+  // /api/v1/spans, which is the default value.
+  string collector_endpoint = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+// DynamicOtConfig is used to dynamically load a tracer from a shared library
+// that implements the `OpenTracing dynamic loading API
+// <https://github.com/opentracing/opentracing-cpp>`_.
+message DynamicOtConfig {
+  // Dynamic library implementing the `OpenTracing API
+  // <https://github.com/opentracing/opentracing-cpp>`_.
+  string library = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The configuration to use when creating a tracer from the given dynamic
+  // library.
+  google.protobuf.Struct config = 2;
+}
+
+// Configuration structure.
+message TraceServiceConfig {
+  // The upstream gRPC cluster that hosts the metrics service.
+  envoy.api.v2.core.GrpcService grpc_service = 1 [(validate.rules).message.required = true];
+}

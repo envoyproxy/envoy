@@ -371,5 +371,6 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],
 )

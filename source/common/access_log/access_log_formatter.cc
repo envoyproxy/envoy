@@ -75,7 +75,7 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   if (subs.size() > 1) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
-        // https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
+        // docs/root/configuration/access_log.rst#format-rules
         fmt::format("More than 1 alternative header specified in token: {}", token));
   }
   if (subs.size() == 1) {

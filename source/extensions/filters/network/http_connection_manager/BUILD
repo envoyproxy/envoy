@@ -1,7 +1,7 @@
 licenses(["notice"])  # Apache 2
 # L4 network filter that implements HTTP protocol handling and filtering. This filter internally
 # drives all of the L7 HTTP filters.
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/http_conn_man/http_conn_man.rst
+# Public docs: docs/root/configuration/http_conn_man/http_conn_man.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
