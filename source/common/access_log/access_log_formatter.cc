@@ -75,7 +75,7 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   if (subs.size() > 1) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
-        // https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
+        // docs/root/configuration/access_log.rst#format-rules
         fmt::format("More than 1 alternative header specified in token: {}", token));
   }
   if (subs.size() == 1) {
@@ -362,8 +362,9 @@ std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& meta
     }
     data = &val;
   }
-  std::string json;
-  Protobuf::util::MessageToJsonString(*data, &json);
+  ProtobufTypes::String json;
+  const auto status = Protobuf::util::MessageToJsonString(*data, &json);
+  RELEASE_ASSERT(status.ok());
   if (max_length_ && json.length() > max_length_.value()) {
     return json.substr(0, max_length_.value());
   }

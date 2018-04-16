@@ -1,11 +1,9 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +29,7 @@ public:
         new envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().EXT_AUTHORIZATION; }
+  std::string name() override { return HttpFilterNames::get().EXT_AUTHORIZATION; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb

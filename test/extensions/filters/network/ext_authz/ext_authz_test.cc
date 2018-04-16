@@ -123,6 +123,7 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -157,6 +158,7 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -186,6 +188,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -214,6 +217,7 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -246,6 +250,7 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -273,6 +278,7 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
@@ -302,8 +308,39 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Test to verify that on stack Error response when failure_mode_allow is configured
+// result in request being allowed.
+TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
+  InSequence s;
+
+  EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_.connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(Filters::Common::ExtAuthz::CheckStatus::Error);
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 

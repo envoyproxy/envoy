@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/common/time.h"
+#include "envoy/common/token_bucket.h"
 
 #include "common/common/logger.h"
 
@@ -46,6 +49,14 @@ public:
   ~MockMonotonicTimeSource();
 
   MOCK_METHOD0(currentTime, MonotonicTime());
+};
+
+class MockTokenBucket : public TokenBucket {
+public:
+  MockTokenBucket();
+  ~MockTokenBucket();
+
+  MOCK_METHOD1(consume, bool(uint64_t));
 };
 
 // Captures absl::string_view parameters into temp strings, for use

@@ -60,7 +60,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//source/common/config:well_known_names",
+        "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/zipkin:zipkin_lib",
         "//source/server:configuration_lib",
     ],

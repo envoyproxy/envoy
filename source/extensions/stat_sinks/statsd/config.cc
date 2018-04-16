@@ -4,10 +4,10 @@
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +43,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::StatsdSink());
 }
 
-std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STATSD; }
+std::string StatsdSinkFactory::name() { return StatsSinkNames::get().STATSD; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

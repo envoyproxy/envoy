@@ -311,6 +311,34 @@ TEST_F(HttpExtAuthzFilterTest, ErrorOpen) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
 }
 
+// Test when failure_mode_allow is set and the response from the authorization service is an
+// immediate Error that the request is allowed to continue.
+TEST_F(HttpExtAuthzFilterTest, ImmediateErrorOpen) {
+  initialize(filter_config_);
+  InSequence s;
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(Filters::Common::ExtAuthz::CheckStatus::Error);
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.error").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ext_authz.failure_mode_allowed")
+                    .value());
+}
+
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

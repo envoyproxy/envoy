@@ -27,7 +27,7 @@ private:
    * Parse a header format rule of the form: %REQ(X?Y):Z% .
    * Will populate a main_header and an optional alternative header if specified.
    * See doc:
-   * https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst#format-rules
+   * docs/root/configuration/access_log.rst#format-rules
    */
   static void parseCommandHeader(const std::string& token, const size_t start,
                                  std::string& main_header, std::string& alternative_header,

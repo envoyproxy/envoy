@@ -3,10 +3,10 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
+#include "extensions/tracers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,9 +23,7 @@ DynamicOpenTracingTracerFactory::createHttpTracer(const Json::Object& json_confi
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
 }
 
-std::string DynamicOpenTracingTracerFactory::name() {
-  return Config::TracerNames::get().DYNAMIC_OT;
-}
+std::string DynamicOpenTracingTracerFactory::name() { return TracerNames::get().DYNAMIC_OT; }
 
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.

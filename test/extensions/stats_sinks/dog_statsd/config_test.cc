@@ -6,6 +6,7 @@
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
 #include "extensions/stat_sinks/dog_statsd/config.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -31,7 +32,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
-  const std::string name = Config::StatsSinkNames::get().DOG_STATSD;
+  const std::string name = StatsSinkNames::get().DOG_STATSD;
 
   envoy::config::metrics::v2::DogStatsdSink sink_config;
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();

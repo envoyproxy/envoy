@@ -7,6 +7,8 @@
 
 #include "server/configuration_impl.h"
 
+#include "extensions/stat_sinks/well_known_names.h"
+
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -238,7 +240,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Config::StatsSinkNames::get().STATSD);
+  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().STATSD);
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 

@@ -1,3 +1,5 @@
+#include "extensions/filters/http/well_known_names.h"
+
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -43,7 +45,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Envoy::Config::HttpFilterNames::get().LUA;
+          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().LUA;
           const std::string yaml =
               R"EOF(
             foo.bar:

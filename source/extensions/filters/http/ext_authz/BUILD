@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # External authorization L7 HTTP filter
-# Public docs: TODO(saumoh): Docs needed in https://github.com/envoyproxy/data-plane-api/tree/master/docs/root/configuration/http_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -34,7 +34,7 @@ envoy_cc_library(
         ":ext_authz",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http:well_known_names",
     ],
 )

@@ -5,6 +5,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 
