@@ -37,6 +37,15 @@ jobs:
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
+   api:
+     docker:
+       - image: *envoy-build-image
+     resource_class: xlarge
+     working_directory: /source
+     steps:
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.api
+       - run: ci/api_mirror.sh
    ipv6_tests:
      machine: true
      steps:
@@ -96,8 +105,11 @@ jobs:
      steps:
        - run: sleep 30 # workaround GH sync issue
        - checkout
-       - add_ssh_keys
        - run: ci/do_circle_ci.sh docs
+       - add_ssh_keys
+       - run: docs/publish.sh
+       - store_artifacts:
+           path: generated/docs
    mac:
      macos:
        xcode: "9.3.0"
@@ -118,6 +130,7 @@ workflows:
               only: /^v.*/
       - asan
       - tsan
+      - api
       - ipv6_tests
       - coverage
       - format

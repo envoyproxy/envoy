@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # Ratelimit L4 network filter
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/network_filters/rate_limit_filter.rst
+# Public docs: docs/root/configuration/network_filters/rate_limit_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

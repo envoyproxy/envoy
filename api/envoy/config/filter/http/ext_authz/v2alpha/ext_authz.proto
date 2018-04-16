@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.ext_authz.v2alpha;
+option go_package = "v2alpha";
+
+import "envoy/api/v2/core/grpc_service.proto";
+import "envoy/api/v2/core/http_uri.proto";
+
+// The external authorization HTTP service configuration.
+message HttpService {
+  // Sets the HTTP server URI which the authorization requests must be sent to.
+  envoy.api.v2.core.HttpUri server_uri = 1;
+
+  // Sets an optional prefix to the value of authorization request header `path`.
+  string path_prefix = 2;
+}
+
+message ExtAuthz {
+
+  oneof services {
+    // The external authorization gRPC service configuration.
+    envoy.api.v2.core.GrpcService grpc_service = 1;
+
+    // The external authorization HTTP service configuration.
+    HttpService http_service = 3;
+  }
+
+  // The filter's behaviour in case the external authorization service does
+  // not respond back. If set to true then in case of failure to get a
+  // response back from the authorization service or getting a response that
+  // is NOT denied then traffic will be permitted.
+  // Defaults to false.
+  bool failure_mode_allow = 2;
+}

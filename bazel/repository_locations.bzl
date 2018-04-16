@@ -75,10 +75,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protobuf-3.5.0",
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
-    envoy_api = dict(
-        commit = "2dcc435e8ae1d35f8c3a4fa9f132778482fb1a78",
-        remote = "https://github.com/envoyproxy/data-plane-api",
-    ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
@@ -86,6 +82,11 @@ REPOSITORY_LOCATIONS = dict(
     io_bazel_rules_go = dict(
         commit = "0.10.3",
         remote = "https://github.com/bazelbuild/rules_go",
+    ),
+    six_archive = dict(
+        sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
+        strip_prefix = "",
+        urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.

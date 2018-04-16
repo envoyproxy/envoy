@@ -5,11 +5,12 @@ as well as to clearly specify how extensions are added to the repository. The to
 are:
 
 * [.circleci/](.circleci/): Configuration for [CircleCI](https://circleci.com/gh/envoyproxy).
+* [api/](api/): Envoy data plane API.
 * [bazel/](bazel/): Configuration for Envoy's use of [Bazel](https://bazel.build/).
 * [ci/](ci/): Scripts used both during CI as well as to build Docker containers.
 * [configs/](configs/): Example Envoy configurations.
-* [docs/](docs/): Project level documentation as well as scripts for publishing final docs during
-  releases.
+* [docs/](docs/): End user facing Envoy proxy and data plane API documentation as well as scripts
+  for publishing final docs during releases.
 * [examples/](examples/): Larger Envoy examples using Docker and Docker Compose.
 * [include/](include/): "Public" interface headers for "core" Envoy. In general,
   these are almost entirely 100% abstract classes. There are a few cases of not-abstract classes in

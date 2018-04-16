@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package envoy.admin.v2;
+
+import "google/protobuf/any.proto";
+import "envoy/api/v2/rds.proto";
+
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: ConfigDump]
+// [#proto-status: draft]
+
+// The /config_dump admin endpoint uses this wrapper message to maintain and serve arbitrary
+// configuration information from any component in Envoy.
+// TODO(jsedgwick) In the future, we may want to formalize this further with an RPC for config_dump,
+// and perhaps even with an RPC per config type. That strategy across all endpoints will allow for
+// more flexibility w.r.t. protocol, serialization, parameters, etc.
+message ConfigDump {
+  // This map is serialized and dumped in its entirety at the /config_dump endpoint.
+  //
+  // Keys should be a short descriptor of the config object they map to. For example, envoy's HTTP
+  // routing subsystem might use "routes" as the key for its config, for which it uses the message
+  // RouteConfigDump as defined below. In the future, the key will also be used to filter the output
+  // of the /config_dump endpoint.
+  map<string, google.protobuf.Any> configs = 1 [(gogoproto.nullable) = false];
+}
+
+// Envoy's RDS implementation fills this message with all currently loaded routes, as described by
+// their RouteConnfiguration objects. Static routes configured in the bootstrap configuration are
+// separated from those configured dynamically via RDS. This message is available at the
+// /config_dump admin endpoint.
+message RouteConfigDump {
+  repeated envoy.api.v2.RouteConfiguration static_route_configs = 1 [(gogoproto.nullable) = false];
+  repeated envoy.api.v2.RouteConfiguration dynamic_route_configs = 2 [(gogoproto.nullable) = false];
+}
