@@ -117,6 +117,12 @@ MockDnsResolver::MockDnsResolver() {
 
 MockDnsResolver::~MockDnsResolver() {}
 
+MockAddressResolver::MockAddressResolver() {
+  ON_CALL(*this, name()).WillByDefault(Return("envoy.mock.resolver"));
+}
+
+MockAddressResolver::~MockAddressResolver() {}
+
 MockReadFilterCallbacks::MockReadFilterCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));

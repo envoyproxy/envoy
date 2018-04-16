@@ -21,10 +21,10 @@
 
 namespace Envoy {
 std::string DateFormatter::fromTime(const SystemTime& time) const {
-  return fromTimeT(std::chrono::system_clock::to_time_t(time));
+  return fromTime(std::chrono::system_clock::to_time_t(time));
 }
 
-std::string DateFormatter::fromTimeT(time_t time) const {
+std::string DateFormatter::fromTime(time_t time) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
@@ -36,7 +36,7 @@ std::string DateFormatter::fromTimeT(time_t time) const {
 std::string DateFormatter::now() {
   time_t current_time_t;
   time(&current_time_t);
-  return fromTimeT(current_time_t);
+  return fromTime(current_time_t);
 }
 
 ProdSystemTimeSource ProdSystemTimeSource::instance_;
@@ -248,12 +248,46 @@ std::string StringUtil::escape(const std::string& source) {
 }
 
 std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static DateFormatter default_date_format("%Y-%m-%dT%H:%M:%S");
+  static const char DefaultDateFormat[] = "%Y-%m-%dT%H:%M:%S.000Z";
 
-  return fmt::format(
-      "{}.{:03d}Z", default_date_format.fromTime(time),
-      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count() %
-          1000);
+  struct CachedTime {
+    std::chrono::seconds epoch_time_seconds;
+    size_t formatted_time_length{0};
+    char formatted_time[32];
+  };
+  static thread_local CachedTime cached_time;
+
+  const std::chrono::milliseconds epoch_time_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
+
+  const std::chrono::seconds epoch_time_seconds =
+      std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
+
+  if (cached_time.formatted_time_length == 0 ||
+      cached_time.epoch_time_seconds != epoch_time_seconds) {
+    time_t time = static_cast<time_t>(epoch_time_seconds.count());
+    tm date_time;
+    gmtime_r(&time, &date_time);
+    cached_time.formatted_time_length =
+        strftime(cached_time.formatted_time, sizeof(cached_time.formatted_time), DefaultDateFormat,
+                 &date_time);
+    cached_time.epoch_time_seconds = epoch_time_seconds;
+  }
+
+  ASSERT(cached_time.formatted_time_length == 24 &&
+         cached_time.formatted_time_length < sizeof(cached_time.formatted_time));
+
+  // Overwrite the digits in the ".000Z" at the end of the string with the
+  // millisecond count from the input time.
+  size_t offset = cached_time.formatted_time_length - 4;
+  uint32_t msec = epoch_time_ms.count() % 1000;
+  cached_time.formatted_time[offset++] = ('0' + (msec / 100));
+  msec %= 100;
+  cached_time.formatted_time[offset++] = ('0' + (msec / 10));
+  msec %= 10;
+  cached_time.formatted_time[offset++] = ('0' + msec);
+
+  return cached_time.formatted_time;
 }
 
 bool StringUtil::endsWith(const std::string& source, const std::string& end) {

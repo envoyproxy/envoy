@@ -1,9 +1,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/config/well_known_names.h"
-
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
+#include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -24,7 +23,7 @@ public:
   void SetUp() override {
     factory_ =
         Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            Config::AccessLogNames::get().HTTP_GRPC);
+            AccessLogNames::get().HTTP_GRPC);
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();

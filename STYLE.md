@@ -104,7 +104,7 @@ A few general notes on our error handling philosophy:
   is almost always a result of faulty configuration which should be caught during a canary process,
   there may be cases in which we want some classes of startup errors to be non-fatal. For example,
   if a misconfigured option is not necessary for server operation. Although this is discouraged, we
-  will discuss these on a case by case basis case basis during code review (an example of this
+  will discuss these on a case by case basis during code review (an example of this
   is the `--admin-address-path` option). **If degraded mode error handling is implemented, we require
   that there is complete test coverage for the degraded case.** Additionally, the user should be
   aware of the degraded state minimally via an error log of level warn or greater and via the

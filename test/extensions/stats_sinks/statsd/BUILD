@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.stat_sinks.statsd",
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//test/mocks/server:server_mocks",

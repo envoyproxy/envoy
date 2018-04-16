@@ -4,9 +4,9 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-#include "common/config/well_known_names.h"
 
 #include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,9 +35,7 @@ ProtobufTypes::MessagePtr ClientSslAuthConfigFactory::createEmptyConfigProto() {
       new envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth()};
 }
 
-std::string ClientSslAuthConfigFactory::name() {
-  return Config::NetworkFilterNames::get().CLIENT_SSL_AUTH;
-}
+std::string ClientSslAuthConfigFactory::name() { return NetworkFilterNames::get().CLIENT_SSL_AUTH; }
 
 Server::Configuration::NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
     const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,

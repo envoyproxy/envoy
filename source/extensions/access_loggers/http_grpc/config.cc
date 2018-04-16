@@ -6,11 +6,11 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/common/macros.h"
-#include "common/config/well_known_names.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
+#include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,9 +44,7 @@ ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::HttpGrpcAccessLogConfig()};
 }
 
-std::string HttpGrpcAccessLogFactory::name() const {
-  return Config::AccessLogNames::get().HTTP_GRPC;
-}
+std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HTTP_GRPC; }
 
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
