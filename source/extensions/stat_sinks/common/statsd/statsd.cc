@@ -39,33 +39,29 @@ void Writer::write(const std::string& message) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string _prefix)
-    : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag) {
+                             const std::string& prefix)
+    : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
+      prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<Writer>(this->server_address_);
   });
-  if (_prefix.size() == 0) {
-    prefix = Statsd::DEFAULT_PREFIX;
-  } else {
-    prefix = _prefix;
-  }
 }
 
 void UdpStatsdSink::flushCounter(const Stats::Counter& counter, uint64_t delta) {
   const std::string message(
-      fmt::format("{}.{}:{}|c{}", prefix, getName(counter), delta, buildTagStr(counter.tags())));
+      fmt::format("{}.{}:{}|c{}", prefix_, getName(counter), delta, buildTagStr(counter.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
   const std::string message(
-      fmt::format("{}.{}:{}|g{}", prefix, getName(gauge), value, buildTagStr(gauge.tags())));
+      fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge), value, buildTagStr(gauge.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
   // For statsd histograms are all timers.
-  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix, getName(histogram),
+  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
                                         std::chrono::milliseconds(value).count(),
                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
@@ -95,9 +91,9 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
                              const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                             const std::string _prefix)
-    : tls_(tls.allocateSlot()), cluster_manager_(cluster_manager),
-      cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
+                             const std::string& prefix)
+    : prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix), tls_(tls.allocateSlot()),
+      cluster_manager_(cluster_manager), cx_overflow_stat_(scope.counter("statsd.cx_overflow")) {
 
   Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
                                             local_info);
@@ -105,11 +101,6 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
-  if (_prefix.size() == 0) {
-    prefix = Statsd::DEFAULT_PREFIX;
-  } else {
-    prefix = _prefix;
-  }
 }
 
 TcpStatsdSink::TlsSink::TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher)
@@ -134,7 +125,7 @@ void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
 
 void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
   ASSERT(current_slice_mem_ != nullptr);
-  // 40 > 6 (prefix) + 4 (random chars) + 30 for number (bigger than it will ever be)
+  // 40 > 6 (prefix_) + 4 (random chars) + 30 for number (bigger than it will ever be)
   const uint32_t max_size = name.size() + 40;
   if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
     endFlush(false);

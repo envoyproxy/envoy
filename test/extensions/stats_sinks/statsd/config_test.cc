@@ -47,7 +47,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 
 TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
-  auto defaultPrefix = Common::Statsd::DEFAULT_PREFIX;
+  auto defaultPrefix = Common::Statsd::getDefaultPrefix();
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();
@@ -100,7 +100,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   const std::string name = Config::StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
-  auto defaultPrefix = Common::Statsd::DEFAULT_PREFIX;
+  auto defaultPrefix = Common::Statsd::getDefaultPrefix();
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
