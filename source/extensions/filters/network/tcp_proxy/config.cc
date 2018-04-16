@@ -4,9 +4,9 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-#include "common/config/well_known_names.h"
 
 #include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +34,7 @@ ProtobufTypes::MessagePtr TcpProxyConfigFactory::createEmptyConfigProto() {
       new envoy::config::filter::network::tcp_proxy::v2::TcpProxy());
 }
 
-std::string TcpProxyConfigFactory::name() { return Config::NetworkFilterNames::get().TCP_PROXY; }
+std::string TcpProxyConfigFactory::name() { return NetworkFilterNames::get().TCP_PROXY; }
 
 Server::Configuration::NetworkFilterFactoryCb TcpProxyConfigFactory::createFilter(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,

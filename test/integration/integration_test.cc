@@ -286,6 +286,44 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
 }
 
+TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
+  config_helper_.setDefaultHostAndRoute("*", "/asd");
+  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  initialize();
+
+  // WebSocket upgrade with early data (HTTP body)
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string early_data_req_str = "hello";
+  const std::string early_data_resp_str = "world";
+  const std::string upgrade_req_str =
+      fmt::format("GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                  "keep-alive, Upgrade\r\nUpgrade: websocket\r\nContent-Length: {}\r\n\r\n",
+                  early_data_req_str.length());
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  tcp_client = makeTcpConnection(lookupPort("http"));
+  // Send early data alongside websocket upgrade request
+  tcp_client->write(upgrade_req_str + early_data_req_str);
+  fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  // The request path gets rewritten from /websocket/test to /websocket.
+  // The size of headers received by the destination is 228 bytes
+  // and we add the early data to that.
+  const std::string data = fake_upstream_connection->waitForData(228 + early_data_req_str.length());
+  // We expect to find the early data on the upstream side
+  EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
+  // Accept websocket upgrade request
+  fake_upstream_connection->write(upgrade_resp_str);
+  // Reply also with early data
+  fake_upstream_connection->write(early_data_resp_str);
+  // upstream disconnect
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(upgrade_resp_str + early_data_resp_str, tcp_client->data());
+}
+
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {

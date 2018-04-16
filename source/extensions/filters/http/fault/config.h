@@ -3,7 +3,7 @@
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +27,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::fault::v2::HTTPFault()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().FAULT; }
+  std::string name() override { return HttpFilterNames::get().FAULT; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb

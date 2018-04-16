@@ -1,11 +1,9 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +28,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::rate_limit::v2::RateLimit()};
   }
 
-  std::string name() override { return Config::HttpFilterNames::get().RATE_LIMIT; }
+  std::string name() override { return HttpFilterNames::get().RATE_LIMIT; }
 
 private:
   Server::Configuration::HttpFilterFactoryCb

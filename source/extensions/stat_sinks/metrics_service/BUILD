@@ -31,7 +31,7 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:well_known_names",
+        "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",

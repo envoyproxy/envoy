@@ -6,6 +6,7 @@
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
 #include "extensions/stat_sinks/statsd/config.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -26,7 +27,7 @@ namespace StatSinks {
 namespace Statsd {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
@@ -50,7 +51,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();

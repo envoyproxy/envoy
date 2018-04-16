@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy",
         "//test/common/upstream:utility_lib",
