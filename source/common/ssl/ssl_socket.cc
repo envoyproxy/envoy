@@ -307,26 +307,22 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
 }
 
 std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
-  STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
-
-  if (altnames == nullptr) {
+    bssl::UniquePtr<GENERAL_NAMES> san_names(
+            static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names == nullptr) {
     return {};
   }
-
   std::vector<std::string> dns_sans = {};
-  for (const GENERAL_NAME* altname : altnames) {
-    switch (altname->type) {
+  for (const GENERAL_NAME* san : san_names.get()) {
+    switch (san->type) {
     case GEN_DNS:
-      dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.dNSName)));
+      dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(san->d.dNSName)));
       break;
     default:
       // Default to empty;
       break;
     }
   }
-
-  sk_GENERAL_NAME_pop_free(altnames, GENERAL_NAME_free);
   return dns_sans;
 }
 
