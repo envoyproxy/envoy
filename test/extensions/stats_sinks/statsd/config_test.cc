@@ -46,7 +46,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 }
 
 TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
   auto defaultPrefix = Common::Statsd::getDefaultPrefix();
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -71,7 +71,7 @@ TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
 }
 
 TEST(StatsConfigTest, UdpSinkCustomPrefix) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
   const std::string customPrefix = "prefix.test";
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -97,7 +97,7 @@ TEST(StatsConfigTest, UdpSinkCustomPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   auto defaultPrefix = Common::Statsd::getDefaultPrefix();
@@ -118,7 +118,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
-  const std::string name = Config::StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   std::string prefix = "prefixTest";
