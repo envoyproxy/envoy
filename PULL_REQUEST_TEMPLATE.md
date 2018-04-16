@@ -36,7 +36,8 @@ if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
 
 *Docs Changes*:
-Description of documentation changes. Please write in N/A if there were no documentation changes.
+Description of documentation changes. These should be made in [docs/root](docs/root) and/or inline
+with the API protos. Please write in N/A if there were no documentation changes.
 
 *Release Notes*:
 >If this change is user impacting you **must** add a release note to
