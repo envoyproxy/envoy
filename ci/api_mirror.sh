@@ -29,14 +29,16 @@ then
 
   # For each SHA, hard reset, rsync api/ and generate commit in
   # envoyproxy/data-plane-api
-  API_WORKING_DIR="$TMPDIR/envoy-api-mirror"
+  API_WORKING_DIR="../envoy-api-mirror"
   git worktree add "$API_WORKING_DIR"
   for sha in $SHAS
   do
     git -C "$API_WORKING_DIR" reset --hard "$sha"
     COMMIT_MSG=$(git -C "$API_WORKING_DIR" log --format=%B -n 1)
     QUALIFIED_COMMIT_MSG=$(echo -e "$COMMIT_MSG\n\n$MIRROR_MSG @ $sha")
-    rsync -av "$API_WORKING_DIR"/api/* "$CHECKOUT_DIR"
+    rsync -acv --delete --exclude "ci/" --exclude ".*" --exclude LICENSE \
+      --exclude WORKSPACE \
+      "$API_WORKING_DIR"/api/ "$CHECKOUT_DIR"/
     git -C "$CHECKOUT_DIR" add .
     git -C "$CHECKOUT_DIR" commit -m "$QUALIFIED_COMMIT_MSG"
   done
