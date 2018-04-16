@@ -5,10 +5,12 @@ set -e
 # TODO(htuch): Remove this once we've verified this script works.
 set -x
 
+CHECKOUT_DIR=../data-plane-api
+
 if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
 then
   echo "Cloning..."
-  git clone git@github.com:envoyproxy/envoyproxy.github.io "$CHECKOUT_DIR"
+  git clone git@github.com:envoyproxy/data-plane-api "$CHECKOUT_DIR"
 
   git -C "$CHECKOUT_DIR" config user.name "data-plane-api(CircleCI)"
   git -C "$CHECKOUT_DIR" config user.email data-plane-api@users.noreply.github.com
@@ -28,7 +30,7 @@ then
   # For each SHA, hard reset, rsync api/ and generate commit in
   # envoyproxy/data-plane-api
   API_WORKING_DIR="$TMPDIR/envoy-api-mirror"
-  git worktree add "$API_WORKING_DIR" master
+  git worktree add "$API_WORKING_DIR"
   for sha in $SHAS
   do
     git -C "$API_WORKING_DIR" reset --hard "$sha"
