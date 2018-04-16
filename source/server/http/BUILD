@@ -51,7 +51,6 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
-        "//source/extensions/stat_sinks/common/hystrix:hystrix_lib",
         "@envoy_api//envoy/admin/v2:config_dump_cc",
     ],
 )

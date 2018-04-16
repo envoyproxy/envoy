@@ -8,6 +8,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "server/http/admin.h"
+
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -244,7 +246,7 @@ void Hystrix::getClusterStats(std::stringstream& ss, absl::string_view cluster_n
   addHystrixThreadPool(ss, cluster_name, max_concurrent_requests, reporting_hosts, rolling_window);
 }
 
-absl::string_view Hystrix::printRollingWindow() const {
+const std::string Hystrix::printRollingWindow() const {
   std::stringstream out_str;
 
   for (auto stats_map_itr = rolling_stats_map_.begin(); stats_map_itr != rolling_stats_map_.end();
@@ -261,7 +263,36 @@ absl::string_view Hystrix::printRollingWindow() const {
 }
 
 namespace HystrixNameSpace {
-HystrixSink::HystrixSink(Server::Instance& server) : stats_(new Hystrix()), server_(&server){};
+HystrixSink::HystrixSink(Server::Instance& server) : stats_(new Hystrix()), server_(&server) {
+  Server::Admin& admin = server_->admin();
+  ENVOY_LOG(debug,
+            "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
+  admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
+                   MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
+};
+
+Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
+                                                  Http::HeaderMap& response_headers,
+                                                  Buffer::Instance&,
+                                                  Http::StreamDecoderFilterCallbacks* callbacks) {
+
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.TextEventStream);
+  response_headers.insertCacheControl().value().setReference(
+      Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.insertConnection().value().setReference(
+      Http::Headers::get().ConnectionValues.Close);
+  response_headers.insertAccessControlAllowHeaders().value().setReference(
+      Http::Headers::get().AccessControlAllowHeadersValue.AccessControlAllowHeadersHystrix);
+  response_headers.insertAccessControlAllowOrigin().value().setReference(
+      Http::Headers::get().AccessControlAllowOriginValue.All);
+  response_headers.insertNoChunks().value().setReference("0");
+
+  registerConnection(callbacks);
+  ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
+            callbacks->connection()->localAddress()->asString());
+  return Http::Code::OK;
+}
 
 void HystrixSink::beginFlush() { current_stat_values_.clear(); }
 
@@ -305,12 +336,11 @@ void HystrixSink::endFlush() {
   callbacks_->encodeData(ping_data, false);
 }
 
-// void HystrixSink::onHistogramComplete(const Histogram& histogram, uint64_t value);
 void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbacks) {
   callbacks_ = callbacks;
 }
 
-// TODO (@trabetti) is this correct way?
+// TODO (@trabetti) is this correct way - to set nullptr?
 void HystrixSink::unregisterConnection() { callbacks_ = nullptr; }
 
 } // namespace HystrixNameSpace

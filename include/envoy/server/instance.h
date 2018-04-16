@@ -185,12 +185,8 @@ public:
    */
   virtual std::chrono::milliseconds statsFlushInterval() PURE;
 
-  // TODO (@trabetti) : for the two methods below - too specific? what is a better way?
-  /**
-   * @ Registers a callbacks connection to Hystrix sink.
-   */
-  virtual bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) PURE;
-
+  // TODO (@trabetti) : for the method below - too specific? what is a better way? it is called on
+  // callback destroy.
   /**
    * @ Unregisters a callbacks connection to Hystrix sink.
    */

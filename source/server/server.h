@@ -169,7 +169,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
   std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
-  bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) override;
+  //  bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) override;
   void unregisterHystrixSink() override;
 
 private:

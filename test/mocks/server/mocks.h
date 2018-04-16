@@ -288,7 +288,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_METHOD1(registerToHystrixSink, bool(Http::StreamDecoderFilterCallbacks* callbacks));
+  //  MOCK_METHOD1(registerToHystrixSink, bool(Http::StreamDecoderFilterCallbacks* callbacks));
   MOCK_METHOD0(unregisterHystrixSink, void());
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;

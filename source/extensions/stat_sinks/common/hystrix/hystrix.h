@@ -52,7 +52,7 @@ public:
   /**
    * Return string represnting current state of the map. for DEBUG.
    */
-  absl::string_view printRollingWindow() const;
+  const std::string printRollingWindow() const;
 
   /**
    * Get the statistic's value change over the rolling window time frame.
@@ -105,23 +105,14 @@ private:
 
 typedef std::unique_ptr<Hystrix> HystrixPtr;
 
-/**
- * This class contains data which will be sent from admin filter to a hystrix_event_stream handler
- * and build a class which contains the relevant data.
- */
-class HystrixHandlerInfoImpl : public Server::HandlerInfo {
-public:
-  HystrixHandlerInfoImpl(Http::StreamDecoderFilterCallbacks* callbacks) : callbacks_(callbacks) {}
-  virtual ~HystrixHandlerInfoImpl(){};
-
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
-};
-
 namespace HystrixNameSpace {
 
-class HystrixSink : public Stats::Sink {
+class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Instance& server);
+  Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
+                                       Buffer::Instance&,
+                                       Http::StreamDecoderFilterCallbacks* callbacks);
   void beginFlush();
   void flushCounter(const Stats::Counter& counter, uint64_t delta);
   void flushGauge(const Stats::Gauge&, uint64_t){};
@@ -131,6 +122,7 @@ public:
               << std::endl;
   };
 
+  // TODO (@trabetti) : support multiple connections
   /**
    * register a new connection
    */

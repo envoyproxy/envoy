@@ -37,6 +37,8 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
+#include "extensions/stat_sinks/common/hystrix/hystrix.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -142,19 +144,6 @@ void InstanceImpl::flushStats() {
 
   InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
   stat_flush_timer_->enableTimer(config_->statsFlushInterval());
-}
-
-bool InstanceImpl::registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) {
-  for (const auto& sink : config_->statsSinks()) {
-    // TODO: is there a better way to find the hystrix sink?
-    Extensions::StatSinks::Common::HystrixNameSpace::HystrixSink* hystrix_sink =
-        dynamic_cast<Extensions::StatSinks::Common::HystrixNameSpace::HystrixSink*>(sink.get());
-    if (hystrix_sink != nullptr) {
-      hystrix_sink->registerConnection(callbacks);
-      return true;
-    }
-  }
-  return false;
 }
 
 void InstanceImpl::unregisterHystrixSink() {

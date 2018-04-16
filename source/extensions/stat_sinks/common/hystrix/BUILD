@@ -13,10 +13,10 @@ envoy_cc_library(
     srcs = ["hystrix.cc"],
     hdrs = ["hystrix.h"],
     deps = [
-        "//include/envoy/server:admin_interface",
         "//include/envoy/server:instance_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/server/http:admin_lib",
     ],
 )

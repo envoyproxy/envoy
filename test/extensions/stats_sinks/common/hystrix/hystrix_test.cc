@@ -121,9 +121,9 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   }
 
   //  //std::string rolling_map = sink_->getStats().printRollingWindow();
-  //  absl::string_view rolling_map = sink_->getStats().printRollingWindow();
-  //  absl::string_view::size_type pos = rolling_map.find("cluster.test_cluster.total");
-  //  EXPECT_NE(absl::string_view::npos, pos);
+  std::string rolling_map = sink_->getStats().printRollingWindow();
+  std::size_t pos = rolling_map.find("cluster.test_cluster.total");
+  EXPECT_NE(std::string::npos, pos);
   //  //EXPECT_NE(absl::string_view::npos, map.find("cluster.test_cluster.total"));
 
   std::string data_message = TestUtility::bufferToString(buffer);

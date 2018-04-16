@@ -24,21 +24,9 @@ namespace Server {
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
-         Buffer::Instance& data, Server::HandlerInfo& handler_info) -> Http::Code {                \
-    return X(path_and_query, response_headers, data, handler_info);                                \
+         Buffer::Instance& data, Http::StreamDecoderFilterCallbacks* callbacks) -> Http::Code {    \
+    return X(path_and_query, response_headers, data, callbacks);                                   \
   }
-
-/**
- * This class is a base class for data which will be sent from admin filter to a handler
- * in admin impl. Each handler which needs to receive data from admin filter can inherit from
- * HandlerInfo and build a class which contains the relevant data.
- */
-class HandlerInfo {
-public:
-  virtual ~HandlerInfo(){};
-};
-
-typedef std::unique_ptr<HandlerInfo> HandlerInfoPtr;
 
 /**
  * Global admin HTTP endpoint for the server.
@@ -57,7 +45,7 @@ public:
    */
   typedef std::function<Http::Code(absl::string_view path_and_query,
                                    Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                   Server::HandlerInfo& handler_info)>
+                                   Http::StreamDecoderFilterCallbacks* callbacks)>
 
       HandlerCb;
 
