@@ -5,6 +5,8 @@ set -e
 # TODO(htuch): Remove this once we've verified this script works.
 set -x
 
+CHECKOUT_DIR=../data-plane-api
+
 if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
 then
   echo "Cloning..."
