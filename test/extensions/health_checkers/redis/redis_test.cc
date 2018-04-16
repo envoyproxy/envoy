@@ -57,7 +57,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checker.redis
+      name: envoy.health_checkers.redis
       config:
     )EOF";
 
@@ -77,7 +77,7 @@ public:
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checker.redis
+      name: envoy.health_checkers.redis
       config:
         key: foo
     )EOF";
@@ -99,7 +99,7 @@ public:
     healthy_threshold: 1
     reuse_connection: false
     custom_health_check:
-      name: envoy.health_checker.redis
+      name: envoy.health_checkers.redis
       config:
     )EOF";
 

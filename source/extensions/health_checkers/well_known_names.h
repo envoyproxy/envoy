@@ -7,13 +7,13 @@ namespace Extensions {
 namespace HealthCheckers {
 
 /**
- * Well-known access logger names.
- * NOTE: New access loggers should use the well known name: envoy.access_loggers.name.
+ * Well-known health checker names.
+ * NOTE: New health checkers should use the well known name: envoy.health_checkers.name.
  */
 class HealthCheckerNameValues {
 public:
   // Redis health checker.
-  const std::string REDIS_HEALTH_CHECKER = "envoy.health_checker.redis";
+  const std::string REDIS_HEALTH_CHECKER = "envoy.health_checkers.redis";
 };
 
 typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;

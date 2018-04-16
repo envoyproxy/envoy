@@ -24,7 +24,7 @@ TEST(HealthCheckerFactoryTest, createRedis) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checker.redis
+      name: envoy.health_checkers.redis
       config:
         key: foo
     )EOF";
@@ -48,7 +48,7 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
     unhealthy_threshold: 1
     healthy_threshold: 1
     custom_health_check:
-      name: envoy.health_checker.redis
+      name: envoy.health_checkers.redis
       config:
         key: foo
     )EOF";

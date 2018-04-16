@@ -18,7 +18,7 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
   return std::make_shared<RedisHealthChecker>(
       context.cluster(), config, getRedisHealthCheckConfig(config), context.dispatcher(),
       context.runtime(), context.random(),
-      Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
+      NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
 };
 
 /**
