@@ -80,6 +80,19 @@ public:
     store_->addSink(sink_);
   }
 
+  void setUp() {
+    InSequence s;
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+  }
+
+  void tearDown() {
+    store_->shutdownThreading();
+    tls_.shutdownThread();
+
+    // Includes overflow stat.
+    EXPECT_CALL(*this, free(_));
+  }
+
   std::vector<uint64_t> h1_cumulative_values, h2_cumulative_values, h1_interval_values,
       h2_interval_values;
 
@@ -265,8 +278,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 TEST_F(StatsThreadLocalStoreTest, BasicSingleHistogramMerge) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setUp();
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ("h1", h1.name());
@@ -282,21 +294,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicSingleHistogramMerge) {
 
   EXPECT_EQ(1, validateMerge());
 
-  // Validate the summary format is as expected.
-  std::string expected_summary = "P0: 0, P25: 14, P50: 44, P75: 420, P90: 3220, P95: 3260, P99: "
-                                 "3292, P99.9: 3299.2, P100: 3300";
-  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
-
-  store_->shutdownThreading();
-  tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  tearDown();
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicMultiHistogramMerge) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setUp();
 
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = store_->histogram("h2");
@@ -309,16 +311,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicMultiHistogramMerge) {
 
   EXPECT_EQ(2, validateMerge());
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  tearDown();
 }
 
 TEST_F(StatsThreadLocalStoreTest, MultiHistogramMultipleMerges) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setUp();
 
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = store_->histogram("h2");
@@ -347,16 +344,11 @@ TEST_F(StatsThreadLocalStoreTest, MultiHistogramMultipleMerges) {
   // cumulativeSummary has right values.
   EXPECT_EQ(2, validateMerge());
 
-  store_->shutdownThreading();
-  tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  tearDown();
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScopeHistogramMerge) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setUp();
 
   ScopePtr scope1 = store_->createScope("scope1.");
 
@@ -369,17 +361,26 @@ TEST_F(StatsThreadLocalStoreTest, BasicScopeHistogramMerge) {
   expectCallAndAccumulate(h2, 2);
   EXPECT_EQ(2, validateMerge());
 
-  store_->shutdownThreading();
+  tearDown();
+}
 
-  tls_.shutdownThread();
+TEST_F(StatsThreadLocalStoreTest, BasicHistogramValidate) {
+  setUp();
 
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  Histogram& h1 = store_->histogram("h1");
+  expectCallAndAccumulate(h1, 1);
+
+  EXPECT_EQ(1, validateMerge());
+
+  std::string expected_summary = "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
+                                 "P99: 1.099, P99.9: 1.0999, P100: 1.1";
+  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
+
+  tearDown();
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicHistogramUsed) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  setUp();
 
   ScopePtr scope1 = store_->createScope("scope1.");
 
@@ -408,12 +409,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicHistogramUsed) {
     EXPECT_TRUE(histogram->used());
   }
 
-  store_->shutdownThreading();
-
-  tls_.shutdownThread();
-
-  // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  tearDown();
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {

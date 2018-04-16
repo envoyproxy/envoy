@@ -367,7 +367,7 @@ private:
  */
 class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
 public:
-  HistogramStatisticsImpl() : computed_quantiles_(supported_quantiles_.size(), 0.0) {}
+  HistogramStatisticsImpl() : computed_quantiles_(supportedQuantiles().size(), 0.0) {}
   /**
    * HistogramStatisticsImpl object is constructed using the passed in histogram.
    * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
