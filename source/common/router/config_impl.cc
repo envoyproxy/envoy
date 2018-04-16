@@ -892,12 +892,7 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt:
 
 const Protobuf::Message* PerFilterConfigs::get(const std::string& name) const {
   auto cfg = configs_.find(name);
-
-  if (cfg == configs_.end()) {
-    return nullptr;
-  }
-
-  return cfg->second.get();
+  return cfg == configs_.end() ? nullptr : cfg->second.get();
 }
 
 } // namespace Router
