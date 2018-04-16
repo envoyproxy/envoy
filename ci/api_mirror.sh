@@ -8,7 +8,7 @@ set -x
 if [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
 then
   echo "Cloning..."
-  git clone git@github.com:envoyproxy/envoyproxy.github.io "$CHECKOUT_DIR"
+  git clone git@github.com:envoyproxy/data-plane-api "$CHECKOUT_DIR"
 
   git -C "$CHECKOUT_DIR" config user.name "data-plane-api(CircleCI)"
   git -C "$CHECKOUT_DIR" config user.email data-plane-api@users.noreply.github.com
