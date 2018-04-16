@@ -16,9 +16,9 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
+        "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",

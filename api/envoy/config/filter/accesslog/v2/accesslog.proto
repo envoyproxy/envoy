@@ -1,0 +1,438 @@
+syntax = "proto3";
+
+package envoy.config.filter.accesslog.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/route/route.proto";
+import "envoy/type/percent.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Common access log types]
+// Envoy access logs describe incoming interaction with Envoy over a fixed
+// period of time, and typically cover a single request/response exchange,
+// (e.g. HTTP), stream (e.g. over HTTP/gRPC), or proxied connection (e.g. TCP).
+// Access logs contain fields defined in protocol-specific protobuf messages.
+//
+// Except where explicitly declared otherwise, all fields describe
+// *downstream* interaction between Envoy and a connected client.
+// Fields describing *upstream* interaction will explicitly include ``upstream``
+// in their name.
+
+// Defines fields that are shared by all Envoy access logs.
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+message AccessLogCommon {
+  // This field indicates the rate at which this log entry was sampled.
+  // Valid range is (0.0, 1.0].
+  double sample_rate = 1 [(validate.rules).double.gt = 0.0, (validate.rules).double.lte = 1.0];
+
+  // This field is the remote/origin address on which the request from the user was received.
+  // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
+  //       example the x-forwarder-for header, proxy protocol, etc.
+  envoy.api.v2.core.Address downstream_remote_address = 2;
+
+  // This field is the local/destination address on which the request from the user was received.
+  envoy.api.v2.core.Address downstream_local_address = 3;
+
+  // If the connection is secure, this field will contain TLS properties.
+  TLSProperties tls_properties = 4;
+
+  // The time that Envoy started servicing this request. This is effectively the time that the first
+  // downstream byte is received.
+  google.protobuf.Timestamp start_time = 5 [(gogoproto.stdtime) = true];
+
+  // Interval between the first downstream byte received and the last
+  // downstream byte received (i.e. time it takes to receive a request).
+  google.protobuf.Duration time_to_last_rx_byte = 6 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the first upstream byte sent. There may
+  // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
+  // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
+  // not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_first_upstream_tx_byte = 7 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the last upstream byte sent. There may
+  // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
+  // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
+  // not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_last_upstream_tx_byte = 8 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the first upstream
+  // byte received (i.e. time it takes to start receiving a response).
+  google.protobuf.Duration time_to_first_upstream_rx_byte = 9 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the last upstream
+  // byte received (i.e. time it takes to receive a complete response).
+  google.protobuf.Duration time_to_last_upstream_rx_byte = 10 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the first downstream byte sent.
+  // There may be a considerable delta between the *time_to_first_upstream_rx_byte* and this field
+  // due to filters. Additionally, the same caveats apply as documented in
+  // *time_to_last_downstream_tx_byte* about not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_first_downstream_tx_byte = 11 [(gogoproto.stdduration) = true];
+
+  // Interval between the first downstream byte received and the last downstream byte sent.
+  // Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
+  // between *time_to_last_upstream_rx_byte* and this field. Note also that this is an approximate
+  // time. In the current implementation it does not include kernel socket buffer time. In the
+  // current implementation it also does not include send window buffering inside the HTTP/2 codec.
+  // In the future it is likely that work will be done to make this duration more accurate.
+  google.protobuf.Duration time_to_last_downstream_tx_byte = 12 [(gogoproto.stdduration) = true];
+
+  // The upstream remote/destination address that handles this exchange. This does not include
+  // retries.
+  envoy.api.v2.core.Address upstream_remote_address = 13;
+
+  // The upstream local/origin address that handles this exchange. This does not include retries.
+  envoy.api.v2.core.Address upstream_local_address = 14;
+
+  // The upstream cluster that *upstream_remote_address* belongs to.
+  string upstream_cluster = 15;
+
+  // Flags indicating occurrences during request/response processing.
+  ResponseFlags response_flags = 16;
+
+  // All metadata encountered during request processing, including endpoint
+  // selection.
+  //
+  // This can be used to associate IDs attached to the various configurations
+  // used to process this request with the access log entry. For example, a
+  // route created from a higher level forwarding rule with some ID can place
+  // that ID in this field and cross reference later. It can also be used to
+  // determine if a canary endpoint was used or not.
+  envoy.api.v2.core.Metadata metadata = 17;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+// Flags indicating occurrences during request/response processing.
+message ResponseFlags {
+  // Indicates local server healthcheck failed.
+  bool failed_local_healthcheck = 1;
+
+  // Indicates there was no healthy upstream.
+  bool no_healthy_upstream = 2;
+
+  // Indicates an there was an upstream request timeout.
+  bool upstream_request_timeout = 3;
+
+  // Indicates local codec level reset was sent on the stream.
+  bool local_reset = 4;
+
+  // Indicates remote codec level reset was received on the stream.
+  bool upstream_remote_reset = 5;
+
+  // Indicates there was a local reset by a connection pool due to an initial connection failure.
+  bool upstream_connection_failure = 6;
+
+  // Indicates the stream was reset locally due to connection termination.
+  bool upstream_connection_termination = 7;
+
+  // Indicates the stream was reset because of a resource overflow.
+  bool upstream_overflow = 8;
+
+  // Indicates no route was found for the request.
+  bool no_route_found = 9;
+
+  // Indicates that the request was delayed before proxying.
+  bool delay_injected = 10;
+
+  // Indicates that the request was aborted with an injected error code.
+  bool fault_injected = 11;
+
+  // Indicates that the request was rate-limited locally.
+  bool rate_limited = 12;
+
+  message Unauthorized {
+    // Reasons why the request was unauthorized
+    enum Reason {
+      REASON_UNSPECIFIED = 0;
+      // The request was denied by the external authorization service.
+      EXTERNAL_SERVICE = 1;
+    }
+
+    Reason reason = 1;
+  }
+
+  // Indicates if the request was deemed unauthorized and the reason for it.
+  Unauthorized unauthorized_details = 13;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+// Properties of a negotiated TLS connection.
+message TLSProperties {
+  enum TLSVersion {
+    VERSION_UNSPECIFIED = 0;
+    TLSv1 = 1;
+    TLSv1_1 = 2;
+    TLSv1_2 = 3;
+    TLSv1_3 = 4;
+  }
+  // Version of TLS that was negotiated.
+  TLSVersion tls_version = 1;
+
+  // TLS cipher suite negotiated during handshake. The value is a
+  // four-digit hex code defined by the IANA TLS Cipher Suite Registry
+  // (e.g. ``009C`` for ``TLS_RSA_WITH_AES_128_GCM_SHA256``).
+  //
+  // Here it is expressed as an integer.
+  google.protobuf.UInt32Value tls_cipher_suite = 2;
+
+  // SNI hostname from handshake.
+  string tls_sni_hostname = 3;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+message TCPAccessLogEntry {
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+message HTTPRequestProperties {
+  // The request method (RFC 7231/2616).
+  // [#comment:TODO(htuch): add (validate.rules).enum.defined_only = true once
+  // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
+  envoy.api.v2.core.RequestMethod request_method = 1;
+
+  // The scheme portion of the incoming request URI.
+  string scheme = 2;
+
+  // HTTP/2 ``:authority`` or HTTP/1.1 ``Host`` header value.
+  string authority = 3;
+
+  // The port of the incoming request URI
+  // (unused currently, as port is composed onto authority).
+  google.protobuf.UInt32Value port = 4;
+
+  // The path portion from the incoming request URI.
+  string path = 5;
+
+  // Value of the ``User-Agent`` request header.
+  string user_agent = 6;
+
+  // Value of the ``Referer`` request header.
+  string referer = 7;
+
+  // Value of the ``X-Forwarded-For`` request header.
+  string forwarded_for = 8;
+
+  // Value of the ``X-Request-Id`` request header
+  //
+  // This header is used by Envoy to uniquely identify a request.
+  // It will be generated for all external requests and internal requests that
+  // do not already have a request ID.
+  string request_id = 9;
+
+  // Value of the ``X-Envoy-Original-Path`` request header.
+  string original_path = 10;
+
+  // Size of the HTTP request headers in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 request_headers_bytes = 11;
+
+  // Size of the HTTP request body in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 request_body_bytes = 12;
+
+  // Map of additional headers that have been configured to be logged.
+  map<string, string> request_headers = 13;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+message HTTPResponseProperties {
+  // The HTTP response code returned by Envoy.
+  google.protobuf.UInt32Value response_code = 1;
+
+  // Size of the HTTP response headers in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 response_headers_bytes = 2;
+
+  // Size of the HTTP response body in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 response_body_bytes = 3;
+
+  // Map of additional headers configured to be logged.
+  map<string, string> response_headers = 4;
+}
+
+// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+message HTTPAccessLogEntry {
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+
+  // HTTP version
+  enum HTTPVersion {
+    PROTOCOL_UNSPECIFIED = 0;
+    HTTP10 = 1;
+    HTTP11 = 2;
+    HTTP2 = 3;
+  }
+  HTTPVersion protocol_version = 2;
+
+  // Description of the incoming HTTP request.
+  HTTPRequestProperties request = 3;
+
+  // Description of the outgoing HTTP response.
+  HTTPResponseProperties response = 4;
+}
+
+message AccessLog {
+  // The name of the access log implementation to instantiate. The name must
+  // match a statically registered access log. Current built-in loggers include:
+  // 1) "envoy.file_access_log"
+  string name = 1;
+
+  // Filter which is used to determine if the access log needs to be written.
+  AccessLogFilter filter = 2;
+
+  // Custom configuration that depends on the access log being instantiated. built-in configurations
+  // include:
+  // 1) "envoy.file_access_log": :ref:`FileAccessLog
+  // <envoy_api_msg_config.filter.accesslog.v2.FileAccessLog>`
+  google.protobuf.Struct config = 3;
+}
+
+message AccessLogFilter {
+  oneof filter_specifier {
+    option (validate.required) = true;
+
+    // Status code filter.
+    StatusCodeFilter status_code_filter = 1;
+
+    // Duration filter.
+    DurationFilter duration_filter = 2;
+
+    // Not health check filter.
+    NotHealthCheckFilter not_health_check_filter = 3;
+
+    // Traceable filter.
+    TraceableFilter traceable_filter = 4;
+
+    // Runtime filter.
+    RuntimeFilter runtime_filter = 5;
+
+    // And filter.
+    AndFilter and_filter = 6;
+
+    // Or filter.
+    OrFilter or_filter = 7;
+
+    // [#not-implemented-hide:] Header filter.
+    HeaderFilter header_filter = 8;
+  }
+}
+
+// Filter on an integer comparison.
+message ComparisonFilter {
+  enum Op {
+    // =
+    EQ = 0;
+
+    // >=
+    GE = 1;
+
+    // <=
+    LE = 2;
+  }
+
+  // Comparison operator.
+  Op op = 1 [(validate.rules).enum.defined_only = true];
+
+  // Value to compare against.
+  envoy.api.v2.core.RuntimeUInt32 value = 2;
+}
+
+// Filters on HTTP response/status code.
+message StatusCodeFilter {
+  // Comparison.
+  ComparisonFilter comparison = 1 [(validate.rules).message.required = true];
+}
+
+// Filters on total request duration in milliseconds.
+message DurationFilter {
+  // Comparison.
+  ComparisonFilter comparison = 1 [(validate.rules).message.required = true];
+}
+
+// Filters for requests that are not health check requests. A health check
+// request is marked by the health check filter.
+message NotHealthCheckFilter {
+}
+
+// Filters for requests that are traceable. See the tracing overview for more
+// information on how a request becomes traceable.
+message TraceableFilter {
+}
+
+// Filters for random sampling of requests.
+message RuntimeFilter {
+  // Runtime key to get an optional overridden numerator for use in the *percent_sampled* field.
+  // If found in runtime, this value will replace the default numerator.
+  string runtime_key = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The default sampling percentage. If not specified, defaults to 0% with denominator of 100.
+  envoy.type.FractionalPercent percent_sampled = 2;
+
+  // By default, sampling pivots on the header
+  // :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` being present. If
+  // :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` is present, the filter will
+  // consistently sample across multiple hosts based on the runtime key value and the value
+  // extracted from :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`. If it is
+  // missing, or *use_independent_randomness* is set to true, the filter will randomly sample based
+  // on the runtime key value alone. *use_independent_randomness* can be used for logging kill
+  // switches within complex nested :ref:`AndFilter
+  // <envoy_api_msg_config.filter.accesslog.v2.AndFilter>` and :ref:`OrFilter
+  // <envoy_api_msg_config.filter.accesslog.v2.OrFilter>` blocks that are easier to reason about
+  // from a probability perspective (i.e., setting to true will cause the filter to behave like
+  // an independent random variable when composed within logical operator filters).
+  bool use_independent_randomness = 3;
+}
+
+// Performs a logical “and” operation on the result of each filter in filters.
+// Filters are evaluated sequentially and if one of them returns false, the
+// filter returns false immediately.
+message AndFilter {
+  repeated AccessLogFilter filters = 1 [(validate.rules).repeated .min_items = 2];
+}
+
+// Performs a logical “or” operation on the result of each individual filter.
+// Filters are evaluated sequentially and if one of them returns true, the
+// filter returns true immediately.
+message OrFilter {
+  repeated AccessLogFilter filters = 2 [(validate.rules).repeated .min_items = 2];
+}
+
+// [#not-implemented-hide:] Filters requests based on the presence or value of a request header.
+message HeaderFilter {
+  // Only requests with a header which matches the specified HeaderMatcher will pass the filter
+  // check.
+  envoy.api.v2.route.HeaderMatcher header = 1 [(validate.rules).message.required = true];
+}
+
+// Custom configuration for an AccessLog that writes log entries directly to a file.
+// Configures the built-in *envoy.file_access_log* AccessLog.
+message FileAccessLog {
+  // A path to a local file to which to write the access log entries.
+  string path = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Access log format. Envoy supports :ref:`custom access log formats
+  // <config_access_log_format>` as well as a :ref:`default format
+  // <config_access_log_default_format>`.
+  string format = 2;
+}

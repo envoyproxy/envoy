@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # Access log implementation that writes to a file.
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/access_log.rst
+# Public docs: docs/root/configuration/access_log.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -29,8 +29,8 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",
         "//source/common/access_log:access_log_formatter_lib",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf",
+        "//source/extensions/access_loggers:well_known_names",
         "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
     ],
 )

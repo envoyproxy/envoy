@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+import "envoy/api/v2/core/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Health check]
+// * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
+// * If health checking is configured for a cluster, additional statistics are emitted. They are
+//   documented :ref:`here <config_cluster_manager_cluster_stats>`.
+
+message HealthCheck {
+  // The time to wait for a health check response. If the timeout is reached the
+  // health check attempt will be considered a failure.
+  google.protobuf.Duration timeout = 1 [(validate.rules).duration.required = true];
+
+  // The interval between health checks.
+  google.protobuf.Duration interval = 2 [(validate.rules).duration.required = true];
+
+  // An optional jitter amount in millseconds. If specified, during every
+  // internal Envoy will add 0 to interval_jitter to the wait time.
+  google.protobuf.Duration interval_jitter = 3;
+
+  // The number of unhealthy health checks required before a host is marked
+  // unhealthy. Note that for *http* health checking if a host responds with 503
+  // this threshold is ignored and the host is considered unhealthy immediately.
+  google.protobuf.UInt32Value unhealthy_threshold = 4;
+
+  // The number of healthy health checks required before a host is marked
+  // healthy. Note that during startup, only a single successful health check is
+  // required to mark a host healthy.
+  google.protobuf.UInt32Value healthy_threshold = 5;
+
+  // [#not-implemented-hide:] Non-serving port for health checking.
+  google.protobuf.UInt32Value alt_port = 6;
+
+  // Reuse health check connection between health checks. Default is true.
+  google.protobuf.BoolValue reuse_connection = 7;
+
+  // Describes the encoding of the payload bytes in the payload.
+  message Payload {
+    oneof payload {
+      option (validate.required) = true;
+
+      // Hex encoded payload. E.g., "000000FF".
+      string text = 1 [(validate.rules).string.min_bytes = 1];
+
+      // [#not-implemented-hide:] Binary payload.
+      bytes binary = 2;
+    }
+  }
+
+  message HttpHealthCheck {
+    // The value of the host header in the HTTP health check request. If
+    // left empty (default value), the IP on behalf of which this health check is performed will be
+    // used.
+    string host = 1;
+
+    // Specifies the HTTP path that will be requested during health checking. For example
+    // */healthcheck*.
+    string path = 2 [(validate.rules).string.min_bytes = 1];
+
+    // [#not-implemented-hide:] HTTP specific payload.
+    Payload send = 3;
+
+    // [#not-implemented-hide:] HTTP specific response.
+    Payload receive = 4;
+
+    // An optional service name parameter which is used to validate the identity of
+    // the health checked cluster. See the :ref:`architecture overview
+    // <arch_overview_health_checking_identity>` for more information.
+    string service_name = 5;
+
+    // Specifies a list of HTTP headers that should be added to each request that is sent to the
+    // health checked cluster.
+    repeated core.HeaderValueOption request_headers_to_add = 6;
+  }
+
+  message TcpHealthCheck {
+    // Empty payloads imply a connect-only health check.
+    Payload send = 1;
+
+    // When checking the response, “fuzzy” matching is performed such that each
+    // binary block must be found, and in the order specified, but not
+    // necessarily contiguous.
+    repeated Payload receive = 2;
+  }
+
+  message RedisHealthCheck {
+    // If set, optionally perform ``EXISTS <key>`` instead of ``PING``. A return value
+    // from Redis of 0 (does not exist) is considered a passing healthcheck. A return value other
+    // than 0 is considered a failure. This allows the user to mark a Redis instance for maintenance
+    // by setting the specified key to any value and waiting for traffic to drain.
+    string key = 1;
+  }
+
+  // `grpc.health.v1.Health
+  // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_-based
+  // healthcheck. See `gRPC doc <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_
+  // for details.
+  message GrpcHealthCheck {
+    // An optional service name parameter which will be sent to gRPC service in
+    // `grpc.health.v1.HealthCheckRequest
+    // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L20>`_.
+    // message. See `gRPC health-checking overview
+    // <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_ for more information.
+    string service_name = 1;
+  }
+
+  // [#not-implemented-hide:] Custom health check.
+  message CustomHealthCheck {
+    // The registered name of the custom health check.
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+
+    // A custom health checker specific configuration which depends on the custom health checker
+    // being instantiated. See :api:`envoy/config/health_checker` for reference.
+    google.protobuf.Struct config = 2;
+  }
+
+  oneof health_checker {
+    option (validate.required) = true;
+
+    // HTTP health check.
+    HttpHealthCheck http_health_check = 8;
+
+    // TCP health check.
+    TcpHealthCheck tcp_health_check = 9;
+
+    // Redis health check.
+    RedisHealthCheck redis_health_check = 10;
+
+    // gRPC health check.
+    GrpcHealthCheck grpc_health_check = 11;
+
+    // [#not-implemented-hide:] Custom health check.
+    CustomHealthCheck custom_health_check = 13;
+  }
+
+  // The "no traffic interval" is a special health check interval that is used when a cluster has
+  // never had traffic routed to it. This lower interval allows cluster information to be kept up to
+  // date, without sending a potentially large amount of active health checking traffic for no
+  // reason. Once a cluster has been used for traffic routing, Envoy will shift back to using the
+  // standard health check interval that is defined. Note that this interval takes precedence over
+  // any other.
+  //
+  // The default value for "no traffic interval" is 60 seconds.
+  google.protobuf.Duration no_traffic_interval = 12;
+
+  // The "unhealthy interval" is a health check interval that is used for hosts that are marked as
+  // unhealthy. As soon as the host is marked as healthy, Envoy will shift back to using the
+  // standard health check interval that is defined.
+  //
+  // The default value for "unhealthy interval" is the same as "interval".
+  google.protobuf.Duration unhealthy_interval = 14;
+
+  // The "unhealthy edge interval" is a special health check interval that is used for the first
+  // health check right after a host is marked as unhealthy. For subsequent health checks
+  // Envoy will shift back to using either "unhealthy interval" if present or the standard health
+  // check interval that is defined.
+  //
+  // The default value for "unhealthy edge interval" is the same as "unhealthy interval".
+  google.protobuf.Duration unhealthy_edge_interval = 15;
+
+  // The "healthy edge interval" is a special health check interval that is used for the first
+  // health check right after a host is marked as healthy. For subsequent health checks
+  // Envoy will shift back to using the standard health check interval that is defined.
+  //
+  // The default value for "healthy edge interval" is the same as the default interval.
+  google.protobuf.Duration healthy_edge_interval = 16;
+}
+
+// Endpoint health status.
+enum HealthStatus {
+  // The health status is not known. This is interpreted by Envoy as *HEALTHY*.
+  UNKNOWN = 0;
+
+  // Healthy.
+  HEALTHY = 1;
+
+  // Unhealthy.
+  UNHEALTHY = 2;
+
+  // Connection draining in progress. E.g.,
+  // `<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care/>`_
+  // or
+  // `<https://cloud.google.com/compute/docs/load-balancing/enabling-connection-draining>`_.
+  // This is interpreted by Envoy as *UNHEALTHY*.
+  DRAINING = 3;
+
+  // Health check timed out. This is part of HDS and is interpreted by Envoy as
+  // *UNHEALTHY*.
+  TIMEOUT = 4;
+}

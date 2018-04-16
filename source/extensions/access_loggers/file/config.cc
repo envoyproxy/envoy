@@ -5,10 +5,10 @@
 #include "envoy/server/filter_config.h"
 
 #include "common/access_log/access_log_formatter.h"
-#include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +36,7 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new envoy::config::filter::accesslog::v2::FileAccessLog()};
 }
 
-std::string FileAccessLogFactory::name() const { return Config::AccessLogNames::get().FILE; }
+std::string FileAccessLogFactory::name() const { return AccessLogNames::get().FILE; }
 
 /**
  * Static registration for the file access log. @see RegisterFactory.

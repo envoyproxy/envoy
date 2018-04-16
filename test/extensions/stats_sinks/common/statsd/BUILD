@@ -12,7 +12,6 @@ envoy_cc_test(
     name = "statsd_test",
     srcs = ["statsd_test.cc"],
     deps = [
-        "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",

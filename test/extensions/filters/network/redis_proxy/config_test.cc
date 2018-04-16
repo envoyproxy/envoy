@@ -14,6 +14,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
+TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(RedisProxyFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::redis_proxy::v2::RedisProxy(), context),
+               ProtoValidationException);
+}
+
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(
   {
