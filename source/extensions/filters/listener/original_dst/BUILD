@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # ORIGINAL_DST iptables redirection listener filter
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/listener_filters/original_dst_filter.rst
+# Public docs: docs/root/configuration/listener_filters/original_dst_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

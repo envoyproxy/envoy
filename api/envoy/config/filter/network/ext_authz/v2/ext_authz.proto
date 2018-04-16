@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.ext_authz.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/grpc_service.proto";
+
+import "validate/validate.proto";
+
+// [#not-implemented-hide:]
+// External Authorization filter calls out to an external service over the
+// gRPC Authorization API defined by
+// :ref:`external_auth <envoy_api_msg_auth.CheckRequest>`.
+// A failed check will cause this filter to close the TCP connection.
+message ExtAuthz {
+  // The prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The external authorization gRPC service configuration.
+  envoy.api.v2.core.GrpcService grpc_service = 2;
+
+  // The filter's behaviour in case the external authorization service does
+  // not respond back. If set to true then in case of failure to get a
+  // response back from the authorization service or getting a response that
+  // is NOT denied then traffic will be permitted.
+  // Defaults to false.
+  bool failure_mode_allow = 3;
+}

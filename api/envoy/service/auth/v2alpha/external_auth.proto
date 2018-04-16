@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+// [#proto-status: draft]
+
+package envoy.service.auth.v2alpha;
+option go_package = "v2alpha";
+option java_generic_services = true;
+
+import "envoy/service/auth/v2alpha/attribute_context.proto";
+
+import "google/rpc/status.proto";
+import "validate/validate.proto";
+
+// A generic interface for performing authorization check on incoming
+// requests to a networked service.
+service Authorization {
+  // Performs authorization check based on the attributes associated with the
+  // incoming request, and returns status `OK` or not `OK`.
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message CheckRequest {
+  // The request attributes.
+  AttributeContext attributes = 1;
+}
+
+message CheckResponse {
+  // Status `OK` allows the request. Any other status indicates the request should be denied.
+  google.rpc.Status status = 1;
+
+  // An optional message that contains HTTP response attributes. This message is
+  // used when the authorization service needs to send custom responses to the
+  // downstream client or, to modify/add request headers being dispatched to the upstream.
+  message HttpResponse {
+    // Http status code.
+    uint32 status_code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+
+    // Http entity headers.
+    map<string, string> headers = 2;
+
+    // Http entity body.
+    string body = 3;
+  }
+}

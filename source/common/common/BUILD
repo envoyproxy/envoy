@@ -140,7 +140,7 @@ envoy_cc_library(
 
 genrule(
     name = "generate_version_number",
-    srcs = ["@envoy_api//:VERSION"],
+    srcs = ["//:VERSION"],
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
 )

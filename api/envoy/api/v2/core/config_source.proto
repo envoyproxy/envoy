@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+import "envoy/api/v2/core/grpc_service.proto";
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Configuration sources]
+
+// API configuration source. This identifies the API type and cluster that Envoy
+// will use to fetch an xDS API.
+message ApiConfigSource {
+  // APIs may be fetched via either REST or gRPC.
+  enum ApiType {
+    // REST-JSON legacy corresponds to the v1 API.
+    REST_LEGACY = 0;
+    // REST-JSON v2 API. The `canonical JSON encoding
+    // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
+    // the v2 protos is used.
+    REST = 1;
+    // gRPC v2 API.
+    GRPC = 2;
+  }
+  ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
+  // Multiple cluster names may be provided for REST_LEGACY/REST. If > 1
+  // cluster is defined, clusters will be cycled through if any kind of failure
+  // occurs.
+  //
+  // .. note::
+  //
+  //  The cluster with name ``cluster_name`` must be statically defined and its
+  //  type must not be ``EDS``.
+  repeated string cluster_names = 2;
+
+  // Multiple gRPC services be provided for GRPC. If > 1 cluster is defined,
+  // services will be cycled through if any kind of failure occurs.
+  //
+  // .. note::
+  //
+  //  If a gRPC service points to a ``cluster_name``, it must be statically
+  //  defined and its type must not be ``EDS``.
+  repeated GrpcService grpc_services = 4;
+
+  // For REST APIs, the delay between successive polls.
+  google.protobuf.Duration refresh_delay = 3 [(gogoproto.stdduration) = true];
+}
+
+// Aggregated Discovery Service (ADS) options. This is currently empty, but when
+// set in :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` can be used to
+// specify that ADS is to be used.
+message AggregatedConfigSource {
+}
+
+// Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
+// <config_cluster_manager_cluster>`, :ref:`routes
+// <config_http_conn_man_route_table>`, :ref:`endpoints
+// <arch_overview_service_discovery>` etc. may either be sourced from the
+// filesystem or from an xDS API source. Filesystem configs are watched with
+// inotify for updates.
+message ConfigSource {
+  oneof config_source_specifier {
+    option (validate.required) = true;
+    // Path on the filesystem to source and watch for configuration updates.
+    //
+    // .. note::
+    //
+    //  The path to the source must exist at config load time.
+    //
+    // .. note::
+    //
+    //   Envoy will only watch the file path for *moves.* This is because in general only moves
+    //   are atomic. The same method of swapping files as is demonstrated in the
+    //   :ref:`runtime documentation <config_runtime_symbolic_link_swap>` can be used here also.
+    string path = 1;
+    // API configuration source.
+    ApiConfigSource api_config_source = 2;
+    // When set, ADS will be used to fetch resources. The ADS API configuration
+    // source in the bootstrap configuration is used.
+    AggregatedConfigSource ads = 3;
+  }
+}

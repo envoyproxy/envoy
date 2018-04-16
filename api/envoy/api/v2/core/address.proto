@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Network addresses]
+
+message Pipe {
+  // Unix Domain Socket path. On Linux, paths starting with '@' will use the
+  // abstract namespace. The starting '@' is replaced by a null byte by Envoy.
+  // Paths starting with '@' will result in an error in environments other than
+  // Linux.
+  string path = 1 [(validate.rules).string.min_bytes = 1];
+}
+
+message SocketAddress {
+  enum Protocol {
+    option (gogoproto.goproto_enum_prefix) = false;
+    TCP = 0;
+    // [#not-implemented-hide:]
+    UDP = 1;
+  }
+  Protocol protocol = 1 [(validate.rules).enum.defined_only = true];
+  // The address for this socket. :ref:`Listeners <config_listeners>` will bind
+  // to the address or outbound connections will be made. An empty address is
+  // not allowed, specify ``0.0.0.0`` or ``::`` to bind any. It's still possible to
+  // distinguish on an address via the prefix/suffix matching in
+  // FilterChainMatch after connection. For :ref:`clusters
+  // <config_cluster_manager_cluster>`, an address may be either an IP or
+  // hostname to be resolved via DNS. If it is a hostname, :ref:`resolver_name
+  // <envoy_api_field_core.SocketAddress.resolver_name>` should be set unless default
+  // (i.e. DNS) resolution is expected.
+  string address = 2 [(validate.rules).string.min_bytes = 1];
+  oneof port_specifier {
+    option (validate.required) = true;
+    uint32 port_value = 3;
+    // This is only valid if :ref:`resolver_name
+    // <envoy_api_field_core.SocketAddress.resolver_name>` is specified below and the
+    // named resolver is capable of named port resolution.
+    string named_port = 4;
+  }
+  // The name of the resolver. This must have been registered with Envoy. If this is
+  // empty, a context dependent default applies. If address is a hostname this
+  // should be set for resolution other than DNS. If the address is a concrete
+  // IP address, no resolution will occur.
+  string resolver_name = 5;
+
+  // When binding to an IPv6 address above, this enables `IPv4 compatibity
+  // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
+  // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
+  // IPv6 space as ``::FFFF:<IPv4-address>``.
+  bool ipv4_compat = 6;
+}
+
+message BindConfig {
+  // The address to bind to when creating a socket.
+  SocketAddress source_address = 1
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  // Whether to set the *IP_FREEBIND* option when creating the socket. When this
+  // flag is set to true, allows the :ref:`source_address
+  // <envoy_api_field_UpstreamBindConfig.source_address>` to be an IP address
+  // that is not configured on the system running Envoy. When this flag is set
+  // to false, the option *IP_FREEBIND* is disabled on the socket. When this
+  // flag is not set (default), the socket is not modified, i.e. the option is
+  // neither enabled nor disabled.
+  google.protobuf.BoolValue freebind = 2;
+}
+
+// Addresses specify either a logical or physical address and port, which are
+// used to tell Envoy where to bind/listen, connect to upstream and find
+// management servers.
+message Address {
+  oneof address {
+    option (validate.required) = true;
+
+    SocketAddress socket_address = 1;
+    Pipe pipe = 2;
+  }
+}
+
+// CidrRange specifies an IP Address and a prefix length to construct
+// the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
+message CidrRange {
+  // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
+  string address_prefix = 1 [(validate.rules).string.min_bytes = 1];
+  // Length of prefix, e.g. 0, 32.
+  google.protobuf.UInt32Value prefix_len = 2 [(validate.rules).uint32.lte = 128];
+}
