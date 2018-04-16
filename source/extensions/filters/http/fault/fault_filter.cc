@@ -75,11 +75,11 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   // by folks using filter level configuration in the fault filter (mainly Lyft folks).
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
     auto proto_config = callbacks_->route()->routeEntry()->perFilterConfig(
-        Envoy::Config::HttpFilterNames::get().FAULT);
+        Extensions::HttpFilters::HttpFilterNames::get().FAULT);
     if (!proto_config) {
       // See if the virtual host has any fault filter config
       proto_config = callbacks_->route()->routeEntry()->virtualHost().perFilterConfig(
-          Envoy::Config::HttpFilterNames::get().FAULT);
+        Extensions::HttpFilters::HttpFilterNames::get().FAULT);
     }
 
     if (proto_config) {
