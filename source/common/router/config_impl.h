@@ -44,6 +44,16 @@ public:
                                       uint64_t random_value) const PURE;
 };
 
+class PerFilterConfigs {
+public:
+  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
+
+  const Protobuf::Message* get(const std::string& name) const;
+
+private:
+  std::unordered_map<std::string, ProtobufTypes::MessagePtr> configs_;
+};
+
 class RouteEntryImplBase;
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
 
@@ -66,6 +76,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
+  const Protobuf::Message* perFilterConfig(const std::string&) const override { return nullptr; }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -119,6 +130,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
+  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -154,6 +166,7 @@ private:
                                           // raw ref to the top level config is currently safe.
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  PerFilterConfigs per_filter_configs_;
 };
 
 typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
@@ -357,6 +370,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
+  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
 
 protected:
   const bool case_sensitive_;
@@ -430,6 +444,10 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
 
+    const Protobuf::Message* perFilterConfig(const std::string& name) const override {
+      return parent_->perFilterConfig(name);
+    };
+
   private:
     const RouteEntryImplBase* parent_;
     const std::string cluster_name_;
@@ -469,6 +487,8 @@ private:
       DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
     }
 
+    const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
@@ -476,6 +496,7 @@ private:
     MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
+    PerFilterConfigs per_filter_configs_;
   };
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
@@ -527,6 +548,7 @@ private:
   const DecoratorConstPtr decorator_;
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
+  PerFilterConfigs per_filter_configs_;
 };
 
 /**

@@ -258,6 +258,13 @@ public:
    * @return const Config& the RouteConfiguration that owns this virtual host.
    */
   virtual const Config& routeConfig() const PURE;
+
+  /**
+   * @return const Protobuf::Message* the per-filter config for the given
+   * filter name configured for this virtual host. If none is present,
+   * nullptr is returned.
+   */
+  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -463,6 +470,14 @@ public:
    * @return const PathMatchCriterion& the match criterion for this route.
    */
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
+
+  /**
+   * @return const Protobuf::Message* the per-filter config for the given
+   * filter name configured for this route entry. Only weighted cluster entries
+   * will potentially have these values available. If none is present,
+   * nullptr is returned.
+   */
+  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -508,6 +523,13 @@ public:
    * @return the decorator or nullptr if not defined for the request.
    */
   virtual const Decorator* decorator() const PURE;
+
+  /**
+   * @return const Protobuf::Message* the per-filter config for the given
+   * filter name configured for this route. If none is present, nullptr is
+   * returned.
+   */
+  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;

@@ -22,6 +22,7 @@ envoy_cc_library(
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:filter_config_interface",  # TODO(rodaine): break dependency on server
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
@@ -30,6 +31,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
+        "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
