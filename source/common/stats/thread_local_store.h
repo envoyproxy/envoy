@@ -141,7 +141,7 @@ typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
  *    to "beginMerge" method.
  *  - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
  *    current_active index via which it writes to the correct histogram.
- *  - When all workers have done this the main thread continues with the flush process where the
+ *  - When all workers have done, the main thread continues with the flush process where the
  *    "actual" merging happens.
  *  - As the active histograms are swapped in TLS histograms, On the main thread, we can be sure
  *    that no worker is writing into the "backup" histogram.

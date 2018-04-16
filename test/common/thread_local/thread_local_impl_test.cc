@@ -47,6 +47,9 @@ public:
   InstanceImpl tls_;
   Event::MockDispatcher main_dispatcher_;
   Event::MockDispatcher thread_dispatcher_;
+  std::condition_variable cv_;
+  std::mutex cv_mutex_;
+  bool all_threads_complete_;
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {
@@ -91,18 +94,18 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   EXPECT_CALL(main_dispatcher_, post(_));
 
   // Ensure that the thread local call back and all_thread_complete call back are called.
-  std::shared_ptr<std::atomic<bool>> all_threads_complete =
-      std::make_shared<std::atomic<bool>>(false);
   std::shared_ptr<std::atomic<uint64_t>> thread_local_calls =
       std::make_shared<std::atomic<uint64_t>>(0);
 
   tlsptr->runOnAllThreads([thread_local_calls]() -> void { ++*thread_local_calls; },
-                          [all_threads_complete, thread_local_calls]() -> void {
+                          [this, thread_local_calls]() -> void {
                             EXPECT_EQ(*thread_local_calls, 1);
-                            *all_threads_complete = true;
+                            all_threads_complete_ = true;
+                            cv_.notify_one();
                           });
 
-  EXPECT_TRUE(*all_threads_complete);
+  std::unique_lock<std::mutex> lock(cv_mutex_);
+  cv_.wait(lock, [this] { return all_threads_complete_; });
 
   tls_.shutdownGlobalThreading();
   tls_.shutdownThread();

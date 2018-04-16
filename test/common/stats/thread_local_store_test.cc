@@ -80,12 +80,38 @@ public:
     store_->addSink(sink_);
   }
 
-  void setUp() {
+  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
+  MOCK_METHOD1(free, void(RawStatData& data));
+
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  TestAllocator alloc_;
+  MockSink sink_;
+  std::unique_ptr<ThreadLocalStoreImpl> store_;
+};
+
+class HistogramTest : public testing::Test, public RawStatDataAllocator {
+public:
+  HistogramTest() {
+    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
+      return alloc_.alloc(name);
+    }));
+
+    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
+      return alloc_.free(data);
+    }));
+
+    EXPECT_CALL(*this, alloc("stats.overflow"));
+    store_.reset(new ThreadLocalStoreImpl(*this));
+    store_->addSink(sink_);
+  }
+
+  void SetUp() override {
     InSequence s;
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
 
-  void tearDown() {
+  void TearDown() override {
     store_->shutdownThreading();
     tls_.shutdownThread();
 
@@ -100,7 +126,7 @@ public:
    * Validates taht Histogram merge happens as desired and returns the processed histogram count
    * that can be asserted later.
    */
-  int validateMerge() {
+  uint64_t validateMerge() {
 
     std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
     store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
@@ -277,140 +303,6 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_)).Times(5);
 }
-TEST_F(StatsThreadLocalStoreTest, BasicSingleHistogramMerge) {
-  setUp();
-
-  Histogram& h1 = store_->histogram("h1");
-  EXPECT_EQ("h1", h1.name());
-
-  expectCallAndAccumulate(h1, 0);
-  expectCallAndAccumulate(h1, 43);
-  expectCallAndAccumulate(h1, 41);
-  expectCallAndAccumulate(h1, 415);
-  expectCallAndAccumulate(h1, 2201);
-  expectCallAndAccumulate(h1, 3201);
-  expectCallAndAccumulate(h1, 125);
-  expectCallAndAccumulate(h1, 13);
-
-  EXPECT_EQ(1, validateMerge());
-
-  tearDown();
-}
-
-TEST_F(StatsThreadLocalStoreTest, BasicMultiHistogramMerge) {
-  setUp();
-
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = store_->histogram("h2");
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("h2", h2.name());
-
-  expectCallAndAccumulate(h1, 1);
-  expectCallAndAccumulate(h2, 1);
-  expectCallAndAccumulate(h2, 2);
-
-  EXPECT_EQ(2, validateMerge());
-
-  tearDown();
-}
-
-TEST_F(StatsThreadLocalStoreTest, MultiHistogramMultipleMerges) {
-  setUp();
-
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = store_->histogram("h2");
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("h2", h2.name());
-
-  // Insert one value in to one histogram and validate
-  expectCallAndAccumulate(h1, 1);
-  EXPECT_EQ(2, validateMerge());
-
-  // Insert value into second histogram and validate that it is merged properly.
-  expectCallAndAccumulate(h2, 1);
-  EXPECT_EQ(2, validateMerge());
-
-  // Insert more values into both the histograms and validate that it is merged properly.
-  expectCallAndAccumulate(h1, 2);
-  EXPECT_EQ(2, validateMerge());
-
-  expectCallAndAccumulate(h2, 3);
-  EXPECT_EQ(2, validateMerge());
-
-  expectCallAndAccumulate(h2, 2);
-  EXPECT_EQ(2, validateMerge());
-
-  // Do not insert any value and validate that intervalSummary is empty for both the histograms and
-  // cumulativeSummary has right values.
-  EXPECT_EQ(2, validateMerge());
-
-  tearDown();
-}
-
-TEST_F(StatsThreadLocalStoreTest, BasicScopeHistogramMerge) {
-  setUp();
-
-  ScopePtr scope1 = store_->createScope("scope1.");
-
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("scope1.h2", h2.name());
-
-  expectCallAndAccumulate(h1, 2);
-  expectCallAndAccumulate(h2, 2);
-  EXPECT_EQ(2, validateMerge());
-
-  tearDown();
-}
-
-TEST_F(StatsThreadLocalStoreTest, BasicHistogramValidate) {
-  setUp();
-
-  Histogram& h1 = store_->histogram("h1");
-  expectCallAndAccumulate(h1, 1);
-
-  EXPECT_EQ(1, validateMerge());
-
-  std::string expected_summary = "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-                                 "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
-
-  tearDown();
-}
-
-TEST_F(StatsThreadLocalStoreTest, BasicHistogramUsed) {
-  setUp();
-
-  ScopePtr scope1 = store_->createScope("scope1.");
-
-  Histogram& h1 = store_->histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("scope1.h2", h2.name());
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
-  h1.recordValue(1);
-
-  std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
-
-  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
-    if (histogram->name() == "h1") {
-      EXPECT_TRUE(histogram->used());
-    } else {
-      EXPECT_FALSE(histogram->used());
-    }
-  }
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
-  h2.recordValue(2);
-
-  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
-    EXPECT_TRUE(histogram->used());
-  }
-
-  tearDown();
-}
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
@@ -563,6 +455,118 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
 
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_)).Times(5);
+}
+
+// Histogram tests
+TEST_F(HistogramTest, BasicSingleHistogramMerge) {
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ("h1", h1.name());
+
+  expectCallAndAccumulate(h1, 0);
+  expectCallAndAccumulate(h1, 43);
+  expectCallAndAccumulate(h1, 41);
+  expectCallAndAccumulate(h1, 415);
+  expectCallAndAccumulate(h1, 2201);
+  expectCallAndAccumulate(h1, 3201);
+  expectCallAndAccumulate(h1, 125);
+  expectCallAndAccumulate(h1, 13);
+
+  EXPECT_EQ(1, validateMerge());
+}
+
+TEST_F(HistogramTest, BasicMultiHistogramMerge) {
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = store_->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  expectCallAndAccumulate(h1, 1);
+  expectCallAndAccumulate(h2, 1);
+  expectCallAndAccumulate(h2, 2);
+
+  EXPECT_EQ(2, validateMerge());
+}
+
+TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = store_->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  // Insert one value in to one histogram and validate
+  expectCallAndAccumulate(h1, 1);
+  EXPECT_EQ(2, validateMerge());
+
+  // Insert value into second histogram and validate that it is merged properly.
+  expectCallAndAccumulate(h2, 1);
+  EXPECT_EQ(2, validateMerge());
+
+  // Insert more values into both the histograms and validate that it is merged properly.
+  expectCallAndAccumulate(h1, 2);
+  EXPECT_EQ(2, validateMerge());
+
+  expectCallAndAccumulate(h2, 3);
+  EXPECT_EQ(2, validateMerge());
+
+  expectCallAndAccumulate(h2, 2);
+  EXPECT_EQ(2, validateMerge());
+
+  // Do not insert any value and validate that intervalSummary is empty for both the histograms and
+  // cumulativeSummary has right values.
+  EXPECT_EQ(2, validateMerge());
+}
+
+TEST_F(HistogramTest, BasicScopeHistogramMerge) {
+  ScopePtr scope1 = store_->createScope("scope1.");
+
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+
+  expectCallAndAccumulate(h1, 2);
+  expectCallAndAccumulate(h2, 2);
+  EXPECT_EQ(2, validateMerge());
+}
+
+TEST_F(HistogramTest, BasicHistogramValidate) {
+  Histogram& h1 = store_->histogram("h1");
+  expectCallAndAccumulate(h1, 1);
+
+  EXPECT_EQ(1, validateMerge());
+
+  std::string expected_summary = "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
+                                 "P99: 1.099, P99.9: 1.0999, P100: 1.1";
+  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
+}
+
+TEST_F(HistogramTest, BasicHistogramUsed) {
+  ScopePtr scope1 = store_->createScope("scope1.");
+
+  Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = scope1->histogram("h2");
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
+    if (histogram->name() == "h1") {
+      EXPECT_TRUE(histogram->used());
+    } else {
+      EXPECT_FALSE(histogram->used());
+    }
+  }
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
+  h2.recordValue(2);
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
+    EXPECT_TRUE(histogram->used());
+  }
 }
 
 } // namespace Stats
