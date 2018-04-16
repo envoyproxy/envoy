@@ -282,41 +282,31 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 
 bool ContextImpl::verifySubjectAltName(X509* cert,
                                        const std::vector<std::string>& subject_alt_names) {
-  bool verified = false;
-
-  STACK_OF(GENERAL_NAME)* altnames = static_cast<STACK_OF(GENERAL_NAME)*>(
-      X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr));
-
-  if (altnames) {
-    int n = sk_GENERAL_NAME_num(altnames);
-    for (int i = 0; i < n && !verified; i++) {
-      GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, i);
-
-      if (altname->type == GEN_DNS) {
-        ASN1_STRING* str = altname->d.dNSName;
-        char* dns_name = reinterpret_cast<char*>(ASN1_STRING_data(str));
-        for (auto& config_san : subject_alt_names) {
-          if (dNSNameMatch(config_san, dns_name)) {
-            verified = true;
-            break;
-          }
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names == nullptr) {
+    return false;
+  }
+  for (const GENERAL_NAME* san : san_names.get()) {
+    if (san->type == GEN_DNS) {
+      ASN1_STRING* str = san->d.dNSName;
+      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+      for (auto& config_san : subject_alt_names) {
+        if (dNSNameMatch(config_san, dns_name)) {
+          return true;
         }
-      } else if (altname->type == GEN_URI) {
-        ASN1_STRING* str = altname->d.uniformResourceIdentifier;
-        char* crt_san = reinterpret_cast<char*>(ASN1_STRING_data(str));
-        for (auto& config_san : subject_alt_names) {
-          if (config_san.compare(crt_san) == 0) {
-            verified = true;
-            break;
-          }
+      }
+    } else if (san->type == GEN_URI) {
+      ASN1_STRING* str = san->d.uniformResourceIdentifier;
+      const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+      for (auto& config_san : subject_alt_names) {
+        if (config_san.compare(uri) == 0) {
+          return true;
         }
       }
     }
-
-    sk_GENERAL_NAME_pop_free(altnames, GENERAL_NAME_free);
   }
-
-  return verified;
+  return false;
 }
 
 bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) {
@@ -540,10 +530,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names != nullptr) {
-    // TODO(ggreenway): Use range-based for loop when newer BoringSSL build is used:
-    //   for (const GENERAL_NAME* san : *san_names) {
-    for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names.get()); i++) {
-      const GENERAL_NAME* san = sk_GENERAL_NAME_value(san_names.get(), i);
+    for (const GENERAL_NAME* san : san_names.get()) {
       if (san->type == GEN_DNS || san->type == GEN_URI) {
         rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
         RELEASE_ASSERT(rc == 1);
