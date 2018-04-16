@@ -43,7 +43,8 @@ private:
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
         : HostImpl(cluster, hostname, address, envoy::api::v2::core::Metadata::default_instance(),
-                   1, envoy::api::v2::core::Locality().default_instance()),
+                   1, envoy::api::v2::core::Locality().default_instance(),
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -77,7 +78,10 @@ private:
     const envoy::api::v2::core::Locality& locality() const override {
       return envoy::api::v2::core::Locality().default_instance();
     }
-
+    // TODO(dio): To support different address port.
+    Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
+      return address_;
+    }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;
   };

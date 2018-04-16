@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.rate_limit.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/ratelimit/ratelimit.proto";
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Rate limit]
+// Rate limit :ref:`configuration overview <config_network_filters_rate_limit>`.
+
+message RateLimit {
+  // The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The rate limit domain to use in the rate limit service request.
+  string domain = 2 [(validate.rules).string.min_bytes = 1];
+
+  // The rate limit descriptor list to use in the rate limit service request.
+  repeated envoy.api.v2.ratelimit.RateLimitDescriptor descriptors = 3
+      [(validate.rules).repeated .min_items = 1];
+
+  // The timeout in milliseconds for the rate limit service RPC. If not
+  // set, this defaults to 20ms.
+  google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
+}

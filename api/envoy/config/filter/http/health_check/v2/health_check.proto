@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.health_check.v2;
+option go_package = "v2";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/type/percent.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Health check]
+// Health check :ref:`configuration overview <config_http_filters_health_check>`.
+
+message HealthCheck {
+  // Specifies whether the filter operates in pass through mode or not.
+  google.protobuf.BoolValue pass_through_mode = 1 [(validate.rules).message.required = true];
+
+  // Specifies the incoming HTTP endpoint that should be considered the
+  // health check endpoint. For example */healthcheck*.
+  string endpoint = 2 [(validate.rules).string.min_bytes = 1];
+
+  // If operating in pass through mode, the amount of time in milliseconds
+  // that the filter should cache the upstream response.
+  google.protobuf.Duration cache_time = 3 [(gogoproto.stdduration) = true];
+
+  // If operating in non-pass-through mode, specifies a set of upstream cluster
+  // names and the minimum percentage of servers in each of those clusters that
+  // must be healthy in order for the filter to return a 200.
+  map<string, envoy.type.Percent> cluster_min_healthy_percentages = 4;
+}

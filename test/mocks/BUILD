@@ -14,6 +14,7 @@ envoy_cc_test_library(
     hdrs = ["common.h"],
     deps = [
         "//include/envoy/common:time_interface",
+        "//include/envoy/common:token_bucket_interface",
         "//source/common/common:logger_lib",
     ],
 )

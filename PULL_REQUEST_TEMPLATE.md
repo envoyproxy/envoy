@@ -36,22 +36,17 @@ if you are unsure. A good rule of thumb is the riskier the change, the
 more comprehensive the testing should be.
 
 *Docs Changes*:
->Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
-if your PR involves documentation changes. Please write in N/A if there were no
-documentation changes.
+Description of documentation changes. These should be made in [docs/root](docs/root) and/or inline
+with the API protos. Please write in N/A if there were no documentation changes.
 
 *Release Notes*:
->If this change is user impacting you **must** add a release note via a discrete PR to
-[version_history.rst](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst).
-Please include any relevant links. Each release note should be prefixed with the relevant subsystem
-in alphabetical order (see existing examples as a guide) and include links to relevant parts of
-the documentation. Often times, this PR can be done concurrently with the main documentation PR
-for the feature. Thank you! Please write in N/A if there are no release notes.
+>If this change is user impacting you **must** add a release note to
+[version_history.rst](docs/root/intro/version_history.rst). Please include any relevant links. Each
+release note should be prefixed with the relevant subsystem in alphabetical order (see existing
+examples as a guide) and include links to relevant parts of the documentation. Thank you! Please
+write in N/A if there are no release notes.
 
 [Optional Fixes #Issue]
 
-[Optional *API Changes*:]
->Link to [Data Plane PR](https://github.com/envoyproxy/data-plane-api/pulls)]
-
 [Optional *Deprecated*:]
->Description of what is deprecated.
+>Description of what is [deprecated](DEPRECATED.md).

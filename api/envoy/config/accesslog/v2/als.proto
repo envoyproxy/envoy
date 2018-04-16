@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.config.accesslog.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/grpc_service.proto";
+
+import "validate/validate.proto";
+
+// Configuration for the built-in *envoy.tcp_grpc_access_log* type. This configuration will
+// populate *StreamAccessLogsMessage.tcp_logs*.
+// [#not-implemented-hide:]
+// [#comment:TODO(mattklein123): Block type in non-tcp proxy cases?]
+message TcpGrpcAccessLogConfig {
+  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message.required = true];
+}
+
+// Configuration for the built-in *envoy.http_grpc_access_log* type. This configuration will
+// populate *StreamAccessLogsMessage.http_logs*.
+// [#not-implemented-hide:]
+// [#comment:TODO(mattklein123): Block type in non-http/router proxy cases?]
+message HttpGrpcAccessLogConfig {
+  CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message.required = true];
+
+  // Additional request headers to log in *HTTPRequestProperties.request_headers*.
+  repeated string additional_request_headers_to_log = 2;
+
+  // Additional response headers to log in *HTTPResponseProperties.response_headers*.
+  repeated string additional_response_headers_to_log = 3;
+}
+
+// Common configuration for gRPC access logs.
+// [#not-implemented-hide:]
+message CommonGrpcAccessLogConfig {
+  // The friendly name of the access log to be returned in StreamAccessLogsMessage.Identifier. This
+  // allows the access log server to differentiate between different access logs coming from the
+  // same Envoy.
+  string log_name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The gRPC service for the access log service.
+  envoy.api.v2.core.GrpcService grpc_service = 2 [(validate.rules).message.required = true];
+}

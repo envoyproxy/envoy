@@ -9,4 +9,8 @@ MockSystemTimeSource::~MockSystemTimeSource() {}
 
 MockMonotonicTimeSource::MockMonotonicTimeSource() {}
 MockMonotonicTimeSource::~MockMonotonicTimeSource() {}
+
+MockTokenBucket::MockTokenBucket() {}
+MockTokenBucket::~MockTokenBucket() {}
+
 } // namespace Envoy
