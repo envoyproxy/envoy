@@ -30,7 +30,7 @@ then
   # For each SHA, hard reset, rsync api/ and generate commit in
   # envoyproxy/data-plane-api
   API_WORKING_DIR="$TMPDIR/envoy-api-mirror"
-  git worktree add "$API_WORKING_DIR" master
+  git worktree add "$API_WORKING_DIR"
   for sha in $SHAS
   do
     git -C "$API_WORKING_DIR" reset --hard "$sha"
