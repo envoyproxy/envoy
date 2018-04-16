@@ -199,26 +199,6 @@ public:
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
 
 /**
- * A histogram that is stored in TLS and used to record values per thread. This holds two
- * histograms, one to collect the values and other as backup that is used for merge process. The
- * swap happens during the merge process.
- */
-class ThreadLocalHistogram : public virtual Histogram {
-public:
-  virtual ~ThreadLocalHistogram() {}
-
-  /**
-   * Called in the beginning of merge process. Swaps the histogram used for collection so that we do
-   * not have to lock the histogram in high throughput TLS writes.
-   */
-  virtual void beginMerge() PURE;
-};
-
-class ThreadLocalHistogramImpl;
-
-typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
-
-/**
  * A histogram that is stored in main thread, manages all thread local histograms and provides
  * summary view of the histogram.
  */
@@ -227,17 +207,10 @@ public:
   virtual ~ParentHistogram() {}
 
   /**
-   * This method is called during the main stats flush process for each of the histogram. This
-   * method iterates through the Tls histograms and collects the histogram data of all of them
-   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
-   * "cumulative_histogram".
+   * This method is called during the main stats flush process for each of the histogram and used
+   * to merge the histogram values.
    */
   virtual void merge() PURE;
-
-  /**
-   * This is used to keep track of all worker thread local histograms.
-   */
-  virtual void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) PURE;
 
   /**
    * Returns the interval histogram summary statistics for the flush interval.

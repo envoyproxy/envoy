@@ -17,6 +17,22 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * A histogram that is stored in TLS and used to record values per thread. This holds two
+ * histograms, one to collect the values and other as backup that is used for merge process. The
+ * swap happens during the merge process.
+ */
+class ThreadLocalHistogram : public virtual Histogram {
+public:
+  virtual ~ThreadLocalHistogram() {}
+
+  /**
+   * Called in the beginning of merge process. Swaps the histogram used for collection so that we do
+   * not have to lock the histogram in high throughput TLS writes.
+   */
+  virtual void beginMerge() PURE;
+};
+
+/**
  * Log Linear Histogram implementation per thread.
  */
 class ThreadLocalHistogramImpl : public ThreadLocalHistogram, public MetricImpl {
@@ -40,6 +56,8 @@ private:
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
 };
+
+typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
@@ -66,7 +84,7 @@ public:
     return cumulative_statistics_;
   }
 
-  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr) override;
+  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr);
 
   Store& parent_;
   std::list<TlsHistogramSharedPtr> tls_histograms_;
@@ -80,6 +98,8 @@ private:
   HistogramStatisticsImpl cumulative_statistics_;
   mutable std::mutex merge_lock_;
 };
+
+typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
 
 /**
  * Store implementation with thread local caching. This implementation supports the following
@@ -114,21 +134,20 @@ private:
  * Each Histogram implementation will have 2 parts.
  *  - "main" thread parent which is called "ParentHistogram".
  *  - "per-thread" collector which is called "ThreadLocalHistogram".
- * Worker threads will write into their per-thread collector, without needing any locking when doing
- so.
+ * Worker threads will write into their per-thread collector, without needing any locking.
  * During the flush process the following sequence is followed.
-    - The main thread starts the flush process by posting a message to every worker which tells the
- worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call to
- beginMerge method.
-    - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
- current_active index via which it writes to the correct histogram.
-    - When all workers have done this the main thread continues with the flush process where the
- "actual" merging happens.
-    - As the active histograms are swapped in TLS histograms, On the main thread, we can be sure
- that no worker is writing into the "backup" histogram.
-    - The main thread now goes through all histograms, collect them across each worker and
- accumulates in to "interval" histograms.
-    - Finally the main "interval" histogram is merged to "cumulative" histogram.
+ *  - The main thread starts the flush process by posting a message to every worker which tells the
+ *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
+ *    to "beginMerge" method.
+ *  - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
+ *    current_active index via which it writes to the correct histogram.
+ *  - When all workers have done this the main thread continues with the flush process where the
+ *    "actual" merging happens.
+ *  - As the active histograms are swapped in TLS histograms, On the main thread, we can be sure
+ *    that no worker is writing into the "backup" histogram.
+ *  - The main thread now goes through all histograms, collect them across each worker and
+ *    accumulates in to "interval" histograms.
+ *  - Finally the main "interval" histogram is merged to "cumulative" histogram.
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
@@ -174,7 +193,7 @@ private:
   struct CentralCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> histograms_;
+    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
   };
 
   struct ScopeImpl : public Scope {

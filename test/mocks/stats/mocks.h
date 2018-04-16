@@ -84,7 +84,6 @@ public:
   // creates a deadlock in gmock and is an unintended use of mock functions.
   const std::string& name() const override { return name_; };
   void merge() override {}
-  void addTlsHistogram(TlsHistogramSharedPtr) override {}
 
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());

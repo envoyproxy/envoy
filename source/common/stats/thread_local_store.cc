@@ -262,7 +262,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  ParentHistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
 
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
