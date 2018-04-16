@@ -1,7 +1,5 @@
 #include "common/ssl/ssl_socket.h"
 
-#include <openssl/x509v3.h>
-
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
@@ -317,9 +315,7 @@ std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
   }
 
   std::vector<std::string> dns_sans = {};
-  int n = sk_GENERAL_NAME_num(altnames);
-  for (int i = 0; n > 0 && i < n; i++) {
-    GENERAL_NAME* altname = sk_GENERAL_NAME_value(altnames, i);
+  for (const GENERAL_NAME* altname : altnames) {
     switch (altname->type) {
     case GEN_DNS:
       dns_sans.push_back(reinterpret_cast<const char*>(ASN1_STRING_data(altname->d.dNSName)));
