@@ -1,11 +1,11 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/stat_sinks/common/hystrix/hystrix.h"
 #include "extensions/stat_sinks/hystrix/config.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -26,7 +26,7 @@ namespace StatSinks {
 namespace HystrixNameSpace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = Config::StatsSinkNames::get().HYSTRIX;
+  const std::string name = StatsSinkNames::get().HYSTRIX;
 
   envoy::config::metrics::v2::HystrixSink sink_config;
 

@@ -1,15 +1,13 @@
 #include "extensions/stat_sinks/hystrix/config.h"
 
-#include <string>
-
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
 
 #include "extensions/stat_sinks/common/hystrix/hystrix.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +24,7 @@ ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::HystrixSink());
 }
 
-std::string HystrixSinkFactory::name() { return Config::StatsSinkNames::get().HYSTRIX; }
+std::string HystrixSinkFactory::name() { return StatsSinkNames::get().HYSTRIX; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

@@ -101,6 +101,27 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
+def _default_envoy_api_impl(ctx):
+    ctx.file("WORKSPACE", "")
+    ctx.file("BUILD.bazel", "")
+    api_dirs = [
+        "bazel",
+        "docs",
+        "envoy",
+        "examples",
+        "test",
+        "tools",
+    ]
+    for d in api_dirs:
+      ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
+
+_default_envoy_api = repository_rule(
+    implementation = _default_envoy_api_impl,
+    attrs = {
+        "api": attr.label(default="@envoy//api:BUILD"),
+    },
+)
+
 # Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
 # wrap them, but for now we can treat them as first-class Bazel.
 def _python_deps():
@@ -140,11 +161,22 @@ def _go_deps(skip_targets):
         _repository_impl("io_bazel_rules_go")
 
 def _envoy_api_deps():
-    _repository_impl("envoy_api")
+    # Treat the data plane API as an external repo, this simplifies exporting the API to
+    # https://github.com/envoyproxy/data-plane-api.
+    if "envoy_api" not in native.existing_rules().keys():
+        _default_envoy_api(name="envoy_api")
 
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
+    )
+    _repository_impl(
+        name = "six_archive",
+        build_file = "@com_google_protobuf//:six.BUILD",
+    )
+    native.bind(
+        name = "six",
+        actual = "@six_archive//:six",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
