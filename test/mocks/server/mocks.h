@@ -9,6 +9,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/health_checker_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
@@ -395,6 +396,22 @@ public:
     addListenSocketOption_(option);
   }
   MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
+};
+
+class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {
+public:
+  MockHealthCheckerFactoryContext();
+  ~MockHealthCheckerFactoryContext();
+
+  MOCK_METHOD0(cluster, Upstream::Cluster&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
+
+  testing::NiceMock<Upstream::MockCluster> cluster_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
 };
 
 } // namespace Configuration

@@ -15,6 +15,9 @@ A logged warning is expected for each deprecated item that is in deprecation win
   instead.
 * gRPC service configuration via the `cluster_names` field in `ApiConfigSource` is deprecated. Use
   `grpc_services` instead. Prior to 1.7, a warning is logged.
+* Redis health checker configuration via the `redis_health_check` field in `HealthCheck` is
+  deprecated. Use `custom_health_check` with name `envoy.health_checkers.redis` instead. Prior
+  to 1.7, `redis_health_check` can be used, but warning is logged.
 
 ## Version 1.6.0 (March 20, 2018)
 
