@@ -306,6 +306,11 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
+TEST_F(RouterTest, HashKeyNoHashPolicy) {
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(router_.computeHashKey().has_value());
+}
+
 TEST_F(RouterTest, AddCookie) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
@@ -457,6 +462,8 @@ TEST_F(RouterTest, AddMultipleCookies) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
   router_.onDestroy();
 }
+
+TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_.metadataMatchCriteria()); }
 
 TEST_F(RouterTest, MetadataMatchCriteria) {
   MockMetadataMatchCriteria matches;
