@@ -233,6 +233,25 @@ class RateLimitPolicy;
 class Config;
 
 /**
+ * Hold both per route config data and its hash.
+ * The hash is calculated at config time. It can be used to detect config change.
+ */
+struct PerFilterConfigAndHash {
+  PerFilterConfigAndHash(const Protobuf::Message& config) : config_(config) {
+    hash_ = MessageUtil::hash(config);
+  }
+  /**
+   * The actual config proto
+   */
+  const Protobuf::Message& config_;
+
+  /**
+   * The hash value of the config data. It can be used to detect changes.
+   */
+  size_t hash_;
+};
+
+/**
  * Virtual host defintion.
  */
 class VirtualHost {
@@ -260,11 +279,11 @@ public:
   virtual const Config& routeConfig() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
+   * @return const PerFilterConfigAndHash* the per-filter config for the given
    * filter name configured for this virtual host. If none is present,
    * nullptr is returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -472,12 +491,12 @@ public:
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
+   * @return const PerFilterConfigAndHash* the per-filter config for the given
    * filter name configured for this route entry. Only weighted cluster entries
    * will potentially have these values available. If none is present,
    * nullptr is returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const PURE;
 };
 
 /**
@@ -525,11 +544,11 @@ public:
   virtual const Decorator* decorator() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
+   * @return const PerFilterConfigAndHash* the per-filter config for the given
    * filter name configured for this route. If none is present, nullptr is
    * returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;
