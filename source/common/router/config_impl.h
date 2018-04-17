@@ -48,10 +48,18 @@ class PerFilterConfigs {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
 
-  const Protobuf::Message* get(const std::string& name) const;
+  const PerFilterConfigAndHash* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, ProtobufTypes::MessagePtr> configs_;
+  struct ConfigData {
+    ConfigData(ProtobufTypes::MessagePtr config)
+        : config_(std::move(config)), config_and_hash_(*config_) {}
+
+    ProtobufTypes::MessagePtr config_;
+    PerFilterConfigAndHash config_and_hash_;
+  };
+  typedef std::unique_ptr<ConfigData> ConfigDataPtr;
+  std::unordered_map<std::string, ConfigDataPtr> configs_;
 };
 
 class RouteEntryImplBase;
@@ -76,7 +84,9 @@ public:
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
-  const Protobuf::Message* perFilterConfig(const std::string&) const override { return nullptr; }
+  const PerFilterConfigAndHash* perFilterConfig(const std::string&) const override {
+    return nullptr;
+  }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -130,7 +140,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -370,7 +380,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const override;
 
 protected:
   const bool case_sensitive_;
@@ -444,7 +454,7 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override {
+    const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
     };
 
@@ -487,7 +497,7 @@ private:
       DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
     }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+    const PerFilterConfigAndHash* perFilterConfig(const std::string& name) const override;
 
   private:
     const std::string runtime_key_;
