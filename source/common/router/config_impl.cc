@@ -524,7 +524,7 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   }
 }
 
-const Protobuf::Message* RouteEntryImplBase::perFilterConfig(const std::string& name) const {
+const PerFilterConfigAndHash* RouteEntryImplBase::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
 
@@ -551,9 +551,9 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
-const Protobuf::Message*
+const PerFilterConfigAndHash*
 RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const Protobuf::Message* cfg = per_filter_configs_.get(name);
+  const PerFilterConfigAndHash* cfg = per_filter_configs_.get(name);
   if (cfg != nullptr) {
     return cfg;
   }
@@ -735,7 +735,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
-const Protobuf::Message* VirtualHostImpl::perFilterConfig(const std::string& name) const {
+const PerFilterConfigAndHash* VirtualHostImpl::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
 
@@ -886,13 +886,14 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt:
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
-    configs_[name] = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
+    configs_[name] = std::make_unique<ConfigData>(
+        Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory));
   }
 }
 
-const Protobuf::Message* PerFilterConfigs::get(const std::string& name) const {
+const PerFilterConfigAndHash* PerFilterConfigs::get(const std::string& name) const {
   auto cfg = configs_.find(name);
-  return cfg == configs_.end() ? nullptr : cfg->second.get();
+  return cfg == configs_.end() ? nullptr : &cfg->second->config_and_hash_;
 }
 
 } // namespace Router

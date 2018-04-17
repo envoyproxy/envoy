@@ -4227,26 +4227,28 @@ public:
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
-                 uint32_t expected_vhost) {
+                 uint32_t expected_vhost, size_t entry_hash, size_t route_hash, size_t vhost_hash) {
     const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime_, cm_, true);
 
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
     const auto& vhost = route_entry->virtualHost();
 
-    check(route_entry->perFilterConfig(factory_.name()), expected_entry, "route entry");
-    check(route->perFilterConfig(factory_.name()), expected_route, "route");
-    check(vhost.perFilterConfig(factory_.name()), expected_vhost, "virtual host");
+    check(route_entry->perFilterConfig(factory_.name()), expected_entry, entry_hash, "route entry");
+    check(route->perFilterConfig(factory_.name()), expected_route, route_hash, "route");
+    check(vhost.perFilterConfig(factory_.name()), expected_vhost, vhost_hash, "virtual host");
   }
 
-  void check(const Protobuf::Message* cfg, uint32_t expected_seconds, std::string source) {
+  void check(const PerFilterConfigAndHash* cfg, uint32_t expected_seconds, size_t expected_hash,
+             std::string source) {
     EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
     EXPECT_NO_THROW({
-      const auto ts = dynamic_cast<const ProtobufWkt::Timestamp*>(cfg);
-      EXPECT_EQ(expected_seconds, ts->seconds())
+      const auto ts = dynamic_cast<const ProtobufWkt::Timestamp&>(cfg->config_);
+      EXPECT_EQ(expected_seconds, ts.seconds())
           << "config value does not match expected for source: " << source;
     }) << "config should properly dynamic_cast to the appropriate type for source: "
        << source;
+    EXPECT_EQ(cfg->hash_, expected_hash) << "hash not expected: " << source;
   }
 
   TestFilterConfig factory_;
@@ -4285,7 +4287,8 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 456 } }
 )EOF";
 
-  checkEach(yaml, 123, 123, 456);
+  checkEach(yaml, 123, 123, 456, 15438051363179759158U, 15438051363179759158U,
+            11607996233962503496U);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
@@ -4305,7 +4308,8 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1011 } }
 )EOF";
 
-  checkEach(yaml, 789, 789, 1011);
+  checkEach(yaml, 789, 789, 1011, 7306100512163972395U, 7306100512163972395U,
+            10656629052726949884U);
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
@@ -4325,7 +4329,8 @@ virtual_hosts:
     per_filter_config: { test.filter: { seconds: 1415 } }
 )EOF";
 
-  checkEach(yaml, 1213, 1213, 1415);
+  checkEach(yaml, 1213, 1213, 1415, 6031967841490598231U, 6031967841490598231U,
+            13246169109574037807U);
 }
 } // namespace
 } // namespace Router
