@@ -59,7 +59,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
 TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  HttpFilterFactoryCb cb =
+  Server::Configuration::HttpFilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
