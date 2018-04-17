@@ -1,9 +1,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
-
 #include "extensions/filters/network/echo/echo.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,7 +34,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return Config::NetworkFilterNames::get().ECHO; }
+  std::string name() override { return NetworkFilterNames::get().ECHO; }
 };
 
 /**

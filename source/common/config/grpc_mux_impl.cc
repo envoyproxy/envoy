@@ -2,6 +2,7 @@
 
 #include <unordered_set>
 
+#include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -10,8 +11,10 @@ namespace Config {
 
 GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
-                         const Protobuf::MethodDescriptor& service_method)
-    : node_(node), async_client_(std::move(async_client)), service_method_(service_method) {
+                         const Protobuf::MethodDescriptor& service_method,
+                         MonotonicTimeSource& time_source)
+    : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
+      time_source_(time_source) {
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
 }
 
@@ -56,6 +59,10 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
     return;
   }
 
+  if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
+    ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
+  }
+
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
 
@@ -98,7 +105,12 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // Lazily kick off the requests based on first subscription. This has the
   // convenient side-effect that we order messages on the channel based on
   // Envoy's internal dependency ordering.
+  // TODO(gsagula): move TokenBucketImpl params to a config.
   if (!api_state_[type_url].subscribed_) {
+    // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
+    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, 5, time_source_);
+    // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
+    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, 0.2, time_source_);
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(node_);
     api_state_[type_url].subscribed_ = true;

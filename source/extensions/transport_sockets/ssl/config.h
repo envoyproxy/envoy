@@ -2,7 +2,7 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/config/well_known_names.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +16,7 @@ namespace SslTransport {
 class SslSocketConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   virtual ~SslSocketConfigFactory() {}
-  std::string name() const override { return Config::TransportSocketNames::get().SSL; }
+  std::string name() const override { return TransportSocketNames::get().SSL; }
 };
 
 class UpstreamSslSocketFactory : public Server::Configuration::UpstreamTransportSocketConfigFactory,

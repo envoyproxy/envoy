@@ -72,30 +72,58 @@ parseSdsClusterFromJson(const std::string& json_string,
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   uint32_t weight = 1) {
-  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                                    envoy::api::v2::core::Metadata::default_instance(), weight,
-                                    envoy::api::v2::core::Locality())};
+  return HostSharedPtr{new HostImpl(
+      cluster, "", Network::Utility::resolveUrl(url),
+      envoy::api::v2::core::Metadata::default_instance(), weight, envoy::api::v2::core::Locality(),
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   const envoy::api::v2::core::Metadata& metadata,
                                   uint32_t weight = 1) {
-  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata,
-                                    weight, envoy::api::v2::core::Locality())};
+  return HostSharedPtr{
+      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
+                   envoy::api::v2::core::Locality(),
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+}
+
+inline HostSharedPtr
+makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
+             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+             uint32_t weight = 1) {
+  return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
+                                    envoy::api::v2::core::Metadata::default_instance(), weight,
+                                    envoy::api::v2::core::Locality(), health_check_config)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
                                                              const std::string& url) {
-  return HostDescriptionConstSharedPtr{
-      new HostDescriptionImpl(cluster, "", Network::Utility::resolveUrl(url),
-                              envoy::api::v2::core::Metadata::default_instance(),
-                              envoy::api::v2::core::Locality().default_instance())};
+  return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
+      cluster, "", Network::Utility::resolveUrl(url),
+      envoy::api::v2::core::Metadata::default_instance(),
+      envoy::api::v2::core::Locality().default_instance(),
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts,
                                                       bool force_no_local_locality = false) {
   return std::make_shared<HostsPerLocalityImpl>(
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
+}
+
+inline envoy::api::v2::core::HealthCheck
+parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
+  envoy::api::v2::core::HealthCheck health_check;
+  MessageUtil::loadFromYaml(yaml_string, health_check);
+  return health_check;
+}
+
+inline envoy::api::v2::core::HealthCheck
+parseHealthCheckFromV1Json(const std::string& json_string) {
+  envoy::api::v2::core::HealthCheck health_check;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
+  return health_check;
 }
 
 } // namespace

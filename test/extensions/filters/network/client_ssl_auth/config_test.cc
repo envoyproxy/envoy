@@ -1,6 +1,9 @@
+#include "envoy/registry/registry.h"
+
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/network/client_ssl_auth/config.h"
+#include "extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -85,6 +88,21 @@ TEST_P(IpWhiteListConfigTest, ClientSslAuthEmptyProto) {
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
+}
+
+TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context),
+               ProtoValidationException);
+}
+
+TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {
+  EXPECT_THROW_WITH_MESSAGE(
+      (Registry::RegisterFactory<ClientSslAuthConfigFactory,
+                                 Server::Configuration::NamedNetworkFilterConfigFactory>()),
+      EnvoyException,
+      fmt::format("Double registration for name: '{}'", NetworkFilterNames::get().CLIENT_SSL_AUTH));
 }
 
 } // namespace ClientSslAuth

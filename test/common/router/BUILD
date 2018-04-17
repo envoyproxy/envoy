@@ -18,9 +18,11 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
+        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

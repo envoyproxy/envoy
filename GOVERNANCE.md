@@ -69,22 +69,17 @@
 * We do releases approximately every 3 months as described in the
   [release cadence documentation](CONTRIBUTING.md#release-cadence).
 * Decide on the somewhat arbitrary time that a release will occur.
-* Begin marshalling the ongoing PR flow in both this repo and
-  [data-plane-api](https://github.com/envoyproxy/data-plane-api). Ask maintainers to hold off
-  merging any particularly risky PRs until after the release is tagged. This is because we currently
-  don't use release branches and assume that master is RC quality at all times. At the same time,
-  try to make sure that data-plane-api doc PRs are only merged *after* the Envoy PR so that we don't
-  wind up with stale docs.
-* Do a final check of the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
-  and make any needed corrections.
-* Switch the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION) from a
-  "dev" variant to a final variant. E.g., "1.6.0-dev" to "1.6.0". Get a review and merge.
-* Update the [data-plane-api SHA in Envoy](https://github.com/envoyproxy/envoy/blob/ed312500ec38876446ce8ee70a06f7cda4adc937/bazel/repository_locations.bzl#L79)
-  to the final release SHA. Get the PR approved and merge.
+* Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
+  particularly risky PRs until after the release is tagged. This is because we currently don't use
+  release branches and assume that master is RC quality at all times.
+* Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
+  corrections.
+* Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
+  "1.6.0". Get a review and merge.
 * **Wait for tests to pass on master.**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
-  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match
-  the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION).**
+  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
+  [VERSION](VERSION).**
 * Monitor the CircleCI tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/master/docs/envoy).
@@ -92,10 +87,9 @@
 * Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
-* Do a new PR to update the [data-plane-api VERSION](https://github.com/envoyproxy/data-plane-api/blob/master/VERSION)
-  to the next development release. E.g., "1.7.0-dev". At the same time, also add a new empty section
-  to the [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst)
-  for the following version. E.g., "1.7.0".
+* Do a new PR to update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". At
+  the same time, also add a new empty section to the [release
+  notes](docs/root/intro/version_history.rst) for the following version. E.g., "1.7.0".
 * Update [DEPRECATED.md](DEPRECATED.md) to remove the '(pending)' comment on the current version,
   replacing it with the release date. Add a placeholder for the next version.
 

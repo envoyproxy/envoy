@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package envoy.api.v2;
+
+option java_generic_services = true;
+
+import "envoy/api/v2/discovery.proto";
+import "envoy/api/v2/endpoint/endpoint.proto";
+
+import "google/api/annotations.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: EDS]
+
+service EndpointDiscoveryService {
+  // The resource_names field in DiscoveryRequest specifies a list of clusters
+  // to subscribe to updates for.
+  rpc StreamEndpoints(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  }
+
+  rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:endpoints"
+      body: "*"
+    };
+  }
+}
+
+// Each route from RDS will map to a single cluster or traffic split across
+// clusters using weights expressed in the RDS WeightedCluster.
+//
+// With EDS, each cluster is treated independently from a LB perspective, with
+// LB taking place between the Localities within a cluster and at a finer
+// granularity between the hosts within a locality. For a given cluster, the
+// effective weight of a host is its load_balancing_weight multiplied by the
+// load_balancing_weight of its Locality.
+message ClusterLoadAssignment {
+  // Name of the cluster. This will be the :ref:`service_name
+  // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified
+  // in the cluster :ref:`EdsClusterConfig
+  // <envoy_api_msg_Cluster.EdsClusterConfig>`.
+  string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // List of endpoints to load balance to.
+  repeated endpoint.LocalityLbEndpoints endpoints = 2 [(gogoproto.nullable) = false];
+
+  // Load balancing policy settings.
+  message Policy {
+    // Percentage of traffic (0-100) that should be dropped. This
+    // action allows protection of upstream hosts should they unable to
+    // recover from an outage or should they be unable to autoscale and hence
+    // overall incoming traffic volume need to be trimmed to protect them.
+    // [#v2-api-diff: This is known as maintenance mode in v1.]
+    double drop_overload = 1 [(validate.rules).double = {gte: 0, lte: 100}];
+  }
+
+  // Load balancing policy settings.
+  Policy policy = 4;
+}

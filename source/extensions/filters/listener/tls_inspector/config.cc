@@ -3,9 +3,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
-
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +30,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return Envoy::Config::ListenerFilterNames::get().TLS_INSPECTOR; }
+  std::string name() override { return ListenerFilterNames::get().TLS_INSPECTOR; }
 };
 
 /**

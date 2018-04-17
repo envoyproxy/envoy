@@ -25,13 +25,14 @@
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/logical_dns_cluster.h"
 #include "common/upstream/original_dst_cluster.h"
+
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -86,6 +87,12 @@ Host::CreateConnectionData
 HostImpl::createConnection(Event::Dispatcher& dispatcher,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) const {
   return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+}
+
+Host::CreateConnectionData
+HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+          shared_from_this()};
 }
 
 Network::ClientConnectionPtr
@@ -247,10 +254,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
-      transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().SSL);
       MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
     } else {
-      transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
+      transport_socket.set_name(
+          Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
     }
   }
 
@@ -599,7 +607,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance())});
+        envoy::api::v2::core::Locality().default_instance(),
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
   }
 }
 
@@ -823,10 +832,11 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // a new address that has port in it. We need to both support IPv6 as well as potentially
           // move port handling into the DNS interface itself, which would work better for SRV.
           ASSERT(address != nullptr);
-          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
-                                              Network::Utility::getAddressWithPort(*address, port_),
-                                              envoy::api::v2::core::Metadata::default_instance(), 1,
-                                              envoy::api::v2::core::Locality().default_instance()));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
+              envoy::api::v2::core::Metadata::default_instance(), 1,
+              envoy::api::v2::core::Locality().default_instance(),
+              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
         }
 
         HostVector hosts_added;

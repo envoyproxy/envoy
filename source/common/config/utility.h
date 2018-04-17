@@ -122,9 +122,28 @@ public:
   static void checkFilesystemSubscriptionBackingPath(const std::string& path);
 
   /**
+   * Check the grpc_services and cluster_names for API config sanity. Throws on error.
+   * @param api_config_source the config source to validate.
+   * @throws EnvoyException when an API config has the wrong number of gRPC
+   * services or cluster names, depending on expectations set by its API type.
+   */
+  static void
+  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
    * Check the validity of a cluster backing an api config source. Throws on error.
    * @param clusters the clusters currently loaded in the cluster manager.
    * @param api_config_source the config source to validate.
+   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
+   */
+  static void validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
+                                  const std::string& cluster_name);
+
+  /**
+   * Potentially calls Utility::validateClusterName, if a cluster name can be found.
+   * @param clusters the clusters currently loaded in the cluster manager.
+   * @param api_config_source the config source to validate.
+   * @throws EnvoyException when an API config doesn't have a statically defined non-EDS cluster.
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
@@ -206,6 +225,7 @@ public:
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
                                                             Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr);
 
@@ -213,6 +233,28 @@ public:
       MessageUtil::jsonConvert(enclosing_message.config(), *config);
     }
 
+    return config;
+  }
+
+  /**
+   * Translate a nested config into a route-specific proto message provided by
+   * the implementation factory.
+   * @param source a message (typically Struct) that contains the config for
+   *        the given factory's route-local configuration (as returned by
+   *        createEmptyRouteConfigProto).
+   * @param factory implementation factory with the method
+   *        'createEmptyRouteConfigProto' to produce a proto to be filled with
+   *        the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryRouteConfig(const Protobuf::Message& source,
+                                                                 Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr);
+
+    MessageUtil::jsonConvert(source, *config);
     return config;
   }
 
@@ -240,9 +282,9 @@ public:
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
   static Grpc::AsyncClientFactoryPtr
-  factoryForApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                            const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                            Stats::Scope& scope);
+  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
+                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                                Stats::Scope& scope);
 };
 
 } // namespace Config
