@@ -41,6 +41,12 @@ typedef absl::optional<int> SocketOptionName;
 #define ENVOY_SOCKET_IPV6_FREEBIND Network::SocketOptionName()
 #endif
 
+#ifdef TCP_FASTOPEN
+#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName(TCP_FASTOPEN)
+#else
+#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
+#endif
+
 class SocketOptionImpl : public Socket::Option, protected Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(absl::optional<bool> transparent, absl::optional<bool> freebind)
