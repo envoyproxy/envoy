@@ -92,7 +92,7 @@ public:
 
 class HistogramTest : public testing::Test, public RawStatDataAllocator {
 public:
-  HistogramTest() {
+  void SetUp() override {
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
       return alloc_.alloc(name);
     }));
@@ -104,9 +104,6 @@ public:
     EXPECT_CALL(*this, alloc("stats.overflow"));
     store_.reset(new ThreadLocalStoreImpl(*this));
     store_->addSink(sink_);
-  }
-
-  void SetUp() override {
     InSequence s;
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -114,7 +111,6 @@ public:
   void TearDown() override {
     store_->shutdownThreading();
     tls_.shutdownThread();
-
     // Includes overflow stat.
     EXPECT_CALL(*this, free(_));
   }
@@ -531,13 +527,31 @@ TEST_F(HistogramTest, BasicScopeHistogramMerge) {
 
 TEST_F(HistogramTest, BasicHistogramValidate) {
   Histogram& h1 = store_->histogram("h1");
+  Histogram& h2 = store_->histogram("h2");
+
   expectCallAndAccumulate(h1, 1);
 
-  EXPECT_EQ(1, validateMerge());
+  EXPECT_EQ(2, validateMerge());
 
-  std::string expected_summary = "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-                                 "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  EXPECT_EQ(expected_summary, store_->histograms().front()->cumulativeStatistics().summary());
+  std::string h1_expected_summary =
+      "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
+      "P99: 1.099, P99.9: 1.0999, P100: 1.1";
+  std::string h2_expected_summary =
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+
+  for (size_t i = 0; i < 100; ++i) {
+    expectCallAndAccumulate(h2, i);
+  }
+
+  EXPECT_EQ(2, validateMerge());
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
+    if (histogram->name() == "h1") {
+      EXPECT_EQ(h1_expected_summary, histogram->cumulativeStatistics().summary());
+    } else {
+      EXPECT_EQ(h2_expected_summary, histogram->cumulativeStatistics().summary());
+    }
+  }
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {
