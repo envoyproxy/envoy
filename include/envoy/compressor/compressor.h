@@ -6,6 +6,11 @@ namespace Envoy {
 namespace Compressor {
 
 /**
+ * Compressor state whether to flush the compressor or to finish the compression stream.
+ */
+enum class State { Flush, Finish };
+
+/**
  * Allows compressing data.
  */
 class Compressor {
@@ -15,9 +20,9 @@ public:
   /**
    * Compresses data buffer.
    * @param buffer supplies the reference to data to be compressed.
-   * @param trailer supplies the indication to write trailer at the end of compressed buffer.
+   * @param state supplies the compressor state.
    */
-  virtual void compress(Buffer::Instance& buffer, bool trailer) PURE;
+  virtual void compress(Buffer::Instance& buffer, State state) PURE;
 };
 
 } // namespace Compressor
