@@ -5,6 +5,7 @@
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
@@ -56,6 +57,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   // Deprecated redis_health_check, preserving using old config until it is removed.
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
+    FALLTHRU;
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
