@@ -73,7 +73,7 @@ public:
   uint64_t checksum();
 
   // Compressor
-  void compress(Buffer::Instance& buffer, bool trailer) override;
+  void compress(Buffer::Instance& buffer, State state) override;
 
 private:
   bool deflateNext(int64_t flush_state);

@@ -33,7 +33,7 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
 
 uint64_t ZlibCompressorImpl::checksum() { return zstream_ptr_->adler; }
 
-void ZlibCompressorImpl::compress(Buffer::Instance& buffer, bool trailer) {
+void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
   const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   Buffer::RawSlice slices[num_slices];
   buffer.getRawSlices(slices, num_slices);
@@ -42,10 +42,10 @@ void ZlibCompressorImpl::compress(Buffer::Instance& buffer, bool trailer) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     process(buffer, Z_NO_FLUSH);
+    buffer.drain(input_slice.len_);
   }
 
-  buffer.drain(buffer.length());
-  process(buffer, trailer ? Z_FINISH : Z_SYNC_FLUSH);
+  process(buffer, state == State::Finish ? Z_FINISH : Z_SYNC_FLUSH);
 }
 
 bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {

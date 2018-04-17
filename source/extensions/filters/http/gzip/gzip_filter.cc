@@ -130,7 +130,7 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
 
 Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
-    compressor_.compress(data, end_stream);
+    compressor_.compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
   }
   return Http::FilterDataStatus::Continue;
 }
