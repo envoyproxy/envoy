@@ -71,8 +71,8 @@ class ZlibCompressorImplTester : public ZlibCompressorImpl {
 public:
   ZlibCompressorImplTester() : ZlibCompressorImpl() {}
   ZlibCompressorImplTester(uint64_t chunk_size) : ZlibCompressorImpl(chunk_size) {}
-  void compressThenFlush(Buffer::OwnedImpl& buffer) { compress(buffer, false); }
-  void finish(Buffer::OwnedImpl& buffer) { compress(buffer, true); }
+  void compressThenFlush(Buffer::OwnedImpl& buffer) { compress(buffer, State::Flush); }
+  void finish(Buffer::OwnedImpl& buffer) { compress(buffer, State::Finish); }
 };
 
 class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {

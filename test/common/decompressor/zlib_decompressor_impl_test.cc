@@ -56,7 +56,7 @@ TEST_F(ZlibDecompressorImplTest, CallingChecksum) {
   ASSERT_EQ(0, compressor.checksum());
 
   TestUtility::feedBufferWithRandomCharacters(compressor_buffer, 4096);
-  compressor.compress(compressor_buffer, false);
+  compressor.compress(compressor_buffer, Compressor::State::Flush);
   ASSERT_TRUE(compressor.checksum() > 0);
 
   ZlibDecompressorImpl decompressor;
@@ -86,14 +86,14 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
     original_text.append(TestUtility::bufferToString(buffer));
-    compressor.compress(buffer, false);
+    compressor.compress(buffer, Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
 
   ASSERT_EQ(0, buffer.length());
 
-  compressor.compress(buffer, true);
+  compressor.compress(buffer, Compressor::State::Finish);
   ASSERT_GE(10, buffer.length());
 
   accumulation_buffer.add(buffer);
@@ -126,14 +126,14 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
     original_text.append(TestUtility::bufferToString(buffer));
-    compressor.compress(buffer, false);
+    compressor.compress(buffer, Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
 
   ASSERT_EQ(0, buffer.length());
 
-  compressor.compress(buffer, true);
+  compressor.compress(buffer, Compressor::State::Finish);
   ASSERT_GE(10, buffer.length());
 
   accumulation_buffer.add(buffer);
@@ -162,17 +162,17 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
                   Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Rle, 15, 1);
 
   std::string original_text{};
-  for (uint64_t i = 0; i < 5; ++i) {
+  for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
     original_text.append(TestUtility::bufferToString(buffer));
-    compressor.compress(buffer, false);
+    compressor.compress(buffer, Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
   }
 
   ASSERT_EQ(0, buffer.length());
 
-  compressor.compress(buffer, true);
+  compressor.compress(buffer, Compressor::State::Finish);
   ASSERT_GE(10, buffer.length());
 
   accumulation_buffer.add(buffer);
