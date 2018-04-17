@@ -81,6 +81,8 @@ currently implemented but that is the plan moving forward.)
     `Envoy::Extensions::ListenerFilters` namespace.
   * [filters/network/](/source/extensions/filters/network): L4 network filters which use the
     `Envoy::Extensions::NetworkFilters` namespace.
+  * [health_checker/](/source/extensions/health_checker): Custom health checkers which use the
+    `Envoy::Extensions::HealthCheckers` namespace.
   * [resolvers/](/source/extensions/resolvers): Network address resolvers which use the
     `Envoy::Extensions::Resolvers` namespace.
   * [stat_sinks/](/source/extensions/stat_sinks): Stat sink implementations which use the
