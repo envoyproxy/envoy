@@ -58,7 +58,7 @@ jobs:
        - checkout
        - add_ssh_keys:
            fingerprints:
-             - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
+             - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
        - run: ci/filter_example_mirror.sh
    ipv6_tests:
      machine: true
