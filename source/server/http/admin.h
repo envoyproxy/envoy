@@ -95,7 +95,9 @@ public:
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
-  void unregisterHystrixConnection() { server_.unregisterHystrixSink(); }
+  void unregisterHystrixConnection(Http::StreamDecoderFilterCallbacks* callbacks) {
+    server_.unregisterHystrixSink(callbacks);
+  }
 
 private:
   /**
@@ -246,7 +248,7 @@ public:
 
   // Http::StreamFilterBase
   // TODO (@trabetti) : make more generic (how?)
-  void onDestroy() override { parent_.unregisterHystrixConnection(); }
+  void onDestroy() override { parent_.unregisterHystrixConnection(callbacks_); }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;

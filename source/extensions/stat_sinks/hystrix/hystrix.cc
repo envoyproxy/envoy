@@ -298,7 +298,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
 void HystrixSink::beginFlush() { current_stat_values_.clear(); }
 
 void HystrixSink::flushCounter(const Stats::Counter& counter, uint64_t) {
-  if (callbacks_ == nullptr) {
+  if (callbacks_list_.empty()) {
     return;
   }
   if (counter.name().find("upstream_rq_") != std::string::npos) {
@@ -307,7 +307,7 @@ void HystrixSink::flushCounter(const Stats::Counter& counter, uint64_t) {
 }
 // void HystrixSink::flushGauge(const Gauge& gauge, uint64_t value);
 void HystrixSink::endFlush() {
-  if (callbacks_ == nullptr)
+  if (callbacks_list_.empty())
     return;
   stats_->incCounter();
   for (auto& cluster : server_->clusterManager().clusters()) {
@@ -328,21 +328,33 @@ void HystrixSink::endFlush() {
         server_->statsFlushInterval().count());
   }
   Buffer::OwnedImpl data;
-  data.add(ss.str());
-  callbacks_->encodeData(data, false);
+  for (auto callbacks : callbacks_list_) {
+    data.add(ss.str());
+    callbacks->encodeData(data, false);
+  }
 
   // send keep alive ping
+  // TODO (@trabetti) : is it ok to send together with data?
   Buffer::OwnedImpl ping_data;
-  ping_data.add(":\n\n");
-  callbacks_->encodeData(ping_data, false);
+  for (auto callbacks : callbacks_list_) {
+    ping_data.add(":\n\n");
+    callbacks->encodeData(ping_data, false);
+  }
 }
 
-void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbacks) {
-  callbacks_ = callbacks;
+void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_register) {
+  callbacks_list_.emplace_back(callbacks_to_register);
 }
 
-// TODO (@trabetti) is this correct way - to set nullptr?
-void HystrixSink::unregisterConnection() { callbacks_ = nullptr; }
+void HystrixSink::unregisterConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_remove) {
+  for (auto it = callbacks_list_.begin(); it != callbacks_list_.end();) {
+    if ((*it)->streamId() == callbacks_to_remove->streamId()) {
+      it = callbacks_list_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
 
 } // namespace Hystrix
 } // namespace StatSinks

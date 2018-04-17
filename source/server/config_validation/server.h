@@ -91,7 +91,7 @@ public:
 
   std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
   //  bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
-  void unregisterHystrixSink() override { NOT_IMPLEMENTED; }
+  void unregisterHystrixSink(Http::StreamDecoderFilterCallbacks*) override { NOT_IMPLEMENTED; }
 
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(

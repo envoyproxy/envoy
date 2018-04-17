@@ -170,7 +170,7 @@ public:
 
   std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
   //  bool registerToHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks) override;
-  void unregisterHystrixSink() override;
+  void unregisterHystrixSink(Http::StreamDecoderFilterCallbacks*) override;
 
 private:
   void flushStats();

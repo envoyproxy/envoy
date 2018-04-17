@@ -178,7 +178,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
 
   // disconnect
   buffer.drain(buffer.length());
-  sink_->unregisterConnection();
+  sink_->unregisterConnection(&callbacks_);
   sink_->beginFlush();
   sink_->flushCounter(success_counter, 1);
   sink_->endFlush();

@@ -740,8 +740,6 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
-          //          {"/hystrix_event_stream", "send hystrix event stream",
-          //           MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false}
       },
 
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values

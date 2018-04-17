@@ -123,16 +123,16 @@ public:
   /**
    * register a new connection
    */
-  void registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_);
+  void registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_register);
   /**
    * remove registered connection
    */
-  void unregisterConnection();
+  void unregisterConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_remove);
   HystrixStatCache& getStats() { return *stats_; }
 
 private:
   HystrixPtr stats_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_{};
   Server::Instance* server_;
   std::map<std::string, uint64_t> current_stat_values_;
 };

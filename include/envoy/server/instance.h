@@ -190,7 +190,7 @@ public:
   /**
    * @ Unregisters a callbacks connection to Hystrix sink.
    */
-  virtual void unregisterHystrixSink() PURE;
+  virtual void unregisterHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks_to_remove) PURE;
 };
 
 } // namespace Server
