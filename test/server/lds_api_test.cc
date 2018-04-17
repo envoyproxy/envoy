@@ -14,6 +14,7 @@
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::Throw;
 using testing::_;
 
 namespace Envoy {
@@ -143,6 +144,32 @@ TEST_F(LdsApiTest, UnknownCluster) {
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
       "EDS cluster");
+}
+
+TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+
+  // Construct a minimal listener that would pass proto validation.
+  auto listener = listeners.Add();
+  listener->set_name("invalid-listener");
+  auto socket_address = listener->mutable_address()->mutable_socket_address();
+  socket_address->set_address("invalid-address");
+  socket_address->set_port_value(1);
+  listener->add_filter_chains();
+
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+
+  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
+      .WillOnce(Throw(EnvoyException("something is wrong")));
+
+  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners), EnvoyException,
+                            "Error adding/updating listener invalid-listener: something is wrong");
+  EXPECT_CALL(request_, cancel());
 }
 
 TEST_F(LdsApiTest, BadLocalInfo) {
