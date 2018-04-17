@@ -218,7 +218,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         if (!peer_cert.empty()) {
           client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
         }
-      } break;
+        break;
+      }
       case Http::ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
@@ -239,7 +240,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
             client_cert_details.push_back("DNS=" + dns);
           }
         }
-      } break;
+        break;
+      }
       }
     }
   }
