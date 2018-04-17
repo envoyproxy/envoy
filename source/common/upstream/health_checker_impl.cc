@@ -588,5 +588,29 @@ ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionDat
                                                  data.host_description_, dispatcher_);
 }
 
+std::ostream& operator<<(std::ostream& out, HealthState state) {
+  switch (state) {
+  case HealthState::Unhealthy:
+    out << "Unhealthy";
+    break;
+  case HealthState::Healthy:
+    out << "Healthy";
+    break;
+  }
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, HealthTransition changed_state) {
+  switch (changed_state) {
+  case HealthTransition::Unchanged:
+    out << "Unchanged";
+    break;
+  case HealthTransition::Changed:
+    out << "Changed";
+    break;
+  }
+  return out;
+}
+
 } // namespace Upstream
 } // namespace Envoy
