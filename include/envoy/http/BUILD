@@ -68,6 +68,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_cc_library(

@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_library(
     name = "assert_lib",
     hdrs = ["assert.h"],
-    deps = [":logger_lib"],
+    deps = [":minimal_logger_lib"],
 )
 
 envoy_cc_library(
@@ -82,15 +82,28 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains minimal code for logging to stderr.
 envoy_cc_library(
-    name = "logger_lib",
+    name = "minimal_logger_lib",
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
         ":macros",
+        "//include/envoy/thread:thread_interface",
+    ],
+)
+
+# All non-essential logger delegates should go here to reduce dependencies that
+# minimal_logger_lib maintains.
+envoy_cc_library(
+    name = "logger_lib",
+    srcs = ["logger_delegates.cc"],
+    hdrs = ["logger_delegates.h"],
+    deps = [
+        ":macros",
+        ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/thread:thread_interface",
     ],
 )
 

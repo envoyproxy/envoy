@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"

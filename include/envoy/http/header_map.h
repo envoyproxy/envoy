@@ -9,6 +9,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,8 +22,12 @@ namespace Http {
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {}
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {}
+  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {
+    ASSERT(*this == LowerCaseString(string_));
+  }
+  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {
+    ASSERT(*this == LowerCaseString(string_));
+  }
   explicit LowerCaseString(const std::string& new_string) : string_(new_string) { lower(); }
 
   const std::string& get() const { return string_; }
