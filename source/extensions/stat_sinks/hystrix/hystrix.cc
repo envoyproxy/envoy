@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/common/hystrix/hystrix.h"
+#include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include <chrono>
 #include <ctime>
@@ -15,40 +15,39 @@
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
-namespace Common {
 
-const uint64_t Hystrix::DEFAULT_NUM_OF_BUCKETS;
+const uint64_t HystrixStatCache::DEFAULT_NUM_OF_BUCKETS;
 
 // Add new value to rolling window, in place of oldest one.
-void Hystrix::pushNewValue(const std::string& key, uint64_t value) {
+void HystrixStatCache::pushNewValue(const std::string& key, uint64_t value) {
   // Create vector if do not exist.
   // TODO trabetti: why resize + value param didn't work without the if?
   if (rolling_stats_map_.find(key) == rolling_stats_map_.end()) {
-    rolling_stats_map_[key].resize(num_of_buckets_, value);
+    rolling_stats_map_[key].resize(window_size_, value);
   } else {
     rolling_stats_map_[key][current_index_] = value;
   }
 }
 
-uint64_t Hystrix::getRollingValue(absl::string_view cluster_name, absl::string_view stats) {
+uint64_t HystrixStatCache::getRollingValue(absl::string_view cluster_name, absl::string_view stat) {
   std::string key;
-  key = absl::StrCat("cluster.", cluster_name, ".", stats);
+  key = absl::StrCat("cluster.", cluster_name, ".", stat);
   if (rolling_stats_map_.find(key) != rolling_stats_map_.end()) {
     // If the counter was reset, the result is negative
     // better return 0, will be back to normal once one rolling window passes.
     if (rolling_stats_map_[key][current_index_] <
-        rolling_stats_map_[key][(current_index_ + 1) % num_of_buckets_]) {
+        rolling_stats_map_[key][(current_index_ + 1) % window_size_]) {
       return 0;
     } else {
       return rolling_stats_map_[key][current_index_] -
-             rolling_stats_map_[key][(current_index_ + 1) % num_of_buckets_];
+             rolling_stats_map_[key][(current_index_ + 1) % window_size_];
     }
   } else {
     return 0;
   }
 }
 
-void Hystrix::CreateCounterNameLookupForCluster(const std::string& cluster_name) {
+void HystrixStatCache::CreateCounterNameLookupForCluster(const std::string& cluster_name) {
   // Building lookup name map for all specific cluster values.
   // Every call to the updateRollingWindowMap function should get the appropriate name from the map.
   std::string cluster_name_with_prefix = absl::StrCat("cluster.", cluster_name, ".");
@@ -77,8 +76,8 @@ void Hystrix::CreateCounterNameLookupForCluster(const std::string& cluster_name)
   counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
 }
 
-void Hystrix::updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
-                                     std::string cluster_name) {
+void HystrixStatCache::updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
+                                              std::string cluster_name) {
 
   if (counter_name_lookup.find(cluster_name) == counter_name_lookup.end()) {
     CreateCounterNameLookupForCluster(cluster_name);
@@ -120,20 +119,21 @@ void Hystrix::updateRollingWindowMap(std::map<std::string, uint64_t> current_sta
   ENVOY_LOG(trace, "{}", printRollingWindow());
 }
 
-void Hystrix::resetRollingWindow() { rolling_stats_map_.clear(); }
+void HystrixStatCache::resetRollingWindow() { rolling_stats_map_.clear(); }
 
-void Hystrix::addStringToStream(absl::string_view key, absl::string_view value,
-                                std::stringstream& info) {
+void HystrixStatCache::addStringToStream(absl::string_view key, absl::string_view value,
+                                         std::stringstream& info) {
   std::string quoted_value = absl::StrCat("\"", value, "\"");
   addInfoToStream(key, quoted_value, info);
 }
 
-void Hystrix::addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info) {
+void HystrixStatCache::addIntToStream(absl::string_view key, uint64_t value,
+                                      std::stringstream& info) {
   addInfoToStream(key, std::to_string(value), info);
 }
 
-void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value,
-                              std::stringstream& info) {
+void HystrixStatCache::addInfoToStream(absl::string_view key, absl::string_view value,
+                                       std::stringstream& info) {
   if (!info.str().empty()) {
     info << ", ";
   }
@@ -141,9 +141,9 @@ void Hystrix::addInfoToStream(absl::string_view key, absl::string_view value,
   info << added_info;
 }
 
-void Hystrix::addHystrixCommand(std::stringstream& ss, absl::string_view cluster_name,
-                                uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                                uint64_t rolling_window) {
+void HystrixStatCache::addHystrixCommand(std::stringstream& ss, absl::string_view cluster_name,
+                                         uint64_t max_concurrent_requests, uint64_t reporting_hosts,
+                                         uint64_t rolling_window) {
   std::stringstream cluster_info;
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   addStringToStream("type", "HystrixCommand", cluster_info);
@@ -214,9 +214,9 @@ void Hystrix::addHystrixCommand(std::stringstream& ss, absl::string_view cluster
   ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
 }
 
-void Hystrix::addHystrixThreadPool(std::stringstream& ss, absl::string_view cluster_name,
-                                   uint64_t queue_size, uint64_t reporting_hosts,
-                                   uint64_t rolling_window) {
+void HystrixStatCache::addHystrixThreadPool(std::stringstream& ss, absl::string_view cluster_name,
+                                            uint64_t queue_size, uint64_t reporting_hosts,
+                                            uint64_t rolling_window) {
   std::stringstream cluster_info;
 
   addIntToStream("currentPoolSize", 0, cluster_info);
@@ -239,22 +239,22 @@ void Hystrix::addHystrixThreadPool(std::stringstream& ss, absl::string_view clus
   ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
 }
 
-void Hystrix::getClusterStats(std::stringstream& ss, absl::string_view cluster_name,
-                              uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                              uint64_t rolling_window) {
+void HystrixStatCache::getClusterStats(std::stringstream& ss, absl::string_view cluster_name,
+                                       uint64_t max_concurrent_requests, uint64_t reporting_hosts,
+                                       uint64_t rolling_window) {
   addHystrixCommand(ss, cluster_name, max_concurrent_requests, reporting_hosts, rolling_window);
   addHystrixThreadPool(ss, cluster_name, max_concurrent_requests, reporting_hosts, rolling_window);
 }
 
-const std::string Hystrix::printRollingWindow() const {
+const std::string HystrixStatCache::printRollingWindow() const {
   std::stringstream out_str;
 
   for (auto stats_map_itr = rolling_stats_map_.begin(); stats_map_itr != rolling_stats_map_.end();
        ++stats_map_itr) {
     out_str << stats_map_itr->first << " | ";
-    RollingStats rolling_stats = stats_map_itr->second;
-    for (auto specific_stat_vec_itr = rolling_stats.begin();
-         specific_stat_vec_itr != rolling_stats.end(); ++specific_stat_vec_itr) {
+    RollingWindow rolling_window = stats_map_itr->second;
+    for (auto specific_stat_vec_itr = rolling_window.begin();
+         specific_stat_vec_itr != rolling_window.end(); ++specific_stat_vec_itr) {
       out_str << *specific_stat_vec_itr << " | ";
     }
     out_str << std::endl;
@@ -262,8 +262,9 @@ const std::string Hystrix::printRollingWindow() const {
   return out_str.str();
 }
 
-namespace HystrixNameSpace {
-HystrixSink::HystrixSink(Server::Instance& server) : stats_(new Hystrix()), server_(&server) {
+namespace Hystrix {
+HystrixSink::HystrixSink(Server::Instance& server)
+    : stats_(new HystrixStatCache()), server_(&server) {
   Server::Admin& admin = server_->admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
@@ -343,8 +344,7 @@ void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbac
 // TODO (@trabetti) is this correct way - to set nullptr?
 void HystrixSink::unregisterConnection() { callbacks_ = nullptr; }
 
-} // namespace HystrixNameSpace
-} // namespace Common
+} // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
 } // namespace Envoy

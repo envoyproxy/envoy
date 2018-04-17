@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
-namespace HystrixNameSpace {
+namespace Hystrix {
 
 class HystrixSinkFactory : Logger::Loggable<Logger::Id::config>,
                            public Server::Configuration::StatsSinkFactory {
@@ -23,7 +23,7 @@ public:
   std::string name() override;
 };
 
-} // namespace HystrixNameSpace
+} // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
 } // namespace Envoy

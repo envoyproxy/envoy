@@ -691,7 +691,7 @@ void AdminFilter::onComplete() {
   callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, true);
+    callbacks_->encodeData(response, end_stream);
   }
 }
 

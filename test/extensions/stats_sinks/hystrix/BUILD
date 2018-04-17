@@ -25,3 +25,17 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "hystrix_test",
+    srcs = ["hystrix_test.cc"],
+    extension_name = "envoy.stat_sinks.hystrix",
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/extensions/stat_sinks/hystrix:hystrix_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

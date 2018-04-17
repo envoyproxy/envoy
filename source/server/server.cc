@@ -37,7 +37,7 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
-#include "extensions/stat_sinks/common/hystrix/hystrix.h"
+#include "extensions/stat_sinks/hystrix/hystrix.h"
 
 namespace Envoy {
 namespace Server {
@@ -149,8 +149,8 @@ void InstanceImpl::flushStats() {
 void InstanceImpl::unregisterHystrixSink() {
   for (const auto& sink : config_->statsSinks()) {
     // TODO: is there a better way to find the hystrix sink?
-    Extensions::StatSinks::Common::HystrixNameSpace::HystrixSink* hystrix_sink =
-        dynamic_cast<Extensions::StatSinks::Common::HystrixNameSpace::HystrixSink*>(sink.get());
+    Extensions::StatSinks::Hystrix::HystrixSink* hystrix_sink =
+        dynamic_cast<Extensions::StatSinks::Hystrix::HystrixSink*>(sink.get());
     if (hystrix_sink != nullptr) {
       // TODO (@trabetti) :  will want to move to a vector of connections,
       // need a parameter (callback, hope it will work) to identify which connection to remove

@@ -6,17 +6,17 @@
 
 #include "common/network/resolver_impl.h"
 
-#include "extensions/stat_sinks/common/hystrix/hystrix.h"
+#include "extensions/stat_sinks/hystrix/hystrix.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
-namespace HystrixNameSpace {
+namespace Hystrix {
 
 Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message&,
                                                    Server::Instance& server) {
-  return std::make_unique<Common::HystrixNameSpace::HystrixSink>(server);
+  return std::make_unique<Hystrix::HystrixSink>(server);
 }
 
 ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
@@ -32,7 +32,7 @@ std::string HystrixSinkFactory::name() { return StatsSinkNames::get().HYSTRIX; }
 static Registry::RegisterFactory<HystrixSinkFactory, Server::Configuration::StatsSinkFactory>
     register_;
 
-} // namespace HystrixNameSpace
+} // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
 } // namespace Envoy

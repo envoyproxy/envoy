@@ -4,7 +4,7 @@
 
 #include "common/stats/stats_impl.h"
 
-#include "extensions/stat_sinks/common/hystrix/hystrix.h"
+#include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -23,8 +23,7 @@ using testing::_;
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
-namespace Common {
-namespace HystrixNameSpace {
+namespace Hystrix {
 
 class HystrixSinkTest : public testing::Test {
 public:
@@ -186,8 +185,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-} // namespace HystrixNameSpace
-} // namespace Common
+} // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
 } // namespace Envoy

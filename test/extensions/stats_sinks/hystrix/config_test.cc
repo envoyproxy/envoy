@@ -3,8 +3,8 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/stat_sinks/common/hystrix/hystrix.h"
 #include "extensions/stat_sinks/hystrix/config.h"
+#include "extensions/stat_sinks/hystrix/hystrix.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
@@ -23,7 +23,7 @@ using testing::_;
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
-namespace HystrixNameSpace {
+namespace Hystrix {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
   const std::string name = StatsSinkNames::get().HYSTRIX;
@@ -40,10 +40,10 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
-  EXPECT_NE(dynamic_cast<Common::HystrixNameSpace::HystrixSink*>(sink.get()), nullptr);
+  EXPECT_NE(dynamic_cast<Hystrix::HystrixSink*>(sink.get()), nullptr);
 }
 
-} // namespace HystrixNameSpace
+} // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
 } // namespace Envoy
