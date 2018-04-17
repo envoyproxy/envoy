@@ -108,9 +108,14 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
         thread_local_data.all_threads_complete_ = true;
         thread_local_data.condvar_.notify_one();
       });
-  std::unique_lock<std::mutex> lock(thread_local_data.condvar_mutex_);
-  thread_local_data.condvar_.wait(
-      lock, [&thread_local_data] { return thread_local_data.all_threads_complete_; });
+
+  {
+    std::unique_lock<std::mutex> lock(thread_local_data.condvar_mutex_);
+    thread_local_data.condvar_.wait(
+        lock, [&thread_local_data] { return thread_local_data.all_threads_complete_; });
+  }
+
+  EXPECT_TRUE(thread_local_data.all_threads_complete_);
 
   tls_.shutdownGlobalThreading();
   tls_.shutdownThread();

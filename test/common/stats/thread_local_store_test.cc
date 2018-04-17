@@ -93,6 +93,7 @@ public:
 class HistogramTest : public testing::Test, public RawStatDataAllocator {
 public:
   void SetUp() override {
+    InSequence s;
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
       return alloc_.alloc(name);
     }));
@@ -104,7 +105,6 @@ public:
     EXPECT_CALL(*this, alloc("stats.overflow"));
     store_.reset(new ThreadLocalStoreImpl(*this));
     store_->addSink(sink_);
-    InSequence s;
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
 
@@ -119,11 +119,10 @@ public:
       h2_interval_values;
 
   /**
-   * Validates taht Histogram merge happens as desired and returns the processed histogram count
+   * Validates that Histogram merge happens as desired and returns the processed histogram count
    * that can be asserted later.
    */
   uint64_t validateMerge() {
-
     std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
     store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
 
@@ -533,10 +532,10 @@ TEST_F(HistogramTest, BasicHistogramValidate) {
 
   EXPECT_EQ(2, validateMerge());
 
-  std::string h1_expected_summary =
+  const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
       "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  std::string h2_expected_summary =
+  const std::string h2_expected_summary =
       "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
 
   for (size_t i = 0; i < 100; ++i) {

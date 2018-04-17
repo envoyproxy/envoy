@@ -390,8 +390,6 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response) {
-  // We currently don't support timers locally (only via statsd) so just group all the counters
-  // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
@@ -518,8 +516,6 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
-  // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
-  // followed by two arrays interval and cumulative.
   for (Stats::ParentHistogramSharedPtr histogram : all_histograms) {
     Value histogram_obj;
     histogram_obj.SetObject();
@@ -529,6 +525,8 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
     rapidjson::Value quantile_array(rapidjson::kArrayType);
 
+    // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
+    // followed by two arrays interval and cumulative.
     for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
       Value quantile_obj;
       quantile_obj.SetObject();
