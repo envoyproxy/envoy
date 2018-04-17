@@ -20,7 +20,11 @@ ListenerSocketOptionImpl::ListenerSocketOptionImpl(
 
 bool ListenerSocketOptionImpl::setOption(Network::Socket& socket,
                                          Network::Socket::SocketState state) const {
-  Network::SocketOptionImpl::setOption(socket, state);
+  bool result = Network::SocketOptionImpl::setOption(socket, state);
+  if (!result) {
+    return result;
+  }
+
   if (state == Network::Socket::SocketState::Listening) {
     if (tcp_fast_open_queue_length_.has_value()) {
       const int tfo_value = tcp_fast_open_queue_length_.value();
