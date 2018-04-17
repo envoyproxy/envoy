@@ -16,7 +16,6 @@
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -42,19 +41,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::api::v2::core::HealthCheck parseHealthCheckFromJson(const std::string& json_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
-  return health_check;
-}
-
-envoy::api::v2::core::HealthCheck parseHealthCheckFromYaml(const std::string& yaml_string) {
-  envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
-  return health_check;
-}
-
 envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
   envoy::api::v2::core::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
@@ -63,27 +49,6 @@ envoy::api::v2::core::HealthCheck createGrpcHealthCheckConfig() {
   health_check.mutable_healthy_threshold()->set_value(2);
   health_check.mutable_grpc_health_check();
   return health_check;
-}
-
-TEST(HealthCheckerFactoryTest, createRedis) {
-  std::string json = R"EOF(
-  {
-    "type": "redis",
-    "timeout_ms": 1000,
-    "interval_ms": 1000,
-    "unhealthy_threshold": 1,
-    "healthy_threshold": 1
-  }
-  )EOF";
-
-  NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr, dynamic_cast<RedisHealthCheckerImpl*>(
-                         HealthCheckerFactory::create(parseHealthCheckFromJson(json), cluster,
-                                                      runtime, random, dispatcher)
-                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
@@ -162,7 +127,7 @@ public:
       path: /healthcheck
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -183,7 +148,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -204,7 +169,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -225,7 +190,7 @@ public:
     )EOF",
                                    host);
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -275,7 +240,7 @@ public:
           append: false
     )EOF";
 
-    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromYaml(yaml),
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_));
     health_checker_->addHostCheckCompleteCb([this](HostSharedPtr host, bool changed_state) -> void {
       onHostStatus(host, changed_state);
@@ -1212,7 +1177,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 
@@ -1229,7 +1194,7 @@ public:
     }
     )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 
@@ -1251,7 +1216,7 @@ public:
       }
       )EOF";
 
-    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
+    health_checker_.reset(new TcpHealthCheckerImpl(*cluster_, parseHealthCheckFromV1Json(json),
                                                    dispatcher_, runtime_, random_));
   }
 
@@ -1564,290 +1529,6 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
-}
-
-class RedisHealthCheckerImplTest
-    : public testing::Test,
-      public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
-public:
-  RedisHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
-
-  void setup() {
-    std::string json = R"EOF(
-    {
-      "type": "redis",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": 1,
-      "healthy_threshold": 1
-    }
-    )EOF";
-
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
-                                                     dispatcher_, runtime_, random_, *this));
-  }
-
-  void setupExistsHealthcheck() {
-    std::string json = R"EOF(
-    {
-      "type": "redis",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": 1,
-      "healthy_threshold": 1,
-      "redis_key": "foo"
-    }
-    )EOF";
-
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
-                                                     dispatcher_, runtime_, random_, *this));
-  }
-
-  void setupDontReuseConnection() {
-    std::string json = R"EOF(
-      {
-        "type": "redis",
-        "timeout_ms": 1000,
-        "interval_ms": 1000,
-        "unhealthy_threshold": 1,
-        "healthy_threshold": 1,
-        "reuse_connection": false
-      }
-      )EOF";
-
-    health_checker_.reset(new RedisHealthCheckerImpl(*cluster_, parseHealthCheckFromJson(json),
-                                                     dispatcher_, runtime_, random_, *this));
-  }
-
-  Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
-  create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::RedisProxy::ConnPool::Config&) override {
-    return Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr{create_()};
-  }
-
-  MOCK_METHOD0(create_, Extensions::NetworkFilters::RedisProxy::ConnPool::Client*());
-
-  void expectSessionCreate() {
-    interval_timer_ = new Event::MockTimer(&dispatcher_);
-    timeout_timer_ = new Event::MockTimer(&dispatcher_);
-  }
-
-  void expectClientCreate() {
-    client_ = new Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient();
-    EXPECT_CALL(*this, create_()).WillOnce(Return(client_));
-    EXPECT_CALL(*client_, addConnectionCallbacks(_));
-  }
-
-  void expectExistsRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::existsHealthCheckRequest("")), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    EXPECT_CALL(*timeout_timer_, enableTimer(_));
-  }
-
-  void expectPingRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthCheckerImpl::pingHealthCheckRequest()), _))
-        .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
-    EXPECT_CALL(*timeout_timer_, enableTimer(_));
-  }
-
-  std::shared_ptr<MockCluster> cluster_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Runtime::MockRandomGenerator> random_;
-  Event::MockTimer* timeout_timer_{};
-  Event::MockTimer* interval_timer_{};
-  Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
-  Extensions::NetworkFilters::RedisProxy::ConnPool::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks* pool_callbacks_{};
-  std::shared_ptr<RedisHealthCheckerImpl> health_checker_;
-};
-
-TEST_F(RedisHealthCheckerImplTest, PingAndVariousFailures) {
-  InSequence s;
-  setup();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-
-  expectSessionCreate();
-  expectClientCreate();
-  expectPingRequestCreate();
-  health_checker_->start();
-
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
-  response->asString() = "PONG";
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Failure
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Redis failure via disconnect
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  pool_callbacks_->onFailure();
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Timeout
-  EXPECT_CALL(pool_request_, cancel());
-  EXPECT_CALL(*client_, close());
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Shutdown with active request.
-  EXPECT_CALL(pool_request_, cancel());
-  EXPECT_CALL(*client_, close());
-
-  EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
-  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
-  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
-}
-
-TEST_F(RedisHealthCheckerImplTest, Exists) {
-  InSequence s;
-  setupExistsHealthcheck();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-
-  expectSessionCreate();
-  expectClientCreate();
-  expectExistsRequestCreate();
-  health_checker_->start();
-
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
-  response->asInteger() = 0;
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectExistsRequestCreate();
-  interval_timer_->callback_();
-
-  // Failure, exists
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
-  response->asInteger() = 1;
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectExistsRequestCreate();
-  interval_timer_->callback_();
-
-  // Failure, no value
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  pool_callbacks_->onResponse(std::move(response));
-
-  EXPECT_CALL(*client_, close());
-
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
-  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
-  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
-}
-
-// Tests that redis client will behave appropriately when reuse_connection is false.
-TEST_F(RedisHealthCheckerImplTest, NoConnectionReuse) {
-  InSequence s;
-  setupDontReuseConnection();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-
-  expectSessionCreate();
-  expectClientCreate();
-  expectPingRequestCreate();
-  health_checker_->start();
-
-  // The connection will close on success.
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_CALL(*client_, close());
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
-  response->asString() = "PONG";
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // The connection will close on failure.
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  EXPECT_CALL(*client_, close());
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Redis failure via disconnect, the connection was closed by the other end.
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  pool_callbacks_->onFailure();
-  client_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Timeout, the connection will be closed.
-  EXPECT_CALL(pool_request_, cancel());
-  EXPECT_CALL(*client_, close());
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  timeout_timer_->callback_();
-
-  expectClientCreate();
-  expectPingRequestCreate();
-  interval_timer_->callback_();
-
-  // Shutdown with active request.
-  EXPECT_CALL(pool_request_, cancel());
-  EXPECT_CALL(*client_, close());
-
-  // The metrics expected after all tests have run.
-  EXPECT_EQ(5UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
-  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
-  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {

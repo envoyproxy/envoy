@@ -112,12 +112,13 @@ envoy_cc_library(
     ],
     deps = [
         ":health_checker_base_lib",
+        # TODO(dio): Remove dependency to server.
+        "//include/envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
-        # TODO(mattklein123): The following should not be required once we allow pluggable health
-        # checkers.
-        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        # TODO(dio): Remove dependency to health checkers extension when redis_health_check is removed.
+        "//source/extensions/health_checkers:well_known_names",
     ],
 )
 

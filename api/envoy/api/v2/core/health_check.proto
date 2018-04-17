@@ -116,9 +116,9 @@ message HealthCheck {
     string service_name = 1;
   }
 
-  // [#not-implemented-hide:] Custom health check.
+  // Custom health check.
   message CustomHealthCheck {
-    // The registered name of the custom health check.
+    // The registered name of the custom health checker.
     string name = 1 [(validate.rules).string.min_bytes = 1];
 
     // A custom health checker specific configuration which depends on the custom health checker
@@ -141,7 +141,7 @@ message HealthCheck {
     // gRPC health check.
     GrpcHealthCheck grpc_health_check = 11;
 
-    // [#not-implemented-hide:] Custom health check.
+    // Custom health check.
     CustomHealthCheck custom_health_check = 13;
   }
 
