@@ -39,6 +39,12 @@ public:
   virtual int32_t requestId() const PURE;
   virtual int32_t responseTo() const PURE;
   virtual std::string toString(bool full) const PURE;
+
+  // Define some constants used in mongo messages encoding
+  constexpr static uint32_t kMessageHeaderSize = 16;
+  constexpr static uint32_t kInt32Length = 4;
+  constexpr static uint32_t kInt64Length = 8;
+  constexpr static uint32_t kStringPaddingLength = 1;
 };
 
 /**
