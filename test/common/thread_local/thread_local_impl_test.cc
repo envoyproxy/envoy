@@ -91,14 +91,12 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   EXPECT_CALL(main_dispatcher_, post(_));
 
   // Ensure that the thread local call back and all_thread_complete call back are called.
-  struct thread_local_verification_info {
+  struct {
     std::atomic<uint64_t> thread_local_calls_{0};
     std::condition_variable condvar_;
     std::mutex condvar_mutex_;
     bool all_threads_complete_;
-  };
-
-  thread_local_verification_info thread_local_data;
+  } thread_local_data;
 
   tlsptr->runOnAllThreads(
       [&thread_local_data]() -> void { ++thread_local_data.thread_local_calls_; },
