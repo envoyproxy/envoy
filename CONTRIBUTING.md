@@ -68,9 +68,8 @@ maximize the chances of your PR being merged.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
-* Any PR that changes user-facing behavior **must** have associated documentation in
-  [data-plane-api](https://github.com/envoyproxy/data-plane-api/tree/master/docs) as well as
-  [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst).
+* Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
+  well as [release notes](docs/root/intro/version_history.rst).
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.

@@ -225,6 +225,7 @@ public:
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
                                                             Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr);
 
@@ -232,6 +233,28 @@ public:
       MessageUtil::jsonConvert(enclosing_message.config(), *config);
     }
 
+    return config;
+  }
+
+  /**
+   * Translate a nested config into a route-specific proto message provided by
+   * the implementation factory.
+   * @param source a message (typically Struct) that contains the config for
+   *        the given factory's route-local configuration (as returned by
+   *        createEmptyRouteConfigProto).
+   * @param factory implementation factory with the method
+   *        'createEmptyRouteConfigProto' to produce a proto to be filled with
+   *        the translated configuration.
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr translateToFactoryRouteConfig(const Protobuf::Message& source,
+                                                                 Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
+
+    // Fail in an obvious way if a plugin does not return a proto.
+    RELEASE_ASSERT(config != nullptr);
+
+    MessageUtil::jsonConvert(source, *config);
     return config;
   }
 

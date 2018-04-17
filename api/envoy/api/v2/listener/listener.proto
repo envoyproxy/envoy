@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package envoy.api.v2.listener;
+option go_package = "listener";
+
+import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/auth/cert.proto";
+import "envoy/api/v2/core/base.proto";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Listener components]
+// Listener :ref:`configuration overview <config_listeners>`
+
+message Filter {
+  // The name of the filter to instantiate. The name must match a supported
+  // filter. The built-in filters are:
+  //
+  // [#comment:TODO(mattklein123): Auto generate the following list]
+  // * :ref:`envoy.client_ssl_auth<config_network_filters_client_ssl_auth>`
+  // * :ref:`envoy.echo <config_network_filters_echo>`
+  // * :ref:`envoy.http_connection_manager <config_http_conn_man>`
+  // * :ref:`envoy.mongo_proxy <config_network_filters_mongo_proxy>`
+  // * :ref:`envoy.ratelimit <config_network_filters_rate_limit>`
+  // * :ref:`envoy.redis_proxy <config_network_filters_redis_proxy>`
+  // * :ref:`envoy.tcp_proxy <config_network_filters_tcp_proxy>`
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  google.protobuf.Struct config = 2;
+
+  // [#not-implemented-hide:]
+  message DeprecatedV1 {
+    string type = 1;
+  }
+
+  // [#not-implemented-hide:]
+  DeprecatedV1 deprecated_v1 = 3 [deprecated = true];
+}
+
+// Specifies the match criteria for selecting a specific filter chain for a
+// listener.
+message FilterChainMatch {
+  // If non-empty, the SNI domains to consider. May contain a wildcard prefix,
+  // e.g. ``*.example.com``.
+  //
+  // .. attention::
+  //
+  //   See the :ref:`FAQ entry <faq_how_to_setup_sni>` on how to configure SNI for more
+  //   information.
+  repeated string sni_domains = 1;
+
+  // If non-empty, an IP address and prefix length to match addresses when the
+  // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
+  // [#not-implemented-hide:]
+  repeated core.CidrRange prefix_ranges = 3;
+
+  // If non-empty, an IP address and suffix length to match addresses when the
+  // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
+  // [#not-implemented-hide:]
+  string address_suffix = 4;
+
+  // [#not-implemented-hide:]
+  google.protobuf.UInt32Value suffix_len = 5;
+
+  // The criteria is satisfied if the source IP address of the downstream
+  // connection is contained in at least one of the specified subnets. If the
+  // parameter is not specified or the list is empty, the source IP address is
+  // ignored.
+  // [#not-implemented-hide:]
+  repeated core.CidrRange source_prefix_ranges = 6;
+
+  // The criteria is satisfied if the source port of the downstream connection
+  // is contained in at least one of the specified ports. If the parameter is
+  // not specified, the source port is ignored.
+  // [#not-implemented-hide:]
+  repeated google.protobuf.UInt32Value source_ports = 7;
+
+  // Optional destination port to consider when use_original_dst is set on the
+  // listener in determining a filter chain match.
+  // [#not-implemented-hide:]
+  google.protobuf.UInt32Value destination_port = 8;
+}
+
+// A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
+// various other parameters.
+message FilterChain {
+  // The criteria to use when matching a connection to this filter chain.
+  FilterChainMatch filter_chain_match = 1;
+
+  // The TLS context for this filter chain.
+  auth.DownstreamTlsContext tls_context = 2;
+
+  // A list of individual network filters that make up the filter chain for
+  // connections established with the listener. Order matters as the filters are
+  // processed sequentially as connection events happen. Note: If the filter
+  // list is empty, the connection will close by default.
+  repeated Filter filters = 3 [(gogoproto.nullable) = false];
+
+  // Whether the listener should expect a PROXY protocol V1 header on new
+  // connections. If this option is enabled, the listener will assume that that
+  // remote address of the connection is the one specified in the header. Some
+  // load balancers including the AWS ELB support this option. If the option is
+  // absent or set to false, Envoy will use the physical peer address of the
+  // connection as the remote address.
+  google.protobuf.BoolValue use_proxy_proto = 4;
+
+  // [#not-implemented-hide:] filter chain metadata.
+  core.Metadata metadata = 5;
+
+  // See :ref:`base.TransportSocket<envoy_api_msg_core.TransportSocket>` description.
+  core.TransportSocket transport_socket = 6;
+}
+
+message ListenerFilter {
+  // The name of the filter to instantiate. The name must match a supported
+  // filter. The built-in filters are:
+  //
+  // [#comment:TODO(mattklein123): Auto generate the following list]
+  // * :ref:`envoy.listener.original_dst <config_listener_filters_original_dst>`
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  google.protobuf.Struct config = 2;
+}

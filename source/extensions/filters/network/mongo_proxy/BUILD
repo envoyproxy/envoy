@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # Mongo proxy L4 network filter (observability and fault injection).
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/network_filters/mongo_proxy_filter.rst
+# Public docs: docs/root/configuration/network_filters/mongo_proxy_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",

@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # External authorization L4 network filter
-# Public docs: TODO(saumoh): Docs needed in https://github.com/envoyproxy/data-plane-api/tree/master/docs/root/configuration/network_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/network_filters
 
 load(
     "//bazel:envoy_build_system.bzl",

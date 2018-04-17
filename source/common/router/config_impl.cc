@@ -11,6 +11,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h" // TODO(rodaine): break dependency on server
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -21,6 +22,8 @@
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/config/utility.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
@@ -244,7 +247,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.route().response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
-      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)) {
+      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
+      per_filter_configs_(route.per_filter_config()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -520,6 +524,10 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   }
 }
 
+const Protobuf::Message* RouteEntryImplBase::perFilterConfig(const std::string& name) const {
+  return per_filter_configs_.get(name);
+}
+
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string runtime_key, Runtime::Loader& loader,
     const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster)
@@ -527,7 +535,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
-                                                       cluster.response_headers_to_remove())) {
+                                                       cluster.response_headers_to_remove())),
+      per_filter_configs_(cluster.per_filter_config()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -540,6 +549,15 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       }
     }
   }
+}
+
+const Protobuf::Message*
+RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
+  const Protobuf::Message* cfg = per_filter_configs_.get(name);
+  if (cfg != nullptr) {
+    return cfg;
+  }
+  return DynamicRouteEntry::perFilterConfig(name);
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
@@ -652,7 +670,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
       global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
-                                                       virtual_host.response_headers_to_remove())) {
+                                                       virtual_host.response_headers_to_remove())),
+      per_filter_configs_(virtual_host.per_filter_config()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -715,6 +734,10 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
+
+const Protobuf::Message* VirtualHostImpl::perFilterConfig(const std::string& name) const {
+  return per_filter_configs_.get(name);
+}
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
   // We do a longest wildcard suffix match against the host that's passed in.
@@ -853,6 +876,23 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
   request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
+}
+
+PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs) {
+  for (const auto& cfg : configs) {
+    const std::string& name = cfg.first;
+    const ProtobufWkt::Struct& struct_config = cfg.second;
+
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedHttpFilterConfigFactory>(name);
+
+    configs_[name] = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
+  }
+}
+
+const Protobuf::Message* PerFilterConfigs::get(const std::string& name) const {
+  auto cfg = configs_.find(name);
+  return cfg == configs_.end() ? nullptr : cfg->second.get();
 }
 
 } // namespace Router
