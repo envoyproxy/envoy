@@ -45,7 +45,7 @@ protected:
     ASSERT_EQ(0, buffer.length());
 
     ZlibDecompressorImpl decompressor;
-    decompressor.init(15);
+    decompressor.init(window_bits);
 
     decompressor.decompress(accumulation_buffer, buffer);
     std::string decompressed_text{TestUtility::bufferToString(buffer)};
@@ -212,6 +212,43 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressWithUncommonParams) {
         Compressor::ZlibCompressorImpl::CompressionLevel::Speed,
         Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered, 15, i);
   }
+}
+
+TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl accumulation_buffer;
+
+  const std::string sample{"slice, slice, slice, slice, slice, "};
+  std::string original_text{};
+  for (uint64_t i = 0; i < 20; ++i) {
+    Buffer::BufferFragmentImpl frag(sample.c_str(), sample.size(), nullptr);
+    buffer.addBufferFragment(frag);
+    original_text.append(sample);
+  }
+
+  const uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
+  EXPECT_EQ(num_slices, 20);
+
+  Envoy::Compressor::ZlibCompressorImpl compressor;
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+                  gzip_window_bits, memory_level);
+
+  compressor.compress(buffer, Compressor::State::Flush);
+  accumulation_buffer.add(buffer);
+
+  ZlibDecompressorImpl decompressor;
+  decompressor.init(gzip_window_bits);
+
+  drainBuffer(buffer);
+  ASSERT_EQ(0, buffer.length());
+
+  decompressor.decompress(accumulation_buffer, buffer);
+  std::string decompressed_text{TestUtility::bufferToString(buffer)};
+
+  ASSERT_EQ(compressor.checksum(), decompressor.checksum());
+  ASSERT_EQ(original_text.length(), decompressed_text.length());
+  EXPECT_EQ(original_text, decompressed_text);
 }
 
 } // namespace
