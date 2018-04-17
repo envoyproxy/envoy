@@ -10,7 +10,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.release
        - setup_remote_docker
@@ -22,10 +22,9 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - run: echo $CIRCLE_SHA1
        - run: echo $CIRCLE_PR_NUMBER
-       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
-       - run: sleep 30 # workaround GH sync issue
        - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
@@ -35,6 +34,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
    api:
@@ -43,6 +43,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.api
        - add_ssh_keys:
@@ -55,6 +56,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - add_ssh_keys:
            fingerprints:
@@ -63,7 +65,7 @@ jobs:
    ipv6_tests:
      machine: true
      steps:
-     - run: sleep 30 # workaround GH sync issue
+     - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
      - checkout
      - run:
          name: enable ipv6
@@ -84,7 +86,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.coverage
        - run: ci/coverage_publish.sh
@@ -96,7 +98,7 @@ jobs:
      resource_class: small
      working_directory: /source
      steps:
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh check_format
    build_image:
@@ -107,7 +109,7 @@ jobs:
            NUM_CPUS: 8
      resource_class: xlarge
      steps:
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - setup_remote_docker
        - run: ci/build_container/docker_push.sh
@@ -117,7 +119,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh docs
        - add_ssh_keys:
@@ -131,7 +133,7 @@ jobs:
        xcode: "9.3.0"
      steps:
        - run: sudo ntpdate -vu time.apple.com
-       - run: sleep 30 # workaround GH sync issue
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/mac_ci_setup.sh
        - run: ci/mac_ci_steps.sh
