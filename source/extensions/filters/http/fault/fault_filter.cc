@@ -80,7 +80,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     if (!proto_config) {
       // See if the virtual host has any fault filter config
       proto_config = callbacks_->route()->routeEntry()->virtualHost().perFilterConfig(
-        Extensions::HttpFilters::HttpFilterNames::get().FAULT);
+          Extensions::HttpFilters::HttpFilterNames::get().FAULT);
     }
 
     if (proto_config) {
