@@ -13,6 +13,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"

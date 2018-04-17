@@ -20,6 +20,8 @@
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
