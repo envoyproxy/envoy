@@ -45,6 +45,9 @@ jobs:
      steps:
        - checkout
        - run: ci/do_circle_ci.sh bazel.api
+       - add_ssh_keys:
+           fingerprints:
+             - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
    ipv6_tests:
      machine: true
@@ -106,7 +109,9 @@ jobs:
        - run: sleep 30 # workaround GH sync issue
        - checkout
        - run: ci/do_circle_ci.sh docs
-       - add_ssh_keys
+       - add_ssh_keys:
+           fingerprints:
+             - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
        - run: docs/publish.sh
        - store_artifacts:
            path: generated/docs
