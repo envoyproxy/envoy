@@ -382,7 +382,6 @@ public:
   void refresh(const histogram_t* new_histogram_ptr);
 
 private:
-  static const std::vector<double> supported_quantiles_;
   std::vector<double> computed_quantiles_;
 };
 
@@ -482,7 +481,9 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
   std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
-  std::list<ParentHistogramSharedPtr> histograms() const override { return parent_histograms_; }
+  std::list<ParentHistogramSharedPtr> histograms() const override {
+    return std::list<ParentHistogramSharedPtr>{};
+  }
 
 private:
   struct ScopeImpl : public Scope {
@@ -508,7 +509,6 @@ private:
   IsolatedStatsCache<Counter, CounterImpl> counters_;
   IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
   IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
-  std::list<ParentHistogramSharedPtr> parent_histograms_;
 };
 
 } // namespace Stats

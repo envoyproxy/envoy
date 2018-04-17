@@ -45,7 +45,10 @@ public:
   void recordValue(uint64_t value) override;
 
   bool used() const override { return flags_ & Flags::Used; }
-  void beginMerge() override { current_active_ = 1 - current_active_; }
+  void beginMerge() override {
+    // this switches the current_active_ between 1 and 0.
+    current_active_ = 1 - current_active_;
+  }
 
   void merge(histogram_t* target);
 
@@ -72,9 +75,9 @@ public:
   bool used() const override;
 
   /**
-   * This method is called during the main stats flush process for each of the histogram. It
+   * This method is called during the main stats flush process for each of the histograms. It
    * iterates through the TLS histograms and collects the histogram data of all of them
-   * in to "interval_histogram_". Then the collected "interval_histogram_" is merged to a
+   * in to "interval_histogram". Then the collected "interval_histogram" is merged to a
    * "cumulative_histogram".
    */
   void merge() override;
@@ -84,7 +87,7 @@ public:
     return cumulative_statistics_;
   }
 
-  void addTlsHistogram(TlsHistogramSharedPtr hist_ptr);
+  void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
 
   Store& parent_;
   std::list<TlsHistogramSharedPtr> tls_histograms_;
@@ -143,7 +146,7 @@ typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
  *    current_active index via which it writes to the correct histogram.
  *  - When all workers have done, the main thread continues with the flush process where the
  *    "actual" merging happens.
- *  - As the active histograms are swapped in TLS histograms, On the main thread, we can be sure
+ *  - As the active histograms are swapped in TLS histograms, on the main thread, we can be sure
  *    that no worker is writing into the "backup" histogram.
  *  - The main thread now goes through all histograms, collect them across each worker and
  *    accumulates in to "interval" histograms.
@@ -167,7 +170,7 @@ public:
 
   // Stats::Store
   // TODO(ramaraochavali): Consider changing the implementation of these methods to use vectors and
-  // use std::sort, rather than inserting into a map and pulling it out for better performance
+  // use std::sort, rather than inserting into a map and pulling it out for better performance.
   std::list<CounterSharedPtr> counters() const override;
   std::list<GaugeSharedPtr> gauges() const override;
   std::list<ParentHistogramSharedPtr> histograms() const override;

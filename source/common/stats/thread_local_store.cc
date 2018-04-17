@@ -67,7 +67,7 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
-  // here. We need to process global storage for histograms similar to how we have a central storage
+  // here. We need process global storage for histograms similar to how we have a central storage
   // in shared memory for counters/gauges.
   for (ScopeImpl* scope : scopes_) {
     for (auto name_histogram_pair : scope->central_cache_.histograms_) {
@@ -76,7 +76,8 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
       } else {
-        ENVOY_LOG(debug, "duplicate histogram {}.{}", scope->prefix_, hist_name);
+        ENVOY_LOG(warn, "duplicate histogram {}.{}: data loss will occur on output", scope->prefix_,
+                  hist_name);
       }
     }
   }
@@ -333,15 +334,15 @@ void ParentHistogramImpl::merge() {
     for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
       tls_histogram->merge(interval_histogram_);
     }
-    histogram_t* hist_array[1];
-    hist_array[0] = interval_histogram_;
-    hist_accumulate(cumulative_histogram_, hist_array, ARRAY_SIZE(hist_array));
+    // Since TLS merge is done, we can release the lock here.
+    lock.unlock();
+    hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
     cumulative_statistics_.refresh(cumulative_histogram_);
     interval_statistics_.refresh(interval_histogram_);
   }
 }
 
-void ParentHistogramImpl::addTlsHistogram(TlsHistogramSharedPtr hist_ptr) {
+void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   std::unique_lock<std::mutex> lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
 }

@@ -403,12 +403,18 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
     all_stats.emplace(gauge->name(), gauge->value());
   }
-  const std::list<Stats::ParentHistogramSharedPtr>& histograms = server_.stats().histograms();
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    all_histograms.emplace(histogram->name(),
-                           fmt::format("\n\t Interval:   {}\n\t Cumulative: {}",
-                                       histogram->intervalStatistics().summary(),
-                                       histogram->cumulativeStatistics().summary()));
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
+    std::vector<std::string> summary;
+    const std::vector<double>& supported_quantiles_ref =
+        histogram->intervalStatistics().supportedQuantiles();
+    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                    histogram->intervalStatistics().computedQuantiles()[i],
+                                    histogram->cumulativeStatistics().computedQuantiles()[i]));
+    }
+
+    all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
   }
 
   if (params.size() == 0) {
@@ -425,7 +431,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_key == "format" && format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, histograms));
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms()));
     } else if (format_key == "format" && format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response);
     } else {
@@ -512,6 +518,8 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
+  // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
+  // followed by two arrays interval and cumulative.
   for (Stats::ParentHistogramSharedPtr histogram : all_histograms) {
     Value histogram_obj;
     histogram_obj.SetObject();
