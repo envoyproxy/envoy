@@ -305,10 +305,8 @@ void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  histogram_t* hist_array[1];
-  hist_array[0] = histograms_[1 - current_active_];
-  hist_accumulate(target, hist_array, ARRAY_SIZE(hist_array));
-  hist_clear(hist_array[0]);
+  hist_accumulate(target, &histograms_[1 - current_active_], 1);
+  hist_clear(histograms_[1 - current_active_]);
 }
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
