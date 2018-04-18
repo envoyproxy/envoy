@@ -1,0 +1,27 @@
+cc_library(
+    name = "libprotobuf_mutator",
+    srcs = [
+        "src/binary_format.cc",
+        "src/field_instance.h",
+        "src/libfuzzer/libfuzzer_macro.cc",
+        "src/libfuzzer/libfuzzer_mutator.cc",
+        "src/mutator.cc",
+        "src/text_format.cc",
+        "src/utf8_fix.cc",
+        "src/weighted_reservoir_sampler.h",
+        "src/binary_format.h",
+        # Included here as well as in hdrs due to include_prefix.
+        "src/libfuzzer/libfuzzer_macro.h",
+        "src/libfuzzer/libfuzzer_mutator.h",
+        "src/mutator.h",
+        "src/random.h",
+        "src/text_format.h",
+        "src/utf8_fix.h",
+        "port/protobuf.h",
+    ],
+    hdrs = ["src/libfuzzer/libfuzzer_macro.h"],
+    includes = ["."],
+    include_prefix = "libprotobuf_mutator",
+    deps = ["//external:protobuf"],
+    visibility = ["//visibility:public"],
+)

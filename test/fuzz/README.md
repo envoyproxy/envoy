@@ -34,10 +34,12 @@ exist, populated with files that will act as the corpus.
 Your fuzz test will ultimately be driven by a simple interface:
 
 ```c++
-void Envoy::Fuzz::Runner::execute(const uint8_t* data, size_t size);
+DEFINE_FUZZER(const uint8_t* data, size_t size) {
+  // Your test code goes here
+}
 ```
 
-It is up to your test `execute()` implementation to map this buffer of data to
+It is up to your test `DEFINE_FUZZER` implementation to map this buffer of data to
 meaningful semantics, e.g. a stream of network bytes or a protobuf binary input.
 
 The fuzz test will be executed in two environments:
@@ -53,7 +55,7 @@ The fuzz test will be executed in two environments:
 
 ## Defining a new fuzz test
 
-1. Write a fuzz test module implementing the `Envoy::Fuzz::Runner::execute`
+1. Write a fuzz test module implementing the `DEFINE_FUZZER`
    interface. E.g.
    [`test/common/common/base64_fuzz_test.cc`](../../test/common/common/base64_fuzz_test.cc).
 
@@ -66,3 +68,17 @@ The fuzz test will be executed in two environments:
 
 4. Run the `envoy_cc_fuzz_test` target. E.g. `bazel test
    //test/common/common:base64_fuzz_test`.
+
+## Protobuf fuzz tests
+
+We also have integration with
+[libprotobuf-mutator](https://github.com/google/libprotobuf-mutator), allowing
+tests built on a protobuf input to work directly with a typed protobuf object,
+rather than a raw buffer. The interface to this is as described at
+https://github.com/google/libprotobuf-mutator#integrating-with-libfuzzer:
+
+```c++
+DEFINE_PROTO_FUZZER(const MyMessageType& input) {
+  // Your test code goes here
+}
+```
