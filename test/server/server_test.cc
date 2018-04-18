@@ -36,7 +36,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushCountersAndGaugesToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store);
 }
 
 class RunHelperTest : public testing::Test {
