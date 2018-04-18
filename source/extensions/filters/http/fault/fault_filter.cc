@@ -70,10 +70,9 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // callback.
 Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   // Route-level configuration overrides filter-level configuration
-  // TODO (rshriram): We should not be using Runtimes when reading from route-level
-  // faults until we parameterize the runtime keys for faults based on the route name.
-  // Its okay for the moment, since the only use case of faults with runtimes is
-  // by folks using filter level configuration in the fault filter (mainly Lyft folks).
+  // NOTE: We should not use runtime when reading from route-level
+  // faults. In other words, runtime is supported only when faults are
+  // configured at the filter level.
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
     const std::string name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
     const auto* route_entry = callbacks_->route()->routeEntry();
@@ -85,6 +84,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
       const envoy::config::filter::http::fault::v2::HTTPFault per_filter_config =
           dynamic_cast<const envoy::config::filter::http::fault::v2::HTTPFault&>(*proto_config);
 
+      // TODO (qiwzhang): Optimize this such that its updated only by the
+      // route update callback
       config_.reset(new FaultFilterConfig(per_filter_config, config_->runtime(),
                                           config_->statsPrefix(), config_->scope()));
     }
