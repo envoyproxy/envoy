@@ -11,6 +11,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -118,15 +119,27 @@ public:
   std::vector<uint64_t> h1_cumulative_values, h2_cumulative_values, h1_interval_values,
       h2_interval_values;
 
+  typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
+
+  NameHistogramMap makeHistogramMap(const std::list<ParentHistogramSharedPtr>& hist_list) {
+    NameHistogramMap name_histogram_map;
+    for (const Stats::ParentHistogramSharedPtr& histogram : hist_list) {
+      // Exclude the scope part of the name.
+      const std::vector<std::string>& split_vector = absl::StrSplit(histogram->name(), '.');
+      name_histogram_map.insert(std::make_pair(split_vector.back(), histogram));
+    }
+    return name_histogram_map;
+  }
+
   /**
    * Validates that Histogram merge happens as desired and returns the processed histogram count
    * that can be asserted later.
    */
   uint64_t validateMerge() {
-    std::shared_ptr<std::atomic<bool>> merge_called = std::make_shared<std::atomic<bool>>(false);
-    store_->mergeHistograms([merge_called]() -> void { *merge_called = true; });
+    std::atomic<bool> merge_called{false};
+    store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
 
-    EXPECT_TRUE(*merge_called);
+    EXPECT_TRUE(merge_called);
 
     std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
@@ -155,14 +168,15 @@ public:
     HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
     HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
 
-    for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
-      if (histogram->name() == "h1") {
-        EXPECT_EQ(histogram->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
-        EXPECT_EQ(histogram->intervalStatistics().summary(), h1_interval_statistics.summary());
-      } else {
-        EXPECT_EQ(histogram->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
-        EXPECT_EQ(histogram->intervalStatistics().summary(), h2_interval_statistics.summary());
-      }
+    NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
+    const Stats::ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
+    EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
+    EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
+
+    if (histogram_list.size() > 1) {
+      const Stats::ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
+      EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
+      EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
     }
 
     hist_free(hist1_cumulative);
@@ -180,7 +194,7 @@ public:
     EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), record_value));
     histogram.recordValue(record_value);
 
-    if (histogram.name().find("h1") != std::string::npos) {
+    if (histogram.name() == "h1") {
       h1_cumulative_values.push_back(record_value);
       h1_interval_values.push_back(record_value);
     } else {
@@ -524,7 +538,7 @@ TEST_F(HistogramTest, BasicScopeHistogramMerge) {
   EXPECT_EQ(2, validateMerge());
 }
 
-TEST_F(HistogramTest, BasicHistogramValidate) {
+TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = store_->histogram("h2");
 
@@ -544,13 +558,30 @@ TEST_F(HistogramTest, BasicHistogramValidate) {
 
   EXPECT_EQ(2, validateMerge());
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
-    if (histogram->name() == "h1") {
-      EXPECT_EQ(h1_expected_summary, histogram->cumulativeStatistics().summary());
-    } else {
-      EXPECT_EQ(h2_expected_summary, histogram->cumulativeStatistics().summary());
-    }
+  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  EXPECT_EQ(h1_expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
+  EXPECT_EQ(h2_expected_summary, name_histogram_map["h2"]->cumulativeStatistics().summary());
+}
+
+// Validates the summary after known value merge in to same histogram.
+TEST_F(HistogramTest, BasicHistogramMergeSummary) {
+  Histogram& h1 = store_->histogram("h1");
+
+  for (size_t i = 0; i < 50; ++i) {
+    expectCallAndAccumulate(h1, i);
   }
+  EXPECT_EQ(1, validateMerge());
+
+  for (size_t i = 50; i < 100; ++i) {
+    expectCallAndAccumulate(h1, i);
+  }
+  EXPECT_EQ(1, validateMerge());
+
+  const std::string expected_summary =
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+
+  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {
@@ -564,20 +595,14 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
   h1.recordValue(1);
 
-  std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
-
-  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
-    if (histogram->name() == "h1") {
-      EXPECT_TRUE(histogram->used());
-    } else {
-      EXPECT_FALSE(histogram->used());
-    }
-  }
+  NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
+  EXPECT_TRUE(name_histogram_map["h1"]->used());
+  EXPECT_FALSE(name_histogram_map["h2"]->used());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
   h2.recordValue(2);
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : histogram_list) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
 }

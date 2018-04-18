@@ -84,7 +84,6 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
 
 // Validate ThreadLocal::runOnAllThreads behavior with all_thread_complete call back.
 TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
-
   SlotPtr tlsptr = tls_.allocateSlot();
 
   EXPECT_CALL(thread_dispatcher_, post(_));

@@ -47,7 +47,7 @@ public:
   bool used() const override { return flags_ & Flags::Used; }
   void beginMerge() override {
     // this switches the current_active_ between 1 and 0.
-    current_active_ = 1 - current_active_;
+    current_active_ = otherHistogramIndex();
   }
 
   void merge(histogram_t* target);
@@ -55,6 +55,7 @@ public:
   Store& parent_;
 
 private:
+  uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;

@@ -70,7 +70,7 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // here. We need process global storage for histograms similar to how we have a central storage
   // in shared memory for counters/gauges.
   for (ScopeImpl* scope : scopes_) {
-    for (auto name_histogram_pair : scope->central_cache_.histograms_) {
+    for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
       const std::string& hist_name = name_histogram_pair.first;
       const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
       if (names.insert(hist_name).second) {
@@ -104,7 +104,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     tls_->runOnAllThreads(
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
-            for (auto name_histogram_pair :
+            for (const auto& name_histogram_pair :
                  tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
               const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
               tls_hist->beginMerge();
@@ -305,8 +305,9 @@ void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  hist_accumulate(target, &histograms_[1 - current_active_], 1);
-  hist_clear(histograms_[1 - current_active_]);
+  uint64_t other_histogram_index = otherHistogramIndex();
+  hist_accumulate(target, &histograms_[other_histogram_index], 1);
+  hist_clear(histograms_[other_histogram_index]);
 }
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
