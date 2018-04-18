@@ -120,7 +120,7 @@ void Filter::onRead() {
     return;
   }
 
-  // Because we're doing a MSG_PEEK, data we've seen before gets returned everytime, so
+  // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
   if (static_cast<uint64_t>(n) > read_) {
     uint8_t* data = buf_.data() + read_;
