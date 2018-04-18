@@ -9,6 +9,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/router/config_utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -52,11 +54,14 @@ typedef std::shared_ptr<const ClusterMinHealthyPercentages>
  */
 class HealthCheckFilter : public Http::StreamFilter {
 public:
-  HealthCheckFilter(Server::Configuration::FactoryContext& context, bool pass_through_mode,
-                    HealthCheckCacheManagerSharedPtr cache_manager, const std::string& endpoint,
-                    ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
+  HealthCheckFilter(
+      Server::Configuration::FactoryContext& context, bool pass_through_mode,
+      HealthCheckCacheManagerSharedPtr cache_manager,
+      std::shared_ptr<std::vector<Router::ConfigUtility::HeaderData>> header_match_data,
+      ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
       : context_(context), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
-        endpoint_(endpoint), cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
+        header_match_data_(std::move(header_match_data)),
+        cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -91,7 +96,7 @@ private:
   bool health_check_request_{};
   bool pass_through_mode_{};
   HealthCheckCacheManagerSharedPtr cache_manager_;
-  const std::string endpoint_;
+  const std::shared_ptr<std::vector<Router::ConfigUtility::HeaderData>> header_match_data_;
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
 };
 
