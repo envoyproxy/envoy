@@ -39,7 +39,9 @@ public:
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(42));
 
-    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
+    EXPECT_CALL(dispatcher_,
+                createFileEvent_(_, _, Event::FileTriggerType::Edge,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
@@ -84,6 +86,13 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
 };
+
+// Test that the filter detects Closed events and terminates.
+TEST_F(TlsInspectorTest, ConnectionClosed) {
+  init();
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Closed);
+}
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
 TEST_F(TlsInspectorTest, SniRegistered) {

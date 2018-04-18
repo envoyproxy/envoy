@@ -70,16 +70,22 @@ Filter::Filter(const ConfigSharedPtr config, uint32_t max_client_hello_size)
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "tls inspector: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
-  ASSERT(file_event_.get() == nullptr);
+  ASSERT(file_event_ == nullptr);
 
   // TODO(ggreenway): detect closed connections.
-  file_event_ =
-      cb.dispatcher().createFileEvent(socket.fd(),
-                                      [this](uint32_t events) {
-                                        ASSERT(events == Event::FileReadyType::Read);
-                                        onRead();
-                                      },
-                                      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  file_event_ = cb.dispatcher().createFileEvent(
+      socket.fd(),
+      [this](uint32_t events) {
+        if (events & Event::FileReadyType::Closed) {
+          config_->stats().connection_closed_.inc();
+          done(false);
+          return;
+        }
+
+        ASSERT(events == Event::FileReadyType::Read);
+        onRead();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Closed);
 
   // TODO(PiotrSikora): make this configurable.
   timer_ = cb.dispatcher().createTimer([this]() -> void { onTimeout(); });
@@ -107,13 +113,6 @@ void Filter::onRead() {
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
   if (n == -1 && errno == EAGAIN) {
-    return;
-  } else if (n == 0) {
-    // Note: this is not a reliable way to detect EOF. This case can only be
-    // hit if the client closes the connection before writing any bytes, due to
-    // all reads using MSG_PEEK.
-    config_->stats().connection_closed_.inc();
-    done(false);
     return;
   } else if (n < 0) {
     config_->stats().read_error_.inc();
