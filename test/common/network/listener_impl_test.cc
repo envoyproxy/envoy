@@ -86,6 +86,35 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
+// Test that socket options are set after the listener is setup.
+TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
+  Event::DispatcherImpl dispatcher;
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
+  socket.addOption(option);
+  EXPECT_CALL(*option, setOption(_, Socket::SocketState::Listening)).WillOnce(Return(true));
+  TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, false);
+}
+
+// Test that an exception is thrown if there is an error setting socket options.
+TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
+  Event::DispatcherImpl dispatcher;
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
+  socket.addOption(option);
+  EXPECT_CALL(*option, setOption(_, Socket::SocketState::Listening)).WillOnce(Return(false));
+  EXPECT_THROW(TestListenerImpl(dispatcher, socket, listener_callbacks, true, false),
+               CreateListenerException);
+}
+
 TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;

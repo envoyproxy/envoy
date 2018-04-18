@@ -31,7 +31,14 @@ public:
    */
   virtual void close() PURE;
 
-  enum class SocketState { PreBind, PostBind };
+  enum class SocketState {
+    // Socket options are applied after socket creation but before binding the socket to a port
+    PreBind,
+    // Socket options are applied after binding the socket to a port but before calling listen()
+    PostBind,
+    // Socket options are applied after calling listen()
+    Listening,
+  };
 
   /**
    * Visitor class for setting socket options.
