@@ -39,12 +39,9 @@ protected:
  * compress before init.
  */
 TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8),
-                             std::string{"assert failure: result >= 0"});
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10),
-                             std::string{"assert failure: result >= 0"});
-  EXPECT_DEATH_LOG_TO_STDERR(unitializedCompressorTestHelper(),
-                             std::string{"assert failure: result == Z_OK"});
+  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
+  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
+  EXPECT_DEATH_LOG_TO_STDERR(unitializedCompressorTestHelper(), "assert failure: result == Z_OK");
 }
 
 /**
