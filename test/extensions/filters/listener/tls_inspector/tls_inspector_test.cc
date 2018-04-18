@@ -117,6 +117,10 @@ TEST_F(TlsInspectorTest, MultipleReads) {
   std::vector<uint8_t> client_hello = generateClientHello(servername);
   {
     InSequence s;
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() -> int {
+      errno = EAGAIN;
+      return -1;
+    }));
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(Invoke([&client_hello, i](int, void* buffer, size_t length, int) -> int {
