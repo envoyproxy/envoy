@@ -2,15 +2,19 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "redis_test",
     srcs = ["redis_test.cc"],
+    extension_name = "envoy.health_checkers.redis",
     deps = [
         "//source/extensions/health_checkers/redis",
         "//source/extensions/health_checkers/redis:utility",
@@ -22,9 +26,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.health_checkers.redis",
     deps = [
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",

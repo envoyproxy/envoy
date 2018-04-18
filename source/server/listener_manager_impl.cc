@@ -15,6 +15,7 @@
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
+#include "server/listener_socket_option_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -110,16 +111,6 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-// Socket::Option implementation for API-defined listener socket options.
-// This same object can be extended to handle additional listener socket options.
-class ListenerSocketOption : public Network::SocketOptionImpl {
-public:
-  ListenerSocketOption(const envoy::api::v2::Listener& config)
-      : Network::SocketOptionImpl(
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, absl::optional<bool>{}),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, absl::optional<bool>{})) {}
-};
-
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
@@ -142,7 +133,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   // Add listen socket options from the config.
-  addListenSocketOption(std::make_shared<ListenerSocketOption>(config));
+  addListenSocketOption(std::make_shared<ListenerSocketOptionImpl>(config));
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
@@ -306,6 +297,10 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       } else {
         ENVOY_LOG(debug, "{}", message);
       }
+
+      // Add the options to the socket_ so that SocketState::Listening options can be
+      // set in the worker after listen()/evconnlistener_new() is called.
+      socket_->addOption(option);
     }
   }
 }

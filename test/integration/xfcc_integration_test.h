@@ -19,15 +19,16 @@ class XfccIntegrationTest : public HttpIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   const std::string previous_xfcc_ =
-      "By=spiffe://lyft.com/frontend;Hash=123456;SAN=spiffe://lyft.com/testclient";
+      "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";
   const std::string current_xfcc_by_hash_ =
       "By=spiffe://lyft.com/"
-      "backend-team;Hash=9ed6533649269c694f717e8729a1c8b55006fd51013c0e0d4294916e00d7ea04";
+      "backend-team;Hash=e0f3c8ce5e2ea305f0701ff512e36e2e97928284a228bcf77332d33930a1b6fd";
   const std::string client_subject_ =
       "Subject=\""
       "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"
       "OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US\"";
-  const std::string client_san_ = "SAN=spiffe://lyft.com/frontend-team";
+  const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
+  const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
