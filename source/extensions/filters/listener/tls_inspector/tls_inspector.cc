@@ -102,7 +102,10 @@ void Filter::onServername(absl::string_view name) {
   } else {
     config_->stats().no_sni_found_.inc();
   }
-  servername_set_ = true;
+  clienthello_success_ = true;
+
+  // TODO(ggreenway): Notify the ConnectionSocket that this
+  // is a TLS connection.
 }
 
 void Filter::onRead() {
@@ -164,7 +167,7 @@ void Filter::parseClientHello(void* data, size_t len) {
     }
     break;
   case SSL_ERROR_SSL:
-    if (servername_set_) {
+    if (clienthello_success_) {
       done(true);
     } else {
       config_->stats().invalid_client_hello_.inc();

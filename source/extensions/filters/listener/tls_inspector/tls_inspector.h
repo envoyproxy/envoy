@@ -79,7 +79,7 @@ private:
   bssl::UniquePtr<SSL> ssl_;
   std::vector<uint8_t> buf_{};
   uint64_t read_{0};
-  bool servername_set_{false};
+  bool clienthello_success_{false};
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;
