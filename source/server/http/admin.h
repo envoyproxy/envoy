@@ -31,6 +31,7 @@
 namespace Envoy {
 namespace Server {
 
+class AdminFilter;
 /**
  * Implementation of Server::Admin.
  */
@@ -46,7 +47,7 @@ public:
 
   Http::Code runCallback(absl::string_view path_and_query, const Http::HeaderMap& request_headers,
                          Http::HeaderMap& response_headers, Buffer::Instance& response,
-                         Http::StreamDecoderFilterCallbacks* callbacks);
+                         AdminFilter& admin_filter);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -94,10 +95,6 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-
-  void unregisterHystrixConnection(Http::StreamDecoderFilterCallbacks* callbacks) {
-    server_.unregisterHystrixSink(callbacks);
-  }
 
 private:
   /**
@@ -149,52 +146,50 @@ private:
    * URL handlers.
    */
   Http::Code handlerAdminHome(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                              Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                              Buffer::Instance& response, AdminFilter&);
   Http::Code handlerCerts(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                          Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                          Buffer::Instance& response, AdminFilter&);
   Http::Code handlerClusters(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                             Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                             Buffer::Instance& response, AdminFilter&);
   Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                               Buffer::Instance& response,
-                               Http::StreamDecoderFilterCallbacks*) const;
+                               Buffer::Instance& response, AdminFilter&) const;
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                                Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                                Buffer::Instance& response, AdminFilter&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                    Http::StreamDecoderFilterCallbacks*);
+                                    AdminFilter&);
   Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  Http::StreamDecoderFilterCallbacks*);
+                                  AdminFilter&);
   Http::Code handlerHelp(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                         Buffer::Instance& response, AdminFilter&);
   Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
                                       Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                      Http::StreamDecoderFilterCallbacks*);
+                                      AdminFilter&);
   Http::Code handlerListenerInfo(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                 Http::StreamDecoderFilterCallbacks*);
+                                 AdminFilter&);
   Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                            Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
-  Http::Code handlerMain(const std::string& path, Buffer::Instance& response,
-                         Http::StreamDecoderFilterCallbacks*);
+                            Buffer::Instance& response, AdminFilter&);
+  Http::Code handlerMain(const std::string& path, Buffer::Instance& response, AdminFilter&);
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                 Http::StreamDecoderFilterCallbacks*);
+                                 AdminFilter&);
   Http::Code handlerResetCounters(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  Http::StreamDecoderFilterCallbacks*);
+                                  AdminFilter&);
   Http::Code handlerServerInfo(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                               Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                               Buffer::Instance& response, AdminFilter&);
   Http::Code handlerStats(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                          Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                          Buffer::Instance& response, AdminFilter&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                    Http::StreamDecoderFilterCallbacks*);
+                                    AdminFilter&);
   Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                            Buffer::Instance& response, Http::StreamDecoderFilterCallbacks*);
+                            Buffer::Instance& response, AdminFilter&);
   Http::Code handlerRuntimeModify(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  Http::StreamDecoderFilterCallbacks*);
+                                  AdminFilter&);
 
   class AdminListener : public Network::ListenerConfig {
   public:
@@ -247,9 +242,10 @@ public:
   AdminFilter(AdminImpl& parent);
 
   // Http::StreamFilterBase
-  // TODO (@trabetti) : make more generic (how?)
-  void onDestroy() override { parent_.unregisterHystrixConnection(callbacks_); }
-
+  void onDestroy() override;
+  void addOnDestroyCallback(std::function<void()> cb);
+  Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() { return callbacks_; }
+  const Http::HeaderMap* getRequestHeaders() { return request_headers_; }
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
@@ -267,6 +263,7 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
+  std::list<std::function<void()>> on_destroy_callbacks_;
 };
 
 /**

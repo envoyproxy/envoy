@@ -150,6 +150,16 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
   return Http::FilterTrailersStatus::StopIteration;
 }
 
+void AdminFilter::onDestroy() {
+  for (auto callback : on_destroy_callbacks_) {
+    callback();
+  }
+}
+
+void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
+  on_destroy_callbacks_.push_back(cb);
+}
+
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
     return false;
@@ -222,8 +232,7 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 }
 
 Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
-                                      Buffer::Instance& response,
-                                      Http::StreamDecoderFilterCallbacks*) {
+                                      Buffer::Instance& response, AdminFilter&) {
   response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
 
   for (auto& cluster : server_.clusterManager().clusters()) {
@@ -281,8 +290,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
-                                        Buffer::Instance& response,
-                                        Http::StreamDecoderFilterCallbacks*) const {
+                                        Buffer::Instance& response, AdminFilter&) const {
   envoy::admin::v2::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
@@ -298,8 +306,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
-                                         Buffer::Instance& response,
-                                         Http::StreamDecoderFilterCallbacks*) {
+                                         Buffer::Instance& response, AdminFilter&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
@@ -323,31 +330,27 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
 }
 
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
-                                             Buffer::Instance& response,
-                                             Http::StreamDecoderFilterCallbacks*) {
+                                             Buffer::Instance& response, AdminFilter&) {
   server_.failHealthcheck(true);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerHealthcheckOk(absl::string_view, Http::HeaderMap&,
-                                           Buffer::Instance& response,
-                                           Http::StreamDecoderFilterCallbacks*) {
+                                           Buffer::Instance& response, AdminFilter&) {
   server_.failHealthcheck(false);
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::HeaderMap&,
-                                               Buffer::Instance& response,
-                                               Http::StreamDecoderFilterCallbacks*) {
+                                               Buffer::Instance& response, AdminFilter&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
-                                     Buffer::Instance& response,
-                                     Http::StreamDecoderFilterCallbacks*) {
+                                     Buffer::Instance& response, AdminFilter&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
@@ -373,8 +376,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
-                                           Buffer::Instance& response,
-                                           Http::StreamDecoderFilterCallbacks*) {
+                                           Buffer::Instance& response, AdminFilter&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     counter->reset();
   }
@@ -384,8 +386,7 @@ Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
-                                        Buffer::Instance& response,
-                                        Http::StreamDecoderFilterCallbacks*) {
+                                        Buffer::Instance& response, AdminFilter&) {
   time_t current_time = time(nullptr);
   response.add(fmt::format("envoy {} {} {} {} {}\n", VersionInfo::version(),
                            server_.healthCheckFailed() ? "draining" : "live",
@@ -396,8 +397,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response,
-                                   Http::StreamDecoderFilterCallbacks* callbacks) {
+                                   Buffer::Instance& response, AdminFilter& admin_filter) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -424,7 +424,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, callbacks);
+      return handlerPrometheusStats(url, response_headers, response, admin_filter);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -435,8 +435,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 }
 
 Http::Code AdminImpl::handlerPrometheusStats(absl::string_view, Http::HeaderMap&,
-                                             Buffer::Instance& response,
-                                             Http::StreamDecoderFilterCallbacks*) {
+                                             Buffer::Instance& response, AdminFilter&) {
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               response);
   return Http::Code::OK;
@@ -515,16 +514,14 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
 }
 
 Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
-                                          Buffer::Instance& response,
-                                          Http::StreamDecoderFilterCallbacks*) {
+                                          Buffer::Instance& response, AdminFilter&) {
   server_.shutdown();
   response.add("OK\n");
   return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& response_headers,
-                                          Buffer::Instance& response,
-                                          Http::StreamDecoderFilterCallbacks*) {
+                                          Buffer::Instance& response, AdminFilter&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   std::list<std::string> listeners;
@@ -536,7 +533,7 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view, Http::HeaderMap& re
 }
 
 Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                   Http::StreamDecoderFilterCallbacks*) {
+                                   AdminFilter&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   std::unordered_set<std::string> context_info_set;
@@ -555,8 +552,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::
 }
 
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
-                                     Buffer::Instance& response,
-                                     Http::StreamDecoderFilterCallbacks*) {
+                                     Buffer::Instance& response, AdminFilter&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
@@ -644,8 +640,7 @@ std::string AdminImpl::runtimeAsJson(
 }
 
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
-                                           Buffer::Instance& response,
-                                           Http::StreamDecoderFilterCallbacks*) {
+                                           Buffer::Instance& response, AdminFilter&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   if (params.empty()) {
     response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
@@ -668,7 +663,7 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
-  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response, callbacks_);
+  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response, *this);
   bool end_stream = true;
 
   if (path.find("/hystrix_event_stream") != std::string::npos) {
@@ -783,7 +778,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   const Http::HeaderMap& request_headers,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  Http::StreamDecoderFilterCallbacks* callbacks) {
+                                  AdminFilter& admin_filter) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -801,7 +796,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                     handler.prefix_, method);
         }
       }
-      code = handler.handler_(path_and_query, response_headers, response, callbacks);
+      code = handler.handler_(path_and_query, response_headers, response, admin_filter);
       found_handler = true;
       break;
     }
@@ -811,7 +806,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     // Extra space is emitted below to have "invalid path." be a separate sentence in the
     // 404 output from "admin commands are:" in handlerHelp.
     response.add("invalid path. ");
-    handlerHelp(path_and_query, response_headers, response, callbacks);
+    handlerHelp(path_and_query, response_headers, response, admin_filter);
     code = Http::Code::NotFound;
   }
 
@@ -830,7 +825,7 @@ std::vector<const AdminImpl::UrlHandler*> AdminImpl::sortedHandlers() const {
 }
 
 Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
-                                  Http::StreamDecoderFilterCallbacks*) {
+                                  AdminFilter&) {
   response.add("admin commands are:\n");
 
   // Prefix order is used during searching, but for printing do them in alpha order.
@@ -841,8 +836,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::I
 }
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
-                                       Buffer::Instance& response,
-                                       Http::StreamDecoderFilterCallbacks*) {
+                                       Buffer::Instance& response, AdminFilter&) {
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Html);
 

@@ -81,7 +81,7 @@ public:
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
-        request_headers_{{":path", "/"}} {
+        request_headers_{{":path", "/"}}, admin_filter_(admin_) {
 
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -90,10 +90,9 @@ public:
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
-    NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
     request_headers_.insertMethod().value(method.data(), method.size());
     return admin_.runCallback(path_and_query, request_headers_, response_headers, response,
-                              &callbacks);
+                              admin_filter_);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -114,6 +113,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
   Http::TestHeaderMapImpl request_headers_;
+  Server::AdminFilter admin_filter_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
@@ -155,11 +155,10 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   EXPECT_NO_LOGS(
       EXPECT_EQ(Http::Code::InternalServerError,
                 admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", request_headers_,
-                                                   header_map, data, &callbacks)));
+                                                   header_map, data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -184,9 +183,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 
 TEST_P(AdminInstanceTest, CustomHandler) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     Http::StreamDecoderFilterCallbacks*) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+                     AdminFilter&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -213,9 +210,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     Http::StreamDecoderFilterCallbacks*) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+                     AdminFilter&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -224,9 +219,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     Http::StreamDecoderFilterCallbacks*) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+                     AdminFilter&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
@@ -235,9 +228,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     Http::StreamDecoderFilterCallbacks*) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+                     AdminFilter&) -> Http::Code { return Http::Code::Accepted; };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.

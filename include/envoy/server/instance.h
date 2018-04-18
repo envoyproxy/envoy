@@ -184,13 +184,6 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() PURE;
-
-  // TODO (@trabetti) : for the method below - too specific? what is a better way? it is called on
-  // callback destroy.
-  /**
-   * @ Unregisters a callbacks connection to Hystrix sink.
-   */
-  virtual void unregisterHystrixSink(Http::StreamDecoderFilterCallbacks* callbacks_to_remove) PURE;
 };
 
 } // namespace Server

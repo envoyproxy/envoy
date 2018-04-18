@@ -111,8 +111,7 @@ class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hyst
 public:
   HystrixSink(Server::Instance& server);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
-                                       Buffer::Instance&,
-                                       Http::StreamDecoderFilterCallbacks* callbacks);
+                                       Buffer::Instance&, Server::AdminFilter& admin_filter);
   void beginFlush() override;
   void flushCounter(const Stats::Counter& counter, uint64_t delta) override;
   void flushGauge(const Stats::Gauge&, uint64_t) override{};

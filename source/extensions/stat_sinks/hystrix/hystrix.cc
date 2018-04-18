@@ -275,7 +275,7 @@ HystrixSink::HystrixSink(Server::Instance& server)
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,
                                                   Buffer::Instance&,
-                                                  Http::StreamDecoderFilterCallbacks* callbacks) {
+                                                  Server::AdminFilter& admin_filter) {
 
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.TextEventStream);
@@ -289,9 +289,22 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       Http::Headers::get().AccessControlAllowOriginValue.All);
   response_headers.insertNoChunks().value().setReference("0");
 
-  registerConnection(callbacks);
+  Http::StreamDecoderFilterCallbacks* stream_decoder_filter_callbacks =
+      admin_filter.getDecoderFilterCallbacks();
+
+  registerConnection(stream_decoder_filter_callbacks);
+
+  // Separated out just so it's easier to understand
+  auto on_destroy_callback = [this, stream_decoder_filter_callbacks]() {
+    // Unregister the callbacks from the sink so data is no longer encoded through them.
+    unregisterConnection(stream_decoder_filter_callbacks);
+  };
+
+  // Add the callback to the admin_filter list of callbacks
+  admin_filter.addOnDestroyCallback(std::move(on_destroy_callback));
+
   ENVOY_LOG(debug, "start sending data to hystrix dashboard on port {}",
-            callbacks->connection()->localAddress()->asString());
+            stream_decoder_filter_callbacks->connection()->localAddress()->asString());
   return Http::Code::OK;
 }
 

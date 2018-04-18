@@ -135,14 +135,6 @@ TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   }
 }
 
-// TODO (@trabetti) : test registerToHystrixSink/unregisterHystrixSink
-// TEST_P(ServerInstanceImplTest, registerSink) {
-//  InSequence s;
-//
-//  server_->registerToHystrixSink(&callbacks);
-//  server_->unregisterHystrixSink();
-//}
-
 TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
