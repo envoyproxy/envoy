@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -152,9 +153,9 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "socket_option_impl_test",
-    srcs = ["socket_option_impl_test.cc"],
+envoy_cc_test_library(
+    name = "socket_option_test_harness",
+    srcs = ["socket_option_test_harness.h"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_lib",
@@ -163,6 +164,14 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "socket_option_impl_test",
+    srcs = ["socket_option_impl_test.cc"],
+    deps = [
+        ":socket_option_test_harness",
     ],
 )
 

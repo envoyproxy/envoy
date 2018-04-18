@@ -147,8 +147,7 @@ envoy_cc_test(
     srcs = ["listener_socket_option_impl_test.cc"],
     deps = [
         "//source/server:listener_socket_option_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/common/network:socket_option_test_harness",
     ],
 )
 
