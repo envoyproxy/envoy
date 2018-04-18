@@ -1,12 +1,14 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -37,6 +39,16 @@ public:
   }
 
   void expectTimerCreate() { timer_ = new NiceMock<Event::MockTimer>(&callbacks_.dispatcher_); }
+
+  void routeLocalConfig(const envoy::config::filter::http::buffer::v2::BufferPerRoute* route_cfg,
+                        const envoy::config::filter::http::buffer::v2::BufferPerRoute* vhost_cfg) {
+
+    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().BUFFER))
+        .WillByDefault(Return(route_cfg));
+    ON_CALL(callbacks_.route_->route_entry_.virtual_host_,
+            perFilterConfig(HttpFilterNames::get().BUFFER))
+        .WillByDefault(Return(vhost_cfg));
+  }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Stats::IsolatedStoreImpl store_;
@@ -100,6 +112,48 @@ TEST_F(BufferFilterTest, TxResetAfterEndStream) {
   // It's possible that the stream will be reset on the TX side even after RX end stream. Mimic
   // that here.
   filter_.onDestroy();
+}
+
+TEST_F(BufferFilterTest, RouteConfigOverride) {
+  envoy::config::filter::http::buffer::v2::BufferPerRoute route_cfg;
+  auto* buf = route_cfg.mutable_buffer();
+  buf->mutable_max_request_bytes()->set_value(123);
+  buf->mutable_max_request_time()->set_seconds(456);
+  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  vhost_cfg.set_disabled(true);
+  routeLocalConfig(&route_cfg, &vhost_cfg);
+
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
+  expectTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+
+  filter_.onDestroy();
+}
+
+TEST_F(BufferFilterTest, VHostConfigOverride) {
+  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  auto* buf = vhost_cfg.mutable_buffer();
+  buf->mutable_max_request_bytes()->set_value(789);
+  buf->mutable_max_request_time()->set_seconds(1011);
+  routeLocalConfig(nullptr, &vhost_cfg);
+
+  EXPECT_CALL(callbacks_, setDecoderBufferLimit(789ULL));
+  expectTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+  filter_.onDestroy();
+}
+
+TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
+  envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
+  vhost_cfg.set_disabled(true);
+  routeLocalConfig(nullptr, &vhost_cfg);
+
+  Http::TestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));
 }
 
 } // namespace BufferFilter

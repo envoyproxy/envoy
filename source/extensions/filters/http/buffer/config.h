@@ -27,6 +27,10 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::buffer::v2::Buffer()};
   }
 
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::buffer::v2::BufferPerRoute()};
+  }
+
   std::string name() override { return HttpFilterNames::get().BUFFER; }
 
 private:

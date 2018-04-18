@@ -83,6 +83,16 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyProto) {
   cb(filter_callback);
 }
 
+TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyRouteProto) {
+  BufferFilterConfigFactory factory;
+  EXPECT_NO_THROW({
+    envoy::config::filter::http::buffer::v2::BufferPerRoute* config =
+        dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute*>(
+            factory.createEmptyRouteConfigProto().get());
+    EXPECT_NE(nullptr, config);
+  });
+}
+
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

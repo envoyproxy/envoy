@@ -1,5 +1,6 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
@@ -12,6 +13,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -21,17 +24,63 @@ BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(co
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
+void BufferFilter::initConfig() {
+  ASSERT(!config_inited_);
+  config_inited_ = true;
+
+  if (!callbacks_->route() || !callbacks_->route()->routeEntry()) {
+    return;
+  }
+
+  const std::string& name = HttpFilterNames::get().BUFFER;
+  const auto* entry = callbacks_->route()->routeEntry();
+
+  const Protobuf::Message* raw_cfg =
+      entry->perFilterConfig(name) ?: entry->virtualHost().perFilterConfig(name);
+
+  if (!raw_cfg) {
+    // No route-local config is specified.
+    return;
+  }
+
+  const auto* cfg =
+      dynamic_cast<const envoy::config::filter::http::buffer::v2::BufferPerRoute*>(raw_cfg);
+
+  if (cfg->disabled()) {
+    // Filter is disabled.
+    disabled_ = true;
+    return;
+  }
+  if (!cfg->has_buffer()) {
+    // OneOf for the route-local config was empty. Should this be an ASSERT_RELEASE?
+    return;
+  }
+
+  const auto& buf = cfg->buffer();
+  auto stats = config_->stats_;
+
+  config_.reset(new BufferFilterConfig{
+      stats, static_cast<uint64_t>(buf.max_request_bytes().value()),
+      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(buf, max_request_time))});
+}
+
 Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
   if (end_stream) {
-    // If this is a header only request, we don't need to do any buffering.
+    // If this is a header-only request, we don't need to do any buffering.
     return Http::FilterHeadersStatus::Continue;
-  } else {
-    // Otherwise stop further iteration.
-    request_timeout_ =
-        callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
-    request_timeout_->enableTimer(config_->max_request_time_);
-    return Http::FilterHeadersStatus::StopIteration;
   }
+
+  initConfig();
+  if (disabled_) {
+    // The filter has been disabled for this route.
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
+  request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
+  request_timeout_->enableTimer(config_->max_request_time_);
+
+  return Http::FilterHeadersStatus::StopIteration;
 }
 
 Http::FilterDataStatus BufferFilter::decodeData(Buffer::Instance&, bool end_stream) {
@@ -69,7 +118,6 @@ void BufferFilter::resetInternalState() { request_timeout_.reset(); }
 
 void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
 }
 
 } // namespace BufferFilter
