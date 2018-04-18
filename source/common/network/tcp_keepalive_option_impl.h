@@ -16,30 +16,34 @@ namespace Network {
 
 // Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
 // on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
-typedef absl::optional<int> SocketOptionName;
+typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 #ifdef SO_KEEPALIVE
-#define ENVOY_SOCKET_SO_KEEPALIVE Network::SocketOptionName(SO_KEEPALIVE)
+#define ENVOY_SOCKET_SO_KEEPALIVE                                                                  \
+  Network::SocketOptionName(std::make_pair(SOL_SOCKET, SO_KEEPALIVE))
 #else
 #define ENVOY_SOCKET_SO_KEEPALIVE Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPCNT
-#define ENVOY_SOCKET_TCP_KEEPCNT Network::SocketOptionName(TCP_KEEPCNT)
+#define ENVOY_SOCKET_TCP_KEEPCNT Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPCNT))
 #else
 #define ENVOY_SOCKET_TCP_KEEPCNT Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPIDLE
-#define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName(TCP_KEEPIDLE)
+#define ENVOY_SOCKET_TCP_KEEPIDLE                                                                  \
+  Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPIDLE))
 #elif TCP_KEEPALIVE // MacOS uses a different name from Linux for just this option.
-#define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName(TCP_KEEPALIVE)
+#define ENVOY_SOCKET_TCP_KEEPIDLE                                                                  \
+  Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPALIVE))
 #else
 #define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPINTVL
-#define ENVOY_SOCKET_TCP_KEEPINTVL Network::SocketOptionName(TCP_KEEPINTVL)
+#define ENVOY_SOCKET_TCP_KEEPINTVL                                                                 \
+  Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_KEEPINTVL))
 #else
 #define ENVOY_SOCKET_TCP_KEEPINTVL Network::SocketOptionName()
 #endif
@@ -61,10 +65,9 @@ public:
 
 private:
   Network::TcpKeepaliveConfig keepalive_config_;
-  static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
+  static int setSocketOption(Socket& socket, Network::SocketOptionName optname,
                              absl::optional<int> value);
-  static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
-                             int value);
+  static int setSocketOption(Socket& socket, Network::SocketOptionName optname, int value);
 };
 } // namespace Network
 } // namespace Envoy

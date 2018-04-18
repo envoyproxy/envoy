@@ -31,7 +31,7 @@ bool ListenerSocketOptionImpl::setOption(Network::Socket& socket,
       const Network::SocketOptionName option_name = ENVOY_SOCKET_TCP_FASTOPEN;
       if (option_name) {
         const int error = Api::OsSysCallsSingleton::get().setsockopt(
-            socket.fd(), IPPROTO_TCP, option_name.value(),
+            socket.fd(), option_name.value().first, option_name.value().second,
             reinterpret_cast<const void*>(&tfo_value), sizeof(tfo_value));
         if (error != 0) {
           ENVOY_LOG(warn, "Setting TCP_FASTOPEN on listener socket failed: {}", strerror(errno));

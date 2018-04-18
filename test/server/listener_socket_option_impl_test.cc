@@ -7,11 +7,11 @@ namespace Server {
 
 class ListenerSocketOptionImplTest : public Network::SocketOptionTestHarness {
 public:
-  void testSetSocketOptionSuccess(ListenerSocketOptionImpl& socket_option, int socket_level,
+  void testSetSocketOptionSuccess(ListenerSocketOptionImpl& socket_option,
                                   Network::SocketOptionName option_name, int option_val,
                                   const std::set<Network::Socket::SocketState>& when) {
-    Network::SocketOptionTestHarness::testSetSocketOptionSuccess(socket_option, socket_level,
-                                                                 option_name, option_val, when);
+    Network::SocketOptionTestHarness::testSetSocketOptionSuccess(socket_option, option_name,
+                                                                 option_val, when);
   }
 };
 
@@ -19,7 +19,8 @@ public:
 TEST_F(ListenerSocketOptionImplTest, SetOptionTcpFastopenFailure) {
   if (ENVOY_SOCKET_TCP_FASTOPEN.has_value()) {
     ListenerSocketOptionImpl socket_option{{}, {}, 1};
-    EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN.value(), _, _))
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, ENVOY_SOCKET_TCP_FASTOPEN.value().first,
+                                           ENVOY_SOCKET_TCP_FASTOPEN.value().second, _, _))
         .WillOnce(Return(-1));
     EXPECT_FALSE(socket_option.setOption(socket_, Network::Socket::SocketState::Listening));
   }
@@ -28,14 +29,14 @@ TEST_F(ListenerSocketOptionImplTest, SetOptionTcpFastopenFailure) {
 // The happy path for setOption(); TCP_FASTOPEN is set to true.
 TEST_F(ListenerSocketOptionImplTest, SetOptionTcpFastopenSuccessTrue) {
   ListenerSocketOptionImpl socket_option{{}, {}, 42};
-  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 42,
+  testSetSocketOptionSuccess(socket_option, ENVOY_SOCKET_TCP_FASTOPEN, 42,
                              {Network::Socket::SocketState::Listening});
 }
 
 // The happy path for setOption(); TCP_FASTOPEN is set to false.
 TEST_F(ListenerSocketOptionImplTest, SetOptionTcpFastopenSuccessFalse) {
   ListenerSocketOptionImpl socket_option{{}, {}, 0};
-  testSetSocketOptionSuccess(socket_option, IPPROTO_TCP, ENVOY_SOCKET_TCP_FASTOPEN, 0,
+  testSetSocketOptionSuccess(socket_option, ENVOY_SOCKET_TCP_FASTOPEN, 0,
                              {Network::Socket::SocketState::Listening});
 }
 

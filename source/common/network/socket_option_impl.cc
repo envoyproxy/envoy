@@ -75,17 +75,20 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
       errno = ENOTSUP;
       return -1;
     }
-    return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
+    return os_syscalls.setsockopt(socket.fd(), ipv4_optname.value().first,
+                                  ipv4_optname.value().second, optval, optlen);
   }
 
   // If the FD is v6, we first try the IPv6 variant if the platfrom supports it and fallback to the
   // IPv4 variant otherwise.
   ASSERT(ip->version() == Network::Address::IpVersion::v6);
   if (ipv6_optname) {
-    return os_syscalls.setsockopt(socket.fd(), IPPROTO_IPV6, ipv6_optname.value(), optval, optlen);
+    return os_syscalls.setsockopt(socket.fd(), ipv6_optname.value().first,
+                                  ipv6_optname.value().second, optval, optlen);
   }
   if (ipv4_optname) {
-    return os_syscalls.setsockopt(socket.fd(), IPPROTO_IP, ipv4_optname.value(), optval, optlen);
+    return os_syscalls.setsockopt(socket.fd(), ipv4_optname.value().first,
+                                  ipv4_optname.value().second, optval, optlen);
   }
   ENVOY_LOG(warn, "Unsupported IPv6 socket option");
   errno = ENOTSUP;

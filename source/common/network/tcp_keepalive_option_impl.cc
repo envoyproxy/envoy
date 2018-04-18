@@ -19,22 +19,22 @@ bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, absl::optional<int>
                                              absl::optional<int> keepalive_time,
                                              absl::optional<int> keepalive_interval) {
   int error;
-  error = setSocketOption(socket, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE, 1);
+  error = setSocketOption(socket, ENVOY_SOCKET_SO_KEEPALIVE, 1);
   if (error != 0) {
     ENVOY_LOG(warn, "Setting SO_KEEPALIVE on socket failed: {}", strerror(errno));
     return false;
   }
-  error = setSocketOption(socket, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPCNT, keepalive_probes);
+  error = setSocketOption(socket, ENVOY_SOCKET_TCP_KEEPCNT, keepalive_probes);
   if (error != 0) {
     ENVOY_LOG(warn, "Setting keepalive_probes failed: {}", strerror(errno));
     return false;
   }
-  error = setSocketOption(socket, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPIDLE, keepalive_time);
+  error = setSocketOption(socket, ENVOY_SOCKET_TCP_KEEPIDLE, keepalive_time);
   if (error != 0) {
     ENVOY_LOG(warn, "Setting keepalive_time failed: {}", strerror(errno));
     return false;
   }
-  error = setSocketOption(socket, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPINTVL, keepalive_interval);
+  error = setSocketOption(socket, ENVOY_SOCKET_TCP_KEEPINTVL, keepalive_interval);
   if (error != 0) {
     ENVOY_LOG(warn, "Setting keepalive_interval failed: {}", strerror(errno));
     return false;
@@ -42,24 +42,24 @@ bool TcpKeepaliveOptionImpl::setTcpKeepalive(Socket& socket, absl::optional<int>
   return true;
 }
 
-int TcpKeepaliveOptionImpl::setSocketOption(Socket& socket, int level,
-                                            Network::SocketOptionName optname,
+int TcpKeepaliveOptionImpl::setSocketOption(Socket& socket, Network::SocketOptionName optname,
                                             absl::optional<int> optional_value) {
   if (optional_value.has_value()) {
-    return setSocketOption(socket, level, optname, optional_value.value());
+    return setSocketOption(socket, optname, optional_value.value());
   } else {
     return 0;
   }
 }
 
-int TcpKeepaliveOptionImpl::setSocketOption(Socket& socket, int level,
-                                            Network::SocketOptionName optname, int value) {
+int TcpKeepaliveOptionImpl::setSocketOption(Socket& socket, Network::SocketOptionName optname,
+                                            int value) {
   if (!optname.has_value()) {
     errno = ENOTSUP;
     return -1;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.setsockopt(socket.fd(), level, optname.value(), &value, sizeof(value));
+  return os_syscalls.setsockopt(socket.fd(), optname.value().first, optname.value().second, &value,
+                                sizeof(value));
 }
 
 } // namespace Network

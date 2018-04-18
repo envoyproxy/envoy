@@ -31,7 +31,7 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveFailure) {
   if (ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first, ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return -1;
@@ -45,7 +45,7 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveSuccess) {
   if (ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first, ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
@@ -62,13 +62,13 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveProbesSuccess) {
   if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPCNT.has_value()) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first, ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPCNT.value(), _, sizeof(int)))
+                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPCNT.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(3, *static_cast<const int*>(optval));
           return 0;
@@ -85,13 +85,13 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveTimeSuccess) {
   if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPIDLE.has_value()) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first, ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPIDLE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.value().first, ENVOY_SOCKET_TCP_KEEPIDLE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(3, *static_cast<const int*>(optval));
           return 0;
@@ -107,13 +107,13 @@ TEST_F(TcpKeepaliveOptionImplTest, SetOptionTcpKeepaliveIntervalSuccess) {
   if (ENVOY_SOCKET_SO_KEEPALIVE.has_value() && ENVOY_SOCKET_TCP_KEEPINTVL.has_value()) {
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(-1));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, SOL_SOCKET, ENVOY_SOCKET_SO_KEEPALIVE.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first, ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
         }));
     EXPECT_CALL(os_sys_calls_,
-                setsockopt_(_, IPPROTO_TCP, ENVOY_SOCKET_TCP_KEEPINTVL.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.value().first, ENVOY_SOCKET_TCP_KEEPINTVL.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(3, *static_cast<const int*>(optval));
           return 0;

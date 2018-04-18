@@ -15,34 +15,38 @@ namespace Network {
 
 // Optional variant of setsockopt(2) optname. The idea here is that if the option is not supported
 // on a platform, we can make this the empty value. This allows us to avoid proliferation of #ifdef.
-typedef absl::optional<int> SocketOptionName;
+typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 #ifdef IP_TRANSPARENT
-#define ENVOY_SOCKET_IP_TRANSPARENT Network::SocketOptionName(IP_TRANSPARENT)
+#define ENVOY_SOCKET_IP_TRANSPARENT                                                                \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_TRANSPARENT))
 #else
 #define ENVOY_SOCKET_IP_TRANSPARENT Network::SocketOptionName()
 #endif
 
 #ifdef IPV6_TRANSPARENT
-#define ENVOY_SOCKET_IPV6_TRANSPARENT Network::SocketOptionName(IPV6_TRANSPARENT)
+#define ENVOY_SOCKET_IPV6_TRANSPARENT                                                              \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_TRANSPARENT))
 #else
 #define ENVOY_SOCKET_IPV6_TRANSPARENT Network::SocketOptionName()
 #endif
 
 #ifdef IP_FREEBIND
-#define ENVOY_SOCKET_IP_FREEBIND Network::SocketOptionName(IP_FREEBIND)
+#define ENVOY_SOCKET_IP_FREEBIND Network::SocketOptionName(std::make_pair(IPPROTO_IP, IP_FREEBIND))
 #else
 #define ENVOY_SOCKET_IP_FREEBIND Network::SocketOptionName()
 #endif
 
 #ifdef IPV6_FREEBIND
-#define ENVOY_SOCKET_IPV6_FREEBIND Network::SocketOptionName(IPV6_FREEBIND)
+#define ENVOY_SOCKET_IPV6_FREEBIND                                                                 \
+  Network::SocketOptionName(std::make_pair(IPPROTO_IPV6, IPV6_FREEBIND))
 #else
 #define ENVOY_SOCKET_IPV6_FREEBIND Network::SocketOptionName()
 #endif
 
 #ifdef TCP_FASTOPEN
-#define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName(TCP_FASTOPEN)
+#define ENVOY_SOCKET_TCP_FASTOPEN                                                                  \
+  Network::SocketOptionName(std::make_pair(IPPROTO_TCP, TCP_FASTOPEN))
 #else
 #define ENVOY_SOCKET_TCP_FASTOPEN Network::SocketOptionName()
 #endif
