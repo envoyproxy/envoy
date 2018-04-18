@@ -520,8 +520,7 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
 
 void EncoderImpl::encodeReply(const ReplyMessage& message) {
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-reply
-  int32_t total_size =
-      Message::MessageHeaderSize + 3 * Message::Int32Length + Message::Int64Length;
+  int32_t total_size = Message::MessageHeaderSize + 3 * Message::Int32Length + Message::Int64Length;
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
