@@ -8,7 +8,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
@@ -17,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilter(
+Server::Configuration::HttpFilterFactoryCb BufferFilterFactory::createTypedFilterFactoryFromProto(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
@@ -33,27 +32,18 @@ Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilt
 }
 
 Server::Configuration::HttpFilterFactoryCb
-BufferFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                               const std::string& stats_prefix,
-                                               Server::Configuration::FactoryContext& context) {
+BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
+                                         const std::string& stats_prefix,
+                                         Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::buffer::v2::Buffer proto_config;
   Config::FilterJson::translateBufferFilter(json_config, proto_config);
-  return createFilter(proto_config, stats_prefix, context);
-}
-
-Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::buffer::v2::Buffer&>(
-          proto_config),
-      stats_prefix, context);
+  return createTypedFilterFactoryFromProto(proto_config, stats_prefix, context);
 }
 
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BufferFilterConfigFactory,
+static Registry::RegisterFactory<BufferFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
