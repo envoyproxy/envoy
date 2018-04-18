@@ -957,7 +957,7 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
                                              Http::Protocol::Http11, nullptr);
 
     outlier_detector.runCallbacks(test_host);
-    health_checker.runCallbacks(test_host, false);
+    health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
     EXPECT_CALL(*cp1, drainConnections());
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -972,12 +972,12 @@ TEST_F(ClusterManagerImplTest, CloseConnectionsOnHealthFailure) {
   EXPECT_CALL(*cp1, drainConnections());
   EXPECT_CALL(*cp2, drainConnections());
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, true);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
   test_host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector.runCallbacks(test_host);
   test_host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker.runCallbacks(test_host, true);
+  health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }

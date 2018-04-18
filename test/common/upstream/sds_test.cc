@@ -309,7 +309,7 @@ TEST_F(SdsTest, HealthChecker) {
     cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[i]->healthFlagClear(
         Host::HealthFlag::FAILED_ACTIVE_HC);
     health_checker->runCallbacks(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[i],
-                                 true);
+                                 HealthTransition::Changed);
   }
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -332,7 +332,8 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(membership_updated_, ready());
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  health_checker->runCallbacks(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Changed);
   EXPECT_EQ("hash_5f3725fa79001155", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
