@@ -61,6 +61,30 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   return ret;
 }
 
+std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
+  // Handle de-dup due to overlapping scopes.
+  std::list<ParentHistogramSharedPtr> ret;
+  std::unordered_set<std::string> names;
+  std::unique_lock<std::mutex> lock(lock_);
+  // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
+  // here. We need process global storage for histograms similar to how we have a central storage
+  // in shared memory for counters/gauges.
+  for (ScopeImpl* scope : scopes_) {
+    for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
+      const std::string& hist_name = name_histogram_pair.first;
+      const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
+      if (names.insert(hist_name).second) {
+        ret.push_back(parent_hist);
+      } else {
+        ENVOY_LOG(warn, "duplicate histogram {}.{}: data loss will occur on output", scope->prefix_,
+                  hist_name);
+      }
+    }
+  }
+
+  return ret;
+}
+
 void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                                                ThreadLocal::Instance& tls) {
   main_thread_dispatcher_ = &main_thread_dispatcher;
@@ -73,6 +97,31 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
 void ThreadLocalStoreImpl::shutdownThreading() {
   // This will block both future cache fills as well as cache flushes.
   shutting_down_ = true;
+}
+
+void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
+  if (!shutting_down_) {
+    tls_->runOnAllThreads(
+        [this]() -> void {
+          for (ScopeImpl* scope : scopes_) {
+            for (const auto& name_histogram_pair :
+                 tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
+              const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
+              tls_hist->beginMerge();
+            }
+          }
+        },
+        [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
+  }
+}
+
+void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
+  if (!shutting_down_) {
+    for (const ParentHistogramSharedPtr& histogram : histograms()) {
+      histogram->merge();
+    }
+    merge_complete_cb();
+  }
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
@@ -204,7 +253,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  HistogramSharedPtr* tls_ref = nullptr;
+  TlsHistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
   }
@@ -214,19 +263,98 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
-  HistogramSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
+
+  std::vector<Tag> tags;
+  std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
   if (!central_ref) {
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        new HistogramImpl(final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+    // Since MetricImpl only has move constructor, we are explicitly copying here.
+    std::string central_tag_extracted_name(tag_extracted_name);
+    std::vector<Tag> central_tags(tags);
+    central_ref.reset(new ParentHistogramImpl(
+        final_name, parent_, std::move(central_tag_extracted_name), std::move(central_tags)));
   }
+  TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
+      final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+  central_ref->addTlsHistogram(hist_tls_ptr);
 
   if (tls_ref) {
-    *tls_ref = central_ref;
+    *tls_ref = hist_tls_ptr;
   }
+  return *hist_tls_ptr;
+}
 
-  return *central_ref;
+ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name, Store& parent,
+                                                   std::string&& tag_extracted_name,
+                                                   std::vector<Tag>&& tags)
+    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+      current_active_(0), flags_(0) {
+  histograms_[0] = hist_alloc();
+  histograms_[1] = hist_alloc();
+}
+
+ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
+  hist_free(histograms_[0]);
+  hist_free(histograms_[1]);
+}
+
+void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
+  hist_insert_intscale(histograms_[current_active_], value, 0, 1);
+  parent_.deliverHistogramToSinks(*this, value);
+  flags_ |= Flags::Used;
+}
+
+void ThreadLocalHistogramImpl::merge(histogram_t* target) {
+  uint64_t other_histogram_index = otherHistogramIndex();
+  hist_accumulate(target, &histograms_[other_histogram_index], 1);
+  hist_clear(histograms_[other_histogram_index]);
+}
+
+ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
+                                         std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
+
+bool ParentHistogramImpl::used() const {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  return usedWorker();
+}
+
+ParentHistogramImpl::~ParentHistogramImpl() {
+  hist_free(interval_histogram_);
+  hist_free(cumulative_histogram_);
+}
+
+void ParentHistogramImpl::merge() {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  if (usedWorker()) {
+    hist_clear(interval_histogram_);
+    for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
+      tls_histogram->merge(interval_histogram_);
+    }
+    // Since TLS merge is done, we can release the lock here.
+    lock.unlock();
+    hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
+    cumulative_statistics_.refresh(cumulative_histogram_);
+    interval_statistics_.refresh(interval_histogram_);
+  }
+}
+
+void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  tls_histograms_.emplace_back(hist_ptr);
+}
+
+bool ParentHistogramImpl::usedWorker() const {
+  bool any_tls_used = false;
+  for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
+    if (tls_histogram->used()) {
+      any_tls_used = true;
+      break;
+    }
+  }
+  return any_tls_used;
 }
 
 } // namespace Stats
