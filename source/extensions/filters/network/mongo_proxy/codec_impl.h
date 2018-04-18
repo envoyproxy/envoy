@@ -211,6 +211,7 @@ public:
     command_args_ = std::move(command_args);
   }
   const std::list<Bson::DocumentSharedPtr>& inputDocs() const override { return input_docs_; }
+  std::list<Bson::DocumentSharedPtr>& inputDocs() override { return input_docs_; }
 
 private:
   std::string database_;
@@ -240,6 +241,7 @@ public:
     command_reply_ = std::move(command_reply);
   }
   const std::list<Bson::DocumentSharedPtr>& outputDocs() const override { return output_docs_; }
+  std::list<Bson::DocumentSharedPtr>& outputDocs() override { return output_docs_; }
 
 private:
   Bson::DocumentSharedPtr metadata_;

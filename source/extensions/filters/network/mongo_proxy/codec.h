@@ -169,6 +169,7 @@ public:
   virtual const Bson::Document* commandArgs() const PURE;
   virtual void commandArgs(Bson::DocumentSharedPtr&& commandArgs) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& inputDocs() const PURE;
+  virtual std::list<Bson::DocumentSharedPtr>& inputDocs() PURE;
 };
 
 typedef std::unique_ptr<CommandMessage> CommandMessagePtr;
@@ -181,6 +182,7 @@ public:
   virtual const Bson::Document* commandReply() const PURE;
   virtual void commandReply(Bson::DocumentSharedPtr&& commandReply) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& outputDocs() const PURE;
+  virtual std::list<Bson::DocumentSharedPtr>& outputDocs() PURE;
 };
 
 typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
