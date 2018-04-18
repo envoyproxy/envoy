@@ -50,7 +50,7 @@ Version history
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * route-local filter configuration: HTTP filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
-  :ref:`route <envoy_api_field_route.Route.per_filter_config`, and
+  :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
   :ref:`weighted cluster <envoy_api_field_route.WeightedCluster.ClusterWeight.per_filter_config>`
   local configuration.
 * buffer filter route-local configuration: the buffer filter can be optionally
