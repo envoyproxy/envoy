@@ -34,6 +34,7 @@ public:
   void init() { init(std::make_unique<Filter>(cfg_)); }
 
   void init(std::unique_ptr<Filter>&& filter) {
+    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     filter_ = std::move(filter);
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
@@ -85,6 +86,7 @@ public:
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
+  Event::MockTimer* timer_{};
 };
 
 // Test that the filter detects Closed events and terminates.
@@ -93,6 +95,14 @@ TEST_F(TlsInspectorTest, ConnectionClosed) {
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Closed);
   EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
+}
+
+// Test that the filter detects timeout and terminates.
+TEST_F(TlsInspectorTest, Timeout) {
+  init();
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  timer_->callback_();
+  EXPECT_EQ(1, cfg_->stats().read_timeout_.value());
 }
 
 // Test that the filter detects detects read errors.
