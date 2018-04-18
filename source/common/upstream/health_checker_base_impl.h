@@ -48,7 +48,7 @@ protected:
     enum class FailureType { Active, Passive, Network };
 
     virtual ~ActiveHealthCheckSession();
-    void setUnhealthy(FailureType type);
+    HealthTransition setUnhealthy(FailureType type);
     void start() { onIntervalBase(); }
 
   protected:
@@ -108,10 +108,10 @@ private:
   void decHealthy();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
-  std::chrono::milliseconds interval() const;
+  std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
-  void runCallbacks(HostSharedPtr host, bool changed_state);
+  void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
@@ -120,6 +120,9 @@ private:
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
   const std::chrono::milliseconds interval_jitter_;
+  const std::chrono::milliseconds unhealthy_interval_;
+  const std::chrono::milliseconds unhealthy_edge_interval_;
+  const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
 };

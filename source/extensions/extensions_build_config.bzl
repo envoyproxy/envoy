@@ -8,6 +8,12 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
+    # Health checkers
+    #
+
+    "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+
+    #
     # HTTP filters
     #
 
