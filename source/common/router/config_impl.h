@@ -49,9 +49,11 @@ public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
 
   const Protobuf::Message* get(const std::string& name) const;
+  const PerRouteConfigObject* get_object(const std::string& name) const;
 
 private:
   std::unordered_map<std::string, ProtobufTypes::MessagePtr> configs_;
+  std::unordered_map<std::string, PerRouteConfigObjectConstSharedPtr> objects_;
 };
 
 class RouteEntryImplBase;
@@ -77,6 +79,9 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const Protobuf::Message* perFilterConfig(const std::string&) const override { return nullptr; }
+  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override {
+    return nullptr;
+  }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -131,6 +136,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
   const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -371,6 +377,7 @@ public:
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
   const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override;
 
 protected:
   const bool case_sensitive_;
@@ -447,6 +454,9 @@ private:
     const Protobuf::Message* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
     };
+    const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const override {
+      return parent_->perFilterConfigObject(name);
+    };
 
   private:
     const RouteEntryImplBase* parent_;
@@ -488,6 +498,7 @@ private:
     }
 
     const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+    const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const override;
 
   private:
     const std::string runtime_key_;

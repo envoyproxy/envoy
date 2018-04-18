@@ -527,6 +527,10 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
 const Protobuf::Message* RouteEntryImplBase::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
+const PerRouteConfigObject*
+RouteEntryImplBase::perFilterConfigObject(const std::string& name) const {
+  return per_filter_configs_.get_object(name);
+}
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string runtime_key, Runtime::Loader& loader,
@@ -558,6 +562,15 @@ RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& nam
     return cfg;
   }
   return DynamicRouteEntry::perFilterConfig(name);
+}
+
+const PerRouteConfigObject*
+RouteEntryImplBase::WeightedClusterEntry::perFilterConfigObject(const std::string& name) const {
+  const PerRouteConfigObject* cfg = per_filter_configs_.get_object(name);
+  if (cfg != nullptr) {
+    return cfg;
+  }
+  return DynamicRouteEntry::perFilterConfigObject(name);
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
@@ -738,6 +751,9 @@ const Config& VirtualHostImpl::routeConfig() const { return global_route_config_
 const Protobuf::Message* VirtualHostImpl::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
+const PerRouteConfigObject* VirtualHostImpl::perFilterConfigObject(const std::string& name) const {
+  return per_filter_configs_.get_object(name);
+}
 
 const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
   // We do a longest wildcard suffix match against the host that's passed in.
@@ -886,13 +902,23 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt:
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
-    configs_[name] = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
+    auto msg = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
+    auto obj = factory.createPerRouteConfigObject(*msg);
+    configs_[name] = std::move(msg);
+    if (obj) {
+      objects_[name] = obj;
+    }
   }
 }
 
 const Protobuf::Message* PerFilterConfigs::get(const std::string& name) const {
   auto cfg = configs_.find(name);
   return cfg == configs_.end() ? nullptr : cfg->second.get();
+}
+
+const PerRouteConfigObject* PerFilterConfigs::get_object(const std::string& name) const {
+  auto obj = objects_.find(name);
+  return obj == objects_.end() ? nullptr : obj->second.get();
 }
 
 } // namespace Router

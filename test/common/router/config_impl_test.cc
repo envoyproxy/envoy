@@ -4214,6 +4214,10 @@ class PerFilterConfigsTest : public testing::Test {
 public:
   PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
 
+  struct TestFilterConfigObject : public Router::PerRouteConfigObject {
+    ProtobufWkt::Timestamp data_;
+  };
+
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
     Server::Configuration::HttpFilterFactoryCb
@@ -4222,6 +4226,13 @@ public:
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    }
+    Router::PerRouteConfigObjectConstSharedPtr
+    createPerRouteConfigObject(const Protobuf::Message& config) override {
+      const auto data = dynamic_cast<const ProtobufWkt::Timestamp&>(config);
+      auto obj = new TestFilterConfigObject;
+      obj->data_ = data;
+      return Router::PerRouteConfigObjectConstSharedPtr(obj);
     }
     std::string name() override { return "test.filter"; }
   };
@@ -4233,18 +4244,27 @@ public:
     const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
     const auto* route_entry = route->routeEntry();
     const auto& vhost = route_entry->virtualHost();
+    auto name = factory_.name();
 
-    check(route_entry->perFilterConfig(factory_.name()), expected_entry, "route entry");
-    check(route->perFilterConfig(factory_.name()), expected_route, "route");
-    check(vhost.perFilterConfig(factory_.name()), expected_vhost, "virtual host");
+    check(route_entry->perFilterConfig(name), route_entry->perFilterConfigObject(name),
+          expected_entry, "route entry");
+    check(route->perFilterConfig(name), route->perFilterConfigObject(name), expected_route,
+          "route");
+    check(vhost.perFilterConfig(name), vhost.perFilterConfigObject(name), expected_vhost,
+          "virtual host");
   }
 
-  void check(const Protobuf::Message* cfg, uint32_t expected_seconds, std::string source) {
+  void check(const Protobuf::Message* cfg, const Router::PerRouteConfigObject* obj,
+             uint32_t expected_seconds, std::string source) {
     EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
+    EXPECT_NE(nullptr, obj) << "config object should not be null for source: " << source;
     EXPECT_NO_THROW({
       const auto ts = dynamic_cast<const ProtobufWkt::Timestamp*>(cfg);
       EXPECT_EQ(expected_seconds, ts->seconds())
           << "config value does not match expected for source: " << source;
+      const auto data_obj = dynamic_cast<const TestFilterConfigObject*>(obj);
+      EXPECT_EQ(data_obj->data_.seconds(), ts->seconds())
+          << "valud in the config object doesn't match with config" << source;
     }) << "config should properly dynamic_cast to the appropriate type for source: "
        << source;
   }

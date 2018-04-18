@@ -307,6 +307,16 @@ public:
   }
 
   /**
+   * @return PerRouteConfigObjectSharedPtr gives the filter a chance to pre-process per route config
+   *         at config time. Returned object will be owned by the filter chain config.
+   */
+  virtual Router::PerRouteConfigObjectConstSharedPtr
+  createPerRouteConfigObject(const Protobuf::Message& config) {
+    UNREFERENCED_PARAMETER(config);
+    return Router::PerRouteConfigObjectConstSharedPtr{};
+  }
+
+  /**
    * @return std::string the identifying name for a particular implementation of an http filter
    * produced by the factory.
    */

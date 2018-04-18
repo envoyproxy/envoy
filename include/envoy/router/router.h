@@ -233,6 +233,15 @@ class RateLimitPolicy;
 class Config;
 
 /**
+ * All pre-processed per route config objects should be derived from this class.
+ */
+class PerRouteConfigObject {
+public:
+  virtual ~PerRouteConfigObject() {}
+};
+typedef std::shared_ptr<const PerRouteConfigObject> PerRouteConfigObjectConstSharedPtr;
+
+/**
  * Virtual host defintion.
  */
 class VirtualHost {
@@ -265,6 +274,13 @@ public:
    * nullptr is returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * @return const PerRouteConfigObject* the per-filter config pre-processed object for
+   *  the given filter name. If not per-filter config for the filter, or the filter factory
+   *  doesn't create such object, nullptr is returned.
+   */
+  virtual const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const PURE;
 };
 
 /**
@@ -478,6 +494,13 @@ public:
    * nullptr is returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * @return const PerRouteConfigObject* the per-filter config pre-processed object for
+   *  the given filter name. If not per-filter config for the filter, or the filter factory
+   *  doesn't create such object, nullptr is returned.
+   */
+  virtual const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const PURE;
 };
 
 /**
@@ -530,6 +553,13 @@ public:
    * returned.
    */
   virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * @return const PerRouteConfigObject* the per-filter config pre-processed object for
+   *  the given filter name. If not per-filter config for the filter, or the filter factory
+   *  doesn't create such object, nullptr is returned.
+   */
+  virtual const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;

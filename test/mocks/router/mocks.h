@@ -164,6 +164,7 @@ public:
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(routeConfig, const Config&());
   MOCK_CONST_METHOD1(perFilterConfig, const Protobuf::Message*(const std::string&));
+  MOCK_CONST_METHOD1(perFilterConfigObject, const PerRouteConfigObject*(const std::string&));
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
@@ -234,6 +235,7 @@ public:
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const Protobuf::Message*(const std::string&));
+  MOCK_CONST_METHOD1(perFilterConfigObject, const PerRouteConfigObject*(const std::string&));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -271,6 +273,7 @@ public:
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
   MOCK_CONST_METHOD0(decorator, const Decorator*());
   MOCK_CONST_METHOD1(perFilterConfig, const Protobuf::Message*(const std::string&));
+  MOCK_CONST_METHOD1(perFilterConfigObject, const PerRouteConfigObject*(const std::string&));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
