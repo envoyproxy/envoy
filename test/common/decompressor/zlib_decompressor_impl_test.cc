@@ -223,7 +223,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   for (uint64_t i = 0; i < 20; ++i) {
     Buffer::BufferFragmentImpl* frag = new Buffer::BufferFragmentImpl(
         sample.c_str(), sample.size(),
-        [this](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
+        [](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
 
     buffer.addBufferFragment(*frag);
     original_text.append(sample);
