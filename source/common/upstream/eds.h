@@ -38,7 +38,7 @@ public:
 private:
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
-  void updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+  bool updateHostsPerLocality(uint32_t priority, HostSet& host_set, const HostVector& new_hosts,
                               LocalityWeightsMap& locality_weights_map);
 
   // ClusterImplBase
@@ -48,7 +48,7 @@ private:
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
-  LocalityWeightsMap current_locality_weights_map_;
+  std::vector<LocalityWeightsMap> current_locality_weights_map_;
 };
 
 } // namespace Upstream

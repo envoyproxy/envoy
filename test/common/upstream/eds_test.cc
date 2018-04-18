@@ -115,6 +115,7 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   cluster_->initialize([&initialized] { initialized = true; });
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Validate that onConfigUpdate() with no service name accepts config.
@@ -169,6 +170,7 @@ TEST_F(EdsTest, EndpointMetadata) {
   cluster_->initialize([&initialized] { initialized = true; });
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
   EXPECT_TRUE(initialized);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
@@ -192,6 +194,10 @@ TEST_F(EdsTest, EndpointMetadata) {
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value());
   EXPECT_TRUE(hosts[1]->canary());
+
+  // We don't rebuild with the exact same config.
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Validate that onConfigUpdate() updates endpoint health status.
@@ -708,6 +714,103 @@ TEST_F(EdsTest, PriorityAndLocality) {
     EXPECT_THAT(Locality("general", "koala", "ingsoc"),
                 ProtoEq(second_hosts_per_locality.get()[2][0]->locality()));
   }
+}
+
+// Set up an EDS config with multiple priorities, localities, weights and make sure
+// they are loaded and reloaded as expected.
+TEST_F(EdsTest, PriorityAndLocalityWeighted) {
+  resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        locality_weighted_lb_config: {}
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+    )EOF");
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  uint32_t port = 1000;
+  auto add_hosts_to_locality_and_priority =
+      [cluster_load_assignment, &port](const std::string& region, const std::string& zone,
+                                       const std::string& sub_zone, uint32_t priority, uint32_t n,
+                                       uint32_t weight) {
+        auto* endpoints = cluster_load_assignment->add_endpoints();
+        endpoints->set_priority(priority);
+        auto* locality = endpoints->mutable_locality();
+        locality->set_region(region);
+        locality->set_zone(zone);
+        locality->set_sub_zone(sub_zone);
+        endpoints->mutable_load_balancing_weight()->set_value(weight);
+
+        for (uint32_t i = 0; i < n; ++i) {
+          auto* socket_address = endpoints->add_lb_endpoints()
+                                     ->mutable_endpoint()
+                                     ->mutable_address()
+                                     ->mutable_socket_address();
+          socket_address->set_address("1.2.3.4");
+          socket_address->set_port_value(port++);
+        }
+      };
+
+  // Set up both priority 0 and priority 1 with 2 localities.
+  add_hosts_to_locality_and_priority("oceania", "koala", "ingsoc", 0, 2, 25);
+  add_hosts_to_locality_and_priority("", "us-east-1a", "", 0, 1, 75);
+  add_hosts_to_locality_and_priority("", "us-east-1a", "", 1, 8, 60);
+  add_hosts_to_locality_and_priority("foo", "bar", "eep", 1, 2, 40);
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_TRUE(initialized);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  {
+    auto& first_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
+    auto& first_locality_weights =
+        *cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights();
+    EXPECT_EQ(2, first_hosts_per_locality.get().size());
+    EXPECT_EQ(1, first_hosts_per_locality.get()[0].size());
+    EXPECT_THAT(Locality("", "us-east-1a", ""),
+                ProtoEq(first_hosts_per_locality.get()[0][0]->locality()));
+    EXPECT_EQ(75, first_locality_weights[0]);
+    EXPECT_EQ(2, first_hosts_per_locality.get()[1].size());
+    EXPECT_THAT(Locality("oceania", "koala", "ingsoc"),
+                ProtoEq(first_hosts_per_locality.get()[1][0]->locality()));
+    EXPECT_THAT(Locality("oceania", "koala", "ingsoc"),
+                ProtoEq(first_hosts_per_locality.get()[1][1]->locality()));
+    EXPECT_EQ(25, first_locality_weights[1]);
+
+    auto& second_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality();
+    auto& second_locality_weights =
+        *cluster_->prioritySet().hostSetsPerPriority()[1]->localityWeights();
+    ASSERT_EQ(2, second_hosts_per_locality.get().size());
+    EXPECT_EQ(8, second_hosts_per_locality.get()[0].size());
+    EXPECT_EQ(60, second_locality_weights[0]);
+    EXPECT_EQ(2, second_hosts_per_locality.get()[1].size());
+    EXPECT_EQ(40, second_locality_weights[1]);
+  }
+
+  // This should noop (regression test for earlier bug where we would still
+  // rebuild).
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  // Adjust locality weights, validate that we observe an update.
+  cluster_load_assignment->mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(60);
+  cluster_load_assignment->mutable_endpoints(1)->mutable_load_balancing_weight()->set_value(40);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Throw on adding a new resource with an invalid endpoint (since the given address is invalid).
