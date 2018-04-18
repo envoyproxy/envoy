@@ -8,6 +8,10 @@
 namespace Envoy {
 namespace Upstream {
 
+enum class HealthState { Unhealthy, Healthy };
+
+enum class HealthTransition { Unchanged, Changed };
+
 /**
  * Wraps active health checking of an upstream cluster.
  */
@@ -21,7 +25,7 @@ public:
    * @param changed_state supplies whether the health check resulted in a host moving from healthy
    *                       to not healthy or vice versa.
    */
-  typedef std::function<void(HostSharedPtr host, bool changed_state)> HostStatusCb;
+  typedef std::function<void(HostSharedPtr host, HealthTransition changed_state)> HostStatusCb;
 
   /**
    * Install a callback that will be invoked every time a health check round is completed for
@@ -37,6 +41,9 @@ public:
 };
 
 typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
+
+std::ostream& operator<<(std::ostream& out, HealthState state);
+std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
 
 } // namespace Upstream
 } // namespace Envoy

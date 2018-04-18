@@ -28,6 +28,7 @@ namespace Logger {
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(hc)                   \
+  FUNCTION(health_checker)       \
   FUNCTION(http)                 \
   FUNCTION(http2)                \
   FUNCTION(lua)                  \

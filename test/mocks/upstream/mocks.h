@@ -185,7 +185,7 @@ public:
   MOCK_METHOD1(addHostCheckCompleteCb, void(HostStatusCb callback));
   MOCK_METHOD0(start, void());
 
-  void runCallbacks(Upstream::HostSharedPtr host, bool changed_state) {
+  void runCallbacks(Upstream::HostSharedPtr host, HealthTransition changed_state) {
     for (const auto& callback : callbacks_) {
       callback(host, changed_state);
     }
