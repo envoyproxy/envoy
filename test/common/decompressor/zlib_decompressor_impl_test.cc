@@ -219,10 +219,13 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   Buffer::OwnedImpl accumulation_buffer;
 
   const std::string sample{"slice, slice, slice, slice, slice, "};
-  std::string original_text{};
+  std::string original_text;
   for (uint64_t i = 0; i < 20; ++i) {
-    Buffer::BufferFragmentImpl frag(sample.c_str(), sample.size(), nullptr);
-    buffer.addBufferFragment(frag);
+    Buffer::BufferFragmentImpl* frag = new Buffer::BufferFragmentImpl(
+        sample.c_str(), sample.size(),
+        [this](const void*, size_t, const Buffer::BufferFragmentImpl* frag) { delete frag; });
+
+    buffer.addBufferFragment(*frag);
     original_text.append(sample);
   }
 
