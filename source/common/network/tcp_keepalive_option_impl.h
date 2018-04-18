@@ -32,7 +32,7 @@ typedef absl::optional<int> SocketOptionName;
 
 #ifdef TCP_KEEPIDLE
 #define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName(TCP_KEEPIDLE)
-#elif TCP_KEEPALIVE // OS X I think
+#elif TCP_KEEPALIVE // MacOS uses a different name from Linux for just this option.
 #define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName(TCP_KEEPALIVE)
 #else
 #define ENVOY_SOCKET_TCP_KEEPIDLE Network::SocketOptionName()
@@ -55,16 +55,16 @@ public:
   // The tcp keepalive options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
-  static bool setTcpKeepalive(Socket& socket, absl::optional<uint32_t> keepalive_probes,
-                              absl::optional<uint32_t> keepalive_time,
-                              absl::optional<uint32_t> keepalive_interval);
+  static bool setTcpKeepalive(Socket& socket, absl::optional<int> keepalive_probes,
+                              absl::optional<int> keepalive_time,
+                              absl::optional<int> keepalive_interval);
 
 private:
   Network::TcpKeepaliveConfig keepalive_config_;
   static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
-                             absl::optional<uint32_t> value);
+                             absl::optional<int> value);
   static int setSocketOption(Socket& socket, int level, Network::SocketOptionName optname,
-                             uint32_t value);
+                             int value);
 };
 } // namespace Network
 } // namespace Envoy

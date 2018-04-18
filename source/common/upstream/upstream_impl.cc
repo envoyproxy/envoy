@@ -91,11 +91,14 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
-    cluster_options->emplace_back(new UpstreamSocketOption(true));
+    cluster_options->emplace_back(std::make_shared<UpstreamSocketOption>(true));
   }
   if (config.upstream_connection_options().has_tcp_keepalive()) {
     cluster_options->emplace_back(
-        new Network::TcpKeepaliveOptionImpl(parseTcpKeepaliveConfig(config)));
+        std::make_shared<Network::TcpKeepaliveOptionImpl>(parseTcpKeepaliveConfig(config)));
+  }
+  if (cluster_options->empty()) {
+    return nullptr;
   }
   return cluster_options;
 }
@@ -119,12 +122,12 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
                            Network::Address::InstanceConstSharedPtr address,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
-  if (cluster.clusterSocketOptions() && !cluster.clusterSocketOptions().get()->empty()) {
+  if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
       connection_options = std::make_shared<Network::ConnectionSocket::Options>();
       *connection_options = *options;
-      copy(cluster.clusterSocketOptions().get()->begin(),
-           cluster.clusterSocketOptions().get()->end(), back_inserter(*connection_options.get()));
+      std::copy(cluster.clusterSocketOptions()->begin(), cluster.clusterSocketOptions()->end(),
+                std::back_inserter(*connection_options));
     } else {
       connection_options = cluster.clusterSocketOptions();
     }

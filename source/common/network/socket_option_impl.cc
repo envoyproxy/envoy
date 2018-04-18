@@ -62,7 +62,8 @@ int SocketOptionImpl::setIpSocketOption(Socket& socket, SocketOptionName ipv4_op
   }
   if (ip == nullptr) {
     ENVOY_LOG(warn, "Failed to set IP socket option on non-IP socket");
-    return ENOTSUP;
+    errno = ENOTSUP;
+    return -1;
   }
 
   // If the FD is v4, we can only try the IPv4 variant.
