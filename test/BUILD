@@ -21,6 +21,9 @@ envoy_cc_test_library(
         "//test/test_common:printers_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
-        "//conditions:default": ["//source/exe:sigaction_lib"],
+        "//conditions:default": [
+            "//source/exe:sigaction_lib" +
+            "//source/exe:terminate_handler",
+        ],
     }),
 )
