@@ -78,7 +78,7 @@ public:
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  NiceMock<Stats::MockStore> store_;
+  Stats::IsolatedStoreImpl store_;
   ConfigSharedPtr cfg_;
   std::unique_ptr<Filter> filter_;
   Network::MockListenerFilterCallbacks cb_;
@@ -92,6 +92,19 @@ TEST_F(TlsInspectorTest, ConnectionClosed) {
   init();
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Closed);
+  EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
+}
+
+// Test that the filter detects detects read errors.
+TEST_F(TlsInspectorTest, ReadError) {
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+    errno = ENOTSUP;
+    return -1;
+  }));
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().read_error_.value());
 }
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
