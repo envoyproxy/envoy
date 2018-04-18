@@ -75,13 +75,11 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   // Its okay for the moment, since the only use case of faults with runtimes is
   // by folks using filter level configuration in the fault filter (mainly Lyft folks).
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
-    auto proto_config = callbacks_->route()->routeEntry()->perFilterConfig(
-        Extensions::HttpFilters::HttpFilterNames::get().FAULT);
-    if (!proto_config) {
-      // See if the virtual host has any fault filter config
-      proto_config = callbacks_->route()->routeEntry()->virtualHost().perFilterConfig(
-          Extensions::HttpFilters::HttpFilterNames::get().FAULT);
-    }
+    const std::string name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
+    const auto* route_entry = callbacks_->route()->routeEntry();
+
+    const auto* proto_config = route_entry->perFilterConfig(name) 
+      ?: route_entry->virtualHost().perFilterConfig(name);
 
     if (proto_config) {
       const envoy::config::filter::http::fault::v2::HTTPFault per_filter_config =
