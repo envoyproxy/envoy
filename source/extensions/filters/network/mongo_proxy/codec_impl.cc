@@ -227,7 +227,7 @@ std::string ReplyMessageImpl::toString(bool full) const {
  */
 void CommandMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding COMMAND message");
-  uint64_t original_data_length = data.length();
+  const uint64_t original_data_length = data.length();
   ASSERT(data.length() >= message_length); // See comment below about relationship.
 
   database_ = Bson::BufferHelper::removeCString(data);
@@ -289,7 +289,7 @@ bool CommandMessageImpl::operator==(const CommandMessage& rhs) const {
 // OP_COMMANDREPLY implementation.
 void CommandReplyMessageImpl::fromBuffer(uint32_t message_length, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding COMMAND REPLY message");
-  uint64_t original_data_length = data.length();
+  const uint64_t original_data_length = data.length();
   ASSERT(data.length() >= message_length); // See comment below about relationship.
 
   metadata_ = Bson::DocumentImpl::create(data);
@@ -363,7 +363,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
 
   // Some messages need to know how long they are to parse. Subtract the header that we have already
   // parsed off before passing the final value.
-  message_length -= Message::kMessageHeaderSize;
+  message_length -= Message::MessageHeaderSize;
 
   switch (op_code) {
   case Message::OpCode::OP_REPLY: {
@@ -444,9 +444,9 @@ void EncoderImpl::encodeGetMore(const GetMoreMessage& message) {
   }
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-get-more
-  int32_t total_size = Message::kMessageHeaderSize + Message::kInt32Length +
-                       message.fullCollectionName().size() + Message::kStringPaddingLength +
-                       Message::kInt32Length + Message::kInt64Length;
+  int32_t total_size = Message::MessageHeaderSize + Message::Int32Length +
+                       message.fullCollectionName().size() + Message::StringPaddingLength +
+                       Message::Int32Length + Message::Int64Length;
 
   encodeCommonHeader(total_size, message, Message::OpCode::OP_GET_MORE);
   Bson::BufferHelper::writeInt32(output_, 0);
@@ -461,8 +461,8 @@ void EncoderImpl::encodeInsert(const InsertMessage& message) {
   }
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-insert
-  int32_t total_size = Message::kMessageHeaderSize + Message::kInt32Length +
-                       message.fullCollectionName().size() + Message::kStringPaddingLength;
+  int32_t total_size = Message::MessageHeaderSize + Message::Int32Length +
+                       message.fullCollectionName().size() + Message::StringPaddingLength;
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
@@ -483,7 +483,7 @@ void EncoderImpl::encodeKillCursors(const KillCursorsMessage& message) {
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-kill-cursors
   int32_t total_size =
-      Message::kMessageHeaderSize + 2 * Message::kInt32Length + (message.numberOfCursorIds() * 8);
+      Message::MessageHeaderSize + 2 * Message::Int32Length + (message.numberOfCursorIds() * 8);
 
   encodeCommonHeader(total_size, message, Message::OpCode::OP_KILL_CURSORS);
   Bson::BufferHelper::writeInt32(output_, 0);
@@ -499,8 +499,8 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
   }
 
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-query
-  int32_t total_size = Message::kMessageHeaderSize + 3 * Message::kInt32Length +
-                       message.fullCollectionName().size() + Message::kStringPaddingLength +
+  int32_t total_size = Message::MessageHeaderSize + 3 * Message::Int32Length +
+                       message.fullCollectionName().size() + Message::StringPaddingLength +
                        message.query()->byteSize();
   if (message.returnFieldsSelector()) {
     total_size += message.returnFieldsSelector()->byteSize();
@@ -521,7 +521,7 @@ void EncoderImpl::encodeQuery(const QueryMessage& message) {
 void EncoderImpl::encodeReply(const ReplyMessage& message) {
   // https://docs.mongodb.org/manual/reference/mongodb-wire-protocol/#op-reply
   int32_t total_size =
-      Message::kMessageHeaderSize + 3 * Message::kInt32Length + Message::kInt64Length;
+      Message::MessageHeaderSize + 3 * Message::Int32Length + Message::Int64Length;
   for (const Bson::DocumentSharedPtr& document : message.documents()) {
     total_size += document->byteSize();
   }
@@ -537,9 +537,9 @@ void EncoderImpl::encodeReply(const ReplyMessage& message) {
 }
 
 void EncoderImpl::encodeCommand(const CommandMessage& message) {
-  int32_t total_size = Message::kMessageHeaderSize;
-  total_size += message.database().size() + Message::kStringPaddingLength;
-  total_size += message.commandName().size() + Message::kStringPaddingLength;
+  int32_t total_size = Message::MessageHeaderSize;
+  total_size += message.database().size() + Message::StringPaddingLength;
+  total_size += message.commandName().size() + Message::StringPaddingLength;
   total_size += message.metadata()->byteSize();
   total_size += message.commandArgs()->byteSize();
   for (const Bson::DocumentSharedPtr& document : message.inputDocs()) {
@@ -558,7 +558,7 @@ void EncoderImpl::encodeCommand(const CommandMessage& message) {
 }
 
 void EncoderImpl::encodeCommandReply(const CommandReplyMessage& message) {
-  int32_t total_size = Message::kMessageHeaderSize;
+  int32_t total_size = Message::MessageHeaderSize;
   total_size += message.metadata()->byteSize();
   total_size += message.commandReply()->byteSize();
   for (const Bson::DocumentSharedPtr& document : message.outputDocs()) {
