@@ -78,8 +78,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
-    const auto* proto_config = route_entry->perFilterConfig(name) 
-      ?: route_entry->virtualHost().perFilterConfig(name);
+    const auto* proto_config =
+        route_entry->perFilterConfig(name) ?: route_entry->virtualHost().perFilterConfig(name);
 
     if (proto_config) {
       const envoy::config::filter::http::fault::v2::HTTPFault per_filter_config =
