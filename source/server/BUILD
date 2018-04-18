@@ -277,15 +277,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "terminate_handler_lib",
-    srcs = ["terminate_handler.cc"],
-    hdrs = ["terminate_handler.h"],
-    deps = [
-        "//source/server:backtrace_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "test_hooks_lib",
     hdrs = ["test_hooks.h"],
 )

@@ -15,7 +15,6 @@
 #include "server/options_impl.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/terminate_handler.h"
 #include "server/test_hooks.h"
 
 #ifdef ENVOY_HOT_RESTART
