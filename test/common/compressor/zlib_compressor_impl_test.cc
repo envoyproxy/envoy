@@ -110,9 +110,9 @@ TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
   EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");
   EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFlushTestHelper(),
-               std::string{"assert failure: result == Z_OK"});
+                             "assert failure: result == Z_OK");
   EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFinishTestHelper(),
-               std::string{"assert failure: result == Z_STREAM_END"});
+                             "assert failure: result == Z_STREAM_END");
 }
 
 // Exercises compressor's checksum by calling it before init or compress.
