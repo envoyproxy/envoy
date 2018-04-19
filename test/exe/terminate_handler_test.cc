@@ -7,7 +7,7 @@ namespace Envoy {
 TEST(TerminateHandler, HandlerInstalledTest) {
   TerminateHandler handler;
   EXPECT_DEATH([]() -> void { std::terminate(); }(),
-               ".*Envoy::TerminateHandler::logOnTerminate().*");
+               ".*Envoy::TerminateHandler::logOnTerminate().*|backtrace\\.h");
 }
 
 } // namespace Envoy
