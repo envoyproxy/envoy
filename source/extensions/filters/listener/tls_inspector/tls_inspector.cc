@@ -64,7 +64,7 @@ Filter::Filter(const ConfigSharedPtr config, uint32_t max_client_hello_size)
 
   // TODO(ggreenway) PERF: Put a buffer in thread-local storage and have every Filter share
   // the buffer.
-  buf_.reserve(max_client_hello_size);
+  buf_.resize(max_client_hello_size);
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -72,7 +72,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_ == nullptr);
 
-  // TODO(ggreenway): detect closed connections.
   file_event_ = cb.dispatcher().createFileEvent(
       socket.fd(),
       [this](uint32_t events) {
@@ -90,6 +89,9 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   // TODO(PiotrSikora): make this configurable.
   timer_ = cb.dispatcher().createTimer([this]() -> void { onTimeout(); });
   timer_->enableTimer(std::chrono::milliseconds(15000));
+
+  // TODO(ggreenway): Move timeout and close-detection to the filter manager
+  // so that it applies to all listener filters.
 
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
@@ -122,7 +124,7 @@ void Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_.data(), buf_.capacity(), MSG_PEEK);
+  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_.data(), buf_.size(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
   if (n == -1 && errno == EAGAIN) {
@@ -136,8 +138,8 @@ void Filter::onRead() {
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
   if (static_cast<uint64_t>(n) > read_) {
-    uint8_t* data = buf_.data() + read_;
-    size_t len = n - read_;
+    const uint8_t* data = buf_.data() + read_;
+    const size_t len = n - read_;
     read_ = n;
     parseClientHello(data, len);
   }
@@ -156,7 +158,7 @@ void Filter::done(bool success) {
   cb_->continueFilterChain(success);
 }
 
-void Filter::parseClientHello(void* data, size_t len) {
+void Filter::parseClientHello(const void* data, size_t len) {
   // Ownership is passed to ssl_ in SSL_set_bio()
   BIO* bio = BIO_new_mem_buf(data, len);
   SSL_set_bio(ssl_.get(), bio, bio);
@@ -169,7 +171,7 @@ void Filter::parseClientHello(void* data, size_t len) {
 
   switch (SSL_get_error(ssl_.get(), ret)) {
   case SSL_ERROR_WANT_READ:
-    if (read_ == buf_.capacity()) {
+    if (read_ == buf_.size()) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
       config_->stats().client_hello_too_big_.inc();

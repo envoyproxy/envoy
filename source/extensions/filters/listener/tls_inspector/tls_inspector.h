@@ -65,7 +65,7 @@ public:
 private:
   static const size_t TLS_DEFAULT_MAX_CLIENT_HELLO = 64 * 1024;
 
-  void parseClientHello(void* data, size_t len);
+  void parseClientHello(const void* data, size_t len);
   void onRead();
   void onTimeout();
   void done(bool success);
@@ -77,7 +77,7 @@ private:
   Event::TimerPtr timer_;
 
   bssl::UniquePtr<SSL> ssl_;
-  std::vector<uint8_t> buf_{};
+  std::vector<uint8_t> buf_;
   uint64_t read_{0};
   bool clienthello_success_{false};
 

@@ -3,7 +3,8 @@
 TLS Inspector
 =============
 
-TLS inspector listener filter allows detecting the server name indication
+TLS inspector listener filter allows detecting the
+`server name indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_
 from the client. This can be used to select a
 :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` via the
 :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` of
