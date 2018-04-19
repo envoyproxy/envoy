@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+import "validate/validate.proto";
+
+package envoy.config.rbac.v2alpha;
+
+// Role Based Access Control (RBAC) provides service-level and method-level access control for a service.
+// Here is an example of RBAC configuration.
+//
+//   action_type: ALLOW
+//   policies:
+//     "service-admin":
+//       permissions:
+//       - methods: [simple:"*"]
+//       subjects:
+//       - name: "cluster.local/ns/default/sa/admin"
+//     "product-viewer":
+//       permissions:
+//       - paths: [prefix:"/products", suffix:"/reviews"]
+//         methods: ["GET"]
+//       subjects:
+//       - name: "cluster.local/ns/default/sa/product-client"
+//
+message RBAC {
+  // Should we do white-list or black-list style access control.
+  enum ActionType {
+    // The policies grant access to subjects. The rest is denied. This is white-list style
+    // access control. This is the default type.
+    ALLOW = 0;
+
+    // The policies deny access to subjects. The rest is allowed. This is black-list style
+    // access control.
+    DENY = 1;
+  }
+
+  ActionType action_type = 1;
+
+  // Maps from policy name to policy.
+  map<string, Policy> policies = 2;
+}
+
+// Policy specifies a role and the subjects that are assigned/denied the role.
+message Policy {
+ // Required. The set of permissions that define a role.
+ repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
+
+ // Required. List of subjects that are assigned/denied the role based on “action_type”.
+ repeated Subject subjects = 2 [(validate.rules).repeated .min_items = 1];
+}
+
+message StringMatch {
+  oneof match_pattern {
+    // The input string must match exactly the string specified here.
+    // Or it is a "*", which means that it matches any string.
+    string simple = 1;
+
+    // The input string must have the prefix specified here.
+    string prefix = 2;
+
+    // The input string must have the suffix specified here.
+    string suffix = 3;
+
+    // The input string must match the regular expression specified here.
+    string regex = 4;
+ }
+}
+
+// Permission defines a permission to access the service.
+message Permission {
+  // Optional. A list of HTTP paths or gRPC methods.
+  // gRPC methods must be presented as fully-qualified name in the form of
+  // packageName.serviceName/methodName.
+  // If this field is unset, it applies to any path.
+  repeated StringMatch paths = 1;
+
+  // Optional. A list of HTTP methods (e.g., "GET", "POST").
+  // It is ignored in gRPC case because the value is always "POST".
+  // If set to ["*"] or unset, it applies to any method.
+  repeated string methods = 2;
+}
+
+// Subject defines an identity or a group of identities.
+message Subject {
+ // Optional. The name of the subject. This refers to the "source.principal" field in
+ // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+ string name = 1;
+}
