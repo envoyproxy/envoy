@@ -38,8 +38,9 @@ public:
 private:
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
-  bool updateHostsPerLocality(uint32_t priority, HostSet& host_set, const HostVector& new_hosts,
-                              LocalityWeightsMap& locality_weights_map);
+  bool updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                              LocalityWeightsMap& new_locality_weights_map,
+                              LocalityWeightsMap& current_locality_weights_map);
 
   // ClusterImplBase
   void startPreInit() override;
