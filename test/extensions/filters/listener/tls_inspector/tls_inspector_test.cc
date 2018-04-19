@@ -25,8 +25,6 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-// Build again on the basis of the connection_handler_test.cc
-
 class TlsInspectorTest : public testing::Test {
 public:
   TlsInspectorTest() : cfg_(std::make_shared<Config>(store_)) {}
