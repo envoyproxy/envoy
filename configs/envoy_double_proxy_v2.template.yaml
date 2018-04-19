@@ -1,7 +1,8 @@
-{%- macro listener(address,port_value,proxy_proto) -%}
+{%- macro listener(protocol, address, port_value, proxy_proto) -%}
 - name: listener_created_from_configgen
   address:
     socket_address:
+      protocol: {{protocol}}
       address:  {{address}}
       port_value: {{port_value}}
   filter_chains:
@@ -49,12 +50,9 @@ admin:
   access_log_path:  "var/log/envoy/admin_access.log"
   address:
     socket_address:
-      protocol:
-      address:  tcp://127.0.0.1
-      port_value: 9901
-      named_port:
-      resolver_name:
-      ipv4_compat:    
+      protocol: TCP
+      address:  127.0.0.1
+      port_value: 9901   
 flags_path: /etc/envoy/flags
 stats_sinks:
   name: envoy.statsd
@@ -77,26 +75,29 @@ static_resources:
       connect_timeout: 0.25s
       lb_policy: ROUND_ROBIN
       hosts:
-        socket_address:
-          address: tcp://127.0.0.1
-          port: 8125
+        - socket_address:
+            protocol: TCP
+            address: 127.0.0.1
+            port: 8125
     - name: backhaul
       type: STRICT_DNS
       connect_timeout: 1s
       lb_policy: ROUND_ROBIN
       hosts:
-        socket_address:
-          address:  tcp://front-proxy.yourcompany.net
-          port: 9400
+        - socket_address:
+            protocol: TCP
+            address:  front-proxy.yourcompany.net
+            port: 9400
       max_requests_per_connection: 25000
     - name: lightstep_saas
       type: LOGICAL_DNS
       connect_timeout: 1s
       lb_policy: ROUND_ROBIN
       hosts:
-        socket_address:
-          address: tcp://collector-grpc.lightstep.com
-          port: 443
+        - socket_address:
+            protocol: TCP
+            address: collector-grpc.lightstep.com
+            port: 443
   listeners:
-    {{ listener("tcp://0.0.0.0",9300,True)|indent(4) }}
-    {{ listener("tcp://0.0.0.0",9301,True)|indent(4) }}    
+    {{ listener("TCP", "0.0.0.0",9300,True)|indent(4) }}
+    {{ listener("TCP", "0.0.0.0",9301,True)|indent(4) }}    
