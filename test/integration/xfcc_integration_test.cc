@@ -38,7 +38,7 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
   std::string json_tls = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
 }
 )EOF";
   std::string json_mtls = R"EOF(
@@ -46,7 +46,7 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
   "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
 }
 )EOF";
 
@@ -187,14 +187,63 @@ TEST_P(XfccIntegrationTest, MtlsSanitize) {
   testRequestAndResponseWithXfccHeader(previous_xfcc_, "");
 }
 
-TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectSan) {
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubject) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       SANITIZE_SET;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_,
+                                       current_xfcc_by_hash_ + ";" + client_subject_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetUri) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.set_uri(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_,
+                                       current_xfcc_by_hash_ + ";" + client_uri_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetDns) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_,
+                                       current_xfcc_by_hash_ + ";" + client_dns_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectUri) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
-                                                           client_subject_ + ";" + client_san_);
+                                                           client_subject_ + ";" + client_uri_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectDns) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
+                                                           client_subject_ + ";" + client_dns_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsSanitizeSetSubjectUriDns) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_uri(true);
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(previous_xfcc_, current_xfcc_by_hash_ + ";" +
+                                                           client_subject_ + ";" + client_uri_san_ +
+                                                           ";" + client_dns_san_);
 }
 
 TEST_P(XfccIntegrationTest, MtlsAppendForward) {
@@ -214,32 +263,72 @@ TEST_P(XfccIntegrationTest, MtlsAppendForwardSubject) {
       previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_subject_);
 }
 
-TEST_P(XfccIntegrationTest, MtlsAppendForwardSan) {
+TEST_P(XfccIntegrationTest, MtlsAppendForwardUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(
-      previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_san_);
+      previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_uri_san_);
 }
 
-TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectSan) {
+TEST_P(XfccIntegrationTest, MtlsAppendForwardDns) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      APPEND_FORWARD;
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(
+      previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_dns_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectUri) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
   sccd_.mutable_subject()->set_value(true);
-  sccd_.mutable_san()->set_value(true);
+  sccd_.set_uri(true);
   initialize();
   testRequestAndResponseWithXfccHeader(previous_xfcc_, previous_xfcc_ + "," +
                                                            current_xfcc_by_hash_ + ";" +
-                                                           client_subject_ + ";" + client_san_);
+                                                           client_subject_ + ";" + client_uri_san_);
 }
 
-TEST_P(XfccIntegrationTest, MtlsAppendForwardSanPreviousXfccHeaderEmpty) {
+TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectDns) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       APPEND_FORWARD;
-  sccd_.mutable_san()->set_value(true);
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_dns(true);
   initialize();
-  testRequestAndResponseWithXfccHeader("", current_xfcc_by_hash_ + ";" + client_san_);
+  testRequestAndResponseWithXfccHeader(previous_xfcc_, previous_xfcc_ + "," +
+                                                           current_xfcc_by_hash_ + ";" +
+                                                           client_subject_ + ";" + client_dns_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsAppendForwardSubjectUriDns) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      APPEND_FORWARD;
+  sccd_.mutable_subject()->set_value(true);
+  sccd_.set_uri(true);
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader(
+      previous_xfcc_, previous_xfcc_ + "," + current_xfcc_by_hash_ + ";" + client_subject_ + ";" +
+                          client_uri_san_ + ";" + client_dns_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsAppendForwardUriPreviousXfccHeaderEmpty) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      APPEND_FORWARD;
+  sccd_.set_uri(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader("", current_xfcc_by_hash_ + ";" + client_uri_san_);
+}
+
+TEST_P(XfccIntegrationTest, MtlsAppendForwardDnsPreviousXfccHeaderEmpty) {
+  fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      APPEND_FORWARD;
+  sccd_.set_dns(true);
+  initialize();
+  testRequestAndResponseWithXfccHeader("", current_xfcc_by_hash_ + ";" + client_dns_san_);
 }
 
 TEST_P(XfccIntegrationTest, TlsAlwaysForwardOnly) {

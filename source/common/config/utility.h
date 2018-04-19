@@ -225,6 +225,7 @@ public:
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
                                                             Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr);
 

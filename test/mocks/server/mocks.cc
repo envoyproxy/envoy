@@ -161,6 +161,15 @@ MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 MockListenerFactoryContext::MockListenerFactoryContext() {}
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
 
+MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
+  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
+}
+
+MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

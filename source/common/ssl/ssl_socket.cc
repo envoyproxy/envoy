@@ -225,6 +225,14 @@ std::string SslSocket::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
+std::vector<std::string> SslSocket::dnsSansLocalCertificate() {
+  X509* cert = SSL_get_certificate(ssl_.get());
+  if (!cert) {
+    return {};
+  }
+  return getDnsSansFromCertificate(cert);
+}
+
 const std::string& SslSocket::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
@@ -273,6 +281,14 @@ std::string SslSocket::uriSanPeerCertificate() {
   return getUriSanFromCertificate(cert.get());
 }
 
+std::vector<std::string> SslSocket::dnsSansPeerCertificate() {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return {};
+  }
+  return getDnsSansFromCertificate(cert.get());
+}
+
 std::string SslSocket::getUriSanFromCertificate(X509* cert) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
@@ -288,6 +304,23 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) {
     }
   }
   return "";
+}
+
+std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names == nullptr) {
+    return {};
+  }
+  std::vector<std::string> dns_sans = {};
+  for (const GENERAL_NAME* san : san_names.get()) {
+    if (san->type == GEN_DNS) {
+      ASN1_STRING* dns = san->d.dNSName;
+      dns_sans.emplace_back(reinterpret_cast<const char*>(ASN1_STRING_data(dns)),
+                            ASN1_STRING_length(dns));
+    }
+  }
+  return dns_sans;
 }
 
 void SslSocket::closeSocket(Network::ConnectionEvent) {

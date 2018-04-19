@@ -296,6 +296,15 @@ public:
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
+   * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
+   * config. Returned object will be stored in the loaded route configuration.
+   */
+  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const ProtobufWkt::Struct&) {
+    return nullptr;
+  }
+
+  /**
    * @return std::string the identifying name for a particular implementation of an http filter
    * produced by the factory.
    */

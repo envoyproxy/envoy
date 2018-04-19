@@ -23,12 +23,6 @@ public:
   LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {}
   LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {}
   explicit LowerCaseString(const std::string& new_string) : string_(new_string) { lower(); }
-  explicit LowerCaseString(std::string&& new_string, bool convert = true)
-      : string_(std::move(new_string)) {
-    if (convert) {
-      lower();
-    }
-  }
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }

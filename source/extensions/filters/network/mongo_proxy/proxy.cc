@@ -207,6 +207,22 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
   }
 }
 
+void ProxyFilter::decodeCommand(CommandMessagePtr&& message) {
+  tryInjectDelay();
+
+  stats_.op_command_.inc();
+  logMessage(*message, true);
+  ENVOY_LOG(debug, "decoded COMMAND: {}", message->toString(true));
+}
+
+void ProxyFilter::decodeCommandReply(CommandReplyMessagePtr&& message) {
+  tryInjectDelay();
+
+  stats_.op_command_reply_.inc();
+  logMessage(*message, true);
+  ENVOY_LOG(debug, "decoded COMMANDREPLY: {}", message->toString(true));
+}
+
 void ProxyFilter::onDrainClose() {
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }

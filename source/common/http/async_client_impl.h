@@ -148,6 +148,9 @@ private:
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
+    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
@@ -202,6 +205,10 @@ private:
       return path_match_criterion_;
     }
 
+    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
+
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
@@ -223,6 +230,9 @@ private:
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
+    const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
 
     RouteEntryImpl route_entry_;
   };
