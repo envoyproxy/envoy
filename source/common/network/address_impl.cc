@@ -19,6 +19,47 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
+namespace {
+
+int socketFromSocketType(SocketType socketType, Type addressType, IpVersion ipVersion) {
+#if defined(__APPLE__)
+  int flags = 0;
+#else
+  int flags = SOCK_NONBLOCK;
+#endif
+
+  if (socketType == SocketType::Stream) {
+    flags |= SOCK_STREAM;
+  } else {
+    flags |= SOCK_DGRAM;
+  }
+
+  int domain;
+  if (addressType == Type::Ip) {
+    if (ipVersion == IpVersion::v6) {
+      domain = AF_INET6;
+    } else {
+      ASSERT(ipVersion == IpVersion::v4);
+      domain = AF_INET;
+    }
+  } else {
+    ASSERT(addressType == Type::Pipe);
+    domain = AF_UNIX;
+  }
+
+  int fd = ::socket(domain, flags, 0);
+  RELEASE_ASSERT(fd != -1);
+
+#ifdef __APPLE__
+  // Cannot set SOCK_NONBLOCK as a ::socket flag.
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+#endif
+
+  return fd;
+}
+
+}  // namespace
+
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t));
@@ -100,44 +141,6 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
-#if defined(__APPLE__)
-  int flags = 0;
-#else
-  int flags = SOCK_NONBLOCK;
-#endif
-
-  if (socketType == SocketType::Stream) {
-    flags |= SOCK_STREAM;
-  } else {
-    flags |= SOCK_DGRAM;
-  }
-
-  int domain;
-  if (type() == Type::Ip) {
-    IpVersion version = ip()->version();
-    if (version == IpVersion::v6) {
-      domain = AF_INET6;
-    } else {
-      ASSERT(version == IpVersion::v4);
-      domain = AF_INET;
-    }
-  } else {
-    ASSERT(type() == Type::Pipe);
-    domain = AF_UNIX;
-  }
-
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1);
-
-#ifdef __APPLE__
-  // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-#endif
-
-  return fd;
-}
-
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
   char str[INET_ADDRSTRLEN];
@@ -180,7 +183,9 @@ int Ipv4Instance::connect(int fd) const {
                    sizeof(ip_.ipv4_.address_));
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+int Ipv4Instance::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v4);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -235,7 +240,7 @@ int Ipv6Instance::connect(int fd) const {
 }
 
 int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
+  const int fd = socketFromSocketType(type, Type::Ip, IpVersion::v6);
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
@@ -300,7 +305,26 @@ int PipeInstance::connect(int fd) const {
   return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+int PipeInstance::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Pipe, static_cast<IpVersion>(0));
+}
+
+int Ipv4InstanceRange::bind(int fd) const {
+  // Implementing via linear search from the bottom of the range.
+  // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
+  for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
+    sockaddr_in socket_address(ip_.ipv4_.address_);
+    socket_address.sin_port = static_cast<in_port_t>(port_to_try);
+    int ret = ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    if (ret != EADDRINUSE)
+      return ret;
+  }
+  return EADDRINUSE;
+}
+
+int Ipv4InstanceRange::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v4);
+}
 
 } // namespace Address
 } // namespace Network

@@ -56,7 +56,6 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  int socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -97,6 +96,8 @@ public:
   int socket(SocketType type) const override;
 
 private:
+  friend class Ipv4InstanceRange;       // For access to helper classes.
+
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -217,6 +218,46 @@ private:
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
 };
+
+// Implementations of InstanceRange
+
+class Ipv4InstanceRange : public InstanceRange {
+  /**
+   * Construct from a string IPv4 address such as "1.2.3.4" as well as a starting and ending port.
+   */
+  Ipv4InstanceRange(const std::string& address, uint32_t starting_port, uint32_t ending_port);
+
+  /**
+   * Construct from a starting and ending port.  The IPv4 address will be set to "any" and is 
+   * suitable for binding a port to any available address.
+   */
+  Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_port);
+
+  // Network::Address::InstanceRange
+  virtual bool operator==(const InstanceRange& rhs) const {
+    return asString() == rhs.asString();
+  }
+  virtual const std::string& asString() const { return friendly_name_; }
+  virtual const std::string& logicalName() const { return friendly_name_; }
+  virtual int bind(int fd) const;
+  virtual const Ip* ip() const { return &ip_; }
+  virtual int socket(SocketType type) const;
+  virtual Type type() const { return Type::Ip; }
+
+ private:
+  const std::string friendly_name_;
+  Ipv4Instance::IpHelper ip_;           // Valid except for port()
+  uint32_t starting_port_;
+  uint32_t ending_port_;
+};
+
+#if 0
+class Ipv6InstanceRange : public InstanceRange {
+};
+
+class PipeInstanceRange : public InstanceRange {
+};
+#endif
 
 } // namespace Address
 } // namespace Network

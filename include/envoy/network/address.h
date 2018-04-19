@@ -158,6 +158,80 @@ public:
 
 typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
+/**
+ * Interface for all network addresses that may include ranges of ports.  
+ */
+class InstanceRange {
+public:
+  virtual ~InstanceRange() {}
+
+  virtual bool operator==(const InstanceRange& rhs) const PURE;
+  bool operator!=(const InstanceRange& rhs) const { return !operator==(rhs); }
+
+  /**
+   * @return a human readable string for the address that represents the
+   * physical/resolved address.
+   *
+   * This string will be in the following format:
+   * For IPv4 addresses: "1.2.3.4:80"
+   * For IPv6 addresses: "[1234:5678::9]:443"
+   * For pipe addresses: "/foo"
+   */
+  virtual const std::string& asString() const PURE;
+
+  /**
+   * @return a human readable string for the address that represents the
+   * logical/unresolved name.
+   *
+   * This string has a source-dependent format and should be obviously 
+   * convertable to a set of names for Address::instances that can be resolved by 
+   * a Network::Address::Resolver.
+   */
+  virtual const std::string& logicalName() const PURE;
+
+  /**
+   * Bind a socket to this address. The socket should have been created with a call to socket() on
+   * an Instance of the same address family.
+   * @param fd supplies the platform socket handle.
+   * @return the platform error code.
+   */
+  virtual int bind(int fd) const PURE;
+
+  /**
+   * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
+   * ip()->port() will be invalid; use starting_port() and ending_port() instead.
+   */
+  virtual const Ip* ip() const PURE;
+
+  /**
+   * @return the starting port of the port range (inclusive).
+   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to 
+   * a single pipe) this value will be 0.
+   */
+  virtual uint32_t starting_port() const PURE;
+
+  /**
+   * @return the ending port of the port range (inclusive).
+   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to 
+   * a single pipe) this value will be 0.
+   */
+  virtual uint32_t ending_port() const PURE;
+
+  /**
+   * Create a socket for this address.
+   * @param type supplies the socket type to create.
+   * @return the platform error code.
+   */
+  virtual int socket(SocketType type) const PURE;
+
+  /**
+   * @return the type of address.
+   */
+  virtual Type type() const PURE;
+};
+
+typedef std::shared_ptr<const InstanceRange> InstanceRangeConstSharedPtr;
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy
