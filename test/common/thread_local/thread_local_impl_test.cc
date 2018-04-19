@@ -82,6 +82,42 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
+// Validate ThreadLocal::runOnAllThreads behavior with all_thread_complete call back.
+TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
+  SlotPtr tlsptr = tls_.allocateSlot();
+
+  EXPECT_CALL(thread_dispatcher_, post(_));
+  EXPECT_CALL(main_dispatcher_, post(_));
+
+  // Ensure that the thread local call back and all_thread_complete call back are called.
+  struct {
+    std::atomic<uint64_t> thread_local_calls_{0};
+    std::condition_variable condvar_;
+    std::mutex condvar_mutex_;
+    bool all_threads_complete_;
+  } thread_local_data;
+
+  tlsptr->runOnAllThreads(
+      [&thread_local_data]() -> void { ++thread_local_data.thread_local_calls_; },
+      [&thread_local_data]() -> void {
+        EXPECT_EQ(thread_local_data.thread_local_calls_, 1);
+        std::unique_lock<std::mutex> lock(thread_local_data.condvar_mutex_);
+        thread_local_data.all_threads_complete_ = true;
+        thread_local_data.condvar_.notify_one();
+      });
+
+  {
+    std::unique_lock<std::mutex> lock(thread_local_data.condvar_mutex_);
+    thread_local_data.condvar_.wait(
+        lock, [&thread_local_data] { return thread_local_data.all_threads_complete_; });
+  }
+
+  EXPECT_TRUE(thread_local_data.all_threads_complete_);
+
+  tls_.shutdownGlobalThreading();
+  tls_.shutdownThread();
+}
+
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
