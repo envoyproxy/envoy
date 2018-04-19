@@ -164,17 +164,35 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   initialize();
 
+  MockStreamCallbacks request_callbacks;
+  request_encoder_->getStream().addCallbacks(request_callbacks);
+
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   request_encoder_->encodeHeaders(request_headers, true);
 
+  // Buffer client data to avoid mock recursion causing lifetime issues.
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+
   TestHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  response_encoder_->encodeHeaders(continue_headers, true);
+
+  // Flush pending data.
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
+  setupDefaultConnectionMocks();
+  client_wrapper_.dispatch(Buffer::OwnedImpl(), client_);
+
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 };
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   initialize();
+
+  MockStreamCallbacks request_callbacks;
+  request_encoder_->getStream().addCallbacks(request_callbacks);
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -185,7 +203,19 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
   response_encoder_->encode100ContinueHeaders(continue_headers);
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), CodecProtocolException);
+  // Buffer client data to avoid mock recursion causing lifetime issues.
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+
+  response_encoder_->encodeHeaders(continue_headers, true);
+
+  // Flush pending data.
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
+  setupDefaultConnectionMocks();
+  client_wrapper_.dispatch(Buffer::OwnedImpl(), client_);
+
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
 };
 
 TEST_P(Http2CodecImplTest, Invalid103) {
@@ -209,6 +239,34 @@ TEST_P(Http2CodecImplTest, Invalid103) {
   EXPECT_EQ(1, stats_store_.counter("http2.too_many_header_frames").value());
 };
 
+TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
+  initialize();
+
+  MockStreamCallbacks request_callbacks;
+  request_encoder_->getStream().addCallbacks(request_callbacks);
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  // Buffer client data to avoid mock recursion causing lifetime issues.
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(
+          Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+
+  TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // Flush pending data.
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset));
+  setupDefaultConnectionMocks();
+  client_wrapper_.dispatch(Buffer::OwnedImpl(), client_);
+
+  EXPECT_EQ(1, stats_store_.counter("http2.rx_messaging_error").value());
+};
+
 TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   initialize();
 
@@ -227,11 +285,17 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 TEST_P(Http2CodecImplTest, InvalidFrame) {
   initialize();
 
+  MockStreamCallbacks request_callbacks;
+  request_encoder_->getStream().addCallbacks(request_callbacks);
+
   ON_CALL(client_connection_, write(_, _))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
+
   request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  EXPECT_THROW(server_wrapper_.dispatch(Buffer::OwnedImpl(), server_), CodecProtocolException);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset));
+  server_wrapper_.dispatch(Buffer::OwnedImpl(), server_);
 }
 
 TEST_P(Http2CodecImplTest, TrailingHeaders) {
