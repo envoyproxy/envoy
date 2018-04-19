@@ -277,16 +277,13 @@ class Ipv6InstanceRange : public InstanceRange {
   virtual Type type() const { return Type::Ip; }
 
  private:
-  const std::string friendly_name_;
+  std::string friendly_name_;
   Ipv6Instance::IpHelper ip_;           // Valid except for port()
   uint32_t starting_port_;
   uint32_t ending_port_;
 };
 
 #if 0
-class Ipv6InstanceRange : public InstanceRange {
-};
-
 class PipeInstanceRange : public InstanceRange {
 };
 #endif

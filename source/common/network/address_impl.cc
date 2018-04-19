@@ -326,6 +326,10 @@ Ipv4InstanceRange::Ipv4InstanceRange(
   if (static_cast<in_port_t>(ending_port) != ending_port) {
     throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
   }
+  if (ending_port < starting_port) {
+    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
+                                     ending_port, starting_port));
+  }
   starting_port_ = starting_port;
   ending_port_ = ending_port;
   friendly_name_ = fmt::format("{}:{}-{}", address, starting_port, ending_port);
@@ -343,6 +347,10 @@ Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_por
   }
   if (static_cast<in_port_t>(ending_port) != ending_port) {
     throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  if (ending_port < starting_port) {
+    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
+                                     ending_port, starting_port));
   }
   friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
 }
@@ -362,6 +370,57 @@ int Ipv4InstanceRange::bind(int fd) const {
 
 int Ipv4InstanceRange::socket(SocketType type) const {
   return socketFromSocketType(type, Type::Ip, IpVersion::v4);
+}
+
+Ipv6InstanceRange::Ipv6InstanceRange(
+    const std::string& address,
+    uint32_t starting_port,
+    uint32_t ending_port) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+  ip_.ipv6_.address_.sin6_family = AF_INET6;
+  if (!address.empty()) {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+      throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
+    }
+  } else {
+    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+  }
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  if (ending_port < starting_port) {
+    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
+                                     ending_port, starting_port));
+  }
+  starting_port_ = starting_port;
+  ending_port_ = ending_port;
+
+  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  friendly_name_ = fmt::format("[{}]:{}-{}", ip_.friendly_address_, starting_port, ending_port);
+}
+
+Ipv6InstanceRange::Ipv6InstanceRange(uint32_t starting_port, uint32_t ending_port)
+    : Ipv6InstanceRange("", starting_port, ending_port) {}
+
+int Ipv6InstanceRange::bind(int fd) const {
+  // Implementing via linear search from the bottom of the range.
+  // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
+  for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
+    sockaddr_in6 socket_address(ip_.ipv6_.address_);
+    socket_address.sin6_port = static_cast<in_port_t>(port_to_try);
+    int ret = ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    if (ret != EADDRINUSE)
+      return ret;
+  }
+  return EADDRINUSE;
+}
+
+int Ipv6InstanceRange::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v6);
 }
 
 } // namespace Address
