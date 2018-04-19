@@ -1,14 +1,13 @@
 #include "exe/terminate_handler.h"
 
 #include <cstdlib>
-#include <exception>
 
 #include "server/backtrace.h"
 
 namespace Envoy {
 
-void TerminateHandler::logOnTerminate() {
-  std::set_terminate([]() {
+std::terminate_handler TerminateHandler::logOnTerminate() const {
+  return std::set_terminate([]() {
     BACKTRACE_LOG();
     std::abort();
   });

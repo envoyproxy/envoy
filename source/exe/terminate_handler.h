@@ -1,18 +1,23 @@
 #pragma once
 
+#include <exception>
+
 #include "common/common/non_copyable.h"
 
 namespace Envoy {
 
 class TerminateHandler : NonCopyable {
 public:
-  TerminateHandler() { logOnTerminate(); }
+  TerminateHandler() : previous_terminate_(logOnTerminate()) {}
+  ~TerminateHandler() { std::set_terminate(previous_terminate_); }
 
 private:
   /**
-   * This function sets the std::terminate to a function which will log as much of a backtrace as
-   * possible, then call abort.
+   * Sets the std::terminate to a function which will log as much of a backtrace as
+   * possible, then call abort. Returns the previous handler.
    */
-  void logOnTerminate();
+  std::terminate_handler logOnTerminate() const;
+
+  const std::terminate_handler previous_terminate_;
 };
 } // namespace Envoy

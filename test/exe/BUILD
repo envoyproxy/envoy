@@ -39,3 +39,10 @@ envoy_cc_test(
     tags = ["backtrace"],
     deps = ["//source/exe:sigaction_lib"],
 )
+
+envoy_cc_test(
+    name = "terminate_handler_test",
+    srcs = ["terminate_handler_test.cc"],
+    tags = ["backtrace"],
+    deps = ["//source/exe:terminate_handler_lib"],
+)
