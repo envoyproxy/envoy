@@ -3,7 +3,7 @@
 set -e
 
 BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures"
-BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_output=all"
+BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_output=all --test_filter=-osx-skip"
 
 # Build envoy and run tests as separate steps so that failure output
 # is somewhat more deterministic (rather than interleaving the build

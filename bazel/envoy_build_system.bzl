@@ -219,6 +219,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
             ":" + test_lib_name,
             "//test/fuzz:main",
         ],
+        tags = ["osx-skip"],
     )
     native.cc_binary(
         name = name + "_driverless",
