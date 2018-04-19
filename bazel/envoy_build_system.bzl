@@ -217,7 +217,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
         args = [PACKAGE_NAME + "/" + corpus],
         # No fuzzing on OS X.
         deps = select({
-            "@bazel_tools//tools/osx:darwin": [],
+            "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 "//test/fuzz:main",
