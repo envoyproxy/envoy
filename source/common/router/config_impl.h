@@ -46,7 +46,7 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
+  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
