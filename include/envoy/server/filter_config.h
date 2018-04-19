@@ -296,24 +296,12 @@ public:
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
-   * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weight cluster-local
-   *         config proto message for v2. The filter config, which arrives in an opaque
-   *         google.protobuf.Struct message, will be converted to JSON and then parsed into this
-   *         empty proto. By default, this method returns the same value as createEmptyConfigProto,
-   *         and can be optionally overridden in implementations.
+   * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
+   * config. Returned object will be stored in the filter chain config.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
-    return createEmptyConfigProto();
-  }
-
-  /**
-   * @return PerRouteConfigObjectSharedPtr gives the filter a chance to pre-process per route config
-   *         at config time. Returned object will be owned by the filter chain config.
-   */
-  virtual Router::PerRouteConfigObjectConstSharedPtr
-  createPerRouteConfigObject(const Protobuf::Message& config) {
-    UNREFERENCED_PARAMETER(config);
-    return Router::PerRouteConfigObjectConstSharedPtr{};
+  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const ProtobufWkt::Struct&) {
+    return Router::RouteSpecificFilterConfigConstSharedPtr{};
   }
 
   /**

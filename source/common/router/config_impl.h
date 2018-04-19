@@ -48,12 +48,10 @@ class PerFilterConfigs {
 public:
   PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
 
-  const Protobuf::Message* get(const std::string& name) const;
-  const PerRouteConfigObject* get_object(const std::string& name) const;
+  const RouteSpecificFilterConfig* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, ProtobufTypes::MessagePtr> configs_;
-  std::unordered_map<std::string, PerRouteConfigObjectConstSharedPtr> objects_;
+  std::unordered_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
 class RouteEntryImplBase;
@@ -78,8 +76,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
-  const Protobuf::Message* perFilterConfig(const std::string&) const override { return nullptr; }
-  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override {
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
     return nullptr;
   }
 
@@ -135,8 +132,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
-  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -376,8 +372,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
-  const PerRouteConfigObject* perFilterConfigObject(const std::string&) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 protected:
   const bool case_sensitive_;
@@ -451,11 +446,8 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override {
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
-    };
-    const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const override {
-      return parent_->perFilterConfigObject(name);
     };
 
   private:
@@ -497,8 +489,7 @@ private:
       DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
     }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override;
-    const PerRouteConfigObject* perFilterConfigObject(const std::string& name) const override;
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
   private:
     const std::string runtime_key_;
