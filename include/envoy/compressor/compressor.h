@@ -19,7 +19,8 @@ public:
 
   /**
    * Compresses data buffer.
-   * @param buffer supplies the reference to data to be compressed.
+   * @param buffer supplies the reference to data to be compressed. The content of the buffer will
+   *        be replaced inline with the compressed data.
    * @param state supplies the compressor state.
    */
   virtual void compress(Buffer::Instance& buffer, State state) PURE;
