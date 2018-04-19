@@ -272,8 +272,8 @@ public:
 
   /**
    * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If not per-filter config for the filter, or the filter factory
-   *  doesn't create such object, nullptr is returned.
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
   virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 
@@ -282,12 +282,7 @@ public:
    * type.
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    const RouteSpecificFilterConfig* obj = perFilterConfig(name);
-    if (obj == nullptr) {
-      return nullptr;
-    }
-    ASSERT(dynamic_cast<const Derived*>(obj) != nullptr);
-    return static_cast<const Derived*>(obj);
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
 };
 
@@ -497,8 +492,8 @@ public:
 
   /**
    * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If not per-filter config for the filter, or the filter factory
-   *  doesn't create such object, nullptr is returned.
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
   virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 
@@ -507,12 +502,7 @@ public:
    * type.
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    const RouteSpecificFilterConfig* obj = perFilterConfig(name);
-    if (obj == nullptr) {
-      return nullptr;
-    }
-    ASSERT(dynamic_cast<const Derived*>(obj) != nullptr);
-    return static_cast<const Derived*>(obj);
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
 };
 
@@ -562,8 +552,8 @@ public:
 
   /**
    * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
-   *  the given filter name. If not per-filter config for the filter, or the filter factory
-   *  doesn't create such object, nullptr is returned.
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
   virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
 
@@ -572,12 +562,7 @@ public:
    * type.
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
-    const RouteSpecificFilterConfig* obj = perFilterConfig(name);
-    if (obj == nullptr) {
-      return nullptr;
-    }
-    ASSERT(dynamic_cast<const Derived*>(obj) != nullptr);
-    return static_cast<const Derived*>(obj);
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
 };
 
