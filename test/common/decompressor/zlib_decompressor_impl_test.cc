@@ -33,12 +33,9 @@ protected:
       accumulation_buffer.add(buffer);
       drainBuffer(buffer);
     }
-
     ASSERT_EQ(0, buffer.length());
 
     compressor.compress(buffer, Compressor::State::Finish);
-    ASSERT_GE(10, buffer.length());
-
     accumulation_buffer.add(buffer);
 
     drainBuffer(buffer);
