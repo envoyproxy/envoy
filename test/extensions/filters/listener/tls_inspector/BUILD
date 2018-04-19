@@ -18,6 +18,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:tls_utility_lib",
     ],
 )
 
@@ -34,5 +35,6 @@ envoy_cc_binary(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:tls_utility_lib",
     ],
 )

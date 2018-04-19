@@ -4,6 +4,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/tls_utility.h"
 
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
@@ -44,35 +45,6 @@ public:
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
-  }
-
-  std::vector<uint8_t> generateClientHello(const std::string& sni_name) {
-    const SSL_METHOD* method = SSLv23_method();
-    bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(method));
-
-    const long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
-    SSL_CTX_set_options(ctx.get(), flags);
-
-    bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
-
-    // Ownership of these is passed to *ssl
-    BIO* in = BIO_new(BIO_s_mem());
-    BIO* out = BIO_new(BIO_s_mem());
-    SSL_set_bio(ssl.get(), in, out);
-
-    SSL_set_connect_state(ssl.get());
-    const char* const PREFERRED_CIPHERS = "HIGH:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4";
-    SSL_set_cipher_list(ssl.get(), PREFERRED_CIPHERS);
-    if (!sni_name.empty()) {
-      SSL_set_tlsext_host_name(ssl.get(), sni_name.c_str());
-    }
-    SSL_do_handshake(ssl.get());
-    const uint8_t* data = NULL;
-    size_t data_len = 0;
-    BIO_mem_contents(out, &data, &data_len);
-    ASSERT(data_len > 0);
-    std::vector<uint8_t> buf(data, data + data_len);
-    return buf;
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
@@ -119,7 +91,7 @@ TEST_F(TlsInspectorTest, ReadError) {
 TEST_F(TlsInspectorTest, SniRegistered) {
   init();
   const std::string servername("example.com");
-  std::vector<uint8_t> client_hello = generateClientHello(servername);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername);
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
         ASSERT(length >= client_hello.size());
@@ -135,7 +107,7 @@ TEST_F(TlsInspectorTest, SniRegistered) {
 TEST_F(TlsInspectorTest, MultipleReads) {
   init();
   const std::string servername("example.com");
-  std::vector<uint8_t> client_hello = generateClientHello(servername);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername);
   {
     InSequence s;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() -> int {
@@ -165,7 +137,7 @@ TEST_F(TlsInspectorTest, MultipleReads) {
 // Test that the filter correctly handles a ClientHello with no SNI present
 TEST_F(TlsInspectorTest, NoSni) {
   init();
-  std::vector<uint8_t> client_hello = generateClientHello("");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
         ASSERT(length >= client_hello.size());
@@ -180,7 +152,7 @@ TEST_F(TlsInspectorTest, NoSni) {
 // Test that the filter fails if the ClientHello is larger than the
 // maximum allowed size.
 TEST_F(TlsInspectorTest, ClientHelloTooBig) {
-  std::vector<uint8_t> client_hello = generateClientHello("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("example.com");
   const size_t max_size = 50;
   ASSERT(client_hello.size() > max_size);
   init(std::make_unique<Filter>(cfg_, max_size));
