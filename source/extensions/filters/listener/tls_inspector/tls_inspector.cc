@@ -109,10 +109,20 @@ void Filter::onServername(absl::string_view name) {
 }
 
 void Filter::onRead() {
-  Network::ConnectionSocket& socket = cb_->socket();
-
+  // This receive code is somewhat complicated, because it must be done as a MSG_PEEK because
+  // there is no way for a listener-filter to pass payload data to the ConnectionImpl and filters
+  // that get created later.
+  //
+  // The file_event_ in this class gets events everytime new data is available on the socket,
+  // even if previous data has not been read, which is always the case due to MSG_PEEK. When
+  // the TlsInspector completes and passes the socket along, a new FileEvent is created for the
+  // socket, so that new event is immediately signalled as readable because it is new and the socket
+  // is readable, even though no new events have ocurred.
+  //
+  // TODO(ggreenway): write an integration test to ensure the events work as expected on all
+  // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  ssize_t n = os_syscalls.recv(socket.fd(), buf_.data(), buf_.capacity(), MSG_PEEK);
+  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_.data(), buf_.capacity(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
   if (n == -1 && errno == EAGAIN) {
