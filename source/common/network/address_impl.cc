@@ -309,6 +309,44 @@ int PipeInstance::socket(SocketType type) const {
   return socketFromSocketType(type, Type::Pipe, static_cast<IpVersion>(0));
 }
 
+Ipv4InstanceRange::Ipv4InstanceRange(
+    const std::string& address,
+    uint32_t starting_port,
+    uint32_t ending_port) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+  ip_.ipv4_.address_.sin_family = AF_INET;
+  int rc = inet_pton(AF_INET, address.c_str(), &ip_.ipv4_.address_.sin_addr);
+  if (1 != rc) {
+    throw EnvoyException(fmt::format("invalid ipv4 address '{}'", address));
+  }
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  starting_port_ = starting_port;
+  ending_port_ = ending_port;
+  friendly_name_ = fmt::format("{}:{}-{}", address, starting_port, ending_port);
+  ip_.friendly_address_ = address;
+}
+
+Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_port) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+  ip_.ipv4_.address_.sin_family = AF_INET;
+  ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
+  ip_.friendly_address_ = "0.0.0.0";
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
+}
+
 int Ipv4InstanceRange::bind(int fd) const {
   // Implementing via linear search from the bottom of the range.
   // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
