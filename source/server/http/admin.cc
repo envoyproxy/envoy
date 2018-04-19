@@ -515,7 +515,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
-  for (Stats::ParentHistogramSharedPtr histogram : all_histograms) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     Value histogram_obj;
     histogram_obj.SetObject();
     Value histogram_name;

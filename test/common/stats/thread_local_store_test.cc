@@ -93,8 +93,10 @@ public:
 
 class HistogramTest : public testing::Test, public RawStatDataAllocator {
 public:
+  typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
+  InSequence s;
+
   void SetUp() override {
-    InSequence s;
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
       return alloc_.alloc(name);
     }));
@@ -116,10 +118,8 @@ public:
     EXPECT_CALL(*this, free(_));
   }
 
-  std::vector<uint64_t> h1_cumulative_values, h2_cumulative_values, h1_interval_values,
-      h2_interval_values;
-
-  typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
+  std::vector<uint64_t> h1_cumulative_values_, h2_cumulative_values_, h1_interval_values_,
+      h2_interval_values_;
 
   NameHistogramMap makeHistogramMap(const std::list<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
@@ -136,32 +136,17 @@ public:
    * that can be asserted later.
    */
   uint64_t validateMerge() {
-    std::atomic<bool> merge_called{false};
+    bool merge_called = false;
     store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
 
     EXPECT_TRUE(merge_called);
 
     std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
-    histogram_t* hist1_cumulative = hist_alloc();
-    for (uint64_t value : h1_cumulative_values) {
-      hist_insert_intscale(hist1_cumulative, value, 0, 1);
-    }
-
-    histogram_t* hist2_cumulative = hist_alloc();
-    for (uint64_t value : h2_cumulative_values) {
-      hist_insert_intscale(hist2_cumulative, value, 0, 1);
-    }
-
-    histogram_t* hist1_interval = hist_alloc();
-    for (uint64_t value : h1_interval_values) {
-      hist_insert_intscale(hist1_interval, value, 0, 1);
-    }
-
-    histogram_t* hist2_interval = hist_alloc();
-    for (uint64_t value : h2_interval_values) {
-      hist_insert_intscale(hist2_interval, value, 0, 1);
-    }
+    histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
+    histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
+    histogram_t* hist1_interval = makeHistogram(h1_interval_values_);
+    histogram_t* hist2_interval = makeHistogram(h2_interval_values_);
 
     HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative);
     HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative);
@@ -184,8 +169,8 @@ public:
     hist_free(hist1_interval);
     hist_free(hist2_interval);
 
-    h1_interval_values.clear();
-    h2_interval_values.clear();
+    h1_interval_values_.clear();
+    h2_interval_values_.clear();
 
     return histogram_list.size();
   }
@@ -195,12 +180,20 @@ public:
     histogram.recordValue(record_value);
 
     if (histogram.name() == "h1") {
-      h1_cumulative_values.push_back(record_value);
-      h1_interval_values.push_back(record_value);
+      h1_cumulative_values_.push_back(record_value);
+      h1_interval_values_.push_back(record_value);
     } else {
-      h2_cumulative_values.push_back(record_value);
-      h2_interval_values.push_back(record_value);
+      h2_cumulative_values_.push_back(record_value);
+      h2_interval_values_.push_back(record_value);
     }
+  }
+
+  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
+    histogram_t* histogram = hist_alloc();
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram, value, 0, 1);
+    }
+    return histogram;
   }
 
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
