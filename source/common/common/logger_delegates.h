@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/filesystem/filesystem.h"
 
+#include "common/common/logger.h"
 #include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
