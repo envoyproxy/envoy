@@ -39,8 +39,8 @@ protected:
  * decompress before init.
  */
 TEST_F(ZlibDecompressorImplDeathTest, DecompressorTestDeath) {
-  EXPECT_DEATH(decompressorBadInitTestHelper(100), std::string{"assert failure: result >= 0"});
-  EXPECT_DEATH(unitializedDecompressorTestHelper(), std::string{"assert failure: result == Z_OK"});
+  EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
+  EXPECT_DEATH_LOG_TO_STDERR(unitializedDecompressorTestHelper(), "assert failure: result == Z_OK");
 }
 
 /**

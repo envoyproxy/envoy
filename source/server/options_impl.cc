@@ -38,7 +38,6 @@ OptionsImpl::OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_r
   }
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
-  log_levels_string += "\n[trace] and [debug] are only available on debug builds";
 
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
