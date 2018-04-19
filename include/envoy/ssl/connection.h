@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
@@ -54,6 +55,18 @@ public:
    *         "" if there is no peer certificate or encoding fails.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificate() const PURE;
+
+  /**
+   * @return std::vector<std::string> the DNS entries in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no DNS.
+   **/
+  virtual std::vector<std::string> dnsSansPeerCertificate() PURE;
+
+  /**
+   * @return std::vector<std::string> the DNS entries in the SAN field of the local certificate.
+   *         Returns {} if there is no local certificate, or no SAN field, or no DNS.
+   **/
+  virtual std::vector<std::string> dnsSansLocalCertificate() PURE;
 };
 
 } // namespace Ssl

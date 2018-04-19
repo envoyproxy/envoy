@@ -460,7 +460,7 @@ void ClusterImplBase::onPreInitComplete() {
     }
 
     // TODO(mattklein123): Remove this callback when done.
-    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool) -> void {
+    health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, HealthTransition) -> void {
       if (pending_initialize_health_checks_ > 0 && --pending_initialize_health_checks_ == 0) {
         finishInitialization();
       }
@@ -494,13 +494,14 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
   health_checker_->start();
-  health_checker_->addHostCheckCompleteCb([this](HostSharedPtr, bool changed_state) -> void {
-    // If we get a health check completion that resulted in a state change, signal to
-    // update the host sets on all threads.
-    if (changed_state) {
-      reloadHealthyHosts();
-    }
-  });
+  health_checker_->addHostCheckCompleteCb(
+      [this](HostSharedPtr, HealthTransition changed_state) -> void {
+        // If we get a health check completion that resulted in a state change, signal to
+        // update the host sets on all threads.
+        if (changed_state == HealthTransition::Changed) {
+          reloadHealthyHosts();
+        }
+      });
 }
 
 void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector) {

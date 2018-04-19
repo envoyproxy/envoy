@@ -350,6 +350,7 @@ public:
 TEST_F(TcpProxyNoConfigTest, Initialization) {
   filter_.reset(new TcpProxyFilter(nullptr, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
 }
 
 TEST_F(TcpProxyNoConfigTest, ReadDisableDownstream) {

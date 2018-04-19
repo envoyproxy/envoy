@@ -111,6 +111,21 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
 }
 
+inline envoy::api::v2::core::HealthCheck
+parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
+  envoy::api::v2::core::HealthCheck health_check;
+  MessageUtil::loadFromYaml(yaml_string, health_check);
+  return health_check;
+}
+
+inline envoy::api::v2::core::HealthCheck
+parseHealthCheckFromV1Json(const std::string& json_string) {
+  envoy::api::v2::core::HealthCheck health_check;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Config::CdsJson::translateHealthCheck(*json_object_ptr, health_check);
+  return health_check;
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

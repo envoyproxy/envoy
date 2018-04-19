@@ -10,14 +10,16 @@ namespace Envoy {
 namespace Network {
 
 bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
-  if (transparent_.has_value()) {
-    const int should_transparent = transparent_.value() ? 1 : 0;
-    const int error =
-        setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
-                          &should_transparent, sizeof(should_transparent));
-    if (error != 0) {
-      ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(errno));
-      return false;
+  if (state == Socket::SocketState::PreBind || state == Socket::SocketState::PostBind) {
+    if (transparent_.has_value()) {
+      const int should_transparent = transparent_.value() ? 1 : 0;
+      const int error =
+          setIpSocketOption(socket, ENVOY_SOCKET_IP_TRANSPARENT, ENVOY_SOCKET_IPV6_TRANSPARENT,
+                            &should_transparent, sizeof(should_transparent));
+      if (error != 0) {
+        ENVOY_LOG(warn, "Setting IP_TRANSPARENT on listener socket failed: {}", strerror(error));
+        return false;
+      }
     }
   }
 

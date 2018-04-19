@@ -29,6 +29,8 @@ public:
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
+  std::vector<std::string> dnsSansPeerCertificate() override;
+  std::vector<std::string> dnsSansLocalCertificate() override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -49,6 +51,7 @@ private:
   void shutdownSsl();
   std::string getUriSanFromCertificate(X509* cert);
   std::string getSubjectFromCertificate(X509* cert) const;
+  std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImpl& ctx_;

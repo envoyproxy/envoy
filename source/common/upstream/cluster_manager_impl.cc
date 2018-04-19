@@ -479,8 +479,9 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   Cluster& cluster_reference = *new_cluster;
   if (new_cluster->healthChecker() != nullptr) {
     new_cluster->healthChecker()->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, bool changed_state) {
-          if (changed_state && host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+        [this](HostSharedPtr host, HealthTransition changed_state) {
+          if (changed_state == HealthTransition::Changed &&
+              host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
             postThreadLocalHealthFailure(host);
           }
         });

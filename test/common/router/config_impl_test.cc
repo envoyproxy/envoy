@@ -4214,14 +4214,20 @@ class PerFilterConfigsTest : public testing::Test {
 public:
   PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
 
+  struct DerivedFilterConfig : public RouteSpecificFilterConfig {
+    ProtobufWkt::Timestamp config_;
+  };
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
     Server::Configuration::HttpFilterFactoryCb
     createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED;
     }
-    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    Router::RouteSpecificFilterConfigConstSharedPtr
+    createRouteSpecificFilterConfig(const ProtobufWkt::Struct& source) override {
+      auto obj = std::make_shared<DerivedFilterConfig>();
+      MessageUtil::jsonConvert(source, obj->config_);
+      return obj;
     }
     std::string name() override { return "test.filter"; }
   };
@@ -4234,19 +4240,18 @@ public:
     const auto* route_entry = route->routeEntry();
     const auto& vhost = route_entry->virtualHost();
 
-    check(route_entry->perFilterConfig(factory_.name()), expected_entry, "route entry");
-    check(route->perFilterConfig(factory_.name()), expected_route, "route");
-    check(vhost.perFilterConfig(factory_.name()), expected_vhost, "virtual host");
+    check(route_entry->perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_entry,
+          "route entry");
+    check(route->perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_route,
+          "route");
+    check(vhost.perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_vhost,
+          "virtual host");
   }
 
-  void check(const Protobuf::Message* cfg, uint32_t expected_seconds, std::string source) {
+  void check(const DerivedFilterConfig* cfg, uint32_t expected_seconds, std::string source) {
     EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
-    EXPECT_NO_THROW({
-      const auto ts = dynamic_cast<const ProtobufWkt::Timestamp*>(cfg);
-      EXPECT_EQ(expected_seconds, ts->seconds())
-          << "config value does not match expected for source: " << source;
-    }) << "config should properly dynamic_cast to the appropriate type for source: "
-       << source;
+    EXPECT_EQ(expected_seconds, cfg->config_.seconds())
+        << "config value does not match expected for source: " << source;
   }
 
   TestFilterConfig factory_;
