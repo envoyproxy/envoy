@@ -56,7 +56,7 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
-# fmt_lib is automatically a dependency of all enovy_cc_library definitions.
+# fmt_lib is automatically a dependency of all envoy_cc_library definitions.
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
