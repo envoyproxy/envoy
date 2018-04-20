@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -356,6 +357,15 @@ Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_por
 }
 
 int Ipv4InstanceRange::bind(int fd) const {
+  RandomGeneratorImpl generator;// TODO(XXX): Nope, doesn't allow for injection.
+  std::set<uint32_t> ports_tried;
+  while (ports_tried.size() < ending_port_ - starting_port_ + 1) {
+    // The offset of the next port to try, counting only the untried ports.
+    int port_index =
+        generator.random() % (ending_port_ - starting_port_ + 1 - ports_tried.size());
+    XXX;
+  }
+
   // Implementing via linear search from the bottom of the range.
   // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
   for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
