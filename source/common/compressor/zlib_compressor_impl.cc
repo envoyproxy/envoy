@@ -43,8 +43,8 @@ void ZlibCompressorImpl::compress(Buffer::Instance& buffer, State state) {
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     // Z_NO_FLUSH tells the compressor to take the data in and compresses it as much as possible
     // without flushing it out. However, if the data output is greater or equal to the allocated
-    // chunk size, process() outputs it to the front section of the buffer. This is fine, since at
-    // the next step, the buffer is drained by the size of input.
+    // chunk size, process() outputs it to the end of the buffer. This is fine, since at the next
+    // step, the buffer is drained from the beginning of the buffer by the size of input.
     process(buffer, Z_NO_FLUSH);
     buffer.drain(input_slice.len_);
   }
