@@ -75,16 +75,15 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   // NOTE: We should not use runtime when reading from route-level
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
+  fault_settings_ = config_->settings();
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
-    fault_settings_ = route_entry->perFilterConfigTyped<FaultSettings>(name)
-                          ?: route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
-    if (!fault_settings_) {
-      // If there is no route_specific_setting, use the filter-level setting.
-      fault_settings_ = config_->settings();
-    }
+    const FaultSettings* per_route_settings_ =
+        route_entry->perFilterConfigTyped<FaultSettings>(name)
+            ?: route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    fault_settings_ = per_route_settings_ ?: fault_settings_;
   }
 
   if (!matchesTargetUpstreamCluster()) {
