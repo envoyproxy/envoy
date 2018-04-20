@@ -1,34 +1,42 @@
 syntax = "proto3";
 
 import "validate/validate.proto";
+import "envoy/api/v2/core/address.proto";
 
 package envoy.config.rbac.v2alpha;
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a service.
-// Here is an example of RBAC configuration.
+// Here is an example of RBAC configuration. It has two policies:
+// * Service account "cluster.local/ns/default/sa/admin" has full access to the service.
+// * Any user can read ("GET") the service at paths with prefix "/products" or suffix "/reviews" when request header
+//   "version" set to either "v1" or "v2".
 //
 //   action_type: ALLOW
 //   policies:
 //     "service-admin":
 //       permissions:
-//       - methods: [simple:"*"]
-//       subjects:
+//       - methods: ["*"]
+//       principals:
 //       - name: "cluster.local/ns/default/sa/admin"
 //     "product-viewer":
 //       permissions:
 //       - paths: [prefix:"/products", suffix:"/reviews"]
 //         methods: ["GET"]
-//       subjects:
-//       - name: "cluster.local/ns/default/sa/product-client"
+//         conditions:
+//         - header:
+//             key: "version"
+//             values: ["v1", "v2"]
+//       principals:
+//       - name: "*"
 //
 message RBAC {
   // Should we do white-list or black-list style access control.
   enum ActionType {
-    // The policies grant access to subjects. The rest is denied. This is white-list style
+    // The policies grant access to principals. The rest is denied. This is white-list style
     // access control. This is the default type.
     ALLOW = 0;
 
-    // The policies deny access to subjects. The rest is allowed. This is black-list style
+    // The policies deny access to principals. The rest is allowed. This is black-list style
     // access control.
     DENY = 1;
   }
@@ -39,13 +47,13 @@ message RBAC {
   map<string, Policy> policies = 2;
 }
 
-// Policy specifies a role and the subjects that are assigned/denied the role.
+// Policy specifies a role and the principals that are assigned/denied the role.
 message Policy {
  // Required. The set of permissions that define a role.
  repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
 
- // Required. List of subjects that are assigned/denied the role based on “action_type”.
- repeated Subject subjects = 2 [(validate.rules).repeated .min_items = 1];
+ // Required. List of principals that are assigned/denied the role based on “action_type”.
+ repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
 message StringMatch {
@@ -61,8 +69,19 @@ message StringMatch {
     string suffix = 3;
 
     // The input string must match the regular expression specified here.
+    // The regex grammar is defined `here
+    // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     string regex = 4;
  }
+}
+
+// Specifies how to match an entry in a map.
+message MapEntryMatch {
+  // The key to select an entry from the map.
+  string key = 1;
+
+  // A list of matched values.
+  repeated StringMatch values = 2;
 }
 
 // Permission defines a permission to access the service.
@@ -73,15 +92,50 @@ message Permission {
   // If this field is unset, it applies to any path.
   repeated StringMatch paths = 1;
 
-  // Optional. A list of HTTP methods (e.g., "GET", "POST").
-  // It is ignored in gRPC case because the value is always "POST".
-  // If set to ["*"] or unset, it applies to any method.
+  // Required. A list of HTTP methods (e.g., "GET", "POST").
+  // If set to ["*"], it applies to any method.
   repeated string methods = 2;
+
+  // Definition of a custom condition.
+  message Condition {
+    oneof condition_spec {
+      // Header match. This refers to the "request.http.headers" field in
+      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      MapEntryMatch header = 1;
+
+      // Label match. This refers to the "destination.labels" field in
+      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      MapEntryMatch label = 2;
+    }
+  }
+
+  // Optional. Custom conditions.
+  repeated Condition conditions = 3;
 }
 
-// Subject defines an identity or a group of identities.
-message Subject {
- // Optional. The name of the subject. This refers to the "source.principal" field in
- // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
- string name = 1;
+// Principal defines an identity or a group of identities.
+message Principal {
+  // Optional. The name of the principal. This refers to the "source.principal" field in
+  // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+  // If set to "*", it applies to any user.
+  string name = 1;
+
+  // Definition of a custom attribute to identify the principal.
+  message Attribute {
+    oneof attribute_spec {
+      // Header match. This refers to the "request.http.headers" field in
+      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      MapEntryMatch header = 1;
+
+      // Label match. This refers to the "source.labels" field in
+      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      MapEntryMatch label = 2;
+
+      // Source IP address.
+      envoy.api.v2.core.CidrRange ip = 3;
+    }
+  }
+
+  // Optional. Custom attributes that identify the principal.
+  repeated Attribute attributes = 2;
 }
