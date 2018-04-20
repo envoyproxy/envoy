@@ -7,6 +7,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -54,10 +55,11 @@ static void errorCallbackTest(Address::IpVersion version) {
 
 class ListenerImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ListenerImplDeathTest, ErrorCallback) {
-  EXPECT_DEATH(errorCallbackTest(GetParam()), ".*listener accept failure.*");
+  EXPECT_DEATH_LOG_TO_STDERR(errorCallbackTest(GetParam()), ".*listener accept failure.*");
 }
 
 class TestListenerImpl : public ListenerImpl {
@@ -81,7 +83,37 @@ protected:
   const Address::InstanceConstSharedPtr alt_address_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Test that socket options are set after the listener is setup.
+TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
+  Event::DispatcherImpl dispatcher;
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
+  socket.addOption(option);
+  EXPECT_CALL(*option, setOption(_, Socket::SocketState::Listening)).WillOnce(Return(true));
+  TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, false);
+}
+
+// Test that an exception is thrown if there is an error setting socket options.
+TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
+  Event::DispatcherImpl dispatcher;
+  Network::MockListenerCallbacks listener_callbacks;
+  Network::MockConnectionHandler connection_handler;
+
+  Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+  std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
+  socket.addOption(option);
+  EXPECT_CALL(*option, setOption(_, Socket::SocketState::Listening)).WillOnce(Return(false));
+  EXPECT_THROW(TestListenerImpl(dispatcher, socket, listener_callbacks, true, false),
+               CreateListenerException);
+}
 
 TEST_P(ListenerImplTest, UseActualDst) {
   Stats::IsolatedStoreImpl stats_store;
@@ -164,7 +196,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   Stats::IsolatedStoreImpl stats_store;
   Event::DispatcherImpl dispatcher;
   auto option = std::make_unique<MockSocketOption>();
-  auto options = std::make_shared<std::vector<Network::Socket::OptionPtr>>();
+  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   options->emplace_back(std::move(option));
 

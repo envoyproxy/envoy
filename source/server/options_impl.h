@@ -34,11 +34,13 @@ public:
   uint64_t baseId() override { return base_id_; }
   uint32_t concurrency() override { return concurrency_; }
   const std::string& configPath() override { return config_path_; }
+  const std::string& configYaml() override { return config_yaml_; }
   bool v2ConfigOnly() override { return v2_config_only_; }
   const std::string& adminAddressPath() override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
   std::chrono::seconds drainTime() override { return drain_time_; }
   spdlog::level::level_enum logLevel() override { return log_level_; }
+  const std::string& logFormat() override { return log_format_; }
   const std::string& logPath() override { return log_path_; }
   std::chrono::seconds parentShutdownTime() override { return parent_shutdown_time_; }
   uint64_t restartEpoch() override { return restart_epoch_; }
@@ -55,10 +57,12 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
+  std::string config_yaml_;
   bool v2_config_only_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;

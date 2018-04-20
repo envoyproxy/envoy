@@ -11,7 +11,6 @@ namespace ProtobufPercentHelper {
 
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
   ASSERT(default_value <= max_value);
-  UNREFERENCED_PARAMETER(max_value);
   return default_value;
 }
 
@@ -112,6 +111,14 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok());
   MessageUtil::loadFromJson(json, dest);
+}
+
+ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
+  ProtobufWkt::Struct struct_obj;
+  ProtobufWkt::Value val;
+  val.set_string_value(value);
+  (*struct_obj.mutable_fields())[key] = val;
+  return struct_obj;
 }
 
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {

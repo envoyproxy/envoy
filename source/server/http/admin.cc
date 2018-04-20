@@ -38,6 +38,8 @@
 #include "common/router/config_impl.h"
 #include "common/upstream/host_utility.h"
 
+#include "extensions/access_loggers/file/file_access_log_impl.h"
+
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 
@@ -126,9 +128,8 @@ const char AdminHtmlEnd[] = R"(
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
 
-Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& response_headers,
-                                                     bool end_stream) {
-  request_headers_ = &response_headers;
+Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  request_headers_ = &headers;
   if (end_stream) {
     onComplete();
   }
@@ -173,13 +174,13 @@ bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   // Now either change all levels or a single level.
   if (name == "level") {
     ENVOY_LOG(debug, "change all log levels: level='{}'", level);
-    for (const Logger::Logger& logger : Logger::Registry::loggers()) {
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
       logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
     }
   } else {
     ENVOY_LOG(debug, "change log level: name='{}' level='{}'", name, level);
-    const Logger::Logger* logger_to_change = nullptr;
-    for (const Logger::Logger& logger : Logger::Registry::loggers()) {
+    Logger::Logger* logger_to_change = nullptr;
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
       if (logger.name() == name) {
         logger_to_change = &logger;
         break;
@@ -285,7 +286,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message);
-    Protobuf::Any any_message;
+    ProtobufWkt::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;
   }
@@ -440,7 +441,7 @@ std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeName(tag.value_)));
   }
   return StringUtil::join(buf, ",");
 }
@@ -542,45 +543,62 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response) {
-  Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  const auto& entries = server_.runtime().snapshot().getAll();
-  const auto pairs = sortedRuntime(entries);
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
 
-  if (params.size() == 0) {
-    for (const auto& entry : pairs) {
-      response.add(fmt::format("{}: {}\n", entry.first, entry.second.string_value_));
+  // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
+  rapidjson::Document document;
+  document.SetObject();
+  auto& allocator = document.GetAllocator();
+  std::map<std::string, rapidjson::Value> entry_objects;
+  rapidjson::Value layer_names{rapidjson::kArrayType};
+  const auto& layers = server_.runtime().snapshot().getLayers();
+
+  for (const auto& layer : layers) {
+    rapidjson::Value layer_name;
+    layer_name.SetString(layer->name().c_str(), allocator);
+    layer_names.PushBack(std::move(layer_name), allocator);
+    for (const auto& kv : layer->values()) {
+      rapidjson::Value entry_object{rapidjson::kObjectType};
+      const auto it = entry_objects.find(kv.first);
+      if (it == entry_objects.end()) {
+        rapidjson::Value entry_object{rapidjson::kObjectType};
+        entry_object.AddMember("layer_values", rapidjson::Value{kArrayType}, allocator);
+        entry_object.AddMember("final_value", "", allocator);
+        entry_objects.emplace(kv.first, std::move(entry_object));
+      }
     }
-  } else {
-    if (params.begin()->first == "format" && params.begin()->second == "json") {
-      response_headers.insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
-      response.add(runtimeAsJson(pairs));
-      response.add("\n");
-    } else {
-      response.add("usage: /runtime?format=json\n");
-      rc = Http::Code::BadRequest;
+  }
+  document.AddMember("layers", std::move(layer_names), allocator);
+
+  for (const auto& layer : layers) {
+    for (auto& kv : entry_objects) {
+      const auto it = layer->values().find(kv.first);
+      const auto& entry_value = it == layer->values().end() ? "" : it->second.string_value_;
+      rapidjson::Value entry_value_object;
+      entry_value_object.SetString(entry_value.c_str(), allocator);
+      if (!entry_value.empty()) {
+        kv.second["final_value"] = rapidjson::Value{entry_value_object, allocator};
+      }
+      kv.second["layer_values"].PushBack(entry_value_object, allocator);
     }
   }
 
-  return rc;
+  rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
+  for (auto& kv : entry_objects) {
+    value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
+                               allocator);
+  }
+
+  document.AddMember("entries", std::move(value_arrays_obj), allocator);
+
+  rapidjson::StringBuffer strbuf;
+  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+  document.Accept(writer);
+  response.add(strbuf.GetString());
+  return Http::Code::OK;
 }
-
-const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> AdminImpl::sortedRuntime(
-    const std::unordered_map<std::string, const Runtime::Snapshot::Entry>& entries) {
-  std::vector<std::pair<std::string, Runtime::Snapshot::Entry>> pairs(entries.begin(),
-                                                                      entries.end());
-
-  std::sort(pairs.begin(), pairs.end(),
-            [](const std::pair<std::string, const Runtime::Snapshot::Entry>& a,
-               const std::pair<std::string, const Runtime::Snapshot::Entry>& b) -> bool {
-              return a.first < b.first;
-            });
-
-  return pairs;
-}
-
-ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
 std::string AdminImpl::runtimeAsJson(
     const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries) {
@@ -611,13 +629,31 @@ std::string AdminImpl::runtimeAsJson(
   return strbuf.GetString();
 }
 
+Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
+                                           Buffer::Instance& response) {
+  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  if (params.empty()) {
+    response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
+    response.add("use an empty value to remove a previously added override");
+    return Http::Code::BadRequest;
+  }
+  std::unordered_map<std::string, std::string> overrides;
+  overrides.insert(params.begin(), params.end());
+  server_.runtime().mergeValues(overrides);
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
+ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
+
 void AdminFilter::onComplete() {
   absl::string_view path = request_headers_->Path()->value().getStringView();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *callbacks_, path);
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-  Http::Code code = parent_.runCallback(path, *header_map, response);
+  RELEASE_ASSERT(request_headers_);
+  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response);
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -681,7 +717,10 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
           {"/listeners", "print listener addresses", MAKE_ADMIN_HANDLER(handlerListenerInfo), false,
            false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false}},
+          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(handlerRuntime), false, false},
+          {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
+           false, true}},
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       listener_(*this, std::move(listener_scope)) {
 
   if (!address_out_path.empty()) {
@@ -694,7 +733,9 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     }
   }
 
-  access_logs_.emplace_back(new AccessLog::FileAccessLog(
+  // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
+  // hard dependency here.
+  access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server.accessLogManager()));
 }
@@ -718,6 +759,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
+                                  const Http::HeaderMap& request_headers,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
@@ -729,6 +771,13 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+      if (handler.mutates_server_state_) {
+        const absl::string_view method = request_headers.Method()->value().getStringView();
+        if (method != Http::Headers::get().MethodValues.Post) {
+          ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
+                    handler.prefix_, method);
+        }
+      }
       code = handler.handler_(path_and_query, response_headers, response);
       found_handler = true;
       break;
@@ -809,7 +858,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   // make no sense as part of a URL path: ? and :.
   const std::string::size_type pos = prefix.find_first_of("&\"'<>?:");
   if (pos != std::string::npos) {
-    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix[pos]);
+    ENVOY_LOG(error, "filter \"{}\" contains invalid character '{}'", prefix, prefix[pos]);
     return false;
   }
 

@@ -18,9 +18,9 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-MockOptions::MockOptions(const std::string& config_path)
-    : config_path_(config_path), admin_address_path_("") {
+MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
+  ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, v2ConfigOnly()).WillByDefault(Invoke([this] { return v2_config_only_; }));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
@@ -160,6 +160,15 @@ MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
 MockListenerFactoryContext::MockListenerFactoryContext() {}
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
+
+MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
+  ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
+}
+
+MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
 
 } // namespace Configuration
 } // namespace Server

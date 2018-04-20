@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/server/filter_config.h"
+
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/config/well_known_names.h"
@@ -13,10 +15,13 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1572,6 +1577,7 @@ TEST(RouteMatcherTest, ClusterHeader) {
     route->routeEntry()->virtualCluster(headers);
     route->routeEntry()->virtualHost();
     route->routeEntry()->virtualHost().rateLimitPolicy();
+    route->routeEntry()->pathMatchCriterion();
   }
 }
 
@@ -2300,6 +2306,7 @@ virtual_hosts:
       Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
       EXPECT_EQ("https://www.lyft.com/foo",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
+      EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
     }
     {
       Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
@@ -2938,6 +2945,7 @@ TEST(NullConfigImplTest, All) {
   Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/baz", true, false);
   EXPECT_EQ(nullptr, config.route(headers, 0));
   EXPECT_EQ(0UL, config.internalOnlyHeaders().size());
+  EXPECT_EQ("", config.name());
 }
 
 TEST(BadHttpRouteConfigurationsTest, BadRouteConfig) {
@@ -4200,6 +4208,129 @@ virtual_hosts:
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
+}
+
+class PerFilterConfigsTest : public testing::Test {
+public:
+  PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
+
+  struct DerivedFilterConfig : public RouteSpecificFilterConfig {
+    ProtobufWkt::Timestamp config_;
+  };
+  class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    Server::Configuration::HttpFilterFactoryCb
+    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+      NOT_IMPLEMENTED;
+    }
+    Router::RouteSpecificFilterConfigConstSharedPtr
+    createRouteSpecificFilterConfig(const ProtobufWkt::Struct& source) override {
+      auto obj = std::make_shared<DerivedFilterConfig>();
+      MessageUtil::jsonConvert(source, obj->config_);
+      return obj;
+    }
+    std::string name() override { return "test.filter"; }
+  };
+
+  void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
+                 uint32_t expected_vhost) {
+    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), runtime_, cm_, true);
+
+    const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+    const auto* route_entry = route->routeEntry();
+    const auto& vhost = route_entry->virtualHost();
+
+    check(route_entry->perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_entry,
+          "route entry");
+    check(route->perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_route,
+          "route");
+    check(vhost.perFilterConfigTyped<DerivedFilterConfig>(factory_.name()), expected_vhost,
+          "virtual host");
+  }
+
+  void check(const DerivedFilterConfig* cfg, uint32_t expected_seconds, std::string source) {
+    EXPECT_NE(nullptr, cfg) << "config should not be null for source: " << source;
+    EXPECT_EQ(expected_seconds, cfg->config_.seconds())
+        << "config value does not match expected for source: " << source;
+  }
+
+  TestFilterConfig factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+};
+
+TEST_F(PerFilterConfigsTest, UnknownFilter) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { unknown.filter: {} }
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), runtime_, cm_, true), EnvoyException,
+      "Didn't find a registered implementation for name: 'unknown.filter'");
+}
+
+TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        per_filter_config: { test.filter: { seconds: 123 } }
+    per_filter_config: { test.filter: { seconds: 456 } }
+)EOF";
+
+  checkEach(yaml, 123, 123, 456);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+                per_filter_config: { test.filter: { seconds: 789 } }
+    per_filter_config: { test.filter: { seconds: 1011 } }
+)EOF";
+
+  checkEach(yaml, 789, 789, 1011);
+}
+
+TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughConfig) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+        per_filter_config: { test.filter: { seconds: 1213 } }
+    per_filter_config: { test.filter: { seconds: 1415 } }
+)EOF";
+
+  checkEach(yaml, 1213, 1213, 1415);
 }
 } // namespace
 } // namespace Router

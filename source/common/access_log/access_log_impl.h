@@ -162,23 +162,5 @@ public:
                                      Server::Configuration::FactoryContext& context);
 };
 
-/**
- * Access log Instance that writes logs to a file.
- */
-class FileAccessLog : public Instance {
-public:
-  FileAccessLog(const std::string& access_log_path, FilterPtr&& filter, FormatterPtr&& formatter,
-                Envoy::AccessLog::AccessLogManager& log_manager);
-
-  // AccessLog::Instance
-  void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-           const RequestInfo::RequestInfo& request_info) override;
-
-private:
-  Filesystem::FileSharedPtr log_file_;
-  FilterPtr filter_;
-  FormatterPtr formatter_;
-};
-
 } // namespace AccessLog
 } // namespace Envoy

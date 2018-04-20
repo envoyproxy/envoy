@@ -135,7 +135,7 @@ public:
   /**
    * Store socket options to be set on the listen socket before listening.
    */
-  virtual void addListenSocketOption(Network::Socket::OptionPtr&& option) PURE;
+  virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
 };
 
 /**
@@ -294,6 +294,15 @@ public:
    *         is deprecated.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+
+  /**
+   * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
+   * config. Returned object will be stored in the loaded route configuration.
+   */
+  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const ProtobufWkt::Struct&) {
+    return nullptr;
+  }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter

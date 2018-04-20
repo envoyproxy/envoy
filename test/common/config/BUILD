@@ -14,6 +14,9 @@ envoy_cc_test(
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [
         ":filesystem_subscription_test_harness",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -40,9 +43,11 @@ envoy_cc_test(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf",
+        "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:discovery_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
@@ -146,6 +151,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

@@ -60,9 +60,11 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         Network::Address::InstanceConstSharedPtr host_ip_port(
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
-        host.reset(new HostImpl(info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
-                                envoy::api::v2::core::Metadata::default_instance(), 1,
-                                envoy::api::v2::core::Locality().default_instance()));
+        host.reset(new HostImpl(
+            info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
+            envoy::api::v2::core::Metadata::default_instance(), 1,
+            envoy::api::v2::core::Locality().default_instance(),
+            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map. We just failed to find it in
@@ -95,8 +97,7 @@ OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                        Event::Dispatcher& dispatcher, bool added_via_api)
-    : ClusterImplBase(config, cm.sourceAddress(), runtime, stats, ssl_context_manager,
-                      added_via_api),
+    : ClusterImplBase(config, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
                                    PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {
@@ -111,7 +112,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   HostVectorSharedPtr new_hosts(new HostVector(first_host_set.hosts()));
   new_hosts->emplace_back(host);
   first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
+                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
                              {std::move(host)}, {});
 }
 
@@ -136,7 +137,7 @@ void OriginalDstCluster::cleanup() {
 
   if (to_be_removed.size() > 0) {
     host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
+                         HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {}, {},
                          to_be_removed);
   }
 

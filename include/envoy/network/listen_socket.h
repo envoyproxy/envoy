@@ -31,7 +31,14 @@ public:
    */
   virtual void close() PURE;
 
-  enum class SocketState { PreBind, PostBind };
+  enum class SocketState {
+    // Socket options are applied after socket creation but before binding the socket to a port
+    PreBind,
+    // Socket options are applied after binding the socket to a port but before calling listen()
+    PostBind,
+    // Socket options are applied after calling listen()
+    Listening,
+  };
 
   /**
    * Visitor class for setting socket options.
@@ -55,13 +62,14 @@ public:
      */
     virtual void hashKey(std::vector<uint8_t>& key) const PURE;
   };
-  typedef std::unique_ptr<Option> OptionPtr;
-  typedef std::shared_ptr<std::vector<OptionPtr>> OptionsSharedPtr;
+  typedef std::shared_ptr<const Option> OptionConstSharedPtr;
+  typedef std::vector<OptionConstSharedPtr> Options;
+  typedef std::shared_ptr<Options> OptionsSharedPtr;
 
   /**
    * Add a socket option visitor for later retrieval with options().
    */
-  virtual void addOption(OptionPtr&&) PURE;
+  virtual void addOption(const OptionConstSharedPtr&) PURE;
 
   /**
    * @return the socket options stored earlier with addOption() calls, if any.

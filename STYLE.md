@@ -9,6 +9,10 @@
   The following section covers the major areas where we deviate from the Google
   guidelines.
 
+# Repository file layout
+
+* Please see [REPO_LAYOUT.md](REPO_LAYOUT.md).
+
 # Deviations from Google C++ style guidelines
 
 * Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
@@ -100,11 +104,17 @@ A few general notes on our error handling philosophy:
   is almost always a result of faulty configuration which should be caught during a canary process,
   there may be cases in which we want some classes of startup errors to be non-fatal. For example,
   if a misconfigured option is not necessary for server operation. Although this is discouraged, we
-  will discuss these on a case by case basis case basis during code review (an example of this
+  will discuss these on a case by case basis during code review (an example of this
   is the `--admin-address-path` option). **If degraded mode error handling is implemented, we require
   that there is complete test coverage for the degraded case.** Additionally, the user should be
   aware of the degraded state minimally via an error log of level warn or greater and via the
   increment of a stat.
+* If you do need to log a non-fatal warning or error, you can unit-test it with EXPECT_LOG_CONTAINS
+  or EXPECT_NO_LOGS from [logging.h](test/test_common/logging.h). It's generally bad practice to
+  test by depending on log messages unless the actual behavior being validated is logging.
+  It's preferable to export statistics to enable consumption by external monitoring for any
+  behavior that should be externally consumed or to introduce appropriate internal interfaces
+  such as mocks for internal behavior.
 * The error handling philosophy described herein is based on the assumption that Envoy is deployed
   using industry best practices (primarily canary). Major and obvious errors should always be
   caught in canary. If a low rate error leads to periodic crash cycling when deployed to

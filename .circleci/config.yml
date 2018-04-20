@@ -10,6 +10,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.release
        - setup_remote_docker
@@ -21,6 +22,10 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - run: echo $CIRCLE_SHA1
+       - run: echo $CIRCLE_PR_NUMBER
+       - run: curl https://api.github.com/repos/envoyproxy/envoy/pulls/$CIRCLE_PR_NUMBER/commits
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
    tsan:
@@ -29,11 +34,38 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
+   api:
+     docker:
+       - image: *envoy-build-image
+     resource_class: xlarge
+     working_directory: /source
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - run: ci/do_circle_ci.sh bazel.api
+       - add_ssh_keys:
+           fingerprints:
+             - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
+       - run: ci/api_mirror.sh
+   filter_example_mirror:
+     docker:
+       - image: *envoy-build-image
+     resource_class: xlarge
+     working_directory: /source
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - add_ssh_keys:
+           fingerprints:
+             - "f6:f9:df:90:9c:4b:5f:9c:f4:69:fd:42:94:ff:88:24"
+       - run: ci/filter_example_mirror.sh
    ipv6_tests:
      machine: true
      steps:
+     - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
      - checkout
      - run:
          name: enable ipv6
@@ -54,6 +86,7 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh bazel.coverage
        - run: ci/coverage_publish.sh
@@ -65,6 +98,7 @@ jobs:
      resource_class: small
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh check_format
    build_image:
@@ -75,6 +109,7 @@ jobs:
            NUM_CPUS: 8
      resource_class: xlarge
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - setup_remote_docker
        - run: ci/build_container/docker_push.sh
@@ -84,14 +119,21 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - add_ssh_keys
        - run: ci/do_circle_ci.sh docs
+       - add_ssh_keys:
+           fingerprints:
+             - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
+       - run: docs/publish.sh
+       - store_artifacts:
+           path: generated/docs
    mac:
      macos:
        xcode: "9.3.0"
      steps:
        - run: sudo ntpdate -vu time.apple.com
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/mac_ci_setup.sh
        - run: ci/mac_ci_steps.sh
@@ -106,6 +148,8 @@ workflows:
               only: /^v.*/
       - asan
       - tsan
+      - api
+      - filter_example_mirror
       - ipv6_tests
       - coverage
       - format

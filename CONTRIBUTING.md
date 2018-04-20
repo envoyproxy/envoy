@@ -31,8 +31,9 @@ maximize the chances of your PR being merged.
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
   conforms to the public interface documentation should continue to compile and work within the
-  deprecation window. We make no guarantees about code or deployments that rely on undocumented
-  behavior.
+  deprecation window. Within this window, a warning of deprecation should be carefully logged (some
+  features might need rate limiting for logging this). We make no guarantees about code or deployments
+  that rely on undocumented behavior.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
 * All deprecations/breaking changes will be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
@@ -60,15 +61,16 @@ maximize the chances of your PR being merged.
   ```
 
   Please see [support/README.md](support/README.md) for more information on these hooks.
+
 * Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
-* Any PR that changes user-facing behavior **must** have associated documentation in
-  [data-plane-api](https://github.com/envoyproxy/data-plane-api/tree/master/docs) as well as
-  [release notes](https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/intro/version_history.rst).
+* Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
+  well as [release notes](docs/root/intro/version_history.rst). API changes should be documented
+  inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md).
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.

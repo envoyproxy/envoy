@@ -46,14 +46,6 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
   {
-    RequestInfoFormatter start_time_format("START_TIME");
-    SystemTime time;
-    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
-    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
-              start_time_format.format(header, header, request_info));
-  }
-
-  {
     RequestInfoFormatter request_duration_format("REQUEST_DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
     EXPECT_CALL(request_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
@@ -230,6 +222,92 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
   }
 }
 
+/**
+ * Populate a metadata object with the following test data:
+ * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
+ */
+void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
+  ProtobufWkt::Struct struct_obj;
+  ProtobufWkt::Value val;
+  auto& fields_map = *struct_obj.mutable_fields();
+  val.set_string_value("test_value");
+  fields_map["test_key"] = val;
+  val.set_string_value("inner_value");
+  ProtobufWkt::Struct struct_inner;
+  (*struct_inner.mutable_fields())["inner_key"] = val;
+  val.clear_string_value();
+  *val.mutable_struct_value() = struct_inner;
+  fields_map["test_obj"] = val;
+  (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
+}
+
+TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+
+  {
+    MetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
+    EXPECT_TRUE(json.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test_value\"", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", json);
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "inner_key"}, absl::optional<size_t>());
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"inner_value\"", json);
+  }
+  // not found cases
+  {
+    MetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  {
+    MetadataFormatter formatter("com.test", {"test_obj", "notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(metadata));
+  }
+  // size limit
+  {
+    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
+    std::string json = formatter.format(metadata);
+    EXPECT_EQ("\"test", json);
+  }
+}
+
+TEST(AccessLogFormatterTest, startTimeFormatter) {
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
+  Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
+
+  {
+    StartTimeFormatter start_time_format("%Y/%m/%d");
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ("2018/03/28", start_time_format.format(header, header, request_info));
+  }
+
+  {
+    StartTimeFormatter start_time_format("");
+    SystemTime time;
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
+              start_time_format.format(header, header, request_info));
+  }
+}
+
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
@@ -257,9 +335,40 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   {
     const std::string format =
         "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%";
+
     FormatterImpl formatter(format);
 
     EXPECT_EQ("GET|G|PU|GET", formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    envoy::api::v2::core::Metadata metadata;
+    populateMetadataTestData(metadata);
+    EXPECT_CALL(request_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+    const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
+                               "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+              formatter.format(request_header, response_header, request_info));
+  }
+
+  {
+    const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
+                               "%START_TIME%";
+
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format);
+
+    // Needed to take into account the behavior in non-GMT timezones.
+    struct tm time_val;
+    gmtime_r(&test_epoch, &time_val);
+    time_t expected_time_t = mktime(&time_val);
+
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z", expected_time_t),
+              formatter.format(request_header, response_header, request_info));
   }
 }
 
@@ -282,7 +391,9 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(TEST):10",
       "REQ(:TEST):10%",
       "%REQ(TEST:10%",
-      "%REQ("};
+      "%REQ(",
+      "%REQ(X?Y?Z)%",
+      "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {
     EXPECT_THROW(parser.parse(test_case), EnvoyException);

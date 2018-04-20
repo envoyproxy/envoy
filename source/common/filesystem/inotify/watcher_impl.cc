@@ -20,11 +20,12 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
       inotify_event_(dispatcher.createFileEvent(inotify_fd_,
                                                 [this](uint32_t events) -> void {
                                                   ASSERT(events == Event::FileReadyType::Read);
-                                                  UNREFERENCED_PARAMETER(events);
                                                   onInotifyEvent();
                                                 },
                                                 Event::FileTriggerType::Edge,
-                                                Event::FileReadyType::Read)) {}
+                                                Event::FileReadyType::Read)) {
+  RELEASE_ASSERT(inotify_fd_ >= 0);
+}
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 

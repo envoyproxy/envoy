@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -178,7 +179,6 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                                client_session.size(), client_ssl_context);
     int rc = SSL_set_session(client_ssl_socket, client_ssl_session);
     ASSERT(rc == 1);
-    UNREFERENCED_PARAMETER(rc);
     SSL_SESSION_free(client_ssl_session);
   }
 
@@ -217,12 +217,11 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
         EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
       }
       SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
-      EXPECT_FALSE(client_ssl_session->not_resumable);
+      EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
       uint8_t* session_data;
       size_t session_len;
       int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
       ASSERT(rc == 1);
-      UNREFERENCED_PARAMETER(rc);
       new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
       OPENSSL_free(session_data);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -262,7 +261,8 @@ class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslSocketTest, GetCertDigest) {
   std::string client_ctx_json = R"EOF(
@@ -998,7 +998,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
-        EXPECT_FALSE(ssl_session->not_resumable);
+        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -1335,7 +1335,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
         Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
-        EXPECT_FALSE(ssl_session->not_resumable);
+        EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher.exit();
@@ -2218,7 +2218,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(SslReadBufferLimitTest, NoLimit) {
   readBufferLimitTest(0, 256 * 1024, 256 * 1024, 1, false);

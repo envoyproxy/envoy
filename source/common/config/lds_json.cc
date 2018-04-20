@@ -5,9 +5,10 @@
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,8 +34,8 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     auto* filter = filter_chain->mutable_filters()->Add();
 
     // Translate v1 name to v2 name.
-    filter->set_name(
-        Config::NetworkFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
+    filter->set_name(Extensions::NetworkFilters::NetworkFilterNames::get().v1_converter_.getV2Name(
+        json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
@@ -43,7 +44,6 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
-    UNREFERENCED_PARAMETER(status);
   }
 
   const std::string drain_type = json_listener.getString("drain_type", "default");
@@ -57,6 +57,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
   JSON_UTIL_SET_BOOL(json_listener, listener, use_original_dst);
   JSON_UTIL_SET_BOOL(json_listener, *listener.mutable_deprecated_v1(), bind_to_port);
   JSON_UTIL_SET_INTEGER(json_listener, listener, per_connection_buffer_limit_bytes);
+  JSON_UTIL_SET_BOOL(json_listener, listener, transparent);
 }
 
 } // namespace Config

@@ -12,5 +12,9 @@ envoy_cc_test_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    deps = ["//include/envoy/common:time_interface"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/common:token_bucket_interface",
+        "//source/common/common:logger_lib",
+    ],
 )

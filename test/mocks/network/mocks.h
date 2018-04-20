@@ -4,9 +4,11 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/stats/stats_impl.h"
@@ -147,6 +149,16 @@ public:
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };
 
+class MockAddressResolver : public Address::Resolver {
+public:
+  MockAddressResolver();
+  ~MockAddressResolver();
+
+  MOCK_METHOD1(resolve,
+               Address::InstanceConstSharedPtr(const envoy::api::v2::core::SocketAddress&));
+  MOCK_CONST_METHOD0(name, std::string());
+};
+
 class MockReadFilterCallbacks : public ReadFilterCallbacks {
 public:
   MockReadFilterCallbacks();
@@ -258,12 +270,12 @@ public:
   MockListenSocket();
   ~MockListenSocket();
 
-  void addOption(Socket::OptionPtr&& option) override { addOption_(option); }
+  void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
-  MOCK_METHOD1(addOption_, void(Socket::OptionPtr& option));
+  MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
   Address::InstanceConstSharedPtr local_address_;
@@ -284,14 +296,14 @@ public:
   MockConnectionSocket();
   ~MockConnectionSocket();
 
-  void addOption(Socket::OptionPtr&& option) override { addOption_(option); }
+  void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
-  MOCK_METHOD1(addOption_, void(Socket::OptionPtr&));
+  MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());

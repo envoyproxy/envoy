@@ -20,10 +20,10 @@
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
+#include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 
-#include "server/config/network/http_connection_manager.h"
 #include "server/http/config_tracker_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -32,7 +32,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Implementation of Server::admin.
+ * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
                   public Network::FilterChainFactory,
@@ -44,8 +44,8 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response);
+  Http::Code runCallback(absl::string_view path_and_query, const Http::HeaderMap& request_headers,
+                         Http::HeaderMap& response_headers, Buffer::Instance& response);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -76,9 +76,7 @@ public:
   bool generateRequestId() override { return false; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
-  const std::string& serverName() override {
-    return Server::Configuration::HttpConnectionManagerConfig::DEFAULT_SERVER_STRING;
-  }
+  const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
@@ -181,6 +179,8 @@ private:
                                     Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerRuntime(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response);
+  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
+                                  Http::HeaderMap& response_headers, Buffer::Instance& response);
 
   class AdminListener : public Network::ListenerConfig {
   public:
@@ -236,8 +236,7 @@ public:
   void onDestroy() override {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& response_headers,
-                                          bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {

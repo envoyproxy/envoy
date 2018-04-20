@@ -17,6 +17,7 @@ envoy_cc_library(
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/http:utility_lib",
         "//source/common/request_info:utility_lib",
     ],
@@ -51,24 +52,5 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "grpc_access_log_lib",
-    srcs = ["grpc_access_log_impl.cc"],
-    hdrs = ["grpc_access_log_impl.h"],
-    deps = [
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/grpc:async_client_lib",
-        "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/accesslog/v2:als_cc",
-        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],
 )

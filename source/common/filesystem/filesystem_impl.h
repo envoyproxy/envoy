@@ -70,7 +70,7 @@ public:
   ~FileImpl();
 
   // Filesystem::File
-  void write(const std::string& data) override;
+  void write(absl::string_view data) override;
 
   /**
    * Filesystem::File

@@ -4,22 +4,33 @@ As of release 1.3.0, Envoy will follow a
 [Breaking Change Policy](https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy).
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
+A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.6.0
+## Version 1.7.0 (pending)
+
+* Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
+  status code and will not have their intended effect. Prior to 1.7, GETs can be used for
+  admin mutations, but a warning is logged.
+* Rate limit service configuration via the `cluster_name` field is deprecated. Use `grpc_service`
+  instead.
+* gRPC service configuration via the `cluster_names` field in `ApiConfigSource` is deprecated. Use
+  `grpc_services` instead. Prior to 1.7, a warning is logged.
+* Redis health checker configuration via the `redis_health_check` field in `HealthCheck` is
+  deprecated. Use `custom_health_check` with name `envoy.health_checkers.redis` instead. Prior
+  to 1.7, `redis_health_check` can be used, but warning is logged.
+* `SAN` is replaced by `URI` in the `x-forwarded-client-cert` header.
+
+## Version 1.6.0 (March 20, 2018)
 
 * DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   instead.
 * CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
-* Rate limit service configuration via the `cluster_name` field is deprecated. Use `grpc_service`
-  instead.
-* gRPC service configuration via the `cluster_names` field in `ApiConfigSource` is deprecated. Use
-  `grpc_services` instead.
 * 'use_original_dst' field in the v2 LDS API is deprecated. Use listener filters and filter chain
   matching instead.
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
 
-## Version 1.5.0
+## Version 1.5.0.0 (Dec 4, 2017)
 
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
   the individual `ejections_detected_*` counters for the detectors of interest, or
@@ -29,7 +40,7 @@ The following features have been DEPRECATED and will be removed in the specified
 * The outlier detection `ejections_success_rate` stats counter has been deprecated in favour of
   `ejections_detected_success_rate` and `ejections_enforced_success_rate`.
 
-## Version 1.4.0
+## Version 1.4.0 (Aug 24, 2017)
 
 * Config option `statsd_local_udp_port` has been deprecated and has been replaced with
   `statsd_udp_ip_address`.

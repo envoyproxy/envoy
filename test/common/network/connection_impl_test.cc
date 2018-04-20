@@ -41,6 +41,13 @@ using testing::_;
 namespace Envoy {
 namespace Network {
 
+TEST(RawBufferSocket, TestBasics) {
+  TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
+  EXPECT_FALSE(raw_buffer_socket->ssl());
+  EXPECT_TRUE(raw_buffer_socket->canFlushClose());
+  EXPECT_EQ("", raw_buffer_socket->protocol());
+}
+
 TEST(ConnectionImplUtility, updateBufferStats) {
   StrictMock<Stats::MockCounter> counter;
   StrictMock<Stats::MockGauge> gauge;
@@ -66,14 +73,15 @@ TEST(ConnectionImplUtility, updateBufferStats) {
 
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Event::DispatcherImpl dispatcher;
-  EXPECT_DEATH(ConnectionImpl(dispatcher,
-                              std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
-                              Network::Test::createRawBufferSocket(), false),
-               ".*assert failure: fd\\(\\) != -1.*");
+  EXPECT_DEATH_LOG_TO_STDERR(
+      ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
+                     Network::Test::createRawBufferSocket(), false),
+      ".*assert failure: fd\\(\\) != -1.*");
 }
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -175,7 +183,17 @@ protected:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(ConnectionImplTest, UniqueId) {
+  setUpBasicConnection();
+  disconnect(false);
+  uint64_t first_id = client_connection_->id();
+  setUpBasicConnection();
+  EXPECT_NE(first_id, client_connection_->id());
+  disconnect(false);
+}
 
 TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
   setUpBasicConnection();
@@ -252,12 +270,12 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto option = std::make_unique<MockSocketOption>();
+  auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->addOption(std::move(option));
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -300,12 +318,12 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
 
-  auto option = std::make_unique<MockSocketOption>();
+  auto option = std::make_shared<MockSocketOption>();
 
   EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind)).WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
-        socket->addOption(std::move(option));
+        socket->addOption(option);
         Network::ConnectionPtr new_connection = dispatcher_->createServerConnection(
             std::move(socket), Network::Test::createRawBufferSocket());
         listener_callbacks_.onNewConnection(std::move(new_connection));
@@ -1214,7 +1232,8 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
@@ -1228,7 +1247,8 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   Event::DispatcherImpl dispatcher;

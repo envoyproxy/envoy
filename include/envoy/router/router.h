@@ -233,6 +233,17 @@ class RateLimitPolicy;
 class Config;
 
 /**
+ * All route specific config returned by the method at
+ *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
+ * should be derived from this class.
+ */
+class RouteSpecificFilterConfig {
+public:
+  virtual ~RouteSpecificFilterConfig() {}
+};
+typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
+
+/**
  * Virtual host defintion.
  */
 class VirtualHost {
@@ -258,6 +269,21 @@ public:
    * @return const Config& the RouteConfiguration that owns this virtual host.
    */
   virtual const Config& routeConfig() const PURE;
+
+  /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 /**
@@ -463,6 +489,21 @@ public:
    * @return const PathMatchCriterion& the match criterion for this route.
    */
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
+
+  /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 /**
@@ -508,6 +549,21 @@ public:
    * @return the decorator or nullptr if not defined for the request.
    */
   virtual const Decorator* decorator() const PURE;
+
+  /**
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;

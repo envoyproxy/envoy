@@ -437,16 +437,8 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) 
   }
 }
 
-uint64_t ConnectionManagerImpl::ActiveStream::connectionId() {
-  return connection_manager_.read_callbacks_->connection().id();
-}
-
 const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
   return &connection_manager_.read_callbacks_->connection();
-}
-
-Ssl::Connection* ConnectionManagerImpl::ActiveStream::ssl() {
-  return connection_manager_.read_callbacks_->connection().ssl();
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
@@ -701,6 +693,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
   request_info_.bytes_received_ += data.length();
+
+  // If the initial websocket upgrade request had an HTTP body
+  // let's send this up
+  if (connection_manager_.isWebSocketConnection()) {
+    if (data.length() > 0) {
+      connection_manager_.ws_connection_->onData(data, false);
+    }
+    return;
+  }
+
   decodeData(nullptr, data, end_stream);
 }
 
@@ -1381,7 +1383,6 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
-  UNREFERENCED_PARAMETER(watermark_callbacks);
   parent_.watermark_callbacks_ = nullptr;
 }
 

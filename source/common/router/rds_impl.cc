@@ -163,7 +163,7 @@ RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
     // in the RdsRouteConfigProviderImpl destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
     RouteConfigProviderSharedPtr provider = element.second.lock();
-    ASSERT(provider)
+    ASSERT(provider);
     ret.push_back(provider);
   }
   return ret;

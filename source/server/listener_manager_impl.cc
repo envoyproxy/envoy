@@ -3,16 +3,22 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/resolver_impl.h"
+#include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
+#include "server/listener_socket_option_impl.h"
+
+#include "extensions/filters/listener/well_known_names.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -108,7 +114,7 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), address_(Network::Utility::protobufAddressToAddress(config.address())),
+    : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
@@ -126,6 +132,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
 
+  // Add listen socket options from the config.
+  addListenSocketOption(std::make_shared<ListenerSocketOptionImpl>(config));
+
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
         parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
@@ -134,7 +143,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            Config::ListenerFilterNames::get().ORIGINAL_DST);
+            Extensions::ListenerFilters::ListenerFilterNames::get().ORIGINAL_DST);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
@@ -145,7 +154,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            Config::ListenerFilterNames::get().PROXY_PROTOCOL);
+            Extensions::ListenerFilters::ListenerFilterNames::get().PROXY_PROTOCOL);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
@@ -178,7 +187,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
     auto transport_socket = filter_chain.transport_socket();
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
-        transport_socket.set_name(Config::TransportSocketNames::get().SSL);
+        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().SSL);
         MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
 
         has_tls++;
@@ -186,7 +195,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
           has_stk++;
         }
       } else {
-        transport_socket.set_name(Config::TransportSocketNames::get().RAW_BUFFER);
+        transport_socket.set_name(
+            Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
       }
     }
 
@@ -287,6 +297,10 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       } else {
         ENVOY_LOG(debug, "{}", message);
       }
+
+      // Add the options to the socket_ so that SocketState::Listening options can be
+      // set in the worker after listen()/evconnlistener_new() is called.
+      socket_->addOption(option);
     }
   }
 }

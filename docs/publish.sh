@@ -1,44 +1,28 @@
 #!/bin/bash
 
+# This is run on every commit that CircleCI picks up. It assumes that docs have already been built
+# via docs/build.sh. The push behavior differs depending on the nature of the commit:
+# * Tag commit (e.g. v1.6.0): pushes docs to versioned location, e.g.
+#   https://www.envoyproxy.io/docs/envoy/v1.6.0/.
+# * Master commit: pushes docs to https://www.envoyproxy.io/docs/envoy/latest/.
+# * Otherwise: noop.
+
 set -e
 
-if [ -z "$CIRCLE_TAG" ]
-then
-  echo "Ignoring non-tag for docs push"
-  exit 0
-fi
-
-export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
-export ENVOY_DOCS_RELEASE_LEVEL=tagged
-
-# Build the docs by cloning data-plane-api and building at the embedded SHA.
-DOCS_BUILD_DIR="${BUILD_DIR}"/docs
-rm -rf "${DOCS_BUILD_DIR}" generated/docs generated/rst
-mkdir -p "${DOCS_BUILD_DIR}"
-ENVOY_API=$(bazel/git_repository_info.py envoy_api)
-read -a GIT_INFO <<< "${ENVOY_API}"
-pushd "${DOCS_BUILD_DIR}"
-git clone "${GIT_INFO[0]}"
-cd data-plane-api
-git checkout "${GIT_INFO[1]}"
-# Check the git tag matches the version number in the VERSION file.
-VERSION_NUMBER=$(cat VERSION)
-if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
-  echo "Given git tag does not match the VERSION file content:"
-  echo "${CIRCLE_TAG} vs $(cat VERSION)"
-  exit 1
-fi
-# Check the version_history.rst contains current release version.
-grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
-./docs/build.sh
-popd
-rsync -av "${DOCS_BUILD_DIR}"/data-plane-api/generated/* generated/
-
-# Now publish them into a directory specific to the tag.
 DOCS_DIR=generated/docs
 CHECKOUT_DIR=../envoy-docs
-PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy/"$CIRCLE_TAG"
 BUILD_SHA=`git rev-parse HEAD`
+
+if [ -n "$CIRCLE_TAG" ]
+then
+  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy/"$CIRCLE_TAG"
+elif [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "master" ]
+then
+  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy/latest
+else
+  echo "Ignoring docs push"
+  exit 0
+fi
 
 echo 'cloning'
 git clone git@github.com:envoyproxy/envoyproxy.github.io "$CHECKOUT_DIR"

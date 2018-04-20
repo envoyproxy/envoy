@@ -178,32 +178,5 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLo
   return factory.createAccessLogInstance(*message, std::move(filter), context);
 }
 
-FileAccessLog::FileAccessLog(const std::string& access_log_path, FilterPtr&& filter,
-                             FormatterPtr&& formatter,
-                             Envoy::AccessLog::AccessLogManager& log_manager)
-    : filter_(std::move(filter)), formatter_(std::move(formatter)) {
-  log_file_ = log_manager.createAccessLog(access_log_path);
-}
-
-void FileAccessLog::log(const Http::HeaderMap* request_headers,
-                        const Http::HeaderMap* response_headers,
-                        const RequestInfo::RequestInfo& request_info) {
-  static Http::HeaderMapImpl empty_headers;
-  if (!request_headers) {
-    request_headers = &empty_headers;
-  }
-  if (!response_headers) {
-    response_headers = &empty_headers;
-  }
-
-  if (filter_) {
-    if (!filter_->evaluate(request_info, *request_headers)) {
-      return;
-    }
-  }
-
-  log_file_->write(formatter_->format(*request_headers, *response_headers, request_info));
-}
-
 } // namespace AccessLog
 } // namespace Envoy

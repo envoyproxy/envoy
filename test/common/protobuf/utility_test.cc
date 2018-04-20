@@ -13,6 +13,15 @@
 
 namespace Envoy {
 
+TEST(UtilityTest, RepeatedPtrUtilDebugString) {
+  Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
+  EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
+  repeated.Add()->set_value(10);
+  EXPECT_EQ("[value: 10\n]", RepeatedPtrUtil::debugString(repeated));
+  repeated.Add()->set_value(20);
+  EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
+}
+
 TEST(UtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
@@ -61,6 +70,13 @@ TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
   EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
+}
+
+TEST(UtilityTest, KeyValueStruct) {
+  const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
+  EXPECT_EQ(obj.fields_size(), 1);
+  EXPECT_EQ(obj.fields().at("test_key").kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
+  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
 }
 
 TEST(UtilityTest, ValueUtilEqual_NullValues) {

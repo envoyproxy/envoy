@@ -12,6 +12,7 @@
 # enough to handle block splitting and correctly detecting the main header subject to the Envoy
 # canonical paths.
 
+import common
 import re
 import sys
 
@@ -66,14 +67,9 @@ def ReorderHeaders(path):
       file_header_filter(),
       regex_filter('<.*\.h>'),
       regex_filter('<.*>'),
-      regex_filter('"envoy/.*"'),
-      regex_filter('"common/.*"'),
-      regex_filter('"source/common/.*"'),
-      regex_filter('"exe/.*"'),
-      regex_filter('"server/.*"'),
-      regex_filter('"extensions/.*"'),
-      regex_filter('"test/.*"'),
   ]
+  for subdir in common.includeDirOrder():
+    block_filters.append(regex_filter('"' + subdir + '/.*"'))
 
   blocks = []
   already_included = set([])
