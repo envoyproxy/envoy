@@ -354,7 +354,7 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
 // Multiple TLS certificates are not yet supported, but one is expected for
 // server.
 // TODO(PiotrSikora): Support multiple TLS certificates.
-TEST(ServerContextConfigImplTicketTest, MultipleTlsCertificates) {
+TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
                             EnvoyException,
@@ -364,6 +364,20 @@ TEST(ServerContextConfigImplTicketTest, MultipleTlsCertificates) {
   EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
                             EnvoyException,
                             "A single TLS certificate is required for server contexts");
+}
+
+// TlsCertificate messages must have a cert for servers.
+TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  ServerContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_MESSAGE(ServerContextPtr server_ctx(manager.createSslServerContext(
+                                "", {}, store, client_context_config, true)),
+                            EnvoyException,
+                            "Server TlsCertificates must have a certificate specified");
 }
 
 } // namespace Ssl
