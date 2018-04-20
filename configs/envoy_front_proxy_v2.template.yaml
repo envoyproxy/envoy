@@ -1,8 +1,8 @@
-{% macro listener(protocol, address, port_value) -%}
+{% macro listener(protocol, address, port_value, proxy_proto) -%}
   name: not_requrired_for_static_listeners
   address:
     socket_address:
-      protocol: {{protocol}}      
+      protocol: {{protocol}}
       address: {{address}}
       port_value: {{port_value}}
   filter_chain:
@@ -29,8 +29,10 @@
               request_type: external
 
           - name: envoy.router
-            config: {}            
-    use_proxy_proto:
+            config: {}
+    {% if proxy_proto %}
+    use_proxy_proto: true
+    {%endif -%}
 {% endmacro -%}
 admin:
   access_log_path: /var/log/envoy/admin_access.log

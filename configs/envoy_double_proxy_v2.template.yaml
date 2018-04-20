@@ -3,16 +3,16 @@
   address:
     socket_address:
       protocol: {{protocol}}
-      address:  {{address}}
+      address: {{address}}
       port_value: {{port_value}}
   filter_chains:
     - filter_chain_match:
-        sni_domains:  example.com
+        sni_domains: example.com
       filters:
         name: envoy.http_connection_manager
         config:
           codec_type: AUTO
-          stat_prefix:  router
+          stat_prefix: router
           route_config:
             name: route_configuration_for_http_connection_manager
             virtual_hosts:
@@ -23,15 +23,15 @@
                   - match:
                       prefix: "/"
                     route:
-                      cluster:  backhaul
-                      timeout:  20s
+                      cluster: backhaul
+                      timeout: 20s
           http_filters:
             - name: envoy.health_check
               config:
                 pass_through_mode: false
                 endpoint: /healthcheck
             - name: envoy.buffer
-              config: 
+              config:
                 max_request_bytes: 5242880
                 max_request_time: 120
             - name: envoy.router
@@ -47,12 +47,12 @@
      {%endif -%}
 {% endmacro -%}
 admin:
-  access_log_path:  "var/log/envoy/admin_access.log"
+  access_log_path: "var/log/envoy/admin_access.log"
   address:
     socket_address:
       protocol: TCP
-      address:  127.0.0.1
-      port_value: 9901   
+      address: 127.0.0.1
+      port_value: 9901
 flags_path: /etc/envoy/flags
 stats_sinks:
   name: envoy.statsd
@@ -62,12 +62,12 @@ tracing:
   http:
     name: envoy.lightstep
     config:
-      collector_cluster:  etc/envoy/lightstep_access_token
-      access_token_file:  lightstep_saas
+      collector_cluster: etc/envoy/lightstep_access_token
+      access_token_file: lightstep_saas
 runtime:
   symlink_root: /srv/runtime_data/current
   subdirectory: envoy
-  override_subdirectory:  envoy_override
+  override_subdirectory: envoy_override
 static_resources:
   clusters:
     - name: statsd
@@ -86,7 +86,7 @@ static_resources:
       hosts:
         - socket_address:
             protocol: TCP
-            address:  front-proxy.yourcompany.net
+            address: front-proxy.yourcompany.net
             port: 9400
       max_requests_per_connection: 25000
     - name: lightstep_saas
