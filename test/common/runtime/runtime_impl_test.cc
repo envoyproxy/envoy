@@ -245,5 +245,11 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
+TEST(DiskLayer, IllegalPath) {
+  Api::MockOsSysCalls mock_os_syscalls;
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", mock_os_syscalls), EnvoyException,
+                            "Invalid path: /dev");
+}
+
 } // namespace Runtime
 } // namespace Envoy
