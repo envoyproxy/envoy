@@ -7,7 +7,6 @@
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
 #include "common/network/socket_option_impl.h"
-#include "common/network/tcp_keepalive_option_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
@@ -1482,7 +1481,6 @@ public:
                           const Network::ConnectionSocket::OptionsSharedPtr& options)
                        -> Network::ClientConnection* {
               EXPECT_NE(nullptr, options.get());
-              EXPECT_EQ(1, options->size());
               NiceMock<Network::MockConnectionSocket> socket;
               EXPECT_TRUE(
                   (*options->begin())->setOption(socket, Network::Socket::SocketState::PreBind));

@@ -548,6 +548,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       }
     }
   }
+
   if (source_address != nullptr) {
     const int rc = source_address->bind(fd());
     if (rc < 0) {

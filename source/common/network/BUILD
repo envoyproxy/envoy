@@ -188,14 +188,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "tcp_keepalive_option_lib",
-    srcs = ["tcp_keepalive_option_impl.cc"],
-    hdrs = ["tcp_keepalive_option_impl.h"],
+    name = "addr_family_aware_socket_lib",
+    srcs = ["addr_family_aware_socket_impl.cc"],
+    hdrs = ["addr_family_aware_socket_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_option_factory_lib",
+    srcs = ["socket_option_factory.cc"],
+    hdrs = ["socket_option_factory.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":addr_family_aware_socket_lib",
+        ":address_lib",
+        ":socket_option_lib",
+        "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
     ],
 )

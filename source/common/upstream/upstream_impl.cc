@@ -24,8 +24,7 @@
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/tcp_keepalive_option_impl.h"
+#include "common/network/socket_option_factory.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/eds.h"
@@ -66,14 +65,6 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config) {
   return features;
 }
 
-// Socket::Option implementation for API-defined upstream options. This same
-// object can be extended to handle additional upstream socket options.
-class UpstreamSocketOption : public Network::SocketOptionImpl {
-public:
-  UpstreamSocketOption(const bool use_freebind)
-      : Network::SocketOptionImpl({}, use_freebind ? true : absl::optional<bool>{}) {}
-};
-
 Network::TcpKeepaliveConfig parseTcpKeepaliveConfig(const envoy::api::v2::Cluster& config) {
   const envoy::api::v2::core::TcpKeepalive& options =
       config.upstream_connection_options().tcp_keepalive();
@@ -91,11 +82,11 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
-    cluster_options->emplace_back(std::make_shared<UpstreamSocketOption>(true));
+    cluster_options->emplace_back(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
   if (config.upstream_connection_options().has_tcp_keepalive()) {
     cluster_options->emplace_back(
-        std::make_shared<Network::TcpKeepaliveOptionImpl>(parseTcpKeepaliveConfig(config)));
+        Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
   }
   if (cluster_options->empty()) {
     return nullptr;
@@ -134,6 +125,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
+
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
       connection_options);
