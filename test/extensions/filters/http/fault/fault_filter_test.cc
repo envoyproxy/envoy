@@ -24,13 +24,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WithArgs;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -142,8 +142,8 @@ public:
     EXPECT_CALL(*timer_, disableTimer());
   }
 
-  void TestPerFilterConfigFault(envoy::config::filter::http::fault::v2::HTTPFault* route_fault,
-                                envoy::config::filter::http::fault::v2::HTTPFault* vhost_fault);
+  void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
+                                const Router::RouteSpecificFilterConfig* vhost_fault);
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -752,8 +752,8 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 }
 
 void FaultFilterTest::TestPerFilterConfigFault(
-    envoy::config::filter::http::fault::v2::HTTPFault* route_fault,
-    envoy::config::filter::http::fault::v2::HTTPFault* vhost_fault) {
+    const Router::RouteSpecificFilterConfig* route_fault,
+    const Router::RouteSpecificFilterConfig* vhost_fault) {
 
   ON_CALL(filter_callbacks_.route_->route_entry_,
           perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
@@ -798,10 +798,9 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
-  envoy::config::filter::http::fault::v2::HTTPFault abort_fault =
-      convertJsonStrToProtoConfig(abort_only_json);
-  envoy::config::filter::http::fault::v2::HTTPFault delay_fault =
-      convertJsonStrToProtoConfig(delay_with_upstream_cluster_json);
+  Fault::PerRouteFaultFilterConfig abort_fault(convertJsonStrToProtoConfig(abort_only_json));
+  Fault::PerRouteFaultFilterConfig delay_fault(
+      convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
 
   // route-level fault overrides listener-level fault
   {

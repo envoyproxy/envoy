@@ -36,29 +36,10 @@ struct FaultFilterStats {
 };
 
 /**
- * Configuration for the fault filter.
+ * Configuration for the fault filter that can be specified per route
  */
-class FaultFilterConfig {
-public:
-  FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
-                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope);
-
-  const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
-    return fault_filter_headers_;
-  }
-  uint64_t abortPercent() { return abort_percent_; }
-  uint64_t delayPercent() { return fixed_delay_percent_; }
-  uint64_t delayDuration() { return fixed_duration_ms_; }
-  uint64_t abortCode() { return http_status_; }
-  const std::string& upstreamCluster() { return upstream_cluster_; }
-  Runtime::Loader& runtime() { return runtime_; }
-  FaultFilterStats& stats() { return stats_; }
-  const std::unordered_set<std::string>& downstreamNodes() { return downstream_nodes_; }
-  const std::string& statsPrefix() { return stats_prefix_; }
-  Stats::Scope& scope() { return scope_; }
-
-private:
-  static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+struct PerRouteFaultFilterConfig : public Router::RouteSpecificFilterConfig {
+  PerRouteFaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
   uint64_t abort_percent_{};       // 0-100
   uint64_t http_status_{};         // HTTP or gRPC return codes
@@ -67,7 +48,44 @@ private:
   std::string upstream_cluster_;   // restrict faults to specific upstream cluster
   std::vector<Router::ConfigUtility::HeaderData> fault_filter_headers_;
   std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
-                                                       // nodes. If not set then inject for all.
+};
+
+typedef std::shared_ptr<const PerRouteFaultFilterConfig> PerRouteFaultFilterConfigConstSharedPtr;
+
+/**
+ * Configuration for the fault filter.
+ */
+class FaultFilterConfig {
+public:
+  FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
+                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope);
+
+  const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
+    return filter_config_->fault_filter_headers_;
+  }
+  uint64_t abortPercent() { return filter_config_->abort_percent_; }
+  uint64_t delayPercent() { return filter_config_->fixed_delay_percent_; }
+  uint64_t delayDuration() { return filter_config_->fixed_duration_ms_; }
+  uint64_t abortCode() { return filter_config_->http_status_; }
+  const std::string& upstreamCluster() { return filter_config_->upstream_cluster_; }
+  Runtime::Loader& runtime() { return runtime_; }
+  FaultFilterStats& stats() { return stats_; }
+  const std::unordered_set<std::string>& downstreamNodes() {
+    return filter_config_->downstream_nodes_;
+  }
+  const std::string& statsPrefix() { return stats_prefix_; }
+  Stats::Scope& scope() { return scope_; }
+  bool emptyFilterConfig() { return !!filter_config_; }
+
+  void updateFilterConfig(const PerRouteFaultFilterConfig* config) {
+    filter_config_ = config != nullptr ? config : filter_config_;
+  }
+
+private:
+  static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
+  const PerRouteFaultFilterConfig* filter_config_;
+  PerRouteFaultFilterConfigConstSharedPtr local_config_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
   const std::string stats_prefix_;

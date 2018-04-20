@@ -42,6 +42,15 @@ FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_
       stats_prefix, context);
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+FaultFilterFactory::createRouteSpecificFilterConfig(const ProtobufWkt::Struct& struct_config) {
+  envoy::config::filter::http::fault::v2::HTTPFault proto_config;
+  MessageUtil::jsonConvert(struct_config, proto_config);
+  Router::RouteSpecificFilterConfigConstSharedPtr rconfig;
+  rconfig.reset(new Fault::PerRouteFaultFilterConfig(proto_config));
+  return rconfig;
+}
+
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */

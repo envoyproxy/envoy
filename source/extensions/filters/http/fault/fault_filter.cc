@@ -32,11 +32,12 @@ const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_perce
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
-FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
-                                     Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope)
-    : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
-      scope_(scope) {
+PerRouteFaultFilterConfig::PerRouteFaultFilterConfig(
+    const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
+
+  if (!fault.has_abort() && !fault.has_delay()) {
+    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
+  }
 
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
@@ -60,6 +61,23 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
   }
 }
 
+FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
+                                     Runtime::Loader& runtime, const std::string& stats_prefix,
+                                     Stats::Scope& scope)
+    : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
+      scope_(scope) {
+
+  // A small optimization to eliminate unnecessary processing in the
+  // fault filter when an empty config is provided
+  if (!fault.has_delay() && !fault.has_abort()) {
+    return;
+  }
+
+  local_config_.reset(new PerRouteFaultFilterConfig(fault));
+  // This feels a bit ugly, but we don't want to allocate anything here.
+  filter_config_ = local_config_.get();
+}
+
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
@@ -77,18 +95,15 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
-    const auto* proto_config =
-        route_entry->perFilterConfig(name) ?: route_entry->virtualHost().perFilterConfig(name);
+    const PerRouteFaultFilterConfig* per_filter_config =
+        route_entry->perFilterConfigTyped<PerRouteFaultFilterConfig>(name)
+            ?: route_entry->virtualHost().perFilterConfigTyped<PerRouteFaultFilterConfig>(name);
+    config_->updateFilterConfig(per_filter_config);
+  }
 
-    if (proto_config) {
-      const envoy::config::filter::http::fault::v2::HTTPFault per_filter_config =
-          dynamic_cast<const envoy::config::filter::http::fault::v2::HTTPFault&>(*proto_config);
-
-      // TODO (qiwzhang): Optimize this such that its updated only by the
-      // route update callback
-      config_.reset(new FaultFilterConfig(per_filter_config, config_->runtime(),
-                                          config_->statsPrefix(), config_->scope()));
-    }
+  // ignore if filter config is empty
+  if (config_->emptyFilterConfig()) {
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!matchesTargetUpstreamCluster()) {
