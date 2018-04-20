@@ -50,7 +50,7 @@ public:
 
   /**
    * @return Upstream::ClusterManager* singleton for use by the entire server.
-   *         This will be nullptr if the cluster managed has not initialized yet.
+   *         This will be nullptr if the cluster manager has not initialized yet.
    */
   virtual Upstream::ClusterManager* clusterManager() PURE;
 
