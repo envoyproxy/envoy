@@ -128,6 +128,9 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   switch (kind) {
+  case ProtobufWkt::Value::KIND_NOT_SET:
+    return v2.kind_case() == ProtobufWkt::Value::KIND_NOT_SET;
+
   case ProtobufWkt::Value::kNullValue:
     return true;
 

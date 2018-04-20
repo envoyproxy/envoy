@@ -215,10 +215,14 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
         linkopts = envoy_test_linkopts(),
         linkstatic = 1,
         args = [PACKAGE_NAME + "/" + corpus],
-        deps = [
-            ":" + test_lib_name,
-            "//test/fuzz:main",
-        ],
+        # No fuzzing on OS X.
+        deps = select({
+            "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
+            "//conditions:default": [
+                ":" + test_lib_name,
+                "//test/fuzz:main",
+            ],
+        }),
     )
     native.cc_binary(
         name = name + "_driverless",

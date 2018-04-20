@@ -155,6 +155,7 @@ envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
+        ":cluster_dupe_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
         "//test/config/integration:server.json",
