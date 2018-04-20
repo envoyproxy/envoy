@@ -38,9 +38,21 @@ struct FaultFilterStats {
 /**
  * Configuration for fault injection.
  */
-struct FaultSettings : public Router::RouteSpecificFilterConfig {
+class FaultSettings : public Router::RouteSpecificFilterConfig {
+public:
   FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
+  const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() const {
+    return fault_filter_headers_;
+  }
+  uint64_t abortPercent() const { return abort_percent_; }
+  uint64_t delayPercent() const { return fixed_delay_percent_; }
+  uint64_t delayDuration() const { return fixed_duration_ms_; }
+  uint64_t abortCode() const { return http_status_; }
+  const std::string& upstreamCluster() const { return upstream_cluster_; }
+  const std::unordered_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
+
+private:
   uint64_t abort_percent_{};       // 0-100
   uint64_t http_status_{};         // HTTP or gRPC return codes
   uint64_t fixed_delay_percent_{}; // 0-100
@@ -58,25 +70,11 @@ public:
   FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope);
 
-  const std::vector<Router::ConfigUtility::HeaderData>& filterHeaders() {
-    return current_config_->fault_filter_headers_;
-  }
-  uint64_t abortPercent() { return current_config_->abort_percent_; }
-  uint64_t delayPercent() { return current_config_->fixed_delay_percent_; }
-  uint64_t delayDuration() { return current_config_->fixed_duration_ms_; }
-  uint64_t abortCode() { return current_config_->http_status_; }
-  const std::string& upstreamCluster() { return current_config_->upstream_cluster_; }
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
-  const std::unordered_set<std::string>& downstreamNodes() {
-    return current_config_->downstream_nodes_;
-  }
   const std::string& statsPrefix() { return stats_prefix_; }
   Stats::Scope& scope() { return scope_; }
-
-  void updateFaultSettings(const FaultSettings* config) {
-    current_config_ = config != nullptr ? config : current_config_;
-  }
+  const FaultSettings* settings() { return &settings_; }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -85,8 +83,7 @@ private:
   FaultFilterStats stats_;
   const std::string stats_prefix_;
   Stats::Scope& scope_;
-  const FaultSettings filter_config_;
-  const FaultSettings* current_config_;
+  const FaultSettings settings_;
 };
 
 typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
@@ -127,6 +124,7 @@ private:
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
   bool stream_destroyed_{};
+  const FaultSettings* fault_settings_;
 
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};

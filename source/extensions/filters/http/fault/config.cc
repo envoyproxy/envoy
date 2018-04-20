@@ -46,9 +46,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfig(const ProtobufWkt::Struct& struct_config) {
   envoy::config::filter::http::fault::v2::HTTPFault proto_config;
   MessageUtil::jsonConvert(struct_config, proto_config);
-  Router::RouteSpecificFilterConfigConstSharedPtr rconfig;
-  rconfig.reset(new Fault::FaultSettings(proto_config));
-  return rconfig;
+  return std::make_shared<const Router::RouteSpecificFilterConfig>(Fault::FaultSettings(proto_config));
 }
 
 /**
