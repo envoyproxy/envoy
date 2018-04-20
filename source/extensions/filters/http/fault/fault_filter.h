@@ -75,7 +75,7 @@ public:
   }
   const std::string& statsPrefix() { return stats_prefix_; }
   Stats::Scope& scope() { return scope_; }
-  bool emptyFilterConfig() { return !!filter_config_; }
+  bool emptyFilterConfig() { return filter_config_ == nullptr; }
 
   void updateFilterConfig(const PerRouteFaultFilterConfig* config) {
     filter_config_ = config != nullptr ? config : filter_config_;
@@ -85,7 +85,7 @@ private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   const PerRouteFaultFilterConfig* filter_config_;
-  PerRouteFaultFilterConfigConstSharedPtr local_config_;
+  PerRouteFaultFilterConfig local_config_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
   const std::string stats_prefix_;

@@ -35,10 +35,6 @@ const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_st
 PerRouteFaultFilterConfig::PerRouteFaultFilterConfig(
     const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
-  if (!fault.has_abort() && !fault.has_delay()) {
-    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
-  }
-
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
     http_status_ = fault.abort().http_status();
@@ -65,17 +61,12 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope)
     : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
-      scope_(scope) {
+      scope_(scope), local_config_(PerRouteFaultFilterConfig(fault)),
+      filter_config_(&local_config_) {
 
-  // A small optimization to eliminate unnecessary processing in the
-  // fault filter when an empty config is provided
-  if (!fault.has_delay() && !fault.has_abort()) {
-    return;
+  if (!fault.has_abort() && !fault.has_delay()) {
+    filter_config_ = nullptr;
   }
-
-  local_config_.reset(new PerRouteFaultFilterConfig(fault));
-  // This feels a bit ugly, but we don't want to allocate anything here.
-  filter_config_ = local_config_.get();
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
