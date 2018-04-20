@@ -59,8 +59,8 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope)
-    : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
-      scope_(scope), settings_(fault) {}
+    : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
+      stats_prefix_(stats_prefix), scope_(scope) {}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 

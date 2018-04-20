@@ -79,11 +79,11 @@ public:
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
+  const FaultSettings settings_;
   Runtime::Loader& runtime_;
   FaultFilterStats stats_;
   const std::string stats_prefix_;
   Stats::Scope& scope_;
-  const FaultSettings settings_;
 };
 
 typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
