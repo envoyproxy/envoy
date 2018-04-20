@@ -152,7 +152,7 @@ envoy_cc_test(
     srcs = ["listener_socket_option_impl_test.cc"],
     deps = [
         "//source/server:listener_socket_option_lib",
-        "//test/common/network:socket_option_test_harness",
+        "//test/common/network:socket_option_test",
     ],
 )
 
