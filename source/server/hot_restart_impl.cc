@@ -43,7 +43,7 @@ SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options
   const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
-  const std::string shmem_name = fmt::format("/envoy_block_memory_{}", options.baseId());
+  const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
   if (options.restartEpoch() == 0) {
     flags |= O_CREAT | O_EXCL;
 
