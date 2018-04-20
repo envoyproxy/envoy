@@ -84,7 +84,7 @@ InstanceImpl::~InstanceImpl() {
   file_logger_.reset();
 }
 
-Upstream::ClusterManager& InstanceImpl::clusterManager() { return config_->clusterManager(); }
+Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
 
 Tracing::HttpTracer& InstanceImpl::httpTracer() { return config_->httpTracer(); }
 
@@ -417,8 +417,8 @@ void InstanceImpl::terminate() {
     flushStats();
   }
 
-  if (config_.get() != nullptr) {
-    config_->clusterManager().shutdown();
+  if (config_.get() != nullptr && config_->clusterManager() != nullptr) {
+    config_->clusterManager()->shutdown();
   }
   handler_.reset();
   thread_local_.shutdownThread();
