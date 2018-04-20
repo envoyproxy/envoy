@@ -115,3 +115,10 @@ artifact_prefix='./'; Test unit written to ./crash-db2ee19f50162f2079dc0c5ba24fd
 The test input can be found in `build/out/envoy`, e.g.
 `build/out/envoy/crash-db2ee19f50162f2079dc0c5ba24fd0e3dcb8b9bc`. For protobuf
 fuzz tests, this will be in text proto format.
+
+To test and validate fixes to the crash, add it to the corpus in the Envoy
+source directory for the test, e.g. for `server_fuzz_test` this is
+`test/server/corpus`, and run `bazel test`, e.g. `bazel test
+//test/server:server_fuzz_test`. These crash cases can be added to the corpus in
+followup PRs to provide fuzzers some interesting starting points for invalid
+inputs.
