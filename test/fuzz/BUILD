@@ -25,6 +25,7 @@ envoy_cc_test_library(
     name = "fuzz_runner_lib",
     srcs = ["fuzz_runner.cc"],
     hdrs = ["fuzz_runner.h"],
+    external_deps = ["libprotobuf_mutator"],
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

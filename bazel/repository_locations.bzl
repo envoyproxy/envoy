@@ -34,6 +34,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
     ),
+    com_github_google_libprotobuf_mutator = dict(
+        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        remote = "https://github.com/google/libprotobuf-mutator",
+    ),
     com_github_grpc_grpc = dict(
         commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1
         remote = "https://github.com/grpc/grpc.git",
