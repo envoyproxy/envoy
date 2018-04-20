@@ -6,6 +6,9 @@ import "envoy/api/v2/core/address.proto";
 package envoy.config.rbac.v2alpha;
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a service.
+// The RBAC engine authorizes a request by evaluating the request context (expressed in the form of
+// :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against the RBAC policies.
+//
 // Here is an example of RBAC configuration. It has two policies:
 // * Service account "cluster.local/ns/default/sa/admin" has full access to the service.
 // * Any user can read ("GET") the service at paths with prefix "/products" or suffix "/reviews" when request header
@@ -99,13 +102,9 @@ message Permission {
   // Definition of a custom condition.
   message Condition {
     oneof condition_spec {
-      // Header match. This refers to the "request.http.headers" field in
+      // Header match. This matches to the "request.http.headers" field in
       // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
       MapEntryMatch header = 1;
-
-      // Label match. This refers to the "destination.labels" field in
-      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      MapEntryMatch label = 2;
     }
   }
 
@@ -115,7 +114,7 @@ message Permission {
 
 // Principal defines an identity or a group of identities.
 message Principal {
-  // Optional. The name of the principal. This refers to the "source.principal" field in
+  // Optional. The name of the principal. This matches to the "source.principal" field in
   // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
   // If set to "*", it applies to any user.
   string name = 1;
@@ -123,16 +122,12 @@ message Principal {
   // Definition of a custom attribute to identify the principal.
   message Attribute {
     oneof attribute_spec {
-      // Header match. This refers to the "request.http.headers" field in
+      // Source service name. This matches to the "source.service" field in
       // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      MapEntryMatch header = 1;
+      string service = 1;
 
-      // Label match. This refers to the "source.labels" field in
-      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      MapEntryMatch label = 2;
-
-      // Source IP address.
-      envoy.api.v2.core.CidrRange ip = 3;
+      // Source IP addresses.
+      repeated envoy.api.v2.core.CidrRange ips = 2;
     }
   }
 
