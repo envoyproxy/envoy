@@ -83,7 +83,7 @@ DEFINE_PROTO_FUZZER(const MyMessageType& input) {
 }
 ```
 
-## Running fuzzers locally
+## Running fuzz tests locally
 
 Within the Envoy repository, we have various `*_fuzz_test` targets. When run
 under `bazel test`, these will exercise the corpus as inputs but not actually
@@ -93,8 +93,8 @@ performed by the [oss-fuzz](https://github.com/google/oss-fuzz) project, with
 results provided on the [ClusterFuzz dashboard](https://oss-fuzz.com).
 
 It is possible to run against fuzzers locally by using the `oss-fuzz` Docker
-image. This is recommended when writing new fuzzers to check if they pick up any
-low hanging fruit (i.e. what you can find on your local machine vs. the fuzz
+image. This is recommended when writing new fuzz tests to check if they pick up
+any low hanging fruit (i.e. what you can find on your local machine vs. the fuzz
 cluster).
 
 1. `git clone https://github.com/google/oss-fuzz.git`
@@ -105,3 +105,13 @@ cluster).
    want to consume Envoy from GitHub at HEAD/master.
 5. `python infra/helper.py run_fuzzer envoy <fuzz test target>`. The fuzz test
    target will be the test name, e.g. `server_fuzz_test`.
+
+If there is a crash, `run_fuzzer` will emit a log line along the lines of:
+
+```
+artifact_prefix='./'; Test unit written to ./crash-db2ee19f50162f2079dc0c5ba24fd0e3dcb8b9bc
+```
+
+The test input can be found in `build/out/envoy`, e.g.
+`build/out/envoy/crash-db2ee19f50162f2079dc0c5ba24fd0e3dcb8b9bc`. For protobuf
+fuzz tests, this will be in text proto format.
