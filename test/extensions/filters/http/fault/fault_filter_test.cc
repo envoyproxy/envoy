@@ -798,9 +798,8 @@ void FaultFilterTest::TestPerFilterConfigFault(
 
 TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
 
-  Fault::PerRouteFaultFilterConfig abort_fault(convertJsonStrToProtoConfig(abort_only_json));
-  Fault::PerRouteFaultFilterConfig delay_fault(
-      convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
+  Fault::FaultSettings abort_fault(convertJsonStrToProtoConfig(abort_only_json));
+  Fault::FaultSettings delay_fault(convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
 
   // route-level fault overrides listener-level fault
   {

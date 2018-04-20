@@ -32,8 +32,7 @@ const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_perce
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
-PerRouteFaultFilterConfig::PerRouteFaultFilterConfig(
-    const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
+FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
@@ -61,13 +60,7 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
                                      Stats::Scope& scope)
     : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
-      scope_(scope), local_config_(PerRouteFaultFilterConfig(fault)),
-      filter_config_(&local_config_) {
-
-  if (!fault.has_abort() && !fault.has_delay()) {
-    filter_config_ = nullptr;
-  }
-}
+      scope_(scope), filter_config_(fault), current_config_(&filter_config_) {}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -86,15 +79,10 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const std::string name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
-    const PerRouteFaultFilterConfig* per_filter_config =
-        route_entry->perFilterConfigTyped<PerRouteFaultFilterConfig>(name)
-            ?: route_entry->virtualHost().perFilterConfigTyped<PerRouteFaultFilterConfig>(name);
-    config_->updateFilterConfig(per_filter_config);
-  }
-
-  // ignore if filter config is empty
-  if (config_->emptyFilterConfig()) {
-    return Http::FilterHeadersStatus::Continue;
+    const FaultSettings* per_route_settings =
+        route_entry->perFilterConfigTyped<FaultSettings>(name)
+            ?: route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    config_->updateFaultSettings(per_route_settings);
   }
 
   if (!matchesTargetUpstreamCluster()) {
