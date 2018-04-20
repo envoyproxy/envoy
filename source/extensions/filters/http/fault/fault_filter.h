@@ -70,11 +70,11 @@ public:
   FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                     Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope);
 
-  Runtime::Loader& runtime() { return runtime_; }
-  FaultFilterStats& stats() { return stats_; }
-  const std::string& statsPrefix() { return stats_prefix_; }
-  Stats::Scope& scope() { return scope_; }
-  const FaultSettings* settings() { return &settings_; }
+  Runtime::Loader& runtime() const { return runtime_; }
+  FaultFilterStats& stats() const { return stats_; }
+  const std::string& statsPrefix() const { return stats_prefix_; }
+  Stats::Scope& scope() const { return scope_; }
+  const FaultSettings* settings() const { return &settings_; }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
