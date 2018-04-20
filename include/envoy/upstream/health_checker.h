@@ -10,7 +10,7 @@ namespace Upstream {
 
 enum class HealthState { Unhealthy, Healthy };
 
-enum class HealthTransition { Unchanged, Changed };
+enum class HealthTransition { Unchanged, Changed, ChangePending };
 
 /**
  * Wraps active health checking of an upstream cluster.
