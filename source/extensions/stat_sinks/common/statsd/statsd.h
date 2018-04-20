@@ -61,7 +61,7 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
-  const std::string& getPrefix() { return prefix_; }
+  const std::string getPrefix() { return prefix_; }
 
 private:
   const std::string getName(const Stats::Metric& metric);
@@ -71,7 +71,7 @@ private:
   Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
   // Prefix for all flushed stats.
-  const std::string& prefix_;
+  const std::string prefix_;
 };
 
 /**
@@ -102,7 +102,7 @@ public:
                                                  std::chrono::milliseconds(value));
   }
 
-  std::string getPrefix() { return prefix_; }
+  const std::string getPrefix() { return prefix_; }
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
@@ -139,7 +139,7 @@ private:
   static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
 
   // Prefix for all flushed stats.
-  const std::string& prefix_;
+  const std::string prefix_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::SlotPtr tls_;

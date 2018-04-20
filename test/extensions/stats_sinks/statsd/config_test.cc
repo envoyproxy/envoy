@@ -65,9 +65,11 @@ TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
-  EXPECT_NE(sink, nullptr);
-  EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), defaultPrefix);
+  ASSERT_NE(sink, nullptr);
+
+  auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
+  ASSERT_NE(udp_sink, nullptr);
+  EXPECT_EQ(udp_sink->getPrefix(), defaultPrefix);
 }
 
 TEST(StatsConfigTest, UdpSinkCustomPrefix) {
@@ -91,9 +93,11 @@ TEST(StatsConfigTest, UdpSinkCustomPrefix) {
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
-  EXPECT_NE(sink, nullptr);
-  EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get())->getPrefix(), customPrefix);
+  ASSERT_NE(sink, nullptr);
+
+  auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
+  ASSERT_NE(udp_sink, nullptr);
+  EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
@@ -112,9 +116,11 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
-  EXPECT_NE(sink, nullptr);
-  EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get())->getPrefix(), defaultPrefix);
+  ASSERT_NE(sink, nullptr);
+
+  auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
+  ASSERT_NE(tcp_sink, nullptr);
+  EXPECT_EQ(tcp_sink->getPrefix(), defaultPrefix);
 }
 
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
@@ -135,9 +141,11 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
-  EXPECT_NE(sink, nullptr);
-  EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
-  EXPECT_EQ(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get())->getPrefix(), prefix);
+  ASSERT_NE(sink, nullptr);
+
+  auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
+  ASSERT_NE(tcp_sink, nullptr);
+  EXPECT_EQ(tcp_sink->getPrefix(), prefix);
 }
 
 class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
