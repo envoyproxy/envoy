@@ -58,7 +58,7 @@ public:
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
    * @param options describes the parameters comtrolling set layout.
-   * @param init true if the shared-memory should be initialized on construction. If false,
+   * @param init true if the memory should be initialized on construction. If false,
    *             the data in the table will be sanity checked, and an exception thrown if
    *             it is incoherent or mismatches the passed-in options.
    * @param memory the memory buffer for the set data.
@@ -79,7 +79,7 @@ public:
   /**
    * Returns the numbers of byte required for the hash-table, based on
    * the control structure. This must be used to allocate the
-   * backing-store (eg) in shared memory, which we do after
+   * backing-store (eg) in memory, which we do after
    * constructing the object with the desired sizing.
    */
   static uint32_t numBytes(const BlockMemoryHashSetOptions& options) {
@@ -250,7 +250,7 @@ private:
   }
 
   /**
-   * Attempts to attach to an existing shared memory segment. Does a (relatively) quick
+   * Attempts to attach to an existing memory segment. Does a (relatively) quick
    * sanity check to make sure the options copied to the provided memory match, and also
    * that the slot, cell, and key-string structures look sane.
    */
@@ -340,7 +340,7 @@ private:
     return *reinterpret_cast<Cell*>(ptr);
   }
 
-  /** Maps out the segments of shared memory for us to work with. */
+  /** Maps out the segments of memory for us to work with. */
   void mapMemorySegments(const BlockMemoryHashSetOptions& options, uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
@@ -351,7 +351,7 @@ private:
     slots_ = reinterpret_cast<uint32_t*>(memory);
   }
 
-  // Pointers into shared memory. Cells go first, because Value may need a more aggressive
+  // Pointers into memory. Cells go first, because Value may need a more aggressive
   // aligmnment.
   Cell* cells_;
   Control* control_;
