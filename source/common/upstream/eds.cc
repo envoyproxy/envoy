@@ -97,12 +97,12 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   bool cluster_rebuilt = false;
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
-      if (current_locality_weights_map_.size() <= i) {
-        current_locality_weights_map_.resize(i + 1);
+      if (locality_weights_map_.size() <= i) {
+        locality_weights_map_.resize(i + 1);
       }
       cluster_rebuilt |=
           updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *priority_state[i].first,
-                                 priority_state[i].second, current_locality_weights_map_[i]);
+                                 locality_weights_map_[i], priority_state[i].second);
     }
   }
   if (!cluster_rebuilt) {
@@ -115,8 +115,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
-                                            LocalityWeightsMap& new_locality_weights_map,
-                                            LocalityWeightsMap& current_locality_weights_map) {
+                                            LocalityWeightsMap& locality_weights_map,
+                                            LocalityWeightsMap& new_locality_weights_map) {
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
@@ -131,8 +131,8 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // improve performance and scalability of locality weight updates.
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr) ||
-      current_locality_weights_map != new_locality_weights_map) {
-    current_locality_weights_map = new_locality_weights_map;
+      locality_weights_map != new_locality_weights_map) {
+    locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
