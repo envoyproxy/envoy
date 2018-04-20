@@ -104,6 +104,7 @@ message Permission {
     oneof condition_spec {
       // Header match. This matches to the "request.http.headers" field in
       // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      // The header specifies how the service is accessed.
       MapEntryMatch header = 1;
     }
   }
@@ -128,6 +129,11 @@ message Principal {
 
       // Source IP addresses.
       repeated envoy.api.v2.core.CidrRange ips = 2;
+
+      // Header match. This matches to the "request.http.headers" field in
+      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+      // The header identifies the client.
+      MapEntryMatch header = 3;
     }
   }
 
