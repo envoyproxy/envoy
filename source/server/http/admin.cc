@@ -469,6 +469,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
+// TODO(ramaraochavali): Add summary histogram output for Prometheus.
 uint64_t
 PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                             const std::list<Stats::GaugeSharedPtr>& gauges,

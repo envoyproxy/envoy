@@ -43,14 +43,13 @@ public:
   ~ThreadLocalHistogramImpl();
   // Stats::Histogram
   void recordValue(uint64_t value) override;
+  void merge(histogram_t* target);
 
   bool used() const override { return flags_ & Flags::Used; }
   void beginMerge() override {
-    // this switches the current_active_ between 1 and 0.
+    // This switches the current_active_ between 1 and 0.
     current_active_ = otherHistogramIndex();
   }
-
-  void merge(histogram_t* target);
 
   Store& parent_;
 
@@ -72,6 +71,7 @@ public:
                       std::vector<Tag>&& tags);
 
   virtual ~ParentHistogramImpl();
+  void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
 
   bool used() const override;
 
@@ -88,13 +88,11 @@ public:
     return cumulative_statistics_;
   }
 
-  void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
-
   Store& parent_;
   std::list<TlsHistogramSharedPtr> tls_histograms_;
 
 private:
-  bool usedWorker() const;
+  bool usedLockHeld() const;
 
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;

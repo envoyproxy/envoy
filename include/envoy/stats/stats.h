@@ -199,15 +199,14 @@ public:
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
 
 /**
- * A histogram that is stored in main thread, manages all thread local histograms and provides
- * summary view of the histogram.
+ * A histogram that is stored in main thread and provides summary view of the histogram.
  */
 class ParentHistogram : public virtual Metric {
 public:
   virtual ~ParentHistogram() {}
 
   /**
-   * This method is called during the main stats flush process for each of the histogram and used
+   * This method is called during the main stats flush process for each of the histograms and used
    * to merge the histogram values.
    */
   virtual void merge() PURE;

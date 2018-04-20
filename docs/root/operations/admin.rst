@@ -181,10 +181,12 @@ The fields are:
 
 .. http:get:: /stats
 
-  Outputs all statistics on demand. This includes only counters and gauges. Histograms are not
-  output as Envoy currently has no built in histogram support and relies on statsd for
-  aggregation. This command is very useful for local debugging. See :ref:`here <operations_stats>`
-  for more information.
+  Outputs all statistics on demand. This command is very useful for local debugging.
+  Histograms will output the computed statistics of it like P0,P50,P75 etc. The output
+  for each quantile will be in the form of (inteval,cumulative) where interval value 
+  represents the summary since last flush interval and cumulative value represents the 
+  summary since the start of envoy instance.
+  See :ref:`here <operations_stats>` for more information.
 
   .. http:get:: /stats?format=json
 

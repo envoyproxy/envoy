@@ -76,7 +76,7 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
       } else {
-        ENVOY_LOG(warn, "duplicate histogram {}.{}: data loss will occur on output", scope->prefix_,
+        ENVOY_LOG(warn, "duplicate histogram {}{}: data loss will occur on output", scope->prefix_,
                   hist_name);
       }
     }
@@ -305,7 +305,7 @@ void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  uint64_t other_histogram_index = otherHistogramIndex();
+  const uint64_t other_histogram_index = otherHistogramIndex();
   hist_accumulate(target, &histograms_[other_histogram_index], 1);
   hist_clear(histograms_[other_histogram_index]);
 }
@@ -318,7 +318,7 @@ ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
 
 bool ParentHistogramImpl::used() const {
   std::unique_lock<std::mutex> lock(merge_lock_);
-  return usedWorker();
+  return usedLockHeld();
 }
 
 ParentHistogramImpl::~ParentHistogramImpl() {
@@ -328,7 +328,7 @@ ParentHistogramImpl::~ParentHistogramImpl() {
 
 void ParentHistogramImpl::merge() {
   std::unique_lock<std::mutex> lock(merge_lock_);
-  if (usedWorker()) {
+  if (usedLockHeld()) {
     hist_clear(interval_histogram_);
     for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
       tls_histogram->merge(interval_histogram_);
@@ -346,15 +346,13 @@ void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr)
   tls_histograms_.emplace_back(hist_ptr);
 }
 
-bool ParentHistogramImpl::usedWorker() const {
-  bool any_tls_used = false;
+bool ParentHistogramImpl::usedLockHeld() const {
   for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
     if (tls_histogram->used()) {
-      any_tls_used = true;
-      break;
+      return true;
     }
   }
-  return any_tls_used;
+  return false;
 }
 
 } // namespace Stats

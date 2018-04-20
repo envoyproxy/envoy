@@ -375,11 +375,12 @@ public:
    */
   HistogramStatisticsImpl(const histogram_t* histogram_ptr);
 
+  void refresh(const histogram_t* new_histogram_ptr);
+
+  // HistogramStatistics
   std::string summary() const override;
   const std::vector<double>& supportedQuantiles() const override;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
-
-  void refresh(const histogram_t* new_histogram_ptr);
 
 private:
   std::vector<double> computed_quantiles_;

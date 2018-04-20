@@ -288,6 +288,7 @@ const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
 std::string HistogramStatisticsImpl::summary() const {
   std::vector<std::string> summary;
   const std::vector<double>& supported_quantiles_ref = supportedQuantiles();
+  summary.reserve(supported_quantiles_ref.size());
   for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
     summary.push_back(
         fmt::format("P{}: {}", 100 * supported_quantiles_ref[i], computed_quantiles_[i]));
