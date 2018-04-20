@@ -86,7 +86,7 @@ private:
   const FaultSettings settings_;
 };
 
-typedef std::shared_ptr<FaultFilterConfig> FaultFilterConfigSharedPtr;
+typedef std::shared_ptr<const FaultFilterConfig> FaultFilterConfigSharedPtr;
 
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
