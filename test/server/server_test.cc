@@ -172,6 +172,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
+// Regression test for segfault when server initialization fails prior to
+// ClusterManager initialization.
+TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/cluster_dupe_bootstrap.yaml"), EnvoyException,
+                            "cluster manager: duplicate cluster 'service_google'");
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";
