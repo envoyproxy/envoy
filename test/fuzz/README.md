@@ -88,7 +88,7 @@ DEFINE_PROTO_FUZZER(const MyMessageType& input) {
 Within the Envoy repository, we have various `*_fuzz_test` targets. When run
 under `bazel test`, these will exercise the corpus as inputs but not actually
 link and run against any fuzzer (e.g.
-[`libfuzzer`](https://llvm.org/docs/LibFuzzer.html)).  The actual fuzzing is
+[`libfuzzer`](https://llvm.org/docs/LibFuzzer.html)). The actual fuzzing is
 performed by the [oss-fuzz](https://github.com/google/oss-fuzz) project, with
 results provided on the [ClusterFuzz dashboard](https://oss-fuzz.com).
 
