@@ -163,11 +163,9 @@ struct ActiveTestRequest {
 
     if (type == Type::CreateConnection) {
       EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
-      parent.conn_pool_.expectEnableUpstreamReady();
       expectNewStream();
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
-      parent.conn_pool_.expectAndRunUpstreamReady();
     }
   }
 
@@ -401,7 +399,6 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
-  conn_pool_.expectEnableUpstreamReady();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
@@ -412,7 +409,6 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  conn_pool_.expectAndRunUpstreamReady();
 
   // We should get a reset callback when the connection disconnects.
   Http::MockStreamCallbacks stream_callbacks;
@@ -435,7 +431,6 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   NiceMock<Http::MockStreamDecoder> outer_decoder1;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
-  conn_pool_.expectEnableUpstreamReady();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder1, callbacks);
 
   EXPECT_NE(nullptr, handle);
@@ -456,7 +451,6 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  conn_pool_.expectAndRunUpstreamReady();
 
   // Finishing request 1 will immediately bind to request 2.
   conn_pool_.expectEnableUpstreamReady();
@@ -489,7 +483,6 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
-  conn_pool_.expectEnableUpstreamReady();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);
@@ -501,7 +494,6 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  conn_pool_.expectAndRunUpstreamReady();
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
@@ -526,7 +518,6 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_.expectClientCreate();
-  conn_pool_.expectEnableUpstreamReady();
   Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
 
   EXPECT_NE(nullptr, handle);
@@ -538,7 +529,6 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   EXPECT_CALL(callbacks.pool_ready_, ready());
 
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  conn_pool_.expectAndRunUpstreamReady();
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
   // Response with 'connection: close' which should cause the connection to go away.
@@ -635,12 +625,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   NiceMock<Http::MockStreamEncoder> request_encoder;
   Http::StreamDecoder* inner_decoder;
   EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
-  conn_pool_.expectEnableUpstreamReady();
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
-  conn_pool_.expectAndRunUpstreamReady();
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 

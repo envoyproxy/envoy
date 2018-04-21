@@ -186,7 +186,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   // whether the client is in the ready list (connected) or the busy list (failed to connect).
   if (event == Network::ConnectionEvent::Connected) {
     conn_connect_ms_->complete();
-    processIdleClient(client);
+    processIdleClient(client, false);
   }
 }
 
@@ -215,7 +215,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
     host_->cluster().stats().upstream_cx_max_requests_.inc();
     onDownstreamReset(client);
   } else {
-    processIdleClient(client);
+    processIdleClient(client, true);
   }
 }
 
@@ -233,13 +233,22 @@ void ConnPoolImpl::onUpstreamReady() {
   }
 }
 
-void ConnPoolImpl::processIdleClient(ActiveClient& client) {
+void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
   client.stream_wrapper_.reset();
-  // There is nothing to service so just move the connection into the ready list.
-  ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
-  client.moveBetweenLists(busy_clients_, ready_clients_);
+  if (pending_requests_.empty() || delay) {
+    // There is nothing to service so just move the connection into the ready list.
+    ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
+    client.moveBetweenLists(busy_clients_, ready_clients_);
+  } else {
+    // There is work to do immediately so bind a request to the client and move it to the busy list.
+    // Pending requests are pushed onto the front, so pull from the back.
+    ENVOY_CONN_LOG(debug, "attaching to next request", *client.codec_client_);
+    attachRequestToClient(client, pending_requests_.back()->decoder_,
+                          pending_requests_.back()->callbacks_);
+    pending_requests_.pop_back();
+  }
 
-  if (!pending_requests_.empty() && !upstream_ready_enabled_) {
+  if (delay && !pending_requests_.empty() && !upstream_ready_enabled_) {
     upstream_ready_enabled_ = true;
     upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
   }

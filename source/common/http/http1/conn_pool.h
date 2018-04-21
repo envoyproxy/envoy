@@ -123,7 +123,7 @@ protected:
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
   void onUpstreamReady();
-  void processIdleClient(ActiveClient& client);
+  void processIdleClient(ActiveClient& client, bool delay);
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
