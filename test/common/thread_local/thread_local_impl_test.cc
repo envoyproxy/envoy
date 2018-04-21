@@ -82,6 +82,9 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
+// TODO(ramaraochavali): Run this test with real threads. The current issue in the unit
+// testing environment is, the post to main_dispatcher is not working as expected.
+
 // Validate ThreadLocal::runOnAllThreads behavior with all_thread_complete call back.
 TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   SlotPtr tlsptr = tls_.allocateSlot();
@@ -93,16 +96,16 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
   struct {
     uint64_t thread_local_calls_{0};
     bool all_threads_complete_ = false;
-  } thread_local_data;
+  } thread_status;
 
   tlsptr->runOnAllThreads(
-      [&thread_local_data]() -> void { ++thread_local_data.thread_local_calls_; },
-      [&thread_local_data]() -> void {
-        EXPECT_EQ(thread_local_data.thread_local_calls_, 1);
-        thread_local_data.all_threads_complete_ = true;
+      [&thread_status]() -> void { ++thread_status.thread_local_calls_; },
+      [&thread_status]() -> void {
+        EXPECT_EQ(thread_status.thread_local_calls_, 1);
+        thread_status.all_threads_complete_ = true;
       });
 
-  EXPECT_TRUE(thread_local_data.all_threads_complete_);
+  EXPECT_TRUE(thread_status.all_threads_complete_);
 
   tls_.shutdownGlobalThreading();
   tls_.shutdownThread();

@@ -142,8 +142,8 @@ typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
  *  - "main" thread parent which is called "ParentHistogram".
  *  - "per-thread" collector which is called "ThreadLocalHistogram".
  * Worker threads will write to ParentHistogram which checks whether a TLS histogram is available.
- * If there is a TLS histogram already available it will write to it otherwise creates one and
- * writes to it. During the flush process the following sequence is followed.
+ * If there is one it will write to it, otherwise creates new one and writes to it. 
+ * During the flush process the following sequence is followed.
  *  - The main thread starts the flush process by posting a message to every worker which tells the
  *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
  *    to "beginMerge" method.
