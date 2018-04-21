@@ -98,12 +98,11 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
     bool all_threads_complete_ = false;
   } thread_status;
 
-  tlsptr->runOnAllThreads(
-      [&thread_status]() -> void { ++thread_status.thread_local_calls_; },
-      [&thread_status]() -> void {
-        EXPECT_EQ(thread_status.thread_local_calls_, 1);
-        thread_status.all_threads_complete_ = true;
-      });
+  tlsptr->runOnAllThreads([&thread_status]() -> void { ++thread_status.thread_local_calls_; },
+                          [&thread_status]() -> void {
+                            EXPECT_EQ(thread_status.thread_local_calls_, 1);
+                            thread_status.all_threads_complete_ = true;
+                          });
 
   EXPECT_TRUE(thread_status.all_threads_complete_);
 
