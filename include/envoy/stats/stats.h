@@ -201,7 +201,7 @@ typedef std::shared_ptr<Histogram> HistogramSharedPtr;
 /**
  * A histogram that is stored in main thread and provides summary view of the histogram.
  */
-class ParentHistogram : public virtual Metric {
+class ParentHistogram : public virtual Histogram {
 public:
   virtual ~ParentHistogram() {}
 

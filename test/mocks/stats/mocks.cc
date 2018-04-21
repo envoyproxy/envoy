@@ -39,6 +39,11 @@ MockHistogram::MockHistogram() {
 MockHistogram::~MockHistogram() {}
 
 MockParentHistogram::MockParentHistogram() {
+  ON_CALL(*this, recordValue(_)).WillByDefault(Invoke([this](uint64_t value) {
+    if (store_ != nullptr) {
+      store_->deliverHistogramToSinks(*this, value);
+    }
+  }));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));

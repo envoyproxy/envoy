@@ -253,15 +253,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
-  TlsHistogramSharedPtr* tls_ref = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
-  }
-
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
-  }
-
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
 
@@ -271,11 +262,31 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     // Since MetricImpl only has move constructor, we are explicitly copying here.
     std::string central_tag_extracted_name(tag_extracted_name);
     std::vector<Tag> central_tags(tags);
-    central_ref.reset(new ParentHistogramImpl(
-        final_name, parent_, std::move(central_tag_extracted_name), std::move(central_tags)));
+    central_ref.reset(new ParentHistogramImpl(final_name, parent_, *this,
+                                              std::move(central_tag_extracted_name),
+                                              std::move(central_tags)));
   }
-  TlsHistogramSharedPtr hist_tls_ptr(new ThreadLocalHistogramImpl(
-      final_name, parent_, std::move(tag_extracted_name), std::move(tags)));
+  return *central_ref;
+}
+
+Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name) {
+  // Here prefix will not be considered because, by the time ParentHistogram calls this method
+  // during recordValue, the prefix is already attached to the name.
+  TlsHistogramSharedPtr* tls_ref = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[name];
+  }
+
+  if (tls_ref && *tls_ref) {
+    return **tls_ref;
+  }
+
+  std::unique_lock<std::mutex> lock(parent_.lock_);
+  std::vector<Tag> tags;
+  std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+  TlsHistogramSharedPtr hist_tls_ptr(
+      new ThreadLocalHistogramImpl(name, std::move(tag_extracted_name), std::move(tags)));
+  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[name];
   central_ref->addTlsHistogram(hist_tls_ptr);
 
   if (tls_ref) {
@@ -284,11 +295,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   return *hist_tls_ptr;
 }
 
-ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name, Store& parent,
+ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
                                                    std::string&& tag_extracted_name,
                                                    std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
-      current_active_(0), flags_(0) {
+    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), current_active_(0),
+      flags_(0), created_thread_id_(std::this_thread::get_id()) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -299,8 +310,8 @@ ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
 }
 
 void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
+  ASSERT(std::this_thread::get_id() == created_thread_id_);
   hist_insert_intscale(histograms_[current_active_], value, 0, 1);
-  parent_.deliverHistogramToSinks(*this, value);
   flags_ |= Flags::Used;
 }
 
@@ -310,20 +321,26 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(histograms_[other_histogram_index]);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
+ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
                                          std::string&& tag_extracted_name, std::vector<Tag>&& tags)
     : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
-      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+      tlsScope_(tlsScope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
-
-bool ParentHistogramImpl::used() const {
-  std::unique_lock<std::mutex> lock(merge_lock_);
-  return usedLockHeld();
-}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
+}
+
+void ParentHistogramImpl::recordValue(uint64_t value) {
+  Histogram& tls_histogram = tlsScope_.tlsHistogram(name());
+  tls_histogram.recordValue(value);
+  parent_.deliverHistogramToSinks(*this, value);
+}
+
+bool ParentHistogramImpl::used() const {
+  std::unique_lock<std::mutex> lock(merge_lock_);
+  return usedLockHeld();
 }
 
 void ParentHistogramImpl::merge() {

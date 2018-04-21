@@ -217,6 +217,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, &store_->gauge("g1"));
 
   Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);

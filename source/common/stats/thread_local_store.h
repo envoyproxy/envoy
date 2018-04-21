@@ -21,60 +21,65 @@ namespace Stats {
  * histograms, one to collect the values and other as backup that is used for merge process. The
  * swap happens during the merge process.
  */
-class ThreadLocalHistogram : public virtual Histogram {
+class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
 public:
-  virtual ~ThreadLocalHistogram() {}
+  ThreadLocalHistogramImpl(const std::string& name, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags);
+
+  ~ThreadLocalHistogramImpl();
+
+  void merge(histogram_t* target);
 
   /**
    * Called in the beginning of merge process. Swaps the histogram used for collection so that we do
    * not have to lock the histogram in high throughput TLS writes.
    */
-  virtual void beginMerge() PURE;
-};
-
-/**
- * Log Linear Histogram implementation per thread.
- */
-class ThreadLocalHistogramImpl : public ThreadLocalHistogram, public MetricImpl {
-public:
-  ThreadLocalHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags);
-
-  ~ThreadLocalHistogramImpl();
-  // Stats::Histogram
-  void recordValue(uint64_t value) override;
-  void merge(histogram_t* target);
-
-  bool used() const override { return flags_ & Flags::Used; }
-  void beginMerge() override {
+  void beginMerge() {
     // This switches the current_active_ between 1 and 0.
     current_active_ = otherHistogramIndex();
   }
 
-  Store& parent_;
+  // Stats::Histogram
+  void recordValue(uint64_t value) override;
+  bool used() const override { return flags_ & Flags::Used; }
 
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
+  std::thread::id created_thread_id_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
+
+/**
+ * Class used to create ThreadLocalHistogram in the scope.
+ */
+class TlsScope : public Scope {
+public:
+  virtual ~TlsScope() {}
+
+  /**
+   * @return a ThreadLocalHistogram within the scope's namespace.
+   */
+  virtual Histogram& tlsHistogram(const std::string& name) PURE;
+};
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
 class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
-  ParentHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                      std::vector<Tag>&& tags);
+  ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
+                      std::string&& tag_extracted_name, std::vector<Tag>&& tags);
 
   virtual ~ParentHistogramImpl();
+
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
 
   bool used() const override;
-
+  void recordValue(uint64_t value) override;
   /**
    * This method is called during the main stats flush process for each of the histograms. It
    * iterates through the TLS histograms and collects the histogram data of all of them
@@ -88,17 +93,17 @@ public:
     return cumulative_statistics_;
   }
 
-  Store& parent_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_;
-
 private:
   bool usedLockHeld() const;
 
+  Store& parent_;
+  TlsScope& tlsScope_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable std::mutex merge_lock_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_;
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
@@ -136,8 +141,9 @@ typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
  * Each Histogram implementation will have 2 parts.
  *  - "main" thread parent which is called "ParentHistogram".
  *  - "per-thread" collector which is called "ThreadLocalHistogram".
- * Worker threads will write into their per-thread collector, without needing any locking.
- * During the flush process the following sequence is followed.
+ * Worker threads will write to ParentHistogram which checks whether a TLS histogram is available.
+ * If there is a TLS histogram already available it will write to it otherwise creates one and
+ * writes to it. During the flush process the following sequence is followed.
  *  - The main thread starts the flush process by posting a message to every worker which tells the
  *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
  *    to "beginMerge" method.
@@ -198,7 +204,7 @@ private:
     std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
   };
 
-  struct ScopeImpl : public Scope {
+  struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
         : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
@@ -211,6 +217,7 @@ private:
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
+    Histogram& tlsHistogram(const std::string& name) override;
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;

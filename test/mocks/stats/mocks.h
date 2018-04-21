@@ -88,6 +88,7 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
   MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
   MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
 
