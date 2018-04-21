@@ -398,6 +398,8 @@ public:
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
     // Use IP_FREEBIND socket option when binding.
     static const uint64_t FREEBIND = 0x4;
+    // Whether connections should be immediately closed upon health failure.
+    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x8;
   };
 
   virtual ~ClusterInfo() {}

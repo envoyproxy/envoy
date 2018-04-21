@@ -41,7 +41,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 30]
+// [#comment:next free field: 31]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -427,6 +427,12 @@ message Cluster {
 
   // Determines how Envoy selects the protocol used to speak to upstream hosts.
   ClusterProtocolSelection protocol_selection = 26;
+
+  // If an upstream host becomes unhealthy (as determined by the coonfigured health checks
+  // or outlier detection), immediately close all connections to the failed host.
+  //
+  // This is currently only supported for connections created by tcp_proxy.
+  bool close_connections_on_host_health_failure = 30;
 }
 
 // An extensible structure containing the address Envoy should bind to when

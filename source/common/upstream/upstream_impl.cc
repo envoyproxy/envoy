@@ -68,6 +68,9 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
       config.upstream_bind_config().freebind().value()) {
     features |= ClusterInfoImpl::Features::FREEBIND;
   }
+  if (config.close_connections_on_host_health_failure()) {
+    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  }
   return features;
 }
 
