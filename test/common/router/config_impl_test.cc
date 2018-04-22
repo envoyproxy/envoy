@@ -3925,6 +3925,8 @@ virtual_hosts:
         redirect: { prefix_rewrite: "/new/regex-prefix/" }
       - match: { prefix: "/http/prefix"}
         redirect: { prefix_rewrite: "/https/prefix" , https_redirect: true }
+      - match: { prefix: "/ignore-this"}
+        redirect: { prefix_rewrite: "/" }
   )EOF";
 
   NiceMock<Runtime::MockLoader> runtime;
@@ -3968,6 +3970,14 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers);
     EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/ignore-this/however/use/the/rest/of/this/path", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/however/use/the/rest/of/this/path",
+              redirect->newPath(headers));
   }
 }
 

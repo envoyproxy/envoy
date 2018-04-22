@@ -372,7 +372,8 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
   std::string path = headers.Path()->value().c_str();
   headers.insertEnvoyOriginalPath().value(*headers.Path());
   ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
+  headers.Path()->value(
+      Envoy::Config::Utility::normalizePath(path.replace(0, matched_path.size(), rewrite)));
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
