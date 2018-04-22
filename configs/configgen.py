@@ -4,6 +4,7 @@ from collections import OrderedDict
 import os
 import sys
 import shutil
+import yaml
 
 SCRIPT_DIR = os.path.dirname(__file__)
 OUT_DIR = sys.argv[1]
@@ -85,20 +86,18 @@ def generate_config(template_path, template, output_file, **context):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
                              undefined=jinja2.StrictUndefined)
     raw_output = env.get_template(template).render(**context)
-    # Verify valid JSON and then dump it nicely formatted to avoid jinja pain.
-    output = json.loads(raw_output, object_pairs_hook=OrderedDict)
     with open(output_file, 'w') as fh:
-        json.dump(output, fh, indent=2)
+        yaml.dump(raw_output, fh)
 
 # Generate a demo config for the main front proxy. This sets up both HTTP and HTTPS listeners,
 # as well as a listener for the double proxy to connect to via SSL client authentication.
-generate_config(SCRIPT_DIR, 'envoy_front_proxy.template.json',
-                '{}/envoy_front_proxy.json'.format(OUT_DIR), clusters=front_envoy_clusters)
+generate_config(SCRIPT_DIR, 'envoy_front_proxy_v2.template.yaml',
+                '{}/envoy_front_proxy.yaml'.format(OUT_DIR), clusters=front_envoy_clusters)
 
 # Generate a demo config for the double proxy. This sets up both an HTTP and HTTPS listeners,
 # and backhauls the traffic to the main front proxy.
-generate_config(SCRIPT_DIR, 'envoy_double_proxy.template.json',
-                '{}/envoy_double_proxy.json'.format(OUT_DIR))
+generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
+                '{}/envoy_double_proxy.yaml'.format(OUT_DIR))
 
 # Generate a demo config for the service to service (local) proxy. This sets up several different
 # listeners:
@@ -108,11 +107,11 @@ generate_config(SCRIPT_DIR, 'envoy_double_proxy.template.json',
 # optional external service ports: built from external_virtual_hosts above. Each external host
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
-generate_config(SCRIPT_DIR, 'envoy_service_to_service.template.json',
-                '{}/envoy_service_to_service.json'.format(OUT_DIR),
-                internal_virtual_hosts=service_to_service_envoy_clusters,
-                external_virtual_hosts=external_virtual_hosts,
-                mongos_servers=mongos_servers)
+# generate_config(SCRIPT_DIR, 'envoy_service_to_service.template.json',
+                # '{}/envoy_service_to_service.json'.format(OUT_DIR),
+                # internal_virtual_hosts=service_to_service_envoy_clusters,
+                # external_virtual_hosts=external_virtual_hosts,
+                # mongos_servers=mongos_servers)
 
-for google_ext in ['json', 'yaml', 'v2.yaml']:
+for google_ext in ['yaml','json','v2.yaml']:
   shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)

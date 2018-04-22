@@ -92,6 +92,6 @@ static_resources:
           address: collector-grpc.lightstep.com
           port_value: 443
   listeners:
-    - {{ listener("TCP", "0.0.0.0", "9300")|indent(4) }}
-    - {{ listener("TCP", "0.0.0.0", "9301")|indent(4) }}
-    - {{ listener("TCP", "0.0.0.0", "9400")|indent(4) }}
+    - {{ listener("TCP", "0.0.0.0", "9300", True)|indent(4) }}
+    - {{ listener("TCP", "0.0.0.0", "9301", True)|indent(4) }}
+    - {{ listener("TCP", "0.0.0.0", "9400", True)|indent(4) }}
