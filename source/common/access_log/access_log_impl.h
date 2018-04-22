@@ -11,7 +11,7 @@
 #include "envoy/server/access_log_config.h"
 
 #include "common/protobuf/protobuf.h"
-#include "common/router/config_utility.h"
+#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -152,7 +152,7 @@ private:
 };
 
 /**
- * Filter requests based on its headers.
+ * Filter based on headers.
  */
 class HeaderFilter : public Filter {
 public:
@@ -163,7 +163,7 @@ public:
                 const Http::HeaderMap& request_headers) override;
 
 private:
-  std::vector<Router::ConfigUtility::HeaderData> header_data_;
+  std::vector<Http::HeaderUtility::HeaderData> header_data_;
 };
 
 /**

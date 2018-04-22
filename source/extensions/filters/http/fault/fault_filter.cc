@@ -18,7 +18,6 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +50,7 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
-  for (const Router::ConfigUtility::HeaderData& header_map : fault.headers()) {
+  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
     fault_filter_headers_.push_back(header_map);
   }
 
@@ -80,7 +79,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
 
   // Check for header matches
-  if (!Router::ConfigUtility::matchHeaders(headers, config_->filterHeaders())) {
+  if (!Http::HeaderUtility::matchHeaders(headers, config_->filterHeaders())) {
     return Http::FilterHeadersStatus::Continue;
   }
 

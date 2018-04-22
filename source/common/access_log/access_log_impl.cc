@@ -14,9 +14,9 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/router/config_utility.h"
 #include "common/runtime/uuid_util.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -166,12 +166,12 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const 
 }
 
 HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config) {
-  header_data_.push_back(Router::ConfigUtility::HeaderData(config.header()));
+  header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
 }
 
 bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
                             const Http::HeaderMap& request_headers) {
-  return Router::ConfigUtility::matchHeaders(request_headers, header_data_);
+  return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
 InstanceSharedPtr
