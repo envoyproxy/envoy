@@ -215,7 +215,7 @@ private:
   Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
-  // Admin case, so there's no reason to export them to the sinks.
+  // Admin case.
   Stats::IsolatedStoreImpl no_op_store_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
