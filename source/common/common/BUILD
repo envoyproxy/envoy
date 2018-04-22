@@ -179,8 +179,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "shared_memory_hash_set_lib",
-    hdrs = ["shared_memory_hash_set.h"],
+    name = "block_memory_hash_set_lib",
+    hdrs = ["block_memory_hash_set.h"],
     deps = [
         ":assert_lib",
         ":logger_lib",
