@@ -270,6 +270,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name) {
+  // See comments in counter() which explains the logic here.
+
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
@@ -284,8 +286,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   std::unique_lock<std::mutex> lock(parent_.lock_);
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-  TlsHistogramSharedPtr hist_tls_ptr(
-      new ThreadLocalHistogramImpl(name, std::move(tag_extracted_name), std::move(tags)));
+  TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
+      name, std::move(tag_extracted_name), std::move(tags));
+
   ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[name];
   central_ref->addTlsHistogram(hist_tls_ptr);
 
@@ -316,9 +319,9 @@ void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
 }
 
 void ThreadLocalHistogramImpl::merge(histogram_t* target) {
-  const uint64_t other_histogram_index = otherHistogramIndex();
-  hist_accumulate(target, &histograms_[other_histogram_index], 1);
-  hist_clear(histograms_[other_histogram_index]);
+  histogram_t** other_histogram = &histograms_[otherHistogramIndex()];
+  hist_accumulate(target, other_histogram, 1);
+  hist_clear(*other_histogram);
 }
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
@@ -347,6 +350,10 @@ void ParentHistogramImpl::merge() {
   std::unique_lock<std::mutex> lock(merge_lock_);
   if (usedLockHeld()) {
     hist_clear(interval_histogram_);
+    // Here we could copy all the pointers to TLS histograms in the tls_histogram_ list,
+    // then release the lock before we do the actual merge. However it is not a big deal
+    // because the tls_histogram merge is not that expensive as it is a single histogram
+    // merge and adding TLS histograms is rare.
     for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
       tls_histogram->merge(interval_histogram_);
     }
