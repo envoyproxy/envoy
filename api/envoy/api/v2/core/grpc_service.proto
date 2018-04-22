@@ -58,6 +58,11 @@ message GrpcService {
     // Additional configuration for site-specific customizations of the Google
     // gRPC library.
     google.protobuf.Struct config = 4;
+
+    // The name of the Google gRPC credentials factory to use. This must have been registered with
+    // Envoy. If this is empty, a default credentials factory will be used that sets up channel
+    // credentials based on other configuration parameters.
+    string credentials_factory_name = 5;
   }
 
   oneof target_specifier {
