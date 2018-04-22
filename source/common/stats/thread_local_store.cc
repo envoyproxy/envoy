@@ -100,7 +100,8 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
-  if (!shutting_down_) {
+  if (!shutting_down_ && !merge_in_progress_) {
+    merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
           for (ScopeImpl* scope : scopes_) {
@@ -121,6 +122,7 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
       histogram->merge();
     }
     merge_complete_cb();
+    merge_in_progress_ = false;
   }
 }
 

@@ -248,6 +248,7 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   std::atomic<bool> shutting_down_{};
+  std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
 };
