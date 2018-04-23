@@ -367,7 +367,8 @@ public:
    * Called during the flush process to merge all the thread local histograms. The passed in
    * callback will be called on the main thread, but it will happen after the method returns
    * which means that the actual flush process will happen on the main thread after this method
-   * returns.
+   * returns. It is expected that only one merge runs at any time and concurrent calls to this
+   * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 };
