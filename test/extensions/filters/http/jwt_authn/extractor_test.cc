@@ -45,11 +45,11 @@ class ExtractorTest : public ::testing::Test {
 public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    extractor_.reset(new Extractor(config_));
+    extractor_ = createExtractor(config_);
   }
 
   JwtAuthentication config_;
-  std::unique_ptr<Extractor> extractor_;
+  ExtractorConstPtr extractor_;
 };
 
 TEST_F(ExtractorTest, TestNoToken) {

@@ -42,7 +42,7 @@ public:
 
 private:
   // Extracted token.
-  std::string token_;
+  const std::string token_;
   // Stored issuers specified the location.
   const std::unordered_set<std::string>& specified_issuers_;
 };
@@ -75,29 +75,69 @@ public:
 private:
 };
 
-} // namespace
+/**
+ * The class implements Extractor interface
+ *
+ */
+class ExtractorImpl : public Extractor {
+public:
+  ExtractorImpl(const JwtAuthentication& config);
 
-Extractor::Extractor(const JwtAuthentication& config) {
+  std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
+
+private:
+  // add a header config
+  void addHeaderConfig(const std::string& issuer, const Http::LowerCaseString& header_name,
+                       const std::string& value_prefix);
+  // add a query param config
+  void addQueryParamConfig(const std::string& issuer, const std::string& param);
+
+  // HeaderMap value type to store prefix and issuers that specified this
+  // header.
+  struct HeaderMapValue {
+    HeaderMapValue(const Http::LowerCaseString& header, const std::string value_prefix)
+        : header_(header), value_prefix_(value_prefix) {}
+    // The header name.
+    Http::LowerCaseString header_;
+    // The value prefix.
+    std::string value_prefix_;
+    // Issuers that specified this header.
+    std::unordered_set<std::string> specified_issuers_;
+  };
+  typedef std::unique_ptr<HeaderMapValue> HeaderMapValuePtr;
+  // The map of (header + value_prefix) to HeaderMapValue
+  std::map<std::string, HeaderMapValuePtr> header_maps_;
+
+  // ParamMap value type to store issuers that specified this header.
+  struct ParamMapValue {
+    // Issuers that specified this param.
+    std::unordered_set<std::string> specified_issuers_;
+  };
+  // The map of parameters to set of issuers.
+  std::map<std::string, ParamMapValue> param_maps_;
+};
+
+ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
   for (const auto& rule : config.rules()) {
     for (const auto& header : rule.from_headers()) {
       addHeaderConfig(rule.issuer(), LowerCaseString(header.name()), header.value_prefix());
     }
     for (const std::string& param : rule.from_params()) {
-      addParamConfig(rule.issuer(), param);
+      addQueryParamConfig(rule.issuer(), param);
     }
 
     // If not specified, use default locations.
     if (rule.from_headers().empty() && rule.from_params().empty()) {
       addHeaderConfig(rule.issuer(), Http::Headers::get().Authorization,
                       JwtConstValues::get().BearerPrefix);
-      addParamConfig(rule.issuer(), JwtConstValues::get().AccessTokenParam);
+      addQueryParamConfig(rule.issuer(), JwtConstValues::get().AccessTokenParam);
     }
   }
 }
 
-void Extractor::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
-                                const std::string& value_prefix) {
-  std::string map_key = header_name.get() + value_prefix;
+void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
+                                    const std::string& value_prefix) {
+  const std::string map_key = header_name.get() + value_prefix;
   auto& map_value = header_maps_[map_key];
   if (!map_value) {
     map_value.reset(new HeaderMapValue(header_name, value_prefix));
@@ -105,13 +145,13 @@ void Extractor::addHeaderConfig(const std::string& issuer, const LowerCaseString
   map_value->specified_issuers_.insert(issuer);
 }
 
-void Extractor::addParamConfig(const std::string& issuer, const std::string& param) {
+void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::string& param) {
   auto& map_value = param_maps_[param];
   map_value.specified_issuers_.insert(issuer);
 }
 
-std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) const {
-  std::vector<JwtLocationPtr> tokens;
+std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
+  std::vector<JwtLocationConstPtr> tokens;
   // Check header first
   for (const auto& header_it : header_maps_) {
     const auto& map_value = header_it.second;
@@ -146,6 +186,12 @@ std::vector<JwtLocationPtr> Extractor::extract(const Http::HeaderMap& headers) c
     }
   }
   return tokens;
+}
+
+} // namespace
+
+ExtractorConstPtr createExtractor(const JwtAuthentication& config) {
+  return ExtractorConstPtr(new ExtractorImpl(config));
 }
 
 } // namespace JwtAuthn
