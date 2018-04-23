@@ -184,7 +184,8 @@ message StatsdSink {
   string prefix = 3;
 }
 
-// can it be empty?
+// Stats configuration proto schema for built-in *envoy.hystrix* sink.
+// The sink emits stats in SSE format for use with Hystrix dashboard
 message HystrixSink {
   int64 num_of_buckets = 1;
 }

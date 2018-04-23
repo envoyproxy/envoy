@@ -151,13 +151,13 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 void AdminFilter::onDestroy() {
-  for (auto callback : on_destroy_callbacks_) {
+  for (const auto& callback : on_destroy_callbacks_) {
     callback();
   }
 }
 
 void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
-  on_destroy_callbacks_.push_back(cb);
+  on_destroy_callbacks_.push_back(std::move(cb));
 }
 
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {

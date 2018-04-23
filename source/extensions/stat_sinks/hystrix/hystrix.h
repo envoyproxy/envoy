@@ -18,8 +18,7 @@ public:
   HystrixStatCache()
       : current_index_(DEFAULT_NUM_OF_BUCKETS), window_size_(DEFAULT_NUM_OF_BUCKETS + 1){};
 
-  HystrixStatCache(uint64_t num_of_buckets)
-      : current_index_(num_of_buckets), window_size_(num_of_buckets + 1){};
+  HystrixStatCache(uint64_t num_of_buckets) : current_index_(num_of_buckets), window_size_(num_of_buckets + 1){};
 
   /**
    * Add new value to top of rolling window, pushing out the oldest value.
@@ -41,9 +40,8 @@ public:
   /**
    * Calculate values needed to create the stream and write into the map.
    */
-  void updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
-                              const std::string cluster_name);
-
+  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info, Stats::Store& stats);
+;
   /**
    * Clear map.
    */
@@ -103,22 +101,23 @@ private:
   std::map<std::string, std::map<std::string, std::string>> counter_name_lookup;
 };
 
-typedef std::unique_ptr<HystrixStatCache> HystrixPtr;
+typedef std::unique_ptr<HystrixStatCache> HystrixStatCachePtr;
 
 namespace Hystrix {
 
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
+  HystrixSink(Server::Instance& server, uint64_t num_of_buckets);
   HystrixSink(Server::Instance& server);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminFilter& admin_filter);
+  void init();
   void beginFlush() override;
-  void flushCounter(const Stats::Counter& counter, uint64_t delta) override;
+  void flushCounter(const Stats::Counter&, uint64_t) override{};
   void flushGauge(const Stats::Gauge&, uint64_t) override{};
   void endFlush() override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 
-  // TODO (@trabetti) : support multiple connections
   /**
    * register a new connection
    */
@@ -130,9 +129,9 @@ public:
   HystrixStatCache& getStats() { return *stats_; }
 
 private:
-  HystrixPtr stats_;
+  HystrixStatCachePtr stats_;
   std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_{};
-  Server::Instance* server_;
+  Server::Instance& server_;
   std::map<std::string, uint64_t> current_stat_values_;
 };
 

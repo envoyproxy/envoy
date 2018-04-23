@@ -14,9 +14,14 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
-Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message&,
+Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                    Server::Instance& server) {
-  return std::make_unique<Hystrix::HystrixSink>(server);
+  const auto& hystrix_sink =
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::HystrixSink&>(config);
+  if (hystrix_sink.num_of_buckets() == 0) { // if not set
+    return std::make_unique<Hystrix::HystrixSink>(server);
+  }
+  return std::make_unique<Hystrix::HystrixSink>(server, hystrix_sink.num_of_buckets());
 }
 
 ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {

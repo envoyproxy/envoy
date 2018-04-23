@@ -30,8 +30,7 @@ void HystrixStatCache::pushNewValue(const std::string& key, uint64_t value) {
 }
 
 uint64_t HystrixStatCache::getRollingValue(absl::string_view cluster_name, absl::string_view stat) {
-  std::string key;
-  key = absl::StrCat("cluster.", cluster_name, ".", stat);
+  std::string key = absl::StrCat("cluster.", cluster_name, ".", stat);
   if (rolling_stats_map_.find(key) != rolling_stats_map_.end()) {
     // If the counter was reset, the result is negative
     // better return 0, will be back to normal once one rolling window passes.
@@ -51,12 +50,6 @@ void HystrixStatCache::CreateCounterNameLookupForCluster(const std::string& clus
   // Building lookup name map for all specific cluster values.
   // Every call to the updateRollingWindowMap function should get the appropriate name from the map.
   std::string cluster_name_with_prefix = absl::StrCat("cluster.", cluster_name, ".");
-  counter_name_lookup[cluster_name]["upstream_rq_timeout"] =
-      absl::StrCat(cluster_name_with_prefix, "upstream_rq_timeout");
-  counter_name_lookup[cluster_name]["upstream_rq_per_try_timeout"] =
-      absl::StrCat(cluster_name_with_prefix, "upstream_rq_per_try_timeout");
-  counter_name_lookup[cluster_name]["timeouts"] =
-      absl::StrCat(cluster_name_with_prefix, "timeouts");
   counter_name_lookup[cluster_name]["upstream_rq_5xx"] =
       absl::StrCat(cluster_name_with_prefix, "upstream_rq_5xx");
   counter_name_lookup[cluster_name]["retry.upstream_rq_5xx"] =
@@ -69,15 +62,16 @@ void HystrixStatCache::CreateCounterNameLookupForCluster(const std::string& clus
   counter_name_lookup[cluster_name]["upstream_rq_2xx"] =
       absl::StrCat(cluster_name_with_prefix, "upstream_rq_2xx");
   counter_name_lookup[cluster_name]["success"] = absl::StrCat(cluster_name_with_prefix, "success");
-  counter_name_lookup[cluster_name]["upstream_rq_pending_overflow"] =
-      absl::StrCat(cluster_name_with_prefix, "upstream_rq_pending_overflow");
   counter_name_lookup[cluster_name]["rejected"] =
       absl::StrCat(cluster_name_with_prefix, "rejected");
-  counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
+  counter_name_lookup[cluster_name]["timeouts"] =
+      absl::StrCat(cluster_name_with_prefix, "timeouts");
+ counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
 }
 
-void HystrixStatCache::updateRollingWindowMap(std::map<std::string, uint64_t> current_stat_values,
-                                              std::string cluster_name) {
+void HystrixStatCache::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info, Stats::Store& stats) {
+  std::string cluster_name = cluster_info->name();
+  Upstream::ClusterStats& cluster_stats = cluster_info->stats();
 
   if (counter_name_lookup.find(cluster_name) == counter_name_lookup.end()) {
     CreateCounterNameLookupForCluster(cluster_name);
@@ -86,8 +80,8 @@ void HystrixStatCache::updateRollingWindowMap(std::map<std::string, uint64_t> cu
   // Combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1).
   uint64_t timeouts =
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_timeout"]] +
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_per_try_timeout"]];
+      cluster_stats.upstream_rq_timeout_.value() +
+      cluster_stats.upstream_rq_per_try_timeout_.value();
 
   pushNewValue(counter_name_lookup[cluster_name]["timeouts"], timeouts);
 
@@ -96,19 +90,19 @@ void HystrixStatCache::updateRollingWindowMap(std::map<std::string, uint64_t> cu
   // since timeouts are 504 (or 408), deduce them from here ("-" sign).
   // Timeout retries were not counted here anyway.
   uint64_t errors =
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_5xx"]] +
-      current_stat_values[counter_name_lookup[cluster_name]["retry.upstream_rq_5xx"]] +
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_4xx"]] +
-      current_stat_values[counter_name_lookup[cluster_name]["retry.upstream_rq_4xx"]] -
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_timeout"]];
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_5xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["retry.upstream_rq_5xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["upstream_rq_4xx"]).value() +
+      stats.counter(counter_name_lookup[cluster_name]["retry.upstream_rq_4xx"]).value() -
+      cluster_stats.upstream_rq_timeout_.value();
 
   pushNewValue(counter_name_lookup[cluster_name]["errors"], errors);
 
-  uint64_t success = current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_2xx"]];
+  uint64_t success = stats.counter(counter_name_lookup[cluster_name]["upstream_rq_2xx"]).value();
   pushNewValue(counter_name_lookup[cluster_name]["success"], success);
 
   uint64_t rejected =
-      current_stat_values[counter_name_lookup[cluster_name]["upstream_rq_pending_overflow"]];
+      cluster_stats.upstream_rq_pending_overflow_.value();
   pushNewValue(counter_name_lookup[cluster_name]["rejected"], rejected);
 
   // should not take from upstream_rq_total since it is updated before its components,
@@ -263,14 +257,23 @@ const std::string HystrixStatCache::printRollingWindow() const {
 }
 
 namespace Hystrix {
+HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_of_buckets)
+    : stats_(new HystrixStatCache(num_of_buckets)), server_(server) {
+init();
+}
+
 HystrixSink::HystrixSink(Server::Instance& server)
-    : stats_(new HystrixStatCache()), server_(&server) {
-  Server::Admin& admin = server_->admin();
+    : stats_(new HystrixStatCache()), server_(server) {
+  init();
+}
+
+void HystrixSink::init() {
+  Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
   admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
-};
+}
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,
@@ -310,24 +313,15 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
 
 void HystrixSink::beginFlush() { current_stat_values_.clear(); }
 
-void HystrixSink::flushCounter(const Stats::Counter& counter, uint64_t) {
-  if (callbacks_list_.empty()) {
-    return;
-  }
-  if (counter.name().find("upstream_rq_") != std::string::npos) {
-    current_stat_values_[counter.name()] = counter.value();
-  }
-}
-// void HystrixSink::flushGauge(const Gauge& gauge, uint64_t value);
 void HystrixSink::endFlush() {
   if (callbacks_list_.empty())
     return;
   stats_->incCounter();
-  for (auto& cluster : server_->clusterManager().clusters()) {
-    stats_->updateRollingWindowMap(current_stat_values_, cluster.second.get().info()->name());
+  for (auto& cluster : server_.clusterManager().clusters()) {
+    stats_->updateRollingWindowMap(cluster.second.get().info(), server_.stats());
   }
   std::stringstream ss;
-  for (auto& cluster : server_->clusterManager().clusters()) {
+  for (auto& cluster : server_.clusterManager().clusters()) {
     stats_->getClusterStats(
         ss, cluster.second.get().info()->name(),
         cluster.second.get()
@@ -335,10 +329,10 @@ void HystrixSink::endFlush() {
             ->resourceManager(Upstream::ResourcePriority::Default)
             .pendingRequests()
             .max(),
-        server_->stats()
+        server_.stats()
             .gauge("cluster." + cluster.second.get().info()->name() + ".membership_total")
             .value(),
-        server_->statsFlushInterval().count());
+        server_.statsFlushInterval().count());
   }
   Buffer::OwnedImpl data;
   for (auto callbacks : callbacks_list_) {
@@ -363,6 +357,7 @@ void HystrixSink::unregisterConnection(Http::StreamDecoderFilterCallbacks* callb
   for (auto it = callbacks_list_.begin(); it != callbacks_list_.end();) {
     if ((*it)->streamId() == callbacks_to_remove->streamId()) {
       it = callbacks_list_.erase(it);
+      break;
     } else {
       ++it;
     }

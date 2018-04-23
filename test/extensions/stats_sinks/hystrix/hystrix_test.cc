@@ -27,7 +27,7 @@ namespace Hystrix {
 
 class HystrixSinkTest : public testing::Test {
 public:
-  HystrixSinkTest() { sink_.reset(new HystrixSink(server_)); }
+  HystrixSinkTest() { sink_.reset(new HystrixSink(server_, 10)); }
 
   absl::string_view getStreamField(absl::string_view dataMessage, absl::string_view key) {
     absl::string_view::size_type key_pos = dataMessage.find(key);
