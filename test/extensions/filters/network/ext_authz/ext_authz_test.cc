@@ -61,7 +61,8 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  Filters::Common::ExtAuthz::ResponsePtr makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
+  Filters::Common::ExtAuthz::ResponsePtr
+  makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
     Filters::Common::ExtAuthz::ResponsePtr response =
         std::make_unique<Filters::Common::ExtAuthz::Response>();
     response->status = status;

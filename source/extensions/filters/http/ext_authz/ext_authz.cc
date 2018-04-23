@@ -125,7 +125,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     for (const auto& header : response->headers) {
       response_headers->setReferenceKey(header.first, header.second);
     }
-    
+
     if (response->body) {
       callbacks_->encodeHeaders(std::move(response_headers), false);
       callbacks_->encodeData(*response->body.get(), true);

@@ -38,9 +38,7 @@ namespace ExtAuthz {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  void onComplete(ResponsePtr&& response) override {
-    onComplete_(response);
-  }
+  void onComplete(ResponsePtr&& response) override { onComplete_(response); }
 
   MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
 };
