@@ -12,6 +12,7 @@
 #include "common/request_info/utility.h"
 
 #include "absl/strings/str_split.h"
+#include "fmt/format.h"
 
 using Envoy::Config::Metadata;
 
@@ -34,8 +35,9 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
 std::string
 AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
   if (time) {
-    return std::to_string(
-        std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count());
+    return fmt::FormatInt(
+               std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count())
+        .str();
   } else {
     return UnspecifiedValueString;
   }
@@ -211,7 +213,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return std::to_string(request_info.bytesReceived());
+      return fmt::FormatInt(request_info.bytesReceived()).str();
     };
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
@@ -219,12 +221,12 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "RESPONSE_CODE") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.responseCode() ? std::to_string(request_info.responseCode().value())
+      return request_info.responseCode() ? fmt::FormatInt(request_info.responseCode().value()).str()
                                          : "0";
     };
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return std::to_string(request_info.bytesSent());
+      return fmt::FormatInt(request_info.bytesSent()).str();
     };
   } else if (field_name == "DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {

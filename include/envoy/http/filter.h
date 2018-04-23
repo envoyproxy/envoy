@@ -261,7 +261,7 @@ public:
   /**
    * This routine may be called to change the buffer limit for decoder filters.
    *
-   * @param boolean supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit.
    */
   virtual void setDecoderBufferLimit(uint32_t limit) PURE;
 
@@ -393,7 +393,7 @@ public:
   /**
    * This routine may be called to change the buffer limit for encoder filters.
    *
-   * @limit settings supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit.
    */
   virtual void setEncoderBufferLimit(uint32_t limit) PURE;
 
