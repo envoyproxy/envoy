@@ -125,8 +125,9 @@ void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
 
 void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
   ASSERT(current_slice_mem_ != nullptr);
-  // 34 > 4 (postfix chars, e.g., "|ms\n") + 30 for number (bigger than it will ever be)
-  const uint32_t max_size = name.size() + parent_.getPrefix().size() + 34;
+  // 36 > 1 ("." after prefix) + 1 (":" after name) + 4 (postfix chars, e.g., "|ms\n") + 30 for
+  // number (bigger than it will ever be)
+  const uint32_t max_size = name.size() + parent_.getPrefix().size() + 36;
   if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
     endFlush(false);
     beginFlush(false);
@@ -138,8 +139,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   const char* snapped_current = current_slice_mem_;
   memcpy(current_slice_mem_, parent_.getPrefix().c_str(), parent_.getPrefix().size());
   current_slice_mem_ += parent_.getPrefix().size();
-  *current_slice_mem_ = '.';
-  current_slice_mem_ += 1;
+  *current_slice_mem_++ = '.';
   memcpy(current_slice_mem_, name.c_str(), name.size());
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
