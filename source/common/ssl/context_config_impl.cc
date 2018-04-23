@@ -133,7 +133,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
           }
           break;
         case envoy::api::v2::auth::DownstreamTlsContext::kSessionTicketKeysSdsSecretConfig:
-          NOT_IMPLEMENTED;
+          throw EnvoyException("SDS not supported yet");
           break;
         case envoy::api::v2::auth::DownstreamTlsContext::SESSION_TICKET_KEYS_TYPE_NOT_SET:
           break;

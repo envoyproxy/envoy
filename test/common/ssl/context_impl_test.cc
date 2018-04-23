@@ -285,6 +285,12 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
+TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys_sds_secret_config();
+  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg), EnvoyException, "SDS not supported yet");
+}
+
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   std::string json = R"EOF(
   {
