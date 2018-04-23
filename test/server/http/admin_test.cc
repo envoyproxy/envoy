@@ -91,8 +91,8 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
-    return admin_.runCallback(path_and_query, request_headers_, response_headers, response,
-                              admin_filter_);
+    admin_filter_.decodeHeaders(request_headers_, false);
+    return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -155,10 +155,10 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
-  EXPECT_NO_LOGS(
-      EXPECT_EQ(Http::Code::InternalServerError,
-                admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", request_headers_,
-                                                   header_map, data, admin_filter_)));
+  admin_filter_.decodeHeaders(request_headers_, false);
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
+                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
+                                                              data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 

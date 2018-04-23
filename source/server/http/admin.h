@@ -45,9 +45,8 @@ public:
             const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
-  Http::Code runCallback(absl::string_view path_and_query, const Http::HeaderMap& request_headers,
-                         Http::HeaderMap& response_headers, Buffer::Instance& response,
-                         AdminFilter& admin_filter);
+  Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                         Buffer::Instance& response, AdminFilter& admin_filter);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -253,9 +252,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
-  void setEndStreamOnComplete(const bool& end_stream) {
-    end_stream_on_complete_ = end_stream;
-  }
+  void setEndStreamOnComplete(const bool& end_stream) { end_stream_on_complete_ = end_stream; }
 
 private:
   /**

@@ -663,7 +663,7 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
-  Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response, *this);
+  Http::Code code = parent_.runCallback(path, *header_map, response, *this);
 
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -679,7 +679,8 @@ void AdminFilter::onComplete() {
 
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
-  callbacks_->encodeHeaders(std::move(header_map), end_stream_on_complete_ && response.length() == 0);
+  callbacks_->encodeHeaders(std::move(header_map),
+                            end_stream_on_complete_ && response.length() == 0);
 
   if (response.length() > 0) {
     callbacks_->encodeData(response, end_stream_on_complete_);
@@ -772,7 +773,6 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 }
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
-                                  const Http::HeaderMap& request_headers,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
                                   AdminFilter& admin_filter) {
   Http::Code code = Http::Code::OK;
@@ -786,7 +786,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       if (handler.mutates_server_state_) {
-        const absl::string_view method = request_headers.Method()->value().getStringView();
+        const absl::string_view method =
+            admin_filter.getRequestHeaders()->Method()->value().getStringView();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);

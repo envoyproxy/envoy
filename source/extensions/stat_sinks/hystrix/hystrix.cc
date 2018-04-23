@@ -66,10 +66,11 @@ void HystrixStatCache::CreateCounterNameLookupForCluster(const std::string& clus
       absl::StrCat(cluster_name_with_prefix, "rejected");
   counter_name_lookup[cluster_name]["timeouts"] =
       absl::StrCat(cluster_name_with_prefix, "timeouts");
- counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
+  counter_name_lookup[cluster_name]["total"] = absl::StrCat(cluster_name_with_prefix, "total");
 }
 
-void HystrixStatCache::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info, Stats::Store& stats) {
+void HystrixStatCache::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
+                                              Stats::Store& stats) {
   std::string cluster_name = cluster_info->name();
   Upstream::ClusterStats& cluster_stats = cluster_info->stats();
 
@@ -79,9 +80,8 @@ void HystrixStatCache::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPt
 
   // Combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1).
-  uint64_t timeouts =
-      cluster_stats.upstream_rq_timeout_.value() +
-      cluster_stats.upstream_rq_per_try_timeout_.value();
+  uint64_t timeouts = cluster_stats.upstream_rq_timeout_.value() +
+                      cluster_stats.upstream_rq_per_try_timeout_.value();
 
   pushNewValue(counter_name_lookup[cluster_name]["timeouts"], timeouts);
 
@@ -101,8 +101,7 @@ void HystrixStatCache::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPt
   uint64_t success = stats.counter(counter_name_lookup[cluster_name]["upstream_rq_2xx"]).value();
   pushNewValue(counter_name_lookup[cluster_name]["success"], success);
 
-  uint64_t rejected =
-      cluster_stats.upstream_rq_pending_overflow_.value();
+  uint64_t rejected = cluster_stats.upstream_rq_pending_overflow_.value();
   pushNewValue(counter_name_lookup[cluster_name]["rejected"], rejected);
 
   // should not take from upstream_rq_total since it is updated before its components,
@@ -259,7 +258,7 @@ const std::string HystrixStatCache::printRollingWindow() const {
 namespace Hystrix {
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_of_buckets)
     : stats_(new HystrixStatCache(num_of_buckets)), server_(server) {
-init();
+  init();
 }
 
 HystrixSink::HystrixSink(Server::Instance& server)
@@ -296,6 +295,8 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
       admin_filter.getDecoderFilterCallbacks();
 
   registerConnection(stream_decoder_filter_callbacks);
+
+  admin_filter.setEndStreamOnComplete(false); // set streaming
 
   // Separated out just so it's easier to understand
   auto on_destroy_callback = [this, stream_decoder_filter_callbacks]() {
