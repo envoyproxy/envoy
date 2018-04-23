@@ -100,6 +100,7 @@ TEST(FilesystemImpl, IllegalPath) {
   EXPECT_TRUE(Filesystem::illegalPath("/proc/"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys/"));
+  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existant_file"));
 }
 
 TEST(FileSystemImpl, flushToLogFilePeriodically) {

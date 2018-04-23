@@ -89,7 +89,7 @@ bool illegalPath(const std::string& path) {
     return false;
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path, ex.what());
-    return false;
+    return true;
   }
 }
 

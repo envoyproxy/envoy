@@ -258,7 +258,7 @@ TEST(DiskLayer, Loop) {
   EXPECT_THROW_WITH_MESSAGE(
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
                 os_syscalls),
-      EnvoyException, "Walk recursion depth exceded 4");
+      EnvoyException, "Walk recursion depth exceded 16");
 }
 
 } // namespace Runtime

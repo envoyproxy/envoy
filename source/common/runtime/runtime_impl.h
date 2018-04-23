@@ -148,7 +148,7 @@ private:
   const std::string path_;
   Api::OsSysCalls& os_sys_calls_;
   // Maximum recursion depth for walkDirectory().
-  const uint32_t MaxWalkDepth = 4;
+  const uint32_t MaxWalkDepth = 16;
 };
 
 /**
