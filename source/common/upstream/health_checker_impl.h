@@ -27,12 +27,14 @@ public:
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
+   * @param event_logger supplies the event_logger.
    * @return a health checker.
    */
   static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
-                                       Event::Dispatcher& dispatcher);
+                                       Event::Dispatcher& dispatcher,
+                                       const HealthCheckEventLoggerSharedPtr& event_logger);
 };
 
 /**
@@ -42,13 +44,15 @@ class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random,
+                        const HealthCheckEventLoggerSharedPtr& event_logger);
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
-    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
+    HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host,
+                                 const HealthCheckEventLoggerSharedPtr& event_logger);
     ~HttpActiveHealthCheckSession();
 
     void onResponseComplete();
@@ -103,7 +107,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
+    return std::make_unique<HttpActiveHealthCheckSession>(*this, host, event_logger_);
   }
 
   const std::string path_;
@@ -182,7 +186,8 @@ class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random);
+                       Runtime::RandomGenerator& random,
+                       const HealthCheckEventLoggerSharedPtr& event_logger);
 
 private:
   struct TcpActiveHealthCheckSession;
@@ -206,8 +211,9 @@ private:
   };
 
   struct TcpActiveHealthCheckSession : public ActiveHealthCheckSession {
-    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host)
-        : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    TcpActiveHealthCheckSession(TcpHealthCheckerImpl& parent, const HostSharedPtr& host,
+                                const HealthCheckEventLoggerSharedPtr& event_logger)
+        : ActiveHealthCheckSession(parent, host, event_logger), parent_(parent) {}
     ~TcpActiveHealthCheckSession();
 
     void onData(Buffer::Instance& data);
@@ -226,7 +232,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return std::make_unique<TcpActiveHealthCheckSession>(*this, host);
+    return std::make_unique<TcpActiveHealthCheckSession>(*this, host, event_logger_);
   }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
@@ -240,13 +246,15 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random,
+                        const HealthCheckEventLoggerSharedPtr& event_logger);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
-    GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host);
+    GrpcActiveHealthCheckSession(GrpcHealthCheckerImpl& parent, const HostSharedPtr& host,
+                                 const HealthCheckEventLoggerSharedPtr& event_logger);
     ~GrpcActiveHealthCheckSession();
 
     void onRpcComplete(Grpc::Status::GrpcStatus grpc_status, const std::string& grpc_message,
@@ -313,7 +321,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
-    return std::make_unique<GrpcActiveHealthCheckSession>(*this, host);
+    return std::make_unique<GrpcActiveHealthCheckSession>(*this, host, event_logger_);
   }
 
   const Protobuf::MethodDescriptor& service_method_;

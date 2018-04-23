@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+import "envoy/api/v2/core/base.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: Health check logging]
+// [#proto-status: draft]
+
+message ActiveHealthCheckEvent {
+  string host_address = 1 [(validate.rules).string.min_bytes = 1];
+  string cluster_name = 2 [(validate.rules).string.min_bytes = 1];
+
+  oneof event {
+    option (validate.required) = true;
+
+    // Host ejection.
+    ActiveHealthCheckEjectUnhealthy eject_unhealthy_event = 3;
+
+    // Host addition.
+    ActiveHealthCheckAddHealthy add_healthy_event = 4;
+  }
+}
+
+message ActiveHealthCheckEjectUnhealthy {
+  // The timeout after which health checks fail for hosts in this cluster
+  google.protobuf.Duration timeout = 1 [(validate.rules).duration.required = true];
+
+  // The number of unhealthy health checks required before a host is marked
+  // unhealthy. Note that for *http* health checking if a host responds with 503
+  // this threshold is ignored and the host is considered unhealthy immediately.
+  google.protobuf.UInt32Value unhealthy_threshold = 2;
+
+}
+
+message ActiveHealthCheckAddHealthy {
+  // The number of healthy health checks required before a host is marked
+  // healthy. Note that during startup, only a single successful health check is
+  // required to mark a host healthy.
+  google.protobuf.UInt32Value healthy_threshold = 1;
+
+  // Whether this addition is the result of the first ever health check on a host, in which case
+  // the above healthy_threshold is bypassed and the host is immediately added.
+  bool first_check = 2;
+}

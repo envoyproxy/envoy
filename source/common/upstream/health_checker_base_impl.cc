@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_base_impl.h"
 
+#include "envoy/api/v2/core/health_check_logging.pb.h"
+
 #include "common/router/router.h"
 
 namespace Envoy {
@@ -9,14 +11,15 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random)
+                                             Runtime::RandomGenerator& random,
+                                             const HealthCheckEventLoggerSharedPtr& event_logger)
     : cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
-      interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      event_logger_(event_logger), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       unhealthy_interval_(
@@ -160,8 +163,9 @@ void HealthCheckerImplBase::start() {
 }
 
 HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
-    HealthCheckerImplBase& parent, HostSharedPtr host)
-    : host_(host), parent_(parent),
+    HealthCheckerImplBase& parent, HostSharedPtr host,
+    const HealthCheckEventLoggerSharedPtr& event_logger)
+    : host_(host), parent_(parent), event_logger_(event_logger),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
       timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
 
@@ -189,6 +193,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
+      if (event_logger_) {
+        event_logger_->logAddHealthy(host_, parent_.healthy_threshold_, first_check_);
+      }
     }
   }
 
@@ -210,6 +217,9 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(F
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
+      if (event_logger_) {
+        event_logger_->logEjectUnhealthy(host_, parent_.timeout_, parent_.unhealthy_threshold_);
+      }
     }
   }
 
@@ -240,6 +250,33 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
   handleFailure(FailureType::Network);
+}
+
+void HealthCheckEventLoggerImpl::logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+                                                   std::chrono::milliseconds timeout,
+                                                   uint32_t unhealthy_threshold) {
+  envoy::api::v2::core::ActiveHealthCheckEvent event;
+  event.set_host_address(host->address()->asString());
+  event.set_cluster_name(host->cluster().name());
+  event.mutable_eject_unhealthy_event()->mutable_timeout()->set_nanos(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
+  event.mutable_eject_unhealthy_event()->mutable_unhealthy_threshold()->set_value(
+      unhealthy_threshold);
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty print */ false);
+  std::cout << json << std::endl;
+  file_->write(fmt::format("{}\n", json));
+}
+
+void HealthCheckEventLoggerImpl::logAddHealthy(const HostDescriptionConstSharedPtr& host,
+                                               uint32_t healthy_threshold, bool first_check) {
+  envoy::api::v2::core::ActiveHealthCheckEvent event;
+  event.set_host_address(host->address()->asString());
+  event.set_cluster_name(host->cluster().name());
+  event.mutable_add_healthy_event()->mutable_healthy_threshold()->set_value(healthy_threshold);
+  event.mutable_add_healthy_event()->set_first_check(first_check);
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty print */ false);
+  std::cout << json << std::endl;
+  file_->write(fmt::format("{}\n", json));
 }
 
 } // namespace Upstream

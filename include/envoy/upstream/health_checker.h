@@ -45,5 +45,30 @@ typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
 std::ostream& operator<<(std::ostream& out, HealthState state);
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
 
+/**
+ * Sink for health check event logs.
+ */
+class HealthCheckEventLogger {
+public:
+  virtual ~HealthCheckEventLogger() {}
+
+  /**
+   * Log an unhealthy host ejection event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+                                 std::chrono::milliseconds timeout,
+                                 uint32_t unhealthy_threshold) PURE;
+
+  /**
+   * Log a healthy host addition event.
+   * @param host supplies the host that generated the event.
+   */
+  virtual void logAddHealthy(const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
+                             bool first_check) PURE;
+};
+
+typedef std::shared_ptr<HealthCheckEventLogger> HealthCheckEventLoggerSharedPtr;
+
 } // namespace Upstream
 } // namespace Envoy

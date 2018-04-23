@@ -52,7 +52,8 @@ protected:
     void start() { onIntervalBase(); }
 
   protected:
-    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
+    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host,
+                             const HealthCheckEventLoggerSharedPtr& event_logger);
 
     void handleSuccess();
     void handleFailure(FailureType type);
@@ -66,6 +67,7 @@ protected:
     void onTimeoutBase();
 
     HealthCheckerImplBase& parent_;
+    HealthCheckEventLoggerSharedPtr event_logger_;
     Event::TimerPtr interval_timer_;
     Event::TimerPtr timeout_timer_;
     uint32_t num_unhealthy_{};
@@ -77,7 +79,8 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random,
+                        const HealthCheckEventLoggerSharedPtr& event_logger);
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
 
@@ -90,6 +93,7 @@ protected:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const bool reuse_connection_;
+  HealthCheckEventLoggerSharedPtr event_logger_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
@@ -125,6 +129,22 @@ private:
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
+};
+
+class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
+public:
+  HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name)
+      : file_(log_manager.createAccessLog(file_name)) {}
+
+  virtual ~HealthCheckEventLoggerImpl() {}
+
+  void logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+                         std::chrono::milliseconds timeout, uint32_t unhealthy_threshold) override;
+  void logAddHealthy(const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
+                     bool first_check) override;
+
+private:
+  Filesystem::FileSharedPtr file_;
 };
 
 } // namespace Upstream

@@ -52,6 +52,7 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                    HealthCheckEventLoggerSharedPtr health_check_event_logger,
                                     bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
@@ -310,6 +311,7 @@ private:
   absl::optional<envoy::api::v2::core::ConfigSource> eds_config_;
   envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
+  HealthCheckEventLoggerSharedPtr health_check_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;

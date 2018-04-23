@@ -100,6 +100,7 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/router:router_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
+        "@envoy_api//envoy/api/v2/core:health_check_logging_cc",
     ],
 )
 

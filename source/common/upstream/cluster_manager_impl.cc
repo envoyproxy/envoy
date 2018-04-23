@@ -466,8 +466,8 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
 void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api,
                                      ClusterMap& cluster_map) {
-  ClusterSharedPtr new_cluster =
-      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+  ClusterSharedPtr new_cluster = factory_.clusterFromProto(
+      cluster, *this, outlier_event_logger_, health_check_event_logger_, added_via_api);
 
   if (!added_via_api) {
     if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
@@ -887,10 +887,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
+    Outlier::EventLoggerSharedPtr outlier_event_logger,
+    HealthCheckEventLoggerSharedPtr health_check_event_logger, bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
                                  runtime_, random_, main_thread_dispatcher_, local_info_,
-                                 outlier_event_logger, added_via_api);
+                                 outlier_event_logger, health_check_event_logger, added_via_api);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(

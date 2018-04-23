@@ -40,20 +40,22 @@ private:
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
-                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher) {
+                             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                             const HealthCheckEventLoggerSharedPtr& event_logger) {
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
-                                                       random);
+                                                       random, event_logger);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kTcpHealthCheck:
-    return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random);
+    return std::make_shared<TcpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime, random,
+                                                  event_logger);
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kGrpcHealthCheck:
     if (!(cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2)) {
       throw EnvoyException(fmt::format("{} cluster must support HTTP/2 for gRPC healthchecking",
                                        cluster.info()->name()));
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
-                                                       random);
+                                                       random, event_logger);
   // Deprecated redis_health_check, preserving using old config until it is removed.
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
     ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
@@ -78,8 +80,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
+                                             Runtime::RandomGenerator& random,
+                                             const HealthCheckEventLoggerSharedPtr& event_logger)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, event_logger),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())) {
@@ -89,8 +92,9 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 }
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
-    HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    HttpHealthCheckerImpl& parent, const HostSharedPtr& host,
+    const HealthCheckEventLoggerSharedPtr& event_logger)
+    : ActiveHealthCheckSession(parent, host, event_logger), parent_(parent) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   if (client_) {
@@ -241,8 +245,10 @@ bool TcpHealthCheckMatcher::match(const MatchSegments& expected, const Buffer::I
 TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                            const envoy::api::v2::core::HealthCheck& config,
                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                           Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random), send_bytes_([&config] {
+                                           Runtime::RandomGenerator& random,
+                                           const HealthCheckEventLoggerSharedPtr& event_logger)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, event_logger),
+      send_bytes_([&config] {
         Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> send_repeated;
         if (!config.tcp_health_check().send().text().empty()) {
           send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
@@ -328,8 +334,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
+                                             Runtime::RandomGenerator& random,
+                                             const HealthCheckEventLoggerSharedPtr& event_logger)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, event_logger),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")) {
   if (!config.grpc_health_check().service_name().empty()) {
@@ -338,8 +345,9 @@ GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
 }
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::GrpcActiveHealthCheckSession(
-    GrpcHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    GrpcHealthCheckerImpl& parent, const HostSharedPtr& host,
+    const HealthCheckEventLoggerSharedPtr& event_logger)
+    : ActiveHealthCheckSession(parent, host, event_logger), parent_(parent) {}
 
 GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::~GrpcActiveHealthCheckSession() {
   if (client_) {

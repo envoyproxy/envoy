@@ -15,6 +15,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
@@ -255,10 +256,11 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
-                                            ClusterManager& cm,
-                                            Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                            bool added_via_api) PURE;
+  virtual ClusterSharedPtr
+  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                   Outlier::EventLoggerSharedPtr outlier_event_logger,
+                   HealthCheckEventLoggerSharedPtr health_check_event_logger,
+                   bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.

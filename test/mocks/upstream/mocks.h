@@ -194,6 +194,13 @@ public:
   std::list<HostStatusCb> callbacks_;
 };
 
+class MockHealthCheckEventLogger : public HealthCheckEventLogger {
+public:
+  MOCK_METHOD3(logEjectUnhealthy,
+               void(const HostDescriptionConstSharedPtr&, std::chrono::milliseconds, uint32_t));
+  MOCK_METHOD3(logAddHealthy, void(const HostDescriptionConstSharedPtr&, uint32_t, bool));
+};
+
 class MockCdsApi : public CdsApi {
 public:
   MockCdsApi();

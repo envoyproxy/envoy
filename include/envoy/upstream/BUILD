@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
     deps = [
+        ":health_checker_interface",
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
         ":upstream_interface",

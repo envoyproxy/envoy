@@ -309,15 +309,13 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 }
 
-ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                         Stats::Store& stats, ThreadLocal::Instance& tls,
-                                         Network::DnsResolverSharedPtr dns_resolver,
-                                         Ssl::ContextManager& ssl_context_manager,
-                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher,
-                                         const LocalInfo::LocalInfo& local_info,
-                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                         bool added_via_api) {
+ClusterSharedPtr ClusterImplBase::create(
+    const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    const LocalInfo::LocalInfo& local_info, Outlier::EventLoggerSharedPtr outlier_event_logger,
+    HealthCheckEventLoggerSharedPtr health_check_event_logger, bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -380,8 +378,9 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     ASSERT(cluster.health_checks().size() == 1);
-    new_cluster->setHealthChecker(HealthCheckerFactory::create(
-        cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher));
+    new_cluster->setHealthChecker(
+        HealthCheckerFactory::create(cluster.health_checks()[0], *new_cluster, runtime, random,
+                                     dispatcher, health_check_event_logger));
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
