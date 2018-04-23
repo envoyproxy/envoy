@@ -16,6 +16,8 @@ genrule(
         | sed 's/^BUILD_SCM_REVISION //') \\
         > $@
     """,
+    # Undocumented attr to depend on workspace status files.
+    # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
 )
 
@@ -28,6 +30,8 @@ genrule(
     | sed 's/^BUILD_SCM_REVISION //' \\
     > $@
     """,
+    # Undocumented attr to depend on workspace status files.
+    # https://github.com/bazelbuild/bazel/issues/4942
     stamp = 1,
 )
 
