@@ -777,7 +777,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
 
     // Each connection will remove itself from the TcpConnectionsMap when it closes, via it's
-    // Network::ConnectionCallbacks.  The last removed tcp conn will remove the TcpConnectionsMap
+    // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
     while (true) {
       const auto& it = config.host_tcp_conn_map_.find(host);
