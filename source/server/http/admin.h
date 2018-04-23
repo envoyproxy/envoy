@@ -23,6 +23,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/http/config_tracker_impl.h"
 
@@ -213,6 +214,9 @@ private:
   Network::SocketPtr socket_;
   Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
+  // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
+  // Admin case.
+  Stats::IsolatedStoreImpl no_op_store_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
