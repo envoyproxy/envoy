@@ -94,7 +94,6 @@ public:
 class HistogramTest : public testing::Test, public RawStatDataAllocator {
 public:
   typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
-  InSequence s;
 
   void SetUp() override {
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
@@ -117,9 +116,6 @@ public:
     // Includes overflow stat.
     EXPECT_CALL(*this, free(_));
   }
-
-  std::vector<uint64_t> h1_cumulative_values_, h2_cumulative_values_, h1_interval_values_,
-      h2_interval_values_;
 
   NameHistogramMap makeHistogramMap(const std::list<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
@@ -204,6 +200,9 @@ public:
   TestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
+  InSequence s;
+  std::vector<uint64_t> h1_cumulative_values_, h2_cumulative_values_, h1_interval_values_,
+      h2_interval_values_;
 };
 
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
