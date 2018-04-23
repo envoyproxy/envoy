@@ -1,0 +1,29 @@
+static_resources {
+  listeners {
+    name: "listener_0"
+    address {
+      pipe {
+        path: "@"
+      }
+    }
+    filter_chains {
+      tls_context {
+        common_tls_context {
+          tls_certificates {
+            password {
+              filename: "\177\177\177\177\177\177\177\177\177\177"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}
