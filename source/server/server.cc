@@ -37,6 +37,8 @@
 #include "server/guarddog_impl.h"
 #include "server/test_hooks.h"
 
+#include "extensions/stat_sinks/hystrix/hystrix.h"
+
 namespace Envoy {
 namespace Server {
 

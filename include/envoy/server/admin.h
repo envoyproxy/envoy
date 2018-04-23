@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/config_tracker.h"
@@ -15,6 +16,7 @@
 namespace Envoy {
 namespace Server {
 
+class AdminFilter;
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
  * a callback that executes X when the specified admin handler is hit. This macro can be
@@ -23,8 +25,8 @@ namespace Server {
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
-         Buffer::Instance& data) -> Http::Code {                                                   \
-    return X(path_and_query, response_headers, data);                                              \
+         Buffer::Instance& data, Server::AdminFilter& admin_filter) -> Http::Code {                \
+    return X(path_and_query, response_headers, data, admin_filter);                                \
   }
 
 /**
@@ -43,7 +45,9 @@ public:
    * @return Http::Code the response code.
    */
   typedef std::function<Http::Code(absl::string_view path_and_query,
-                                   Http::HeaderMap& response_headers, Buffer::Instance& response)>
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminFilter& admin_filter)>
+
       HandlerCb;
 
   /**

@@ -184,6 +184,12 @@ message StatsdSink {
   string prefix = 3;
 }
 
+// Stats configuration proto schema for built-in *envoy.hystrix* sink.
+// The sink emits stats in SSE format for use with Hystrix dashboard
+message HystrixSink {
+  int64 num_of_buckets = 1;
+}
+
 // Stats configuration proto schema for built-in *envoy.dog_statsd* sink.
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
