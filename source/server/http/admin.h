@@ -253,6 +253,9 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }
+  void setEndStreamOnComplete(const bool& end_stream) {
+    end_stream_on_complete_ = end_stream;
+  }
 
 private:
   /**
@@ -264,6 +267,7 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
+  bool end_stream_on_complete_ = true;
 };
 
 /**

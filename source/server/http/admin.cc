@@ -664,11 +664,7 @@ void AdminFilter::onComplete() {
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
   Http::Code code = parent_.runCallback(path, *request_headers_, *header_map, response, *this);
-  bool end_stream = true;
 
-  if (path.find("/hystrix_event_stream") != std::string::npos) {
-    end_stream = false;
-  }
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -683,10 +679,10 @@ void AdminFilter::onComplete() {
 
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
-  callbacks_->encodeHeaders(std::move(header_map), end_stream && response.length() == 0);
+  callbacks_->encodeHeaders(std::move(header_map), end_stream_on_complete_ && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, end_stream);
+    callbacks_->encodeData(response, end_stream_on_complete_);
   }
 }
 
