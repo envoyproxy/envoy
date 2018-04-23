@@ -108,8 +108,10 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   Protobuf::util::JsonOptions json_options;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
-  // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  if (!status.ok()) {
+    throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
+                                     status.ToString(), source.DebugString()));
+  }
   MessageUtil::loadFromJson(json, dest);
 }
 
