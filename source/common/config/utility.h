@@ -265,9 +265,9 @@ public:
                                 Stats::Scope& scope);
 
   /**
-   * Normalize URI path, partially implement https://tools.ietf.org/html/rfc3986.
+   * Normalize URI path. Currently it only handles to remove repeated slashes.
    * @param path supplies the path to be normalized.
-   * @return std::string normalized path.
+   * @return std::string the normalized path.
    */
   static std::string normalizePath(absl::string_view path);
 };

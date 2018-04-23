@@ -192,8 +192,6 @@ TEST(UtilityTest, NormalizePath) {
   EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok/a/b/c"));
   EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok//a//b//c"));
   EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok///a///b///c"));
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok/./a/./b/../c"));
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok/../a/../b/.././c"));
   EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("////ok/a/b/c"));
 
   // Maintain the trailing slash.

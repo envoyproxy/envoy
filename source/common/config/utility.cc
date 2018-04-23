@@ -230,13 +230,6 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
 
 std::string Utility::normalizePath(absl::string_view path) {
   std::vector<absl::string_view> segments = StringUtil::splitToken(path, "/", false);
-
-  // Removes dot and double-dot segments https://tools.ietf.org/html/rfc3986#section-5.2.4.
-  segments.erase(
-      std::remove_if(segments.begin(), segments.end(),
-                     [](absl::string_view segment) { return segment == "." || segment == ".."; }),
-      segments.end());
-
   bool has_trailing_slash = path.back() == '/';
   return absl::StrCat("/", absl::StrJoin(segments, "/"), has_trailing_slash ? "/" : "");
 }
