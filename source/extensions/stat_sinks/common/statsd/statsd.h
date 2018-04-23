@@ -61,7 +61,7 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
-  const std::string getPrefix() { return prefix_; }
+  const std::string& getPrefix() { return prefix_; }
 
 private:
   const std::string getName(const Stats::Metric& metric);
@@ -102,7 +102,7 @@ public:
                                                  std::chrono::milliseconds(value));
   }
 
-  const std::string getPrefix() { return prefix_; }
+  const std::string& getPrefix() { return prefix_; }
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
