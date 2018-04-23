@@ -16,6 +16,8 @@ Version history
 * admin: removed `/routes` endpoint; route configs can now be found at the :ref:`/config_dump endpoint <operations_admin_interface_config_dump>`.
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
+* cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure`
+  to close tcp_proxy upstream connections when health checks fail.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
