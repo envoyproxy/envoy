@@ -170,8 +170,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), log_manager_(log_manager), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
-      local_info_(local_info), cm_stats_(generateStats(stats)),
+      random_(random), log_manager_(log_manager),
+      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
+      cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -887,12 +888,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-    Outlier::EventLoggerSharedPtr outlier_event_logger,
-    AccessLog::AccessLogManager& log_manager,
+    Outlier::EventLoggerSharedPtr outlier_event_logger, AccessLog::AccessLogManager& log_manager,
     bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, main_thread_dispatcher_, log_manager, local_info_,
-                                 outlier_event_logger, added_via_api);
+                                 runtime_, random_, main_thread_dispatcher_, log_manager,
+                                 local_info_, outlier_event_logger, added_via_api);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(

@@ -256,11 +256,11 @@ public:
   /**
    * Allocate a cluster from configuration proto.
    */
-  virtual ClusterSharedPtr
-  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger,
-                   AccessLog::AccessLogManager& log_manager,
-                   bool added_via_api) PURE;
+  virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
+                                            ClusterManager& cm,
+                                            Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                            AccessLog::AccessLogManager& log_manager,
+                                            bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.
