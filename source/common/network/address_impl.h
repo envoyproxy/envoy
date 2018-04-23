@@ -298,7 +298,9 @@ class PipeInstanceRange : public InstanceRange {
   explicit PipeInstanceRange(const std::string& pipe_path) : instance_(pipe_path) {}
 
   // InstanceRange
-  bool operator==(const PipeInstanceRange& rhs) const override { return instance_ == rhs.instance_; }
+  bool operator==(const InstanceRange& rhs) const override {
+    return asString() == rhs.asString();
+  }
   const std::string& asString() const override { return instance_.asString(); }
   const std::string& logicalName() const override {return instance_.logicalName(); }
   int bind(int fd) const override { return instance_.bind(fd); }
