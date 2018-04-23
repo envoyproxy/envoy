@@ -474,6 +474,68 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
 }
 
 /**
+ * Test when upstream closes connection without 'connection: close' like
+ * https://github.com/envoyproxy/envoy/pull/2715
+ */
+TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder1;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder1, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  // Request 2 should not kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder2;
+  ConnPoolCallbacks callbacks2;
+  handle = conn_pool_.newStream(outer_decoder2, callbacks2);
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
+
+  EXPECT_NE(nullptr, handle);
+
+  // Connect event will bind to request 1.
+  NiceMock<Http::MockStreamEncoder> request_encoder;
+  Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Finishing request 1 will schedule binding the connection to request 2.
+  conn_pool_.expectEnableUpstreamReady();
+
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  Http::HeaderMapPtr response_headers(new TestHeaderMapImpl{{":status", "200"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+
+  // Cause the connection to go away.
+  conn_pool_.expectClientCreate();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  conn_pool_.expectAndRunUpstreamReady();
+  conn_pool_.
+
+  EXPECT_CALL(*conn_pool_.test_clients_[1].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks2.pool_ready_, ready());
+  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+  response_headers.reset(new TestHeaderMapImpl{{":status", "200"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
  * Test when upstream sends us 'connection: close'
  */
 TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {

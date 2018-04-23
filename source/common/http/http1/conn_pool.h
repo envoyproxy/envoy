@@ -134,7 +134,6 @@ protected:
   std::list<DrainedCb> drained_callbacks_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
 };
