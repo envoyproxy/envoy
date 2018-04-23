@@ -358,6 +358,19 @@ message RouteAction {
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
   // at a different path from those exposed at the reverse proxy layer.
+  //
+  // .. note::
+  //
+  //   As an example, given following config,
+  //
+  //   .. code-block:: yaml
+  //
+  //     match:
+  //       prefix: "/prefix"
+  //     route:
+  //       prefix_rewrite: "/"
+  //
+  //   it rewrites :code:`/prefix` to :code:`/` and :code:`/prefix/foo` to :code:`/foo`.
   string prefix_rewrite = 5;
 
   oneof host_rewrite_specifier {
@@ -571,6 +584,19 @@ message RedirectAction {
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
     // based on the request.
+    //
+    // .. note::
+    //
+    //   As an example, given following config,
+    //
+    //   .. code-block:: yaml
+    //
+    //     match:
+    //       prefix: "/prefix"
+    //     redirect:
+    //       prefix_rewrite: "/"
+    //
+    //   it rewrites :code:`/prefix` to :code:`/` and :code:`/prefix/foo` to :code:`/foo`.
     string prefix_rewrite = 5;
   }
 
