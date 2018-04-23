@@ -183,4 +183,25 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 }
 
+namespace {
+
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  if (duration.seconds() < 0 || duration.nanos() < 0) {
+    throw DurationUtil::OutOfRangeException(
+        fmt::format("Expected positive duration: {}", duration.DebugString()));
+  }
+}
+
+} // namespace
+
+uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration);
+  return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
+}
+
+uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration);
+  return Protobuf::util::TimeUtil::DurationToSeconds(duration);
+}
+
 } // namespace Envoy
