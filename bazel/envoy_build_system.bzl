@@ -63,22 +63,22 @@ def _envoy_stamped_linkopts():
     # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
     # ELF section, so just stuff the raw ID into a new text section.
     "@bazel_tools//tools/osx:darwin": [
-        "-sectcreate __TEXT __build_id", "$(location //bazel:raw_build_id.ldscript)"
+        "-sectcreate __TEXT __build_id", "$(location @envoy//bazel:raw_build_id.ldscript)"
     ],
 
     # Note: assumes GNU GCC (or compatible) handling of `--build-id` flag.
     "//conditions:default": [
-        "-Wl,@$(location //bazel:gnu_build_id.ldscript)",
+        "-Wl,@$(location @envoy//bazel:gnu_build_id.ldscript)",
     ],
   })
 
 def _envoy_stamped_deps():
   return select({
     "@bazel_tools//tools/osx:darwin": [
-        "//bazel:raw_build_id.ldscript"
+        "@envoy//bazel:raw_build_id.ldscript"
     ],
     "//conditions:default": [
-        "//bazel:gnu_build_id.ldscript",
+        "@envoy//bazel:gnu_build_id.ldscript",
     ],
   })
 
