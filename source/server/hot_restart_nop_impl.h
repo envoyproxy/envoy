@@ -18,7 +18,7 @@ namespace Server {
 class HotRestartNopImpl : public Server::HotRestart {
 public:
   HotRestartNopImpl(Options& options)
-      : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())) {
+      : stats_set_options_(blockMemHashOptions(options.maxStats())) {
     uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(stats_set_options_);
     memory_.reset(new uint8_t[num_bytes]);
     memset(memory_.get(), 0, num_bytes);
@@ -40,7 +40,6 @@ public:
   Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
 private:
-  Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   std::unique_ptr<uint8_t[]> memory_;
   Thread::MutexBasicLockable log_lock_;
