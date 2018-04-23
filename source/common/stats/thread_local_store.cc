@@ -256,6 +256,16 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
+  ParentHistogramSharedPtr* tls_ref = nullptr;
+
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].parent_histograms_[final_name];
+  }
+
+  if (tls_ref && *tls_ref) {
+    return **tls_ref;
+  }
+
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
 
@@ -268,6 +278,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     central_ref.reset(new ParentHistogramImpl(final_name, parent_, *this,
                                               std::move(central_tag_extracted_name),
                                               std::move(central_tags)));
+  }
+
+  if (tls_ref) {
+    *tls_ref = central_ref;
   }
   return *central_ref;
 }

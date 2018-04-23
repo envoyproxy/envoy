@@ -199,6 +199,7 @@ private:
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
     std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
+    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
   };
 
   struct CentralCacheEntry {
