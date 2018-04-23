@@ -4,7 +4,6 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {

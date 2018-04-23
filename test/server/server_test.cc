@@ -36,7 +36,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushCountersAndGaugesToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store);
 }
 
 class RunHelperTest : public testing::Test {
@@ -170,6 +170,13 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+}
+
+// Regression test for segfault when server initialization fails prior to
+// ClusterManager initialization.
+TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/cluster_dupe_bootstrap.yaml"), EnvoyException,
+                            "cluster manager: duplicate cluster 'service_google'");
 }
 
 // Negative test for protoc-gen-validate constraints.

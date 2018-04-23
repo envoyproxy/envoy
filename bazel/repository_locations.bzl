@@ -12,6 +12,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",
     ),
+    com_github_circonus_labs_libcircllhist = dict(
+        commit = "97ef5e088fd01fa8ec5a86334a6308ac0d51ea6f",  # 2018-04-07
+        remote = "https://github.com/circonus-labs/libcircllhist",
+    ),
     com_github_cyan4973_xxhash = dict(
         commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
         remote = "https://github.com/Cyan4973/xxHash",
@@ -33,6 +37,10 @@ REPOSITORY_LOCATIONS = dict(
     com_github_gcovr_gcovr = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
+    ),
+    com_github_google_libprotobuf_mutator = dict(
+        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
         commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1

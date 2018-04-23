@@ -342,6 +342,15 @@ TEST(DnsImplConstructor, SupportsCustomResolvers) {
   ares_free_data(resolvers);
 }
 
+TEST(DnsImplConstructor, BadCustomResolvers) {
+  Event::DispatcherImpl dispatcher;
+  envoy::api::v2::core::Address pipe_address;
+  pipe_address.mutable_pipe()->set_path("foo");
+  auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
+  EXPECT_THROW_WITH_MESSAGE(dispatcher.createDnsResolver({pipe_instance}), EnvoyException,
+                            "DNS resolver 'foo' is not an IP address");
+}
+
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void SetUp() override {

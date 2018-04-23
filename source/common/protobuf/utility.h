@@ -24,23 +24,20 @@
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return the
 // default value.
 #define PROTOBUF_GET_MS_OR_DEFAULT(message, field_name, default_value)                             \
-  ((message).has_##field_name()                                                                    \
-       ? Protobuf::util::TimeUtil::DurationToMilliseconds((message).field_name())                  \
-       : (default_value))
+  ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
+                                : (default_value))
 
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
-  ((message).has_##field_name()                                                                    \
-       ? Protobuf::util::TimeUtil::DurationToMilliseconds((message).field_name())                  \
-       : throw MissingFieldException(#field_name, (message)))
+  ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
+                                : throw MissingFieldException(#field_name, (message)))
 
 // Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
-  ((message).has_##field_name()                                                                    \
-       ? Protobuf::util::TimeUtil::DurationToSeconds((message).field_name())                       \
-       : throw MissingFieldException(#field_name, (message)))
+  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
+                                : throw MissingFieldException(#field_name, (message)))
 
 namespace Envoy {
 namespace ProtobufPercentHelper {
@@ -269,6 +266,33 @@ public:
 private:
   const ProtobufWkt::Value value_;
   const std::size_t hash_;
+};
+
+class DurationUtil {
+public:
+  class OutOfRangeException : public EnvoyException {
+  public:
+    OutOfRangeException(const std::string& error) : EnvoyException(error) {}
+  };
+
+  /**
+   * Same as DurationUtil::durationToMilliseconds but with extra validation logic.
+   * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
+   * Specifically, we ensure that the duration is positive.
+   * @param duration protobuf.
+   * @return duration in milliseconds.
+   * @throw OutOfRangeException when duration is out-of-range.
+   */
+  static uint64_t durationToMilliseconds(const ProtobufWkt::Duration& duration);
+
+  /**
+   * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
+   * Specifically, we ensure that the duration is positive.
+   * @param duration protobuf.
+   * @return duration in seconds.
+   * @throw OutOfRangeException when duration is out-of-range.
+   */
+  static uint64_t durationToSeconds(const ProtobufWkt::Duration& duration);
 };
 
 } // namespace Envoy

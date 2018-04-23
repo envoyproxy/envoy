@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <cwchar>
 
+// Bring in DEFINE_PROTO_FUZZER definition as per
+// https://github.com/google/libprotobuf-mutator#integrating-with-libfuzzer.
+#include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
+
 namespace Envoy {
 namespace Fuzz {
 
@@ -15,13 +19,6 @@ public:
    * @param argv array of command-line args.
    */
   static void setupEnvironment(int argc, char** argv);
-
-  /**
-   * Execute a single fuzz test. This should be implemented by the
-   * envoy_cc_fuzz_test target. See
-   * https://llvm.org/docs/LibFuzzer.html#fuzz-target.
-   */
-  static void execute(const uint8_t* data, size_t size);
 };
 
 } // namespace Fuzz
@@ -31,6 +28,24 @@ public:
 // https://llvm.org/docs/LibFuzzer.html#startup-initialization.
 extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv);
 
-// Entry point from fuzzing library driver, see
-// https://llvm.org/docs/LibFuzzer.html#fuzz-target.
+// See https://llvm.org/docs/LibFuzzer.html#fuzz-target.
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
+#define DEFINE_TEST_ONE_INPUT_IMPL                                                                 \
+  extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {                        \
+    EnvoyTestOneInput(data, size);                                                                 \
+    return 0;                                                                                      \
+  }
+
+/**
+ * Define a fuzz test. This should be used to define a fuzz_cc_fuzz_test_target with:
+ *
+ * DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+ *   // Do some test stuff with buf/len.
+ *   return 0;
+ * }
+ */
+#define DEFINE_FUZZER                                                                              \
+  static void EnvoyTestOneInput(const uint8_t* buf, size_t len);                                   \
+  DEFINE_TEST_ONE_INPUT_IMPL                                                                       \
+  static void EnvoyTestOneInput
