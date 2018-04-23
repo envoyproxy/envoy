@@ -25,8 +25,8 @@ BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(co
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
 void BufferFilter::initConfig() {
-  ASSERT(!config_inited_);
-  config_inited_ = true;
+  ASSERT(!config_initialized_);
+  config_initialized_ = true;
 
   if (!callbacks_->route() || !callbacks_->route()->routeEntry()) {
     return;
@@ -51,16 +51,13 @@ void BufferFilter::initConfig() {
     disabled_ = true;
     return;
   }
-  if (!cfg->has_buffer()) {
-    // OneOf for the route-local config was empty. Should this be an ASSERT_RELEASE?
-    return;
-  }
 
+  ASSERT(cfg->has_buffer());
   const auto& buf = cfg->buffer();
-  auto stats = config_->stats_;
 
+  // TODO(rodaine): use per-route update callbacks to pre-optimize this.
   config_.reset(new BufferFilterConfig{
-      stats, static_cast<uint64_t>(buf.max_request_bytes().value()),
+      config_->stats_, static_cast<uint64_t>(buf.max_request_bytes().value()),
       std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(buf, max_request_time))});
 }
 

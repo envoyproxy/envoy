@@ -14,6 +14,10 @@ Version history
   :http:post:`/logging`, :http:post:`/quitquitquit`, :http:post:`/reset_counters`,
   :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`,
 * admin: removed `/routes` endpoint; route configs can now be found at the :ref:`/config_dump endpoint <operations_admin_interface_config_dump>`.
+* buffer filter: the buffer filter can be optionally
+  :ref:`disabled <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.disabled>` or
+  :ref:`overridden <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.buffer>` with
+  route-local configuration.
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
 * health check: added ability to set :ref:`additional HTTP headers
@@ -24,10 +28,14 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
-* listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
-* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* http: filters can now optionally support
+  :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
+  :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
+  :ref:`weighted cluster <envoy_api_field_route.WeightedCluster.ClusterWeight.per_filter_config>`
+  local configuration.
 * http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+* listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
@@ -48,15 +56,6 @@ Version history
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
-* route-local filter configuration: HTTP filters can now optionally support
-  :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
-  :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
-  :ref:`weighted cluster <envoy_api_field_route.WeightedCluster.ClusterWeight.per_filter_config>`
-  local configuration.
-* buffer filter route-local configuration: the buffer filter can be optionally
-  :ref:`disabled <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.disabled>` or
-  :ref:`overridden <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.buffer>` with
-  route-local configuration.
 
 1.6.0 (March 20, 2018)
 ======================

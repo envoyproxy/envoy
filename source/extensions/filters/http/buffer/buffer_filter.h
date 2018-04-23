@@ -69,9 +69,8 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
   bool stream_destroyed_{};
-
   bool disabled_{};
-  bool config_inited_{};
+  bool config_initialized_{};
 };
 
 } // namespace BufferFilter

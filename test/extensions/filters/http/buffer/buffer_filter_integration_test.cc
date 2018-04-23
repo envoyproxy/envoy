@@ -1,6 +1,7 @@
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
+namespace {
 
 typedef HttpProtocolIntegrationTest BufferIntegrationTest;
 
@@ -117,4 +118,5 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
 }
 
+} // namespace
 } // namespace Envoy
