@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/grpc/status.h"
 
@@ -34,7 +35,7 @@ public:
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
-                                       const HealthCheckEventLoggerSharedPtr& event_logger);
+                                       AccessLog::AccessLogManager& log_manager);
 };
 
 /**

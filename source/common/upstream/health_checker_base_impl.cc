@@ -263,7 +263,6 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(const HostDescriptionConstSha
   event.mutable_eject_unhealthy_event()->mutable_unhealthy_threshold()->set_value(
       unhealthy_threshold);
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty print */ false);
-  std::cout << json << std::endl;
   file_->write(fmt::format("{}\n", json));
 }
 
@@ -275,7 +274,6 @@ void HealthCheckEventLoggerImpl::logAddHealthy(const HostDescriptionConstSharedP
   event.mutable_add_healthy_event()->mutable_healthy_threshold()->set_value(healthy_threshold);
   event.mutable_add_healthy_event()->set_first_check(first_check);
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty print */ false);
-  std::cout << json << std::endl;
   file_->write(fmt::format("{}\n", json));
 }
 

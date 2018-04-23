@@ -26,7 +26,9 @@ class RedisHealthCheckerTest
     : public testing::Test,
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
-  RedisHealthCheckerTest() : cluster_(new NiceMock<Upstream::MockCluster>()) {}
+  RedisHealthCheckerTest()
+      : cluster_(new NiceMock<Upstream::MockCluster>()),
+        event_logger_(new Upstream::MockHealthCheckEventLogger()) {}
 
   void setupExistsHealthcheckDeprecated() {
     const std::string yaml = R"EOF(
@@ -45,7 +47,7 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+                                                 runtime_, random_, event_logger_, *this));
   }
 
   void setup() {
@@ -65,7 +67,7 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+                                                 runtime_, random_, event_logger_, *this));
   }
 
   void setupExistsHealthcheck() {
@@ -86,7 +88,7 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+                                                 runtime_, random_, event_logger_, *this));
   }
 
   void setupDontReuseConnection() {
@@ -107,7 +109,7 @@ public:
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
     health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+                                                 runtime_, random_, event_logger_, *this));
   }
 
   Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
@@ -145,6 +147,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::shared_ptr<Upstream::MockHealthCheckEventLogger> event_logger_;
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
@@ -181,6 +184,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   interval_timer_->callback_();
 
   // Failure
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -248,6 +252,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   interval_timer_->callback_();
 
   // Failure, exists
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -299,6 +304,7 @@ TEST_F(RedisHealthCheckerTest, ExistsDeprecated) {
   interval_timer_->callback_();
 
   // Failure, exists
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -350,6 +356,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   interval_timer_->callback_();
 
   // The connection will close on failure.
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());

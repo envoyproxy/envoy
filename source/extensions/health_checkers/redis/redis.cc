@@ -9,8 +9,9 @@ RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const Upstream::HealthCheckEventLoggerSharedPtr& event_logger,
     Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, event_logger),
       client_factory_(client_factory), key_(redis_config.key()) {
   if (!key_.empty()) {
     type_ = Type::Exists;
@@ -20,8 +21,9 @@ RedisHealthChecker::RedisHealthChecker(
 }
 
 RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
-    RedisHealthChecker& parent, const Upstream::HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    RedisHealthChecker& parent, const Upstream::HostSharedPtr& host,
+    const Upstream::HealthCheckEventLoggerSharedPtr& event_logger)
+    : ActiveHealthCheckSession(parent, host, event_logger), parent_(parent) {}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   if (current_request_) {

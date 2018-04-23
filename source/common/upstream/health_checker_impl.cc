@@ -23,25 +23,34 @@ class HealthCheckerFactoryContextImpl : public Server::Configuration::HealthChec
 public:
   HealthCheckerFactoryContextImpl(Upstream::Cluster& cluster, Envoy::Runtime::Loader& runtime,
                                   Envoy::Runtime::RandomGenerator& random,
-                                  Event::Dispatcher& dispatcher)
-      : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher) {}
+                                  Event::Dispatcher& dispatcher,
+                                  const HealthCheckEventLoggerSharedPtr& event_logger)
+      : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+        event_logger_(event_logger) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  const HealthCheckEventLoggerSharedPtr& eventLogger() override { return event_logger_; }
 
 private:
   Upstream::Cluster& cluster_;
   Envoy::Runtime::Loader& runtime_;
   Envoy::Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
+  HealthCheckEventLoggerSharedPtr event_logger_;
 };
 
 HealthCheckerSharedPtr
 HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              Upstream::Cluster& cluster, Runtime::Loader& runtime,
                              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                             const HealthCheckEventLoggerSharedPtr& event_logger) {
+                             AccessLog::AccessLogManager& log_manager) {
+  HealthCheckEventLoggerSharedPtr event_logger;
+  if (!hc_config.event_log_path().empty()) {
+    event_logger =
+        std::make_shared<HealthCheckEventLoggerImpl>(log_manager, hc_config.event_log_path());
+  }
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
@@ -67,7 +76,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                 ? Extensions::HealthCheckers::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
                 : std::string(hc_config.custom_health_check().name()));
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
-        new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher));
+        new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher, event_logger));
     return factory.createCustomHealthChecker(hc_config, *context);
   }
   default:

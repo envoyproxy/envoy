@@ -31,6 +31,12 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /*
+   * @return Upstream::HealthCheckEventLoggerSharedPtr& the health check event logger for the
+   * created health checkers
+   */
+  virtual const Upstream::HealthCheckEventLoggerSharedPtr& eventLogger() PURE;
 };
 
 /**

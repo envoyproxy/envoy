@@ -406,8 +406,8 @@ public:
          ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
          Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         const LocalInfo::LocalInfo& local_info, Outlier::EventLoggerSharedPtr outlier_event_logger,
-         HealthCheckEventLoggerSharedPtr health_check_event_logger, bool added_via_api);
+         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }

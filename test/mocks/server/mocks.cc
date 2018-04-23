@@ -162,10 +162,12 @@ MockListenerFactoryContext::MockListenerFactoryContext() {}
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
+  event_logger_ = std::make_shared<NiceMock<Upstream::MockHealthCheckEventLogger>>();
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(*this, eventLogger()).WillByDefault(ReturnRef(event_logger_));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}

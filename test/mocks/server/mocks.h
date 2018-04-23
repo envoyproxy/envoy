@@ -407,11 +407,13 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
+  MOCK_METHOD0(eventLogger, const Upstream::HealthCheckEventLoggerSharedPtr&());
 
   testing::NiceMock<Upstream::MockCluster> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
+  Upstream::HealthCheckEventLoggerSharedPtr event_logger_;
 };
 
 } // namespace Configuration

@@ -59,9 +59,10 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
+  AccessLog::MockAccessLogManager log_manager;
 
   EXPECT_THROW_WITH_MESSAGE(HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
-                                                         runtime, random, dispatcher, nullptr),
+                                                         runtime, random, dispatcher, log_manager),
                             EnvoyException,
                             "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
@@ -75,10 +76,11 @@ TEST(HealthCheckerFactoryTest, createGrpc) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
+  AccessLog::MockAccessLogManager log_manager;
 
   EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
                          HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
-                                                      runtime, random, dispatcher, nullptr)
+                                                      runtime, random, dispatcher, log_manager)
                              .get()));
 }
 
