@@ -44,7 +44,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   typedef std::unique_ptr<HostVector> HostListPtr;
   std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state(1);
   if (resources.empty()) {

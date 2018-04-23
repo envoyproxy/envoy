@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -224,8 +224,6 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 
 Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
                                       Buffer::Instance& response) {
-  response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
-
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
                    response);
@@ -282,7 +280,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
                                         Buffer::Instance& response) const {
-  envoy::admin::v2::ConfigDump dump;
+  envoy::admin::v2alpha::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();

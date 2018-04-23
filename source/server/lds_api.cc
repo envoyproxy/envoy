@@ -40,7 +40,7 @@ void LdsApi::initialize(std::function<void()> callback) {
   subscription_->start({}, *this);
 }
 
-void LdsApi::onConfigUpdate(const ResourceVector& resources) {
+void LdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
   for (const auto& listener : resources) {
