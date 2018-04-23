@@ -405,6 +405,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref =
         histogram->intervalStatistics().supportedQuantiles();
+    summary.reserve(supported_quantiles_ref.size());
     for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
       summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
                                     histogram->intervalStatistics().computedQuantiles()[i],

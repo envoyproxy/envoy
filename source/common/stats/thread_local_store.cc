@@ -341,10 +341,11 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
-                                         std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
+                                         TlsScope& tls_scope, std::string&& tag_extracted_name,
+                                         std::vector<Tag>&& tags)
     : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
-      tlsScope_(tlsScope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
+      tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
@@ -353,7 +354,7 @@ ParentHistogramImpl::~ParentHistogramImpl() {
 }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tlsScope_.tlsHistogram(name(), *this);
+  Histogram& tls_histogram = tls_scope_.tlsHistogram(name(), *this);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }

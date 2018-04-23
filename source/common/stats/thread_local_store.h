@@ -86,7 +86,7 @@ private:
   bool usedLockHeld() const;
 
   Store& parent_;
-  TlsScope& tlsScope_;
+  TlsScope& tls_scope_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
@@ -104,6 +104,7 @@ class TlsScope : public Scope {
 public:
   virtual ~TlsScope() {}
 
+  // TODO(ramaraochavali): Allow direct TLS access for the advanced consumers.
   /**
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
