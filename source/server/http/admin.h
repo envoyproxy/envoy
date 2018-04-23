@@ -23,6 +23,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/http/config_tracker_impl.h"
 
@@ -133,7 +134,8 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats);
+  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                                 const std::list<Stats::ParentHistogramSharedPtr>& all_histograms);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -213,6 +215,9 @@ private:
   Network::SocketPtr socket_;
   Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
+  // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
+  // Admin case.
+  Stats::IsolatedStoreImpl no_op_store_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;

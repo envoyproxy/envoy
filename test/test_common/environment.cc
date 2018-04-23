@@ -39,6 +39,16 @@ std::string getOrCreateUnixDomainSocketDirectory() {
   return std::string(test_udsdir);
 }
 
+std::string getTemporaryDirectory() {
+  if (::getenv("TEST_TMPDIR")) {
+    return TestEnvironment::getCheckedEnvVar("TEST_TMPDIR");
+  }
+  if (::getenv("TMPDIR")) {
+    return TestEnvironment::getCheckedEnvVar("TMPDIR");
+  }
+  return "/tmp";
+}
+
 // Allow initializeOptions() to remember CLI args for getOptions().
 int argc_;
 char** argv_;
@@ -93,7 +103,7 @@ Server::Options& TestEnvironment::getOptions() {
 }
 
 const std::string& TestEnvironment::temporaryDirectory() {
-  CONSTRUCT_ON_FIRST_USE(std::string, getCheckedEnvVar("TEST_TMPDIR"));
+  CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
 
 const std::string& TestEnvironment::runfilesDirectory() {

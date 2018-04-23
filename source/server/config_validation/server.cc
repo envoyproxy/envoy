@@ -96,7 +96,9 @@ void ValidationInstance::shutdown() {
   // do an abbreviated shutdown here since there's less to clean up -- for example, no workers to
   // exit.
   thread_local_.shutdownGlobalThreading();
-  config_->clusterManager().shutdown();
+  if (config_ != nullptr && config_->clusterManager() != nullptr) {
+    config_->clusterManager()->shutdown();
+  }
   thread_local_.shutdownThread();
 }
 

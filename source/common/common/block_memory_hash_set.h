@@ -15,18 +15,18 @@
 namespace Envoy {
 
 /**
- * Initialization parameters for SharedMemoryHashSet. The options are duplicated
+ * Initialization parameters for BlockMemoryHashSet. The options are duplicated
  * to the control-block after init, to aid with sanity checking when attaching
  * an existing memory segment.
  */
-struct SharedMemoryHashSetOptions {
+struct BlockMemoryHashSetOptions {
   std::string toString() const {
     return fmt::format("capacity={}, num_slots={}", capacity, num_slots);
   }
-  bool operator==(const SharedMemoryHashSetOptions& that) const {
+  bool operator==(const BlockMemoryHashSetOptions& that) const {
     return capacity == that.capacity && num_slots == that.num_slots;
   }
-  bool operator!=(const SharedMemoryHashSetOptions& that) const { return !(*this == that); }
+  bool operator!=(const BlockMemoryHashSetOptions& that) const { return !(*this == that); }
 
   uint32_t capacity;  // how many values can be stored.
   uint32_t num_slots; // determines speed of hash vs size efficiency.
@@ -45,7 +45,7 @@ struct SharedMemoryHashSetOptions {
  * term storage, but not across machine architectures, as it doesn't
  * use network byte order for storing ints.
  */
-template <class Value> class SharedMemoryHashSet : public Logger::Loggable<Logger::Id::config> {
+template <class Value> class BlockMemoryHashSet : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Sentinal used for next_cell links to indicate end-of-list.
@@ -58,7 +58,7 @@ public:
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
    * @param options describes the parameters comtrolling set layout.
-   * @param init true if the shared-memory should be initialized on construction. If false,
+   * @param init true if the memory should be initialized on construction. If false,
    *             the data in the table will be sanity checked, and an exception thrown if
    *             it is incoherent or mismatches the passed-in options.
    * @param memory the memory buffer for the set data.
@@ -66,23 +66,23 @@ public:
    * Note that no locking of any kind is done by this class; this must be done at the
    * call-site to support concurrent access.
    */
-  SharedMemoryHashSet(const SharedMemoryHashSetOptions& options, bool init, uint8_t* memory)
+  BlockMemoryHashSet(const BlockMemoryHashSetOptions& options, bool init, uint8_t* memory)
       : cells_(nullptr), control_(nullptr), slots_(nullptr) {
     mapMemorySegments(options, memory);
     if (init) {
       initialize(options);
     } else if (!attach(options)) {
-      throw EnvoyException("SharedMemoryHashSet: Incompatible memory block");
+      throw EnvoyException("BlockMemoryHashSet: Incompatible memory block");
     }
   }
 
   /**
    * Returns the numbers of byte required for the hash-table, based on
    * the control structure. This must be used to allocate the
-   * backing-store (eg) in shared memory, which we do after
+   * backing-store (eg) in memory, which we do after
    * constructing the object with the desired sizing.
    */
-  static uint32_t numBytes(const SharedMemoryHashSetOptions& options) {
+  static uint32_t numBytes(const BlockMemoryHashSetOptions& options) {
     uint32_t size =
         cellOffset(options.capacity) + sizeof(Control) + options.num_slots * sizeof(uint32_t);
     return align(size);
@@ -93,7 +93,7 @@ public:
   /**
    * Returns the options structure that was used to construct the set.
    */
-  const SharedMemoryHashSetOptions& options() const { return control_->options; }
+  const BlockMemoryHashSetOptions& options() const { return control_->options; }
 
   /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
   void sanityCheck() {
@@ -221,14 +221,14 @@ public:
   }
 
 private:
-  friend class SharedMemoryHashSetTest;
+  friend class BlockMemoryHashSetTest;
 
   /**
    * Initializes a hash-map on raw memory. No expectations are made about the state of the memory
    * coming in.
    * @param memory
    */
-  void initialize(const SharedMemoryHashSetOptions& options) {
+  void initialize(const BlockMemoryHashSetOptions& options) {
     control_->hash_signature = Value::hash(signatureStringToHash());
     control_->num_bytes = numBytes(options);
     control_->options = options;
@@ -250,18 +250,18 @@ private:
   }
 
   /**
-   * Attempts to attach to an existing shared memory segment. Does a (relatively) quick
+   * Attempts to attach to an existing memory segment. Does a (relatively) quick
    * sanity check to make sure the options copied to the provided memory match, and also
    * that the slot, cell, and key-string structures look sane.
    */
-  bool attach(const SharedMemoryHashSetOptions& options) {
+  bool attach(const BlockMemoryHashSetOptions& options) {
     if (numBytes(options) != control_->num_bytes) {
-      ENVOY_LOG(error, "SharedMemoryHashSet unexpected memory size {} != {}", numBytes(options),
+      ENVOY_LOG(error, "BlockMemoryHashSet unexpected memory size {} != {}", numBytes(options),
                 control_->num_bytes);
       return false;
     }
     if (Value::hash(signatureStringToHash()) != control_->hash_signature) {
-      ENVOY_LOG(error, "SharedMemoryHashSet hash signature mismatch.");
+      ENVOY_LOG(error, "BlockMemoryHashSet hash signature mismatch.");
       return false;
     }
     sanityCheck();
@@ -290,11 +290,11 @@ private:
    * Represents control-values for the hash-table.
    */
   struct Control {
-    SharedMemoryHashSetOptions options; // Options established at map construction time.
-    uint64_t hash_signature;            // Hash of a constant signature string.
-    uint32_t num_bytes;                 // Bytes allocated on behalf of the map.
-    uint32_t size;                      // Number of values currently stored.
-    uint32_t free_cell_index;           // Offset of first free cell.
+    BlockMemoryHashSetOptions options; // Options established at map construction time.
+    uint64_t hash_signature;           // Hash of a constant signature string.
+    uint32_t num_bytes;                // Bytes allocated on behalf of the map.
+    uint32_t size;                     // Number of values currently stored.
+    uint32_t free_cell_index;          // Offset of first free cell.
   };
 
   /**
@@ -340,8 +340,8 @@ private:
     return *reinterpret_cast<Cell*>(ptr);
   }
 
-  /** Maps out the segments of shared memory for us to work with. */
-  void mapMemorySegments(const SharedMemoryHashSetOptions& options, uint8_t* memory) {
+  /** Maps out the segments of memory for us to work with. */
+  void mapMemorySegments(const BlockMemoryHashSetOptions& options, uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
     cells_ = reinterpret_cast<Cell*>(memory); // First because Value may need to be aligned.
@@ -351,7 +351,7 @@ private:
     slots_ = reinterpret_cast<uint32_t*>(memory);
   }
 
-  // Pointers into shared memory. Cells go first, because Value may need a more aggressive
+  // Pointers into memory. Cells go first, because Value may need a more aggressive
   // aligmnment.
   Cell* cells_;
   Control* control_;

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -114,6 +115,11 @@ public:
    * Returns the name of the Metric with the portions designated as tags removed.
    */
   virtual const std::string& tagExtractedName() const PURE;
+
+  /**
+   * Indicates whether this metric has been updated since the server was started.
+   */
+  virtual bool used() const PURE;
 };
 
 /**
@@ -128,7 +134,6 @@ public:
   virtual void inc() PURE;
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
-  virtual bool used() const PURE;
   virtual uint64_t value() const PURE;
 };
 
@@ -146,11 +151,33 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
-  virtual bool used() const PURE;
   virtual uint64_t value() const PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
+
+/**
+ * Holds the computed statistics for a histogram.
+ */
+class HistogramStatistics {
+public:
+  virtual ~HistogramStatistics() {}
+
+  /**
+   * Returns summary representation of the histogram.
+   */
+  virtual std::string summary() const PURE;
+
+  /**
+   * Returns supported quantiles.
+   */
+  virtual const std::vector<double>& supportedQuantiles() const PURE;
+
+  /**
+   * Returns computed quantile values during the period.
+   */
+  virtual const std::vector<double>& computedQuantiles() const PURE;
+};
 
 /**
  * A histogram that records values one at a time.
@@ -170,6 +197,32 @@ public:
 };
 
 typedef std::shared_ptr<Histogram> HistogramSharedPtr;
+
+/**
+ * A histogram that is stored in main thread and provides summary view of the histogram.
+ */
+class ParentHistogram : public virtual Histogram {
+public:
+  virtual ~ParentHistogram() {}
+
+  /**
+   * This method is called during the main stats flush process for each of the histograms and used
+   * to merge the histogram values.
+   */
+  virtual void merge() PURE;
+
+  /**
+   * Returns the interval histogram summary statistics for the flush interval.
+   */
+  virtual const HistogramStatistics& intervalStatistics() const PURE;
+
+  /**
+   * Returns the cumulative histogram summary statistics.
+   */
+  virtual const HistogramStatistics& cumulativeStatistics() const PURE;
+};
+
+typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
 
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
@@ -193,6 +246,11 @@ public:
    * Flush a gauge value.
    */
   virtual void flushGauge(const Gauge& gauge, uint64_t value) PURE;
+
+  /**
+   * Flush a histogram.
+   */
+  virtual void flushHistogram(const ParentHistogram& histogram) PURE;
 
   /**
    * This will be called after beginFlush(), some number of flushCounter(), and some number of
@@ -263,9 +321,19 @@ public:
    * @return a list of all known gauges.
    */
   virtual std::list<GaugeSharedPtr> gauges() const PURE;
+
+  /**
+   * @return a list of all known histograms.
+   */
+  virtual std::list<ParentHistogramSharedPtr> histograms() const PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;
+
+/**
+ * Callback invoked when a store's mergeHistogram() runs.
+ */
+typedef std::function<void()> PostMergeCb;
 
 /**
  * The root of the stat store.
@@ -294,6 +362,15 @@ public:
    * down.
    */
   virtual void shutdownThreading() PURE;
+
+  /**
+   * Called during the flush process to merge all the thread local histograms. The passed in
+   * callback will be called on the main thread, but it will happen after the method returns
+   * which means that the actual flush process will happen on the main thread after this method
+   * returns. It is expected that only one merge runs at any time and concurrent calls to this
+   * method would be asserted.
+   */
+  virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

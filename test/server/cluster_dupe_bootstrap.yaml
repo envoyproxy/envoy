@@ -1,0 +1,12 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+static_resources:
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+  - name: service_google
+    connect_timeout: 0.25s
