@@ -232,6 +232,7 @@ DiskLayer::DiskLayer(const std::string& name, const std::string& path,
 void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   // Check if this is an obviously bad path.
+  // TODO(htuch): We should also add a depth check for the recursion in future.
   if (Filesystem::illegalPath(path)) {
     throw EnvoyException(fmt::format("Invalid path: {}", path));
   }

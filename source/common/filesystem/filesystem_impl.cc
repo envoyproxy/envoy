@@ -75,17 +75,22 @@ std::string canonicalPath(const std::string& path) {
 }
 
 bool illegalPath(const std::string& path) {
-  const std::string canonical_path = canonicalPath(path);
-  // Platform specific path sanity; we provide a convenience to avoid Envoy
-  // instances poking in bad places. We may have to consider conditioning on
-  // platform in the future, growing these or relaxing some constraints (e.g.
-  // there are valid reasons to go via /proc for file paths).
-  // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path, "/dev") || absl::StartsWith(canonical_path, "/sys") ||
-      absl::StartsWith(canonical_path, "/proc")) {
-    return true;
+  try {
+    const std::string canonical_path = canonicalPath(path);
+    // Platform specific path sanity; we provide a convenience to avoid Envoy
+    // instances poking in bad places. We may have to consider conditioning on
+    // platform in the future, growing these or relaxing some constraints (e.g.
+    // there are valid reasons to go via /proc for file paths).
+    // TODO(htuch): Optimize this as a hash lookup if we grow any further.
+    if (absl::StartsWith(canonical_path, "/dev") || absl::StartsWith(canonical_path, "/sys") ||
+        absl::StartsWith(canonical_path, "/proc")) {
+      return true;
+    }
+    return false;
+  } catch (const EnvoyException& ex) {
+    ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path, ex.what());
+    return false;
   }
-  return false;
 }
 
 FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
