@@ -47,6 +47,11 @@ config_setting(
 )
 
 config_setting(
+    name = "coverage_build",
+    values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )

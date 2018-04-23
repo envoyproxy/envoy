@@ -55,9 +55,18 @@ def envoy_linkopts():
 
 def _envoy_stamped_linkopts():
   return select({
+    # Coverage builds in CI are failing to link when setting a build ID.
+    #
+    # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
+    "@envoy//bazel:coverage_build": [],
+
+    # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
+    # ELF section, so just stuff the raw ID into a new text section.
     "@bazel_tools//tools/osx:darwin": [
         "-sectcreate __TEXT __build_id", "$(location //bazel:raw_build_id.ldscript)"
     ],
+
+    # Note: assumes GNU GCC (or compatible) handling of `--build-id` flag.
     "//conditions:default": [
         "-Wl,@$(location //bazel:gnu_build_id.ldscript)",
     ],
