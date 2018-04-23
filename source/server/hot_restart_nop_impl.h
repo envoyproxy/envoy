@@ -7,8 +7,6 @@
 #include "common/common/thread.h"
 #include "common/stats/stats_impl.h"
 
-#include "server/hot_restart_impl.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -18,7 +16,7 @@ namespace Server {
 class HotRestartNopImpl : public Server::HotRestart {
 public:
   HotRestartNopImpl(Options& options)
-      : stats_set_options_(blockMemHashOptions(options.maxStats())) {
+      : stats_set_options_(Stats::blockMemHashOptions(options.maxStats())) {
     uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(stats_set_options_);
     memory_.reset(new uint8_t[num_bytes]);
     memset(memory_.get(), 0, num_bytes);

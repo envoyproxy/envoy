@@ -35,6 +35,15 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
+  BlockMemoryHashSetOptions hash_set_options;
+  hash_set_options.capacity = max_stats;
+
+  // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
+  hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
+  return hash_set_options;
+}
+
 size_t RawStatData::size() {
   // Normally the compiler would do this, but because name_ is a flexible-array-length
   // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so

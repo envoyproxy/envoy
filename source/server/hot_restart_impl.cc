@@ -28,15 +28,6 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
-  BlockMemoryHashSetOptions hash_set_options;
-  hash_set_options.capacity = max_stats;
-
-  // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
-  hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
-  return hash_set_options;
-}
-
 SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
@@ -115,7 +106,7 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
+    : options_(options), stats_set_options_(Stats::blockMemHashOptions(options.maxStats())),
       shmem_(
           SharedMemory::initialize(Stats::RawStatDataSet::numBytes(stats_set_options_), options)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),

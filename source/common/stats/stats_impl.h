@@ -29,6 +29,8 @@ namespace Stats {
 
 typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
 
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats);
+
 class TagExtractorImpl : public TagExtractor {
 public:
   /**

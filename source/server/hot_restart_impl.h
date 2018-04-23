@@ -18,8 +18,6 @@
 namespace Envoy {
 namespace Server {
 
-BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats);
-
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
  * all running envoy processes.

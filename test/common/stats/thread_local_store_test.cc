@@ -7,8 +7,6 @@
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
-#include "server/hot_restart_impl.h"
-
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -33,7 +31,7 @@ public:
   StatsThreadLocalStoreTest() {
     Stats::RawStatData::configureForTestsOnly(options_);
     BlockMemoryHashSetOptions memory_hash_set_options_ =
-        Server::blockMemHashOptions(options_.maxStats());
+        Stats::blockMemHashOptions(options_.maxStats());
     uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(memory_hash_set_options_);
     memory_.reset(new uint8_t[num_bytes]);
     memset(memory_.get(), 0, num_bytes);

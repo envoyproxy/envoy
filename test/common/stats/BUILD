@@ -13,7 +13,6 @@ envoy_cc_test(
     srcs = ["stats_impl_test.cc"],
     deps = [
         "//source/common/stats:stats_lib",
-        "//source/server:hot_restart_lib",
         "//source/server:options_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
@@ -27,7 +26,6 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/common/stats:thread_local_store_lib",
-        "//source/server:hot_restart_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
