@@ -10,18 +10,6 @@
 namespace Envoy {
 namespace Http {
 
-TEST(LowerCaseStringTest, TestConstructors) {
-  auto lower = LowerCaseString("foo");
-  auto converted = LowerCaseString("Foo");
-  EXPECT_EQ(lower, converted);
-
-  auto moved = LowerCaseString(std::move(LowerCaseString(std::string("Foo"))));
-  EXPECT_EQ(lower, moved);
-
-  auto copy = LowerCaseString(lower);
-  EXPECT_EQ(lower, copy);
-}
-
 TEST(HeaderStringTest, All) {
   // Static LowerCaseString constructor
   {
