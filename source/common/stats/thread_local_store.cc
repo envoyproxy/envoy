@@ -272,7 +272,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   return *central_ref;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
+                                                         ParentHistogramImpl& parent) {
   // See comments in counter() which explains the logic here.
 
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
@@ -292,8 +293,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
       name, std::move(tag_extracted_name), std::move(tags));
 
-  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[name];
-  central_ref->addTlsHistogram(hist_tls_ptr);
+  parent.addTlsHistogram(hist_tls_ptr);
 
   if (tls_ref) {
     *tls_ref = hist_tls_ptr;
@@ -339,7 +339,7 @@ ParentHistogramImpl::~ParentHistogramImpl() {
 }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tlsScope_.tlsHistogram(name());
+  Histogram& tls_histogram = tlsScope_.tlsHistogram(name(), *this);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }

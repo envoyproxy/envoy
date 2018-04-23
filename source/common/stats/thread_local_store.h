@@ -53,18 +53,7 @@ private:
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
 
-/**
- * Class used to create ThreadLocalHistogram in the scope.
- */
-class TlsScope : public Scope {
-public:
-  virtual ~TlsScope() {}
-
-  /**
-   * @return a ThreadLocalHistogram within the scope's namespace.
-   */
-  virtual Histogram& tlsHistogram(const std::string& name) PURE;
-};
+class TlsScope;
 
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
@@ -107,6 +96,20 @@ private:
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
+
+/**
+ * Class used to create ThreadLocalHistogram in the scope.
+ */
+class TlsScope : public Scope {
+public:
+  virtual ~TlsScope() {}
+
+  /**
+   * @return a ThreadLocalHistogram within the scope's namespace.
+   * @param name name of the histogram with scope prefix attached.
+   */
+  virtual Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) PURE;
+};
 
 /**
  * Store implementation with thread local caching. This implementation supports the following
@@ -217,7 +220,7 @@ private:
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
-    Histogram& tlsHistogram(const std::string& name) override;
+    Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
