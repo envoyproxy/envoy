@@ -8,6 +8,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/ssl/connection.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
@@ -47,23 +48,39 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
 
 void GrpcClientImpl::onSuccess(
     std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response, Tracing::Span& span) {
-  CheckStatus status = CheckStatus::OK;
+
   ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
-  if (response->status().code() != Grpc::Status::GrpcStatus::Ok) {
-    status = CheckStatus::Denied;
-    span.setTag(Constants::get().TraceStatus, Constants::get().TraceUnauthz);
-  } else {
-    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
+  ResponsePtr authz_response = std::make_unique<Response>();
+
+  if (response->has_http_response()) {
+    for (const auto& header : response->http_response().headers()) {
+      authz_response->headers.emplace_back(
+          std::make_pair(Http::LowerCaseString(header.first), header.second));
+    }
+    if (!response->http_response().body().empty()) {
+      authz_response->body = std::make_unique<Buffer::OwnedImpl>(response->http_response().body());
+    }
   }
 
-  callbacks_->onComplete(status);
+  if (response->status().code() != Grpc::Status::GrpcStatus::Ok) {
+    span.setTag(Constants::get().TraceStatus, Constants::get().TraceUnauthz);
+    authz_response->status = CheckStatus::Denied;
+    authz_response->status_code = response->http_response().status_code();
+  } else {
+    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
+    authz_response->status = CheckStatus::OK;
+  }
+
+  callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  callbacks_->onComplete(CheckStatus::Error);
+  ResponsePtr response = std::make_unique<Response>();
+  response->status = CheckStatus::Error;
+  callbacks_->onComplete(std::move(response));
   callbacks_ = nullptr;
 }
 

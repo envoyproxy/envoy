@@ -24,21 +24,24 @@ message CheckRequest {
   AttributeContext attributes = 1;
 }
 
+// An message that contains HTTP response attributes. This message is
+// used when the authorization service needs to send custom responses to the
+// downstream client or, to modify/add request headers being dispatched to the upstream.
+message HttpResponse {
+  // Http status code.
+  uint32 status_code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+
+  // Http entity headers.
+  map<string, string> headers = 2;
+
+  // Http entity body.
+  string body = 3;
+}
+
 message CheckResponse {
   // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;
 
-  // An optional message that contains HTTP response attributes. This message is
-  // used when the authorization service needs to send custom responses to the
-  // downstream client or, to modify/add request headers being dispatched to the upstream.
-  message HttpResponse {
-    // Http status code.
-    uint32 status_code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
-
-    // Http entity headers.
-    map<string, string> headers = 2;
-
-    // Http entity body.
-    string body = 3;
-  }
+  // A field that supplies the attributes for an HTTP response.
+  HttpResponse http_response = 2;
 }

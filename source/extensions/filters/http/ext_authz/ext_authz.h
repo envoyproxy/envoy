@@ -77,7 +77,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // ExtAuthz::RequestCallbacks
-  void onComplete(Filters::Common::ExtAuthz::CheckStatus status) override;
+  void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
   enum class State { NotStarted, Calling, Complete };
@@ -86,6 +86,7 @@ private:
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::HeaderMap* request_headers_;
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};

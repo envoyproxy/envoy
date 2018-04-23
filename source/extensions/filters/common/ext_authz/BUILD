@@ -34,6 +34,7 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

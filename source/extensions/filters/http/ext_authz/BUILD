@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = ["ext_authz.h"],
     deps = [
         "//include/envoy/http:codes_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",

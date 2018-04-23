@@ -38,7 +38,11 @@ namespace ExtAuthz {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
-  MOCK_METHOD1(onComplete, void(CheckStatus status));
+  void onComplete(ResponsePtr&& response) override {
+    onComplete_(response);
+  }
+
+  MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
 };
 
 class ExtAuthzGrpcClientTest : public testing::Test {
@@ -68,7 +72,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
   auto status = response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::Ok);
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
-  EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::OK));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
   client_.onSuccess(std::move(response), span_);
 }
 
@@ -98,7 +102,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
   auto status = response->mutable_status();
   status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
-  EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::Denied));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
   client_.onSuccess(std::move(response), span_);
 }
 
@@ -108,7 +112,7 @@ TEST_F(ExtAuthzGrpcClientTest, BasicError) {
 
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  EXPECT_CALL(request_callbacks_, onComplete(CheckStatus::Error));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
   client_.onFailure(Grpc::Status::Unknown, "", span_);
 }
 

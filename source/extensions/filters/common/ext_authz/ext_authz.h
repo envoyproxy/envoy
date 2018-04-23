@@ -27,6 +27,24 @@ enum class CheckStatus {
   Denied
 };
 
+typedef std::vector<std::pair<Http::LowerCaseString, std::string>> KeyValueHeaders;
+
+/**
+ * Authorization response object for a RequestCallback.
+ */
+struct Response {
+  // Call status.
+  CheckStatus status;
+  // Optional http headers attribute.
+  KeyValueHeaders headers;
+  // Optional http body attribute.
+  Buffer::InstancePtr body;
+  // Extra http status code attribute.
+  uint32_t status_code;
+};
+
+typedef std::unique_ptr<Response> ResponsePtr;
+
 /**
  * Async callbacks used during check() calls.
  */
@@ -35,9 +53,9 @@ public:
   virtual ~RequestCallbacks() {}
 
   /**
-   * Called when a check request is complete. The resulting status is supplied.
+   * Called when a check request is complete. The resulting ResponsePtr is supplied.
    */
-  virtual void onComplete(CheckStatus status) PURE;
+  virtual void onComplete(ResponsePtr&& response) PURE;
 };
 
 class Client {
