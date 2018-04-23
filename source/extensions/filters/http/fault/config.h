@@ -27,6 +27,9 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::fault::v2::HTTPFault()};
   }
 
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const ProtobufWkt::Struct&) override;
+
   std::string name() override { return HttpFilterNames::get().FAULT; }
 
 private:

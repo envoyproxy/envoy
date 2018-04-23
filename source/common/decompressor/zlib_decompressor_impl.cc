@@ -59,6 +59,13 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
 
 bool ZlibDecompressorImpl::inflateNext() {
   const int result = inflate(zstream_ptr_.get(), Z_NO_FLUSH);
+  if (result == Z_STREAM_END) {
+    // Z_FINISH informs inflate to not maintain a sliding window if the stream completes, which
+    // reduces inflate's memory footprint. Ref: https://www.zlib.net/manual.html.
+    inflate(zstream_ptr_.get(), Z_FINISH);
+    return false;
+  }
+
   if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
     return false; // This means that zlib needs more input, so stop here.
   }

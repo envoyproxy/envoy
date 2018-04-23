@@ -231,6 +231,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
+    _com_github_google_libprotobuf_mutator()
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
@@ -312,6 +313,16 @@ def _com_github_gcovr_gcovr():
     native.bind(
         name = "gcovr",
         actual = "@com_github_gcovr_gcovr//:gcovr",
+    )
+
+def _com_github_google_libprotobuf_mutator():
+    _repository_impl(
+        name = "com_github_google_libprotobuf_mutator",
+        build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+    native.bind(
+        name = "libprotobuf_mutator",
+        actual = "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
     )
 
 def _io_opentracing_cpp():

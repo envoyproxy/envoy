@@ -56,19 +56,14 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
   cb(filter_callback);
 }
 
-TEST(FaultFilterConfigTest, InvalidFaultFilterInProto) {
-  envoy::config::filter::http::fault::v2::HTTPFault config{};
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  FaultFilterFactory factory;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(config, "stats", context), EnvoyException);
-}
-
 TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  EXPECT_THROW(
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context),
-      EnvoyException);
+  Server::Configuration::HttpFilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  cb(filter_callback);
 }
 
 } // namespace Fault
