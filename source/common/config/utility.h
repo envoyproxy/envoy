@@ -265,7 +265,7 @@ public:
                                 Stats::Scope& scope);
 
   /**
-   * Normalize URI path. Currently it only handles to remove repeated slashes.
+   * Normalize URI path. Currently it only handles removing repeated slashes.
    * @param path supplies the path to be normalized.
    * @return std::string the normalized path.
    */
