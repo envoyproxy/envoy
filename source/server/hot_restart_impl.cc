@@ -436,7 +436,7 @@ std::string HotRestartImpl::version() {
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
-  const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
+  const BlockMemoryHashSetOptions options = Stats::blockMemHashOptions(max_num_stats);
   const size_t bytes = Stats::RawStatDataSet::numBytes(options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
   Stats::RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
