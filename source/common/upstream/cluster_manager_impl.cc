@@ -170,7 +170,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
+      random_(random), log_manager_(log_manager), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
@@ -466,8 +466,8 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
 
 void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api,
                                      ClusterMap& cluster_map) {
-  ClusterSharedPtr new_cluster = factory_.clusterFromProto(
-      cluster, *this, outlier_event_logger_, health_check_event_logger_, added_via_api);
+  ClusterSharedPtr new_cluster =
+      factory_.clusterFromProto(cluster, *this, outlier_event_logger_, log_manager_, added_via_api);
 
   if (!added_via_api) {
     if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
@@ -888,10 +888,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger,
-    HealthCheckEventLoggerSharedPtr health_check_event_logger, bool added_via_api) {
+    AccessLog::AccessLogManager& log_manager,
+    bool added_via_api) {
   return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_,
-                                 runtime_, random_, main_thread_dispatcher_, local_info_,
-                                 outlier_event_logger, health_check_event_logger, added_via_api);
+                                 runtime_, random_, main_thread_dispatcher_, log_manager, local_info_,
+                                 outlier_event_logger, added_via_api);
 }
 
 CdsApiPtr ProdClusterManagerFactory::createCds(
