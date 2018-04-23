@@ -94,8 +94,8 @@ private:
 
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
-  struct HeaderMapValue {
-    HeaderMapValue(const Http::LowerCaseString& header, const std::string value_prefix)
+  struct HeaderLocationSpec {
+    HeaderLocationSpec(const Http::LowerCaseString& header, const std::string value_prefix)
         : header_(header), value_prefix_(value_prefix) {}
     // The header name.
     Http::LowerCaseString header_;
@@ -104,17 +104,17 @@ private:
     // Issuers that specified this header.
     std::unordered_set<std::string> specified_issuers_;
   };
-  typedef std::unique_ptr<HeaderMapValue> HeaderMapValuePtr;
-  // The map of (header + value_prefix) to HeaderMapValue
-  std::map<std::string, HeaderMapValuePtr> header_maps_;
+  typedef std::unique_ptr<HeaderLocationSpec> HeaderLocationSpecPtr;
+  // The map of (header + value_prefix) to HeaderLocationSpecPtr
+  std::map<std::string, HeaderLocationSpecPtr> header_locations_;
 
   // ParamMap value type to store issuers that specified this header.
-  struct ParamMapValue {
+  struct ParamLocationSpec {
     // Issuers that specified this param.
     std::unordered_set<std::string> specified_issuers_;
   };
-  // The map of parameters to set of issuers.
-  std::map<std::string, ParamMapValue> param_maps_;
+  // The map of a parameter key to set of issuers specified the parameter
+  std::map<std::string, ParamLocationSpec> param_locations_;
 };
 
 ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
@@ -138,51 +138,53 @@ ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
 void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                     const std::string& value_prefix) {
   const std::string map_key = header_name.get() + value_prefix;
-  auto& map_value = header_maps_[map_key];
-  if (!map_value) {
-    map_value.reset(new HeaderMapValue(header_name, value_prefix));
+  auto& header_location_spec = header_locations_[map_key];
+  if (!header_location_spec) {
+    header_location_spec.reset(new HeaderLocationSpec(header_name, value_prefix));
   }
-  map_value->specified_issuers_.insert(issuer);
+  header_location_spec->specified_issuers_.insert(issuer);
 }
 
 void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::string& param) {
-  auto& map_value = param_maps_[param];
-  map_value.specified_issuers_.insert(issuer);
+  auto& param_location_spec = param_locations_[param];
+  param_location_spec.specified_issuers_.insert(issuer);
 }
 
 std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
-  // Check header first
-  for (const auto& header_it : header_maps_) {
-    const auto& map_value = header_it.second;
-    const Http::HeaderEntry* entry = headers.get(map_value->header_);
+
+  // Check header locations first
+  for (const auto& location_it : header_locations_) {
+    const auto& location_spec = location_it.second;
+    const Http::HeaderEntry* entry = headers.get(location_spec->header_);
     if (entry) {
-      std::string value_str = std::string(entry->value().c_str(), entry->value().size());
-      if (!map_value->value_prefix_.empty()) {
-        if (!StringUtil::startsWith(value_str.c_str(), map_value->value_prefix_, true)) {
+      auto value_str = entry->value().getStringView();
+      if (!location_spec->value_prefix_.empty()) {
+        if (!StringUtil::startsWith(value_str.data(), location_spec->value_prefix_, true)) {
           // prefix doesn't match, skip it.
           continue;
         }
-        value_str = value_str.substr(map_value->value_prefix_.size());
+        value_str = value_str.substr(location_spec->value_prefix_.size());
       }
-      tokens.push_back(std::make_unique<JwtHeaderLocation>(value_str, map_value->specified_issuers_,
-                                                           map_value->header_));
+      tokens.push_back(std::make_unique<const JwtHeaderLocation>(
+          std::string(value_str), location_spec->specified_issuers_, location_spec->header_));
     }
   }
 
-  if (param_maps_.empty() || headers.Path() == nullptr) {
+  // If no query parameter locations specified, or Path() is null, bail out
+  if (param_locations_.empty() || headers.Path() == nullptr) {
     return tokens;
   }
 
-  const auto& current_params = Http::Utility::parseQueryString(
-      std::string(headers.Path()->value().c_str(), headers.Path()->value().size()));
-  for (const auto& param_it : param_maps_) {
-    const auto& map_key = param_it.first;
-    const auto& map_value = param_it.second;
-    const auto& it = current_params.find(map_key);
-    if (it != current_params.end()) {
-      tokens.push_back(
-          std::make_unique<JwtParamLocation>(it->second, map_value.specified_issuers_, map_key));
+  // Check query parameter locations.
+  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().c_str());
+  for (const auto& location_it : param_locations_) {
+    const auto& param_key = location_it.first;
+    const auto& location_spec = location_it.second;
+    const auto& it = params.find(param_key);
+    if (it != params.end()) {
+      tokens.push_back(std::make_unique<const JwtParamLocation>(
+          it->second, location_spec.specified_issuers_, param_key));
     }
   }
   return tokens;

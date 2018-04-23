@@ -14,12 +14,10 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
- * JwtLocation stores following info
+ * JwtLocation stores following info:
  * *  extracted JWT string,
  * *  the location where the JWT is extracted from,
- * *  list of issuers specified the location. The issuer of extracted JWT must
- * match one of these
- * issuers.
+ * *  list of issuers specified the location.
  */
 class JwtLocation {
 public:
