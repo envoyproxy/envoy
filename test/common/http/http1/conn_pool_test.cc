@@ -519,9 +519,10 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
   dispatcher_.clearDeferredDeleteList();
 
   conn_pool_.expectAndRunUpstreamReady();
-  conn_pool_.
+  conn_pool_
+      .
 
-  EXPECT_CALL(*conn_pool_.test_clients_[1].codec_, newStream(_))
+      EXPECT_CALL(*conn_pool_.test_clients_[1].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
   conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
