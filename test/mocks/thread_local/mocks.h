@@ -28,6 +28,11 @@ public:
 
   SlotPtr allocateSlot_() { return SlotPtr{new SlotImpl(*this, current_slot_++)}; }
   void runOnAllThreads_(Event::PostCb cb) { cb(); }
+  void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) {
+    cb();
+    main_callback();
+  }
+
   void shutdownThread_() {
     shutdown_ = true;
     // Reverse order which is same as the production code.
@@ -53,6 +58,9 @@ public:
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override { return parent_.data_[index_]; }
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
+    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
+      parent_.runOnAllThreads(cb, main_callback);
+    }
     void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
 
     MockInstance& parent_;

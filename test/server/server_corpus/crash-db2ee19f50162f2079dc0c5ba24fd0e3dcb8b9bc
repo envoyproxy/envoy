@@ -1,0 +1,23 @@
+static_resources {
+  clusters {
+    name: "@"
+    connect_timeout {
+      nanos: 250000000
+    }
+    lb_policy: MAGLEV
+    dns_lookup_family: V4_ONLY
+    dns_resolvers {
+      pipe {
+        path: "\014\000"
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}

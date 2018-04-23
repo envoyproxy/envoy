@@ -93,11 +93,20 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
     }
   }
 
+  // Track whether we rebuilt any LB structures.
+  bool cluster_rebuilt = false;
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
-      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *priority_state[i].first,
-                             priority_state[i].second);
+      if (locality_weights_map_.size() <= i) {
+        locality_weights_map_.resize(i + 1);
+      }
+      cluster_rebuilt |=
+          updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *priority_state[i].first,
+                                 locality_weights_map_[i], priority_state[i].second);
     }
+  }
+  if (!cluster_rebuilt) {
+    info_->stats().update_no_rebuild_.inc();
   }
 
   // If we didn't setup to initialize when our first round of health checking is complete, just
@@ -105,8 +114,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
   onPreInitComplete();
 }
 
-void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
-                                            LocalityWeightsMap& locality_weights_map) {
+bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                                            LocalityWeightsMap& locality_weights_map,
+                                            LocalityWeightsMap& new_locality_weights_map) {
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
@@ -121,8 +131,8 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // improve performance and scalability of locality weight updates.
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
                             health_checker_ != nullptr) ||
-      current_locality_weights_map_ != locality_weights_map) {
-    current_locality_weights_map_ = locality_weights_map;
+      locality_weights_map != new_locality_weights_map) {
+    locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
@@ -155,7 +165,7 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
     if (non_empty_local_locality) {
       per_locality.emplace_back(hosts_per_locality[local_locality]);
       if (locality_weighted_lb) {
-        locality_weights->emplace_back(locality_weights_map[local_locality]);
+        locality_weights->emplace_back(new_locality_weights_map[local_locality]);
       }
     }
 
@@ -166,7 +176,7 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
       if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
         per_locality.emplace_back(entry.second);
         if (locality_weighted_lb) {
-          locality_weights->emplace_back(locality_weights_map[entry.first]);
+          locality_weights->emplace_back(new_locality_weights_map[entry.first]);
         }
       }
     }
@@ -177,7 +187,9 @@ void EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
     host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
                          per_locality_shared, createHealthyHostLists(*per_locality_shared),
                          std::move(locality_weights), hosts_added, hosts_removed);
+    return true;
   }
+  return false;
 }
 
 void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
