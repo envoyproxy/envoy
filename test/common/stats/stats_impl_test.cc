@@ -615,7 +615,8 @@ TEST_P(BlockRawStatDataAllocatorAlignmentTest, objectOverlap) {
 
 INSTANTIATE_TEST_CASE_P(BlockRawStatDataAllocatorAlignmentTest,
                         BlockRawStatDataAllocatorAlignmentTest,
-                        testing::Range(std::size_t{0}, alignof(Stats::RawStatData) + std::size_t{1}));
+                        testing::Range(std::size_t{0},
+                                       alignof(Stats::RawStatData) + std::size_t{1}));
 
 } // namespace Stats
 } // namespace Envoy
