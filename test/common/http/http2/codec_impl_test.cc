@@ -257,7 +257,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
 
   TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "3"}};
   // What follows is a hack to get headers that should span into continuation frames. The default
-  // maximum frame size is 16K. We will add 3,000 headers that will take is above this size and
+  // maximum frame size is 16K. We will add 3,000 headers that will take us above this size and
   // not easily compress with HPACK. (I confirmed this generates 26,468 bytes of header data
   // which should contain a continuation.)
   for (uint i = 1; i < 3000; i++) {
