@@ -44,6 +44,7 @@ Version history
   :ref:`cluster specific <envoy_api_field_Cluster.upstream_bind_config>` options.
 * sockets: added `IP_TRANSPARENT` socket option support for :ref:`listeners
   <envoy_api_field_Listener.transparent>`.
+* stats: added support for histograms.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
