@@ -16,6 +16,7 @@
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
+#include "common/vpp/vpp_connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
 
@@ -76,8 +77,8 @@ Network::ConnectionPtr
 DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                        Network::TransportSocketPtr&& transport_socket) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ConnectionImpl>(*this, std::move(socket),
-                                                   std::move(transport_socket), true);
+  return std::make_unique<Network::VppConnectionImpl>(*this, std::move(socket),
+                                                      std::move(transport_socket), true);
 }
 
 Network::ClientConnectionPtr
@@ -86,8 +87,8 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        Network::TransportSocketPtr&& transport_socket,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
-                                                         std::move(transport_socket), options);
+  return std::make_unique<Network::VppClientConnectionImpl>(*this, address, source_address,
+                                                            std::move(transport_socket), options);
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

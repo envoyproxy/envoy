@@ -7,6 +7,7 @@ def envoy_all_extensions():
   all_extensions = [
     "//source/extensions/transport_sockets/raw_buffer:config",
     "//source/extensions/transport_sockets/ssl:config",
+    "//source/extensions/transport_sockets/vpp:config",
   ]
 
   # These extensions can be removed on a site specific basis.

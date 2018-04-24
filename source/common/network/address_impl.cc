@@ -15,9 +15,26 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 
+#include <vcl/vppcom.h>
+
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+Address::InstanceConstSharedPtr addressFromSockAddr(const vppcom_endpt_t& ep) {
+  struct sockaddr_in sin;
+  memset (&sin, 0, sizeof (sockaddr_in));
+  sin.sin_family = ((ep.is_ip4) ? AF_INET : AF_INET6);
+  switch (sin.sin_family) {
+    case AF_INET: {
+      memcpy(&sin.sin_addr, &ep.ip, sizeof(sin.sin_addr));
+      sin.sin_port = ep.port;
+      return std::make_shared<Address::Ipv4Instance>(&sin);
+    }
+    default:
+      throw EnvoyException(fmt::format("Unexpected sockaddr family for vppcom_endpt_t"));
+  }
+}
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
@@ -62,24 +79,30 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
 
 InstanceConstSharedPtr addressFromFd(int fd) {
   sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  int rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  vppcom_endpt_t ep;
+  socklen_t ss_len = sizeof ep;
+  uint8_t addr_buf[sizeof (ss)];
+  ep.ip = addr_buf;
+  
+  const int rc =
+      vppcom_session_attr(fd, VPPCOM_ATTR_GET_LCL_ADDR, &ep, &ss_len);
   if (rc != 0) {
     throw EnvoyException(
         fmt::format("getsockname failed for '{}': ({}) {}", fd, errno, strerror(errno)));
   }
-  int socket_v6only = 0;
-  if (ss.ss_family == AF_INET6) {
-    socklen_t size_int = sizeof(socket_v6only);
-    RELEASE_ASSERT(::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int) == 0);
-  }
-  return addressFromSockAddr(ss, ss_len, rc == 0 && socket_v6only);
+  ep.is_ip4 = 1;
+  return addressFromSockAddr(ep);
 }
 
 InstanceConstSharedPtr peerAddressFromFd(int fd) {
   sockaddr_storage ss;
-  socklen_t ss_len = sizeof ss;
-  const int rc = ::getpeername(fd, reinterpret_cast<sockaddr*>(&ss), &ss_len);
+  vppcom_endpt_t ep;
+  socklen_t ss_len = sizeof ep;
+  uint8_t addr_buf[sizeof (ss)];
+  ep.ip = addr_buf;
+
+  const int rc =
+      vppcom_session_attr(fd, VPPCOM_ATTR_GET_PEER_ADDR, &ep, &ss_len);
   if (rc != 0) {
     throw EnvoyException(fmt::format("getpeername failed for '{}': {}", fd, strerror(errno)));
   }
@@ -127,8 +150,14 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
     domain = AF_UNIX;
   }
 
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1);
+  (void)domain; // You don't NEED to know its V6 or not really, until bind()
+  std::string str{"envoy"};
+  char* app_name = new char[str.length() + 1];
+  strcpy(app_name, str.c_str());
+  int rv = vppcom_app_create(app_name);
+  ASSERT(rv == 0);
+  int fd = vppcom_session_create(VPPCOM_PROTO_TCP, 0 /* Is nonblocking */);
+  RELEASE_ASSERT(fd >= 0);
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
@@ -171,13 +200,25 @@ Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
 }
 
 int Ipv4Instance::bind(int fd) const {
-  return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                sizeof(ip_.ipv4_.address_));
+  vppcom_endpt_t ep;
+  ep.is_ip4 = 1;
+  uint8_t addr_buf[sizeof (struct in_addr)];
+  ep.ip = addr_buf;
+  memcpy(ep.ip, &ip_.ipv4_.address_.sin_addr, sizeof(ip_.ipv4_.address_.sin_addr));
+  ep.port = static_cast<uint16_t>(ip_.ipv4_.address_.sin_port);
+  return vppcom_session_bind(fd, &ep);
 }
 
 int Ipv4Instance::connect(int fd) const {
-  return ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                   sizeof(ip_.ipv4_.address_));
+  vppcom_endpt_t ep;
+  ep.is_ip4 = 1;
+  uint8_t addr_buf[sizeof (struct in_addr)];
+  ep.ip = addr_buf;
+  memset (ep.ip, 0, sizeof(ip_.ipv4_.address_.sin_addr));
+  if (ip_.ipv4_.address_.sin_addr.s_addr != 0)
+    memcpy(ep.ip, &ip_.ipv4_.address_.sin_addr, sizeof(ip_.ipv4_.address_.sin_addr));
+  ep.port = static_cast<uint16_t>(ip_.ipv4_.address_.sin_port);
+  return vppcom_session_connect(fd, &ep);
 }
 
 int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }

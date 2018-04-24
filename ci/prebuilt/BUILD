@@ -53,6 +53,40 @@ cc_library(
 )
 
 cc_library(
+    name = "vppcom",
+    srcs = ["thirdparty_build/lib/libvppcom.a"],
+    hdrs = glob(["thirdparty_build/include/vcl/vppcom.h"]),
+    includes = ["thirdparty_build/include"],
+    deps = [
+        ":svm",
+        ":vlibmemoryclient",
+    ],
+)
+
+cc_library(
+    name = "svm",
+    srcs = ["thirdparty_build/lib/libsvm.a"],
+    hdrs = glob(["thirdparty_build/include/svm/**/*.h"]),
+    includes = ["thirdparty_build/include"],
+    deps = [":vppinfra"],
+)
+
+cc_library(
+    name = "vlibmemoryclient",
+    srcs = ["thirdparty_build/lib/libvlibmemoryclient.a"],
+    hdrs = glob(["thirdparty_build/include/vlibmemoryclient/**/*.h"]),
+    includes = ["thirdparty_build/include"],
+    deps = [":vppinfra"],
+)
+
+cc_library(
+    name = "vppinfra",
+    srcs = ["thirdparty_build/lib/libvppinfra.a"],
+    hdrs = glob(["thirdparty_build/include/vppinfra/**/*.h"]),
+    includes = ["thirdparty_build/include"],
+)
+
+cc_library(
     name = "yaml_cpp",
     srcs = ["thirdparty_build/lib/libyaml-cpp.a"],
     hdrs = glob(["thirdparty_build/include/yaml-cpp/**/*.h"]),

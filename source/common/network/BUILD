@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "address_lib",
     srcs = ["address_impl.cc"],
     hdrs = ["address_impl.h"],
+    external_deps = ["vppcom"],
     deps = [
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
@@ -56,6 +57,19 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/ssl:ssl_socket_lib",
+        "//source/common/event:dispatcher_includes",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_includes",
+    hdrs = [
+        "connection_impl.h",
+    ],
+    deps = [
+        ":filter_manager_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/ssl:ssl_socket_lib",
     ],
 )
