@@ -68,6 +68,7 @@ public:
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
   void remove(const LowerCaseString& key) override;
+  void remove(const std::regex& regex) override;
   size_t size() const override { return headers_.size(); }
 
 protected:

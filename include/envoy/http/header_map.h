@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <regex>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -464,6 +465,14 @@ public:
    * @param key supplies the header key to remove.
    */
   virtual void remove(const LowerCaseString& key) PURE;
+
+  /**
+   * Remove all instances of headers with key matching the supplies regex.
+   * @param key_matcher supplies the regex to match header keys against. Note
+   * that this will be matching against LowerCaseString, so should be using
+   * lowercase characters.
+   */
+  virtual void remove(const std::regex& key_matcher) PURE;
 
   /**
    * @return the number of headers in the map.
