@@ -7,12 +7,15 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+
+static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
 
 /**
  * This is a simple UDP localhost writer for statsd messages.
@@ -38,11 +41,12 @@ private:
 class UdpStatsdSink : public Stats::Sink {
 public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
-                const bool use_tag);
+                const bool use_tag, const std::string& prefix = getDefaultPrefix());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
-                const bool use_tag)
-      : tls_(tls.allocateSlot()), use_tag_(use_tag) {
+                const bool use_tag, const std::string& prefix = getDefaultPrefix())
+      : tls_(tls.allocateSlot()), use_tag_(use_tag),
+        prefix_(prefix.empty() ? getDefaultPrefix() : prefix) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -58,6 +62,7 @@ public:
   // Called in unit test to validate writer construction and address.
   int getFdForTests() { return tls_->getTyped<Writer>().getFdForTests(); }
   bool getUseTagForTest() { return use_tag_; }
+  const std::string& getPrefix() { return prefix_; }
 
 private:
   const std::string getName(const Stats::Metric& metric);
@@ -66,6 +71,8 @@ private:
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
+  // Prefix for all flushed stats.
+  const std::string prefix_;
 };
 
 /**
@@ -75,7 +82,7 @@ class TcpStatsdSink : public Stats::Sink {
 public:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope);
+                Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
   void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
@@ -97,6 +104,8 @@ public:
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
                                                  std::chrono::milliseconds(value));
   }
+
+  const std::string& getPrefix() { return prefix_; }
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
@@ -133,7 +142,7 @@ private:
   static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
 
   // Prefix for all flushed stats.
-  static char STAT_PREFIX[];
+  const std::string prefix_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   ThreadLocal::SlotPtr tls_;
