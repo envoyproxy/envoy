@@ -143,7 +143,7 @@ public:
     }
   }
 
-  // Redis::DecoderFactory
+  // RedisProxy::DecoderFactory
   DecoderPtr create(DecoderCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
     return DecoderPtr{decoder_};
