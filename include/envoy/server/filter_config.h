@@ -171,9 +171,8 @@ public:
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   *         config, which arrives in an opaque message, will be parsed into this empty proto.
+   *         Optional today, will be compulsory when v1 is deprecated.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
@@ -296,11 +295,22 @@ public:
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
+   * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
+   *         cluster-local config proto message for v2. The filter config, which arrives in an
+   *         opaque message, will be parsed into this empty proto. By default, this method
+   *         returns the same value as createEmptyConfigProto, and can be optionally overridden
+   *         in implementations.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
+    return createEmptyConfigProto();
+  }
+
+  /**
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const ProtobufWkt::Struct&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&) {
     return nullptr;
   }
 
