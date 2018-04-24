@@ -4223,10 +4223,13 @@ public:
     createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED;
     }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    }
     Router::RouteSpecificFilterConfigConstSharedPtr
-    createRouteSpecificFilterConfig(const ProtobufWkt::Struct& source) override {
+    createRouteSpecificFilterConfig(const Protobuf::Message& message) override {
       auto obj = std::make_shared<DerivedFilterConfig>();
-      MessageUtil::jsonConvert(source, obj->config_);
+      obj->config_.MergeFrom(message);
       return obj;
     }
     std::string name() override { return "test.filter"; }
