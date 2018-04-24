@@ -502,10 +502,16 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
   // finishes.
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
+    if (cluster.has_lb_subset_config()) {
+      throw EnvoyException("RingHash LB type is not compatible with subset LB");
+    }
     cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
         cluster_reference.prioritySet(), cluster_reference.info()->stats(), runtime_, random_,
         cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
+    if (cluster.has_lb_subset_config()) {
+      throw EnvoyException("Maglev LB type is not compatible with subset LB");
+    }
     cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
         cluster_reference.prioritySet(), cluster_reference.info()->stats(), runtime_, random_,
         cluster_reference.info()->lbConfig());
