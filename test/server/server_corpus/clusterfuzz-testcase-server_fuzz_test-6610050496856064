@@ -1,0 +1,45 @@
+static_resources {
+  listeners {
+    name: "listener_0"
+    address {
+      pipe {
+        path: "\t"
+      }
+    }
+    filter_chains {
+      tls_context {
+        common_tls_context {
+          tls_certificate_sds_secret_configs {
+            sds_config {
+              api_config_source {
+                refresh_delay {
+                  seconds: -281474976710656
+                }
+                grpc_services {
+                  envoy_grpc {
+                    cluster_name: "\000\000\000\000\000"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        sni_domains: "6e702f1f66d415068aabbc60377ad67a326b6b2b"
+      }
+    }
+    filter_chains {
+    }
+  }
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "^"
+    }
+  }
+}

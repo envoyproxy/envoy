@@ -10,11 +10,11 @@ echo "building using ${NUM_CPUS} CPUs"
 function bazel_release_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
-  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static.stamped
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy
 
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
@@ -28,11 +28,11 @@ function bazel_release_binary_build() {
 function bazel_debug_binary_build() {
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
-  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static.stamped
+  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-genfiles/source/exe/envoy-static.stamped \
+    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-debug
 }
 
@@ -154,7 +154,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
   /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel --batch build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
-    -c opt //source/exe:envoy-static.stamped
+    -c opt //source/exe:envoy-static
   # tar up the coverity results
   tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
   # Copy the Coverity results somewhere that we can access outside of the container.

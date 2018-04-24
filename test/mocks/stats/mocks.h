@@ -68,10 +68,35 @@ public:
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(recordValue, void(uint64_t value));
+  MOCK_CONST_METHOD0(used, bool());
 
   std::string name_;
   std::vector<Tag> tags_;
   Store* store_;
+};
+
+class MockParentHistogram : public ParentHistogram {
+public:
+  MockParentHistogram();
+  ~MockParentHistogram();
+
+  // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
+  // creates a deadlock in gmock and is an unintended use of mock functions.
+  const std::string& name() const override { return name_; };
+  void merge() override {}
+
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
+  MOCK_METHOD1(recordValue, void(uint64_t value));
+  MOCK_CONST_METHOD0(cumulativeStatistics, const HistogramStatistics&());
+  MOCK_CONST_METHOD0(intervalStatistics, const HistogramStatistics&());
+
+  std::string name_;
+  std::vector<Tag> tags_;
+  Store* store_;
+  std::shared_ptr<HistogramStatistics> histogram_stats_ =
+      std::make_shared<HistogramStatisticsImpl>();
 };
 
 class MockSink : public Sink {
@@ -82,6 +107,7 @@ public:
   MOCK_METHOD0(beginFlush, void());
   MOCK_METHOD2(flushCounter, void(const Counter& counter, uint64_t delta));
   MOCK_METHOD2(flushGauge, void(const Gauge& gauge, uint64_t value));
+  MOCK_METHOD1(flushHistogram, void(const ParentHistogram& histogram));
   MOCK_METHOD0(endFlush, void());
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
@@ -100,6 +126,7 @@ public:
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::list<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
+  MOCK_CONST_METHOD0(histograms, std::list<ParentHistogramSharedPtr>());
 
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;

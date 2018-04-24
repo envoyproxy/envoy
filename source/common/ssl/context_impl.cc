@@ -425,6 +425,9 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
     : ContextImpl(parent, scope, config), listener_name_(listener_name),
       server_names_(server_names), skip_context_update_(skip_context_update), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
+  if (config.certChain().empty()) {
+    throw EnvoyException("Server TlsCertificates must have a certificate specified");
+  }
   SSL_CTX_set_select_certificate_cb(
       ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
         ContextImpl* context_impl = static_cast<ContextImpl*>(
