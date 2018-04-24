@@ -365,16 +365,8 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   headers.addReference(key4, "value");
   headers.addReference(key5, "value");
 
-  // Trying to remove upper case strings from LowerCaseStrings will not work.
-  headers.remove(std::regex("^X-Prefix-"));
-  EXPECT_NE(nullptr, headers.get(key1));
-  EXPECT_NE(nullptr, headers.get(key2));
-  EXPECT_NE(nullptr, headers.get(key3));
-  EXPECT_NE(nullptr, headers.get(key4));
-  EXPECT_NE(nullptr, headers.get(key5));
-
   // Test removing the first header, middle headers, and the end header.
-  headers.remove(std::regex("^x-prefix-"));
+  headers.removePrefix(LowerCaseString("x-prefix-"));
   EXPECT_EQ(nullptr, headers.get(key1));
   EXPECT_NE(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key3));
@@ -382,7 +374,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   EXPECT_EQ(nullptr, headers.get(key5));
 
   // Remove all headers.
-  headers.remove(std::regex(".*"));
+  headers.removePrefix(LowerCaseString(""));
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
 
@@ -390,7 +382,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   headers.insertContentLength().value(5);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
-  headers.remove(std::regex("content"));
+  headers.removePrefix(LowerCaseString("content"));
   EXPECT_EQ(nullptr, headers.ContentLength());
 }
 
