@@ -225,6 +225,44 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterEndpointOverride) {
   TestHealthCheckHeaderMatch(config, headers, false);
 }
 
+TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
+  envoy::config::filter::http::health_check::v2::HealthCheck config;
+
+  config.mutable_pass_through_mode()->set_value(false);
+
+
+  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  header.set_name("x-healthcheck");
+  header.set_value("foo");
+
+  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  dup_header.set_name("x-healthcheck");
+
+  Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
+
+  TestHealthCheckHeaderMatch(config, headers, true);
+}
+
+
+TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
+  envoy::config::filter::http::health_check::v2::HealthCheck config;
+
+  config.mutable_pass_through_mode()->set_value(false);
+
+
+  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  header.set_name("x-healthcheck");
+  header.set_value("foo");
+
+  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  dup_header.set_name("x-healthcheck");
+  dup_header.set_value("bar");
+
+  Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
+
+  TestHealthCheckHeaderMatch(config, headers, false);
+}
+
 } // namespace HealthCheck
 } // namespace HttpFilters
 } // namespace Extensions
