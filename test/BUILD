@@ -8,6 +8,12 @@ load(
 
 envoy_package()
 
+# TODO(htuch): remove when we have a solution for https://github.com/bazelbuild/bazel/issues/3510
+envoy_cc_test_library(
+    name = "dummy_main",
+    srcs = ["dummy_main.cc"],
+)
+
 envoy_cc_test_library(
     name = "main",
     srcs = [

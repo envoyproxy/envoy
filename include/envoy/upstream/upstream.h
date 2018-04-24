@@ -358,6 +358,7 @@ public:
   COUNTER  (update_success)                                                                        \
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
+  COUNTER  (update_no_rebuild)                                                                     \
   GAUGE    (version)
 // clang-format on
 

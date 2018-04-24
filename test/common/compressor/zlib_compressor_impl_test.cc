@@ -12,126 +12,14 @@ namespace {
 
 class ZlibCompressorImplTest : public testing::Test {
 protected:
-  static const int64_t gzip_window_bits{31};
-  static const int64_t memory_level{8};
-  static const uint64_t default_input_size{796};
-};
-
-class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
-protected:
-  static void compressorBadInitTestHelper(int64_t window_bits, int64_t mem_level) {
-    ZlibCompressorImpl compressor;
-    compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                    ZlibCompressorImpl::CompressionStrategy::Standard, window_bits, mem_level);
-  }
-
-  static void unitializedCompressorTestHelper() {
-    Buffer::OwnedImpl input_buffer;
-    Buffer::OwnedImpl output_buffer;
-    ZlibCompressorImpl compressor;
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
-    compressor.compress(input_buffer, output_buffer);
-  }
-};
-
-/**
- * Exercises death by passing bad initialization params or by calling
- * compress before init.
- */
-TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(unitializedCompressorTestHelper(), "assert failure: result == Z_OK");
-}
-
-/**
- * Exercises compressor's checksum by calling it before init or compress.
- */
-TEST_F(ZlibCompressorImplTest, CallingChecksum) {
-  Buffer::OwnedImpl compressor_input_buffer;
-  Buffer::OwnedImpl compressor_output_buffer;
-
-  ZlibCompressorImpl compressor;
-  EXPECT_EQ(0, compressor.checksum());
-
-  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
-                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
-                  gzip_window_bits, memory_level);
-  EXPECT_EQ(0, compressor.checksum());
-
-  TestUtility::feedBufferWithRandomCharacters(compressor_input_buffer, 4096);
-  compressor.compress(compressor_input_buffer, compressor_output_buffer);
-  compressor.flush(compressor_output_buffer);
-  compressor_input_buffer.drain(4096);
-  EXPECT_TRUE(compressor.checksum() > 0);
-}
-
-/**
- * Exercises compression with a very small output buffer.
- */
-TEST_F(ZlibCompressorImplTest, CompressWithReducedInternalMemory) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl output_buffer;
-
-  Envoy::Compressor::ZlibCompressorImpl compressor(8);
-  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                  ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
-                  memory_level);
-
-  for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
-    compressor.compress(input_buffer, output_buffer);
-    input_buffer.drain(default_input_size * i);
-    ASSERT_EQ(0, input_buffer.length());
-  }
-
-  compressor.flush(output_buffer);
-
-  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice compressed_slices[num_comp_slices];
-  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
-
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
-  // HEADER 0x1f = 31 (window_bits)
-  EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
-  // CM 0x8 = deflate (compression method)
-  EXPECT_EQ("08", header_hex_str.substr(4, 2));
-
-  const std::string footer_hex_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
-  // FOOTER four-byte sequence (sync flush)
-  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
-}
-
-/**
- * Exercises compression with a flush call on each received buffer.
- */
-TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl output_buffer;
-
-  Envoy::Compressor::ZlibCompressorImpl compressor;
-  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                  ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
-                  memory_level);
-
-  for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
-    compressor.compress(input_buffer, output_buffer);
-
-    input_buffer.drain(default_input_size * i);
-    ASSERT_EQ(0, input_buffer.length());
-
-    compressor.flush(output_buffer);
-
+  void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
     Buffer::RawSlice compressed_slices[num_comp_slices];
     output_buffer.getRawSlices(compressed_slices, num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(
         reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+
     // HEADER 0x1f = 31 (window_bits)
     EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
     // CM 0x8 = deflate (compression method)
@@ -143,142 +31,176 @@ TEST_F(ZlibCompressorImplTest, CompressWithContinuesFlush) {
     // FOOTER four-byte sequence (sync flush)
     EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
   }
+
+  void expectValidFinishedBuffer(const Buffer::OwnedImpl& output_buffer,
+                                 const uint32_t input_size) {
+    uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
+    Buffer::RawSlice compressed_slices[num_comp_slices];
+    output_buffer.getRawSlices(compressed_slices, num_comp_slices);
+
+    const std::string header_hex_str = Hex::encode(
+        reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
+    // HEADER 0x1f = 31 (window_bits)
+    EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
+    // CM 0x8 = deflate (compression method)
+    EXPECT_EQ("08", header_hex_str.substr(4, 2));
+
+    const std::string footer_bytes_str =
+        Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
+                    compressed_slices[num_comp_slices - 1].len_);
+
+    // A valid finished compressed buffer should have trailer with input size in it.
+    expectEqualInputSize(footer_bytes_str, input_size);
+  }
+
+  void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
+    const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
+    uint64_t size;
+    StringUtil::atoul(size_bytes.c_str(), size, 16);
+    EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
+  }
+
+  void drainBuffer(Buffer::OwnedImpl& buffer) { buffer.drain(buffer.length()); }
+
+  static const int64_t gzip_window_bits{31};
+  static const int64_t memory_level{8};
+  static const uint64_t default_input_size{796};
+};
+
+class ZlibCompressorImplTester : public ZlibCompressorImpl {
+public:
+  ZlibCompressorImplTester() : ZlibCompressorImpl() {}
+  ZlibCompressorImplTester(uint64_t chunk_size) : ZlibCompressorImpl(chunk_size) {}
+  void compressThenFlush(Buffer::OwnedImpl& buffer) { compress(buffer, State::Flush); }
+  void finish(Buffer::OwnedImpl& buffer) { compress(buffer, State::Finish); }
+};
+
+class ZlibCompressorImplDeathTest : public ZlibCompressorImplTest {
+protected:
+  static void compressorBadInitTestHelper(int64_t window_bits, int64_t mem_level) {
+    ZlibCompressorImpl compressor;
+    compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
+                    ZlibCompressorImpl::CompressionStrategy::Standard, window_bits, mem_level);
+  }
+
+  static void uninitializedCompressorTestHelper() {
+    Buffer::OwnedImpl buffer;
+    ZlibCompressorImplTester compressor;
+    TestUtility::feedBufferWithRandomCharacters(buffer, 100);
+    compressor.finish(buffer);
+  }
+
+  static void uninitializedCompressorFlushTestHelper() {
+    Buffer::OwnedImpl buffer;
+    ZlibCompressorImplTester compressor;
+    compressor.compressThenFlush(buffer);
+  }
+
+  static void uninitializedCompressorFinishTestHelper() {
+    Buffer::OwnedImpl buffer;
+    ZlibCompressorImplTester compressor;
+    compressor.finish(buffer);
+  }
+};
+
+// Exercises death by passing bad initialization params or by calling
+// compress before init.
+TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
+  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
+  EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
+  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");
+  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFlushTestHelper(),
+                             "assert failure: result == Z_OK");
+  EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorFinishTestHelper(),
+                             "assert failure: result == Z_STREAM_END");
 }
 
-/**
- * Exercises compression with very small input buffer.
- */
-TEST_F(ZlibCompressorImplTest, CompressSmallInputMemory) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl output_buffer;
+// Exercises compressor's checksum by calling it before init or compress.
+TEST_F(ZlibCompressorImplTest, CallingChecksum) {
+  Buffer::OwnedImpl buffer;
 
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ZlibCompressorImplTester compressor;
+  EXPECT_EQ(0, compressor.checksum());
+
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+                  gzip_window_bits, memory_level);
+  EXPECT_EQ(0, compressor.checksum());
+
+  TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
+  compressor.compressThenFlush(buffer);
+  expectValidFlushedBuffer(buffer);
+
+  drainBuffer(buffer);
+  EXPECT_TRUE(compressor.checksum() > 0);
+}
+
+// Exercises compressor's checksum by calling it before init or compress.
+TEST_F(ZlibCompressorImplTest, CallingFinishOnly) {
+  Buffer::OwnedImpl buffer;
+
+  ZlibCompressorImplTester compressor;
+  compressor.init(Envoy::Compressor::ZlibCompressorImpl::CompressionLevel::Standard,
+                  Envoy::Compressor::ZlibCompressorImpl::CompressionStrategy::Standard,
+                  gzip_window_bits, memory_level);
+  EXPECT_EQ(0, compressor.checksum());
+
+  TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
+  compressor.finish(buffer);
+  expectValidFinishedBuffer(buffer, 4096);
+}
+
+TEST_F(ZlibCompressorImplTest, CompressWithSmallChunkSize) {
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl accumulation_buffer;
+
+  ZlibCompressorImplTester compressor(8);
   compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
                   ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
                   memory_level);
 
-  TestUtility::feedBufferWithRandomCharacters(input_buffer, 10);
+  uint64_t input_size = 0;
+  for (uint64_t i = 0; i < 10; i++) {
+    TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
+    ASSERT_EQ(default_input_size * i, buffer.length());
+    input_size += buffer.length();
+    compressor.compressThenFlush(buffer);
+    accumulation_buffer.add(buffer);
+    drainBuffer(buffer);
+    ASSERT_EQ(0, buffer.length());
+  }
+  expectValidFlushedBuffer(accumulation_buffer);
 
-  compressor.compress(input_buffer, output_buffer);
-  EXPECT_EQ(0, output_buffer.length());
-
-  compressor.flush(output_buffer);
-  EXPECT_LE(10, output_buffer.length());
-
-  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice compressed_slices[num_comp_slices];
-  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
-
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
-  // HEADER 0x1f = 31 (window_bits)
-  EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
-  // CM 0x8 = deflate (compression method)
-  EXPECT_EQ("08", header_hex_str.substr(4, 2));
-
-  const std::string footer_hex_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
-  // FOOTER four-byte sequence (sync flush)
-  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+  compressor.finish(buffer);
+  accumulation_buffer.add(buffer);
+  expectValidFinishedBuffer(accumulation_buffer, input_size);
 }
 
-/**
- * Exercises common flow of compressing some data, making it available to output buffer,
- * then moving output buffer to another buffer and so on.
- */
-TEST_F(ZlibCompressorImplTest, CompressMoveFlushAndRepeat) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl temp_buffer;
-  Buffer::OwnedImpl output_buffer;
-
-  Envoy::Compressor::ZlibCompressorImpl compressor;
-  compressor.init(ZlibCompressorImpl::CompressionLevel::Standard,
-                  ZlibCompressorImpl::CompressionStrategy::Standard, gzip_window_bits,
-                  memory_level);
-
-  for (uint64_t i = 0; i < 20; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
-    compressor.compress(input_buffer, temp_buffer);
-    input_buffer.drain(default_input_size * i);
-    ASSERT_EQ(0, input_buffer.length());
-    output_buffer.move(temp_buffer);
-    ASSERT_EQ(0, temp_buffer.length());
-  }
-
-  compressor.flush(temp_buffer);
-  ASSERT_TRUE(temp_buffer.length() > 0);
-  output_buffer.move(temp_buffer);
-  const uint64_t first_n_compressed_bytes = output_buffer.length();
-
-  for (uint64_t i = 0; i < 15; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i * 10);
-    compressor.compress(input_buffer, temp_buffer);
-    input_buffer.drain(default_input_size * i);
-    ASSERT_EQ(0, input_buffer.length());
-    output_buffer.move(temp_buffer);
-    ASSERT_EQ(0, temp_buffer.length());
-  }
-
-  compressor.flush(temp_buffer);
-  output_buffer.move(temp_buffer);
-  ASSERT_EQ(0, temp_buffer.length());
-  EXPECT_GE(output_buffer.length(), first_n_compressed_bytes);
-
-  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice compressed_slices[num_comp_slices];
-  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
-
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
-  // HEADER 0x1f = 31 (window_bits)
-  EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
-  // CM 0x8 = deflate (compression method)
-  EXPECT_EQ("08", header_hex_str.substr(4, 2));
-
-  const std::string footer_hex_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
-  // FOOTER four-byte sequence (sync flush)
-  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
-}
-
-/**
- * Exercises compression with other supported zlib initialization params.
- */
+// Exercises compression with other supported zlib initialization params.
 TEST_F(ZlibCompressorImplTest, CompressWithNotCommonParams) {
-  Buffer::OwnedImpl input_buffer;
-  Buffer::OwnedImpl output_buffer;
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl accumulation_buffer;
 
-  Envoy::Compressor::ZlibCompressorImpl compressor;
+  ZlibCompressorImplTester compressor;
   compressor.init(ZlibCompressorImpl::CompressionLevel::Speed,
                   ZlibCompressorImpl::CompressionStrategy::Rle, gzip_window_bits, 1);
 
+  uint64_t input_size = 0;
   for (uint64_t i = 0; i < 10; i++) {
-    TestUtility::feedBufferWithRandomCharacters(input_buffer, default_input_size * i, i);
-    compressor.compress(input_buffer, output_buffer);
-    input_buffer.drain(default_input_size * i);
-    ASSERT_EQ(0, input_buffer.length());
+    TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
+    ASSERT_EQ(default_input_size * i, buffer.length());
+    input_size += buffer.length();
+    compressor.compressThenFlush(buffer);
+    accumulation_buffer.add(buffer);
+    drainBuffer(buffer);
+    ASSERT_EQ(0, buffer.length());
   }
 
-  compressor.flush(output_buffer);
+  expectValidFlushedBuffer(accumulation_buffer);
 
-  uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice compressed_slices[num_comp_slices];
-  output_buffer.getRawSlices(compressed_slices, num_comp_slices);
-
-  const std::string header_hex_str = Hex::encode(
-      reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
-  // HEADER 0x1f = 31 (window_bits)
-  EXPECT_EQ("1f8b", header_hex_str.substr(0, 4));
-  // CM 0x8 = deflate (compression method)
-  EXPECT_EQ("08", header_hex_str.substr(4, 2));
-
-  const std::string footer_hex_str =
-      Hex::encode(reinterpret_cast<unsigned char*>(compressed_slices[num_comp_slices - 1].mem_),
-                  compressed_slices[num_comp_slices - 1].len_);
-  // FOOTER four-byte sequence (sync flush)
-  EXPECT_EQ("0000ffff", footer_hex_str.substr(footer_hex_str.size() - 8, 10));
+  compressor.finish(buffer);
+  accumulation_buffer.add(buffer);
+  expectValidFinishedBuffer(accumulation_buffer, input_size);
 }
 
 } // namespace

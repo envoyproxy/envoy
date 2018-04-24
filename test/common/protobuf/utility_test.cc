@@ -203,4 +203,35 @@ TEST(UtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+TEST(UtilityTest, JsonConvertSuccess) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Duration dest_duration;
+  MessageUtil::jsonConvert(source_duration, dest_duration);
+  EXPECT_EQ(42, dest_duration.seconds());
+}
+
+TEST(UtilityTest, JsonConvertFail) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(-281474976710656);
+  ProtobufWkt::Duration dest_duration;
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::jsonConvert(source_duration, dest_duration),
+                            EnvoyException,
+                            "Unable to convert protobuf message to JSON string: INTERNAL:Duration "
+                            "seconds exceeds limit for field:  seconds: -281474976710656\n");
+}
+
+TEST(DurationUtilTest, OutOfRange) {
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+}
+
 } // namespace Envoy

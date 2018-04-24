@@ -13,6 +13,7 @@
 #include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
@@ -104,7 +105,7 @@ public:
     }
     )EOF";
 
-  const std::string fault_with_target_cluster_json = R"EOF(
+  const std::string delay_with_upstream_cluster_json = R"EOF(
     {
       "delay" : {
         "type" : "fixed",
@@ -115,11 +116,21 @@ public:
     }
     )EOF";
 
-  void SetUpTest(const std::string json) {
+  const std::string v2_empty_fault_config_json = R"EOF(
+    {
+    }
+    )EOF";
+
+  envoy::config::filter::http::fault::v2::HTTPFault
+  convertJsonStrToProtoConfig(const std::string json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::fault::v2::HTTPFault fault;
-
     Config::FilterJson::translateFaultFilter(*config, fault);
+    return fault;
+  }
+
+  void SetUpTest(const std::string json) {
+    envoy::config::filter::http::fault::v2::HTTPFault fault = convertJsonStrToProtoConfig(json);
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
@@ -130,6 +141,9 @@ public:
     EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(duration_ms)));
     EXPECT_CALL(*timer_, disableTimer());
   }
+
+  void TestPerFilterConfigFault(const Router::RouteSpecificFilterConfig* route_fault,
+                                const Router::RouteSpecificFilterConfig* vhost_fault);
 
   FaultFilterConfigSharedPtr config_;
   std::unique_ptr<FaultFilter> filter_;
@@ -651,7 +665,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
@@ -693,7 +707,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("mismatch");
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
@@ -716,10 +730,10 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 }
 
 TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
-  SetUpTest(fault_with_target_cluster_json);
+  SetUpTest(delay_with_upstream_cluster_json);
   const std::string upstream_cluster("www1");
 
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -735,6 +749,79 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+void FaultFilterTest::TestPerFilterConfigFault(
+    const Router::RouteSpecificFilterConfig* route_fault,
+    const Router::RouteSpecificFilterConfig* vhost_fault) {
+
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
+      .WillByDefault(Return(route_fault));
+  ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
+      .WillByDefault(Return(vhost_fault));
+
+  const std::string upstream_cluster("www1");
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
+      .WillOnce(ReturnRef(upstream_cluster));
+
+  // Delay related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("PerFilterConfigFault");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
+      .WillOnce(Return(false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  timer_->callback_();
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
+
+  Fault::FaultSettings abort_fault(convertJsonStrToProtoConfig(abort_only_json));
+  Fault::FaultSettings delay_fault(convertJsonStrToProtoConfig(delay_with_upstream_cluster_json));
+
+  // route-level fault overrides listener-level fault
+  {
+    SetUpTest(v2_empty_fault_config_json); // This is a valid listener level fault
+    TestPerFilterConfigFault(&delay_fault, nullptr);
+  }
+
+  // virtual-host-level fault overrides listener-level fault
+  {
+    config_->stats().aborts_injected_.reset();
+    config_->stats().delays_injected_.reset();
+    SetUpTest(v2_empty_fault_config_json);
+    TestPerFilterConfigFault(nullptr, &delay_fault);
+  }
+
+  // route-level fault overrides virtual-host-level fault
+  {
+    config_->stats().aborts_injected_.reset();
+    config_->stats().delays_injected_.reset();
+    SetUpTest(v2_empty_fault_config_json);
+    TestPerFilterConfigFault(&delay_fault, &abort_fault);
+  }
 }
 
 } // namespace Fault
