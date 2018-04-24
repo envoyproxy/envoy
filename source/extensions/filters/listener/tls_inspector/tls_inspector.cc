@@ -13,7 +13,9 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
-#include "common/config/well_known_names.h"
+
+//#include "common/config/well_known_names.h"
+#include "extensions/transport_sockets/well_known_names.h"
 
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
@@ -107,8 +109,6 @@ void Filter::onServername(absl::string_view name) {
     config_->stats().no_sni_found_.inc();
   }
   clienthello_success_ = true;
-
-  // TODO(ggreenway): Notify the ConnectionSocket that this is a TLS connection.
 }
 
 void Filter::onRead() {
@@ -185,12 +185,14 @@ void Filter::parseClientHello(const void* data, size_t len) {
     }
     break;
   case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      done(true);
-    } else {
+    if (!clienthello_success_) {
       config_->stats().invalid_client_hello_.inc();
-      done(false);
+      cb_->socket().setDetectedTransportProtocol(
+          TransportSockets::TransportSocketNames::get().RAW_BUFFER);
+    } else {
+      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
     }
+    done(true);
     break;
   default:
     done(false);

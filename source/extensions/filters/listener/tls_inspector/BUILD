@@ -23,7 +23,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
-        "//source/common/config:well_known_names",
+        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 

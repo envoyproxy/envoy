@@ -90,6 +90,11 @@ public:
   }
   bool localAddressRestored() const override { return local_address_restored_; }
 
+  void setDetectedTransportProtocol(absl::string_view protocol) override {
+    transport_protocol_ = std::string(protocol);
+  }
+  absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
+
   void setRequestedServerName(absl::string_view server_name) override {
     server_name_ = std::string(server_name);
   }
@@ -98,6 +103,7 @@ public:
 protected:
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};
+  std::string transport_protocol_;
   std::string server_name_;
 };
 

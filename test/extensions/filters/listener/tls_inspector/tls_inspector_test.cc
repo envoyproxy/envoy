@@ -103,6 +103,7 @@ TEST_F(TlsInspectorTest, SniRegistered) {
         return client_hello.size();
       }));
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
 }
@@ -130,6 +131,7 @@ TEST_F(TlsInspectorTest, MultipleReads) {
 
   bool got_continue = false;
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
   }));
@@ -149,6 +151,7 @@ TEST_F(TlsInspectorTest, NoSni) {
         return client_hello.size();
       }));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
 }
@@ -185,7 +188,8 @@ TEST_F(TlsInspectorTest, NotSsl) {
         memcpy(buffer, data.data(), data.size());
         return data.size();
       }));
-  EXPECT_CALL(cb_, continueFilterChain(false));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("raw_buffer")));
+  EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
 }
 
