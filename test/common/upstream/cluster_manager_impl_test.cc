@@ -466,26 +466,6 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
-TEST_F(ClusterManagerImplTest, RingHashSubsetReject) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-  cluster->set_lb_policy(envoy::api::v2::Cluster::RING_HASH);
-  cluster->mutable_lb_subset_config();
-  cluster->mutable_connect_timeout();
-  EXPECT_THROW_WITH_MESSAGE(create(bootstrap), EnvoyException,
-                            "RingHash LB type is not compatible with subset LB");
-}
-
-TEST_F(ClusterManagerImplTest, MaglevSubsetReject) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-  cluster->set_lb_policy(envoy::api::v2::Cluster::MAGLEV);
-  cluster->mutable_lb_subset_config();
-  cluster->mutable_connect_timeout();
-  EXPECT_THROW_WITH_MESSAGE(create(bootstrap), EnvoyException,
-                            "Maglev LB type is not compatible with subset LB");
-}
-
 // Verify EDS clusters have EDS config.
 TEST_F(ClusterManagerImplTest, EdsClustersRequireEdsConfig) {
   const std::string yaml = R"EOF(
