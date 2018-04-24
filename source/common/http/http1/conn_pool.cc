@@ -239,7 +239,7 @@ void ConnPoolImpl::onUpstreamReady() {
 void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
   client.stream_wrapper_.reset();
   if (pending_requests_.empty() || delay) {
-    // There is nothing to service or delay processing is requested, so just move the connection
+    // There is nothing to service or delayed processing is requested, so just move the connection
     // into the ready list.
     ENVOY_CONN_LOG(debug, "moving to ready", *client.codec_client_);
     client.moveBetweenLists(busy_clients_, ready_clients_);
