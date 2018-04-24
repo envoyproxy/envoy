@@ -9,6 +9,15 @@ namespace Dynamo {
 
 class Utility {
 public:
+  // returns example max name length, 127. This number is easily mutable in the
+  // outside world, and depending on it makes this test fragile. Thus, the examples
+  // in dynamo_utility_test are hard-coded to make sure
+  //   `locations-sandbox-partition-test-iad-mytest-really-long-name`
+  // becomes
+  //   `locations-sandbox-partition-test-iad-mytest-rea`
+
+  static uint64_t exampleMaxNameLength();
+
   /**
    * Creates the partition id stats string.
    * The stats format is

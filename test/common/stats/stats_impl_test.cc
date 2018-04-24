@@ -475,7 +475,7 @@ TEST(TagProducerTest, CheckConstructor) {
 
 class BlockRawStatDataAllocatorTest : public testing::Test {
 public:
-  void setup() {
+  void SetUp() override {
     Stats::RawStatData::configureForTestsOnly(options_);
     BlockMemoryHashSetOptions memory_hash_set_options_ =
         Stats::blockMemHashOptions(options_.maxStats());
@@ -486,6 +486,13 @@ public:
                                                                     memory_.get(), stat_lock_);
   }
 
+  void TearDown() override {
+    // Configure it back so that later tests don't get the wonky values
+    // used here
+    NiceMock<Server::MockOptions> default_options;
+    Stats::RawStatData::configureForTestsOnly(default_options);
+  }
+
   std::unique_ptr<uint8_t[]> memory_;
   std::unique_ptr<Stats::BlockRawStatDataAllocator> allocator_;
   NiceMock<Server::MockOptions> options_;
@@ -493,8 +500,6 @@ public:
 };
 
 TEST_F(BlockRawStatDataAllocatorTest, truncateKey) {
-  setup();
-
   std::string key1(Stats::RawStatData::maxNameLength(), 'a');
   Stats::RawStatData* stat1 = allocator_->alloc(key1);
   std::string key2 = key1 + "a";
@@ -503,7 +508,6 @@ TEST_F(BlockRawStatDataAllocatorTest, truncateKey) {
 }
 
 TEST_F(BlockRawStatDataAllocatorTest, uniqueNaming) {
-  setup();
 
   auto foo_1 = allocator_->alloc("foo");
   auto foo_2 = allocator_->alloc("foo");
@@ -515,7 +519,7 @@ TEST_F(BlockRawStatDataAllocatorTest, uniqueNaming) {
 
 TEST_F(BlockRawStatDataAllocatorTest, allocFail) {
   EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(2));
-  setup();
+  BlockRawStatDataAllocatorTest::SetUp();
 
   Stats::RawStatData* s1 = allocator_->alloc("1");
   Stats::RawStatData* s2 = allocator_->alloc("2");
@@ -525,16 +529,18 @@ TEST_F(BlockRawStatDataAllocatorTest, allocFail) {
   EXPECT_EQ(s3, nullptr);
 }
 
-// Because the shared memory is managed manually, make sure it meets
+// Because the block memory is managed manually, make sure it meets
 // basic requirements:
 //   - Objects are correctly aligned so that std::atomic works properly
 //   - Objects don't overlap
 class BlockRawStatDataAllocatorAlignmentTest : public BlockRawStatDataAllocatorTest,
                                                public testing::WithParamInterface<uint64_t> {
 public:
-  BlockRawStatDataAllocatorAlignmentTest() : name_len_(8 + GetParam()) {
+  BlockRawStatDataAllocatorAlignmentTest() : name_len_(8 + GetParam()) {}
+
+  void SetUp() override {
     EXPECT_CALL(options_, maxObjNameLength()).WillRepeatedly(Return(name_len_));
-    setup();
+    BlockRawStatDataAllocatorTest::SetUp();
     EXPECT_EQ(name_len_, Stats::RawStatData::maxObjNameLength());
   }
 
