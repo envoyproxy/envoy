@@ -5,9 +5,9 @@
 #include <sys/socket.h>
 
 #include "envoy/network/listen_socket.h"
-#include "common/network/socket_option_impl.h"
 
 #include "common/common/logger.h"
+#include "common/network/socket_option_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -15,9 +15,11 @@ namespace Envoy {
 namespace Network {
 
 class AddrFamilyAwareSocketImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
- public:
-      AddrFamilyAwareSocketImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname, SocketOptionName ipv6_optname, int value)
-      : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)), ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
+public:
+  AddrFamilyAwareSocketImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
+                            SocketOptionName ipv6_optname, int value)
+      : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
+        ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
   // Socket::Option
   bool setOption(Socket& socket, Socket::SocketState state) const override;
@@ -39,10 +41,11 @@ class AddrFamilyAwareSocketImpl : public Socket::Option, Logger::Loggable<Logger
    * platform for fd after the above option level fallback semantics are taken into account or the
    *         socket is non-IP.
    */
-  static bool setIpSocketOption(Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
-                                                    const std::unique_ptr<SocketOptionImpl>& ipv6_option);
+  static bool setIpSocketOption(Socket& socket, Socket::SocketState state,
+                                const std::unique_ptr<SocketOptionImpl>& ipv4_option,
+                                const std::unique_ptr<SocketOptionImpl>& ipv6_option);
 
- private:
+private:
   const std::unique_ptr<SocketOptionImpl> ipv4_option_;
   const std::unique_ptr<SocketOptionImpl> ipv6_option_;
 };

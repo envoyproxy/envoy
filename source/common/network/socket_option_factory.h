@@ -14,6 +14,13 @@
 namespace Envoy {
 namespace Network {
 
+struct TcpKeepaliveConfig {
+  absl::optional<uint32_t>
+      keepalive_probes_; // Number of unanswered probes before the connection is dropped
+  absl::optional<uint32_t> keepalive_time_; // Connection idle time before probing will start, in ms
+  absl::optional<uint32_t> keepalive_interval_; // Interval between probes, in ms
+};
+
 class SocketOptionFactory : Logger::Loggable<Logger::Id::connection> {
 public:
   static std::unique_ptr<Socket::Option>

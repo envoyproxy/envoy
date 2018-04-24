@@ -1,12 +1,11 @@
 #include "common/network/addr_family_aware_socket_impl.h"
 
-#include "common/network/socket_option_impl.h"
-
 #include "envoy/common/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"
+#include "common/network/socket_option_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -15,8 +14,9 @@ bool AddrFamilyAwareSocketImpl::setOption(Socket& socket, Socket::SocketState st
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
-bool AddrFamilyAwareSocketImpl::setIpSocketOption(Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
-                                                  const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
+bool AddrFamilyAwareSocketImpl::setIpSocketOption(
+    Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
+    const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   // If this isn't IP, we're out of luck.
   Address::InstanceConstSharedPtr address;
   const Address::Ip* ip = nullptr;

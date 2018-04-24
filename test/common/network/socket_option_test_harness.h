@@ -34,8 +34,8 @@ public:
 
     for (Socket::SocketState state : when) {
       if (option_name.has_value()) {
-        EXPECT_CALL(os_sys_calls_,
-                    setsockopt_(_, option_name.value().first, option_name.value().second, _, sizeof(int)))
+        EXPECT_CALL(os_sys_calls_, setsockopt_(_, option_name.value().first,
+                                               option_name.value().second, _, sizeof(int)))
             .WillOnce(Invoke([option_val](int, int, int, const void* optval, socklen_t) -> int {
               EXPECT_EQ(option_val, *static_cast<const int*>(optval));
               return 0;
