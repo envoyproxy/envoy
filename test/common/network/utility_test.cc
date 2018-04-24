@@ -28,6 +28,7 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
   EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
 }
 
 TEST(NetworkUtility, resolveUrl) {
