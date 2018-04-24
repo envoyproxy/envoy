@@ -1244,6 +1244,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   NiceMock<Network::MockClientConnection>* upstream_connection =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
+  Runtime::RandomGeneratorImpl randomGenerator;
 
   conn_info.connection_ = upstream_connection;
   conn_info.host_description_.reset(new Upstream::HostImpl(
@@ -1251,7 +1252,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
       Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
       envoy::api::v2::core::Metadata::default_instance(), 1,
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), randomGenerator));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
@@ -1293,6 +1294,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
   NiceMock<Network::MockClientConnection>* upstream_connection =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
+  Runtime::RandomGeneratorImpl randomGenerator;
 
   conn_info.connection_ = upstream_connection;
   conn_info.host_description_.reset(new Upstream::HostImpl(
@@ -1300,7 +1302,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
       Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
       envoy::api::v2::core::Metadata::default_instance(), 1,
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), randomGenerator));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
@@ -1349,6 +1351,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
                                              {"connection", "Upgrade"},
                                              {"upgrade", "websocket"}}};
   auto raw_header_ptr = headers.get();
+  Runtime::RandomGeneratorImpl randomGenerator;
 
   conn_info.connection_ = upstream_connection;
   conn_info.host_description_.reset(new Upstream::HostImpl(
@@ -1356,7 +1359,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
       Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
       envoy::api::v2::core::Metadata::default_instance(), 1,
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), randomGenerator));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
@@ -1396,6 +1399,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   NiceMock<Network::MockClientConnection>* upstream_connection =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
+  Runtime::RandomGeneratorImpl randomGenerator;
 
   conn_info.connection_ = upstream_connection;
   conn_info.host_description_.reset(new Upstream::HostImpl(
@@ -1403,7 +1407,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
       Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
       envoy::api::v2::core::Metadata::default_instance(), 1,
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), randomGenerator));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
@@ -1449,6 +1453,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   NiceMock<Network::MockClientConnection>* upstream_connection =
       new NiceMock<Network::MockClientConnection>();
   Upstream::MockHost::MockCreateConnectionData conn_info;
+  Runtime::RandomGeneratorImpl randomGenerator;
 
   conn_info.connection_ = upstream_connection;
   conn_info.host_description_.reset(new Upstream::HostImpl(
@@ -1456,7 +1461,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
       Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
       envoy::api::v2::core::Metadata::default_instance(), 1,
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), randomGenerator));
   EXPECT_CALL(*connect_timer, enableTimer(_));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 

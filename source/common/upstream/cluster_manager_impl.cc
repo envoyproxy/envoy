@@ -797,7 +797,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new OriginalDstCluster::LoadBalancer(
-          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_));
+          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
+          parent_.parent_.random_));
       break;
     }
     }

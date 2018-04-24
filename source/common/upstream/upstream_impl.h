@@ -127,9 +127,10 @@ public:
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
-           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
+           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+           Envoy::Runtime::RandomGenerator& random)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config),
-        used_(true) {
+        used_(true), random_(random) {
     weight(initial_weight);
   }
 
@@ -165,6 +166,7 @@ private:
   std::atomic<uint64_t> health_flags_{};
   std::atomic<uint32_t> weight_;
   std::atomic<bool> used_;
+  Envoy::Runtime::RandomGenerator& random_;
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -446,7 +448,7 @@ protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  bool added_via_api);
+                  Envoy::Runtime::RandomGenerator& random, bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
@@ -469,6 +471,7 @@ protected:
              // and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
+  Envoy::Runtime::RandomGenerator& random_;
 
 protected:
   PrioritySetImpl priority_set_;
