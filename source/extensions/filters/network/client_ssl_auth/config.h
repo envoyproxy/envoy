@@ -14,17 +14,17 @@ namespace ClientSslAuth {
 class ClientSslAuthConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::NetworkFilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::NetworkFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() override;
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb createFilter(
+  Network::NetworkFilterFactoryCb createFilter(
       const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
       Server::Configuration::FactoryContext& context);
 };

@@ -70,7 +70,7 @@ public:
         .WillOnce(Invoke([raw_listener, need_init](
                              const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
                              Configuration::FactoryContext& context)
-                             -> std::vector<Configuration::NetworkFilterFactoryCb> {
+                             -> std::vector<Network::NetworkFilterFactoryCb> {
           std::shared_ptr<ListenerHandle> notifier(raw_listener);
           raw_listener->context_ = &context;
           if (need_init) {
@@ -111,7 +111,7 @@ public:
         .WillByDefault(
             Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                       Configuration::FactoryContext& context)
-                       -> std::vector<Configuration::NetworkFilterFactoryCb> {
+                       -> std::vector<Network::NetworkFilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                    context);
             }));
@@ -119,7 +119,7 @@ public:
         .WillByDefault(Invoke(
             [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
                Configuration::ListenerFactoryContext& context)
-                -> std::vector<Configuration::ListenerFilterFactoryCb> {
+                -> std::vector<Network::ListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
                                                                                     context);
             }));
@@ -241,7 +241,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Configuration::NetworkFilterFactoryCb
+  Network::NetworkFilterFactoryCb
   createFilterFactory(const Json::Object&, Configuration::FactoryContext& context) override {
     context.scope().counter("bar").inc();
     return [](Network::FilterManager&) -> void {};
@@ -1276,7 +1276,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
     // NamedListenerFilterConfigFactory
-    Configuration::ListenerFilterFactoryCb
+    Network::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
@@ -1351,7 +1351,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
     // NamedListenerFilterConfigFactory
-    Configuration::ListenerFilterFactoryCb
+    Network::ListenerFilterFactoryCb
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();

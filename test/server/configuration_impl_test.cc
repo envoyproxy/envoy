@@ -29,9 +29,11 @@ namespace Configuration {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
-  std::vector<NetworkFilterFactoryCb> factories;
+  std::vector<Network::NetworkFilterFactoryCb> factories;
   ReadyWatcher watcher;
-  NetworkFilterFactoryCb factory = [&](Network::FilterManager&) -> void { watcher.ready(); };
+  Network::NetworkFilterFactoryCb factory = [&](Network::FilterManager&) -> void {
+    watcher.ready();
+  };
   factories.push_back(factory);
   factories.push_back(factory);
 
@@ -42,7 +44,7 @@ TEST(FilterChainUtility, buildFilterChain) {
 
 TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
   Network::MockConnection connection;
-  std::vector<NetworkFilterFactoryCb> factories;
+  std::vector<Network::NetworkFilterFactoryCb> factories;
   EXPECT_CALL(connection, initializeReadFilters()).WillOnce(Return(false));
   EXPECT_EQ(FilterChainUtility::buildFilterChain(connection, factories), false);
 }

@@ -35,8 +35,7 @@ namespace HttpConnectionManager {
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-Server::Configuration::NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilter(
+Network::NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
@@ -69,7 +68,7 @@ HttpConnectionManagerFilterConfigFactory::createFilter(
   };
 }
 
-Server::Configuration::NetworkFilterFactoryCb
+Network::NetworkFilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
@@ -77,7 +76,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactory(
   return createFilter(proto_config, context);
 }
 
-Server::Configuration::NetworkFilterFactoryCb
+Network::NetworkFilterFactoryCb
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(

@@ -18,7 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-Server::Configuration::NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
+Network::NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilter(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -41,7 +41,7 @@ Server::Configuration::NetworkFilterFactoryCb RedisProxyFilterConfigFactory::cre
   };
 }
 
-Server::Configuration::NetworkFilterFactoryCb
+Network::NetworkFilterFactoryCb
 RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
@@ -49,8 +49,7 @@ RedisProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
   return createFilter(proto_config, context);
 }
 
-Server::Configuration::NetworkFilterFactoryCb
-RedisProxyFilterConfigFactory::createFilterFactoryFromProto(
+Network::NetworkFilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<
