@@ -88,7 +88,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  // Redis::DecoderCallbacks
+  // RedisProxy::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override;
 
 private:
@@ -96,7 +96,7 @@ private:
     PendingRequest(ProxyFilter& parent);
     ~PendingRequest();
 
-    // Redis::CommandSplitter::SplitCallbacks
+    // RedisProxy::CommandSplitter::SplitCallbacks
     void onResponse(RespValuePtr&& value) override { parent_.onResponse(*this, std::move(value)); }
 
     ProxyFilter& parent_;
@@ -114,7 +114,8 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
 };
-}
+
+} // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
