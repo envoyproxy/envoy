@@ -467,7 +467,7 @@ public:
   virtual void remove(const LowerCaseString& key) PURE;
 
   /**
-   * Remove all instances of headers with key matching the supplies regex.
+   * Remove all instances of headers with key matching the supplied regex.
    * @param key_matcher supplies the regex to match header keys against. Note
    * that this will be matching against LowerCaseString, so should be using
    * lowercase characters.
