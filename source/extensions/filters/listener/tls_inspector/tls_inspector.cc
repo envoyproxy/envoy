@@ -185,12 +185,13 @@ void Filter::parseClientHello(const void* data, size_t len) {
     }
     break;
   case SSL_ERROR_SSL:
-    if (!clienthello_success_) {
-      config_->stats().invalid_client_hello_.inc();
+    if (clienthello_success_) {
+      config_->stats().tls_found_.inc();
+      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
+    } else {
+      config_->stats().no_tls_found_.inc();
       cb_->socket().setDetectedTransportProtocol(
           TransportSockets::TransportSocketNames::get().RAW_BUFFER);
-    } else {
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
     }
     done(true);
     break;

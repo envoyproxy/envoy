@@ -21,9 +21,10 @@ namespace TlsInspector {
 #define ALL_TLS_INSPECTOR_STATS(COUNTER)                                                           \
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_big)                                                                    \
-  COUNTER(invalid_client_hello)                                                                    \
   COUNTER(read_error)                                                                              \
   COUNTER(read_timeout)                                                                            \
+  COUNTER(no_tls_found)                                                                            \
+  COUNTER(tls_found)                                                                               \
   COUNTER(no_sni_found)                                                                            \
   COUNTER(sni_found)
 
