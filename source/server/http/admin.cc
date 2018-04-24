@@ -517,6 +517,18 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
+  Value histograms_obj;
+  histograms_obj.SetObject();
+  Stats::HistogramStatisticsImpl empty_statistics;
+  rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
+  for (size_t i = 0; i < empty_statistics.supportedQuantiles().size(); ++i) {
+    Value quantile_type;
+    quantile_type.SetDouble(empty_statistics.supportedQuantiles()[i] * 100);
+    supported_quantile_array.PushBack(quantile_type, allocator);
+  }
+  histograms_obj.AddMember("supported_quanlties", supported_quantile_array, allocator);
+  rapidjson::Value histogram_array(rapidjson::kArrayType);
+
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     Value histogram_obj;
     histogram_obj.SetObject();
@@ -524,32 +536,28 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     histogram_name.SetString(histogram->name().c_str(), allocator);
     histogram_obj.AddMember("name", histogram_name, allocator);
 
-    rapidjson::Value quantile_array(rapidjson::kArrayType);
+    rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
 
-    // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
-    // followed by two arrays interval and cumulative.
     for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
       Value quantile_obj;
       quantile_obj.SetObject();
-      Value quantile_type;
-      quantile_type.SetDouble(histogram->intervalStatistics().supportedQuantiles()[i] * 100);
-      quantile_obj.AddMember("quantile", quantile_type, allocator);
       Value interval_value;
       if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
         interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
       }
-      quantile_obj.AddMember("interval_value", interval_value, allocator);
+      quantile_obj.AddMember("interval", interval_value, allocator);
       Value cumulative_value;
       if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
         cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
       }
-      quantile_obj.AddMember("cumulative_value", cumulative_value, allocator);
-      quantile_array.PushBack(quantile_obj, allocator);
+      quantile_obj.AddMember("cumulative", cumulative_value, allocator);
+      computed_quantile_array.PushBack(quantile_obj, allocator);
     }
-    histogram_obj.AddMember("quantiles", quantile_array, allocator);
-    stats_array.PushBack(histogram_obj, allocator);
+    histogram_obj.AddMember("computed_quantiles", computed_quantile_array, allocator);
+    histogram_array.PushBack(histogram_obj, allocator);
   }
-
+  histograms_obj.AddMember("histograms", histogram_array, allocator);
+  stats_array.PushBack(histograms_obj, allocator);
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
   rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
