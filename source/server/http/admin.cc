@@ -397,7 +397,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 }
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
-                                   Buffer::Instance& response, AdminStream& admin_filter) {
+                                   Buffer::Instance& response, AdminStream& admin_stream) {
   // We currently don't support timers locally (only via statsd) so just group all the counters
   // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
@@ -424,7 +424,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
           Http::Headers::get().ContentTypeValues.Json);
       response.add(AdminImpl::statsAsJson(all_stats));
     } else if (format_key == "format" && format_value == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, admin_filter);
+      return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
       response.add("usage: /stats?format=json \n");
       response.add("\n");
@@ -774,7 +774,7 @@ void AdminImpl::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) 
 
 Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                  AdminStream& admin_filter) {
+                                  AdminStream& admin_stream) {
   Http::Code code = Http::Code::OK;
   bool found_handler = false;
 
@@ -787,13 +787,13 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       if (handler.mutates_server_state_) {
         const absl::string_view method =
-            admin_filter.getRequestHeaders()->Method()->value().getStringView();
+            admin_stream.getRequestHeaders()->Method()->value().getStringView();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
         }
       }
-      code = handler.handler_(path_and_query, response_headers, response, admin_filter);
+      code = handler.handler_(path_and_query, response_headers, response, admin_stream);
       found_handler = true;
       break;
     }
@@ -803,7 +803,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     // Extra space is emitted below to have "invalid path." be a separate sentence in the
     // 404 output from "admin commands are:" in handlerHelp.
     response.add("invalid path. ");
-    handlerHelp(path_and_query, response_headers, response, admin_filter);
+    handlerHelp(path_and_query, response_headers, response, admin_stream);
     code = Http::Code::NotFound;
   }
 

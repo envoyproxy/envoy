@@ -19,10 +19,30 @@ namespace Server {
 class AdminStream {
 public:
   virtual ~AdminStream() {}
+
+  /**
+   * @param end_stream set to false for streaming response. Default is true, which will close
+   * connection on socket
+   */
   virtual void setEndStreamOnComplete(const bool& end_stream) PURE;
+
+  /**
+   * @param cb callback to be added to the list of callbacks invoked by onDestroy() when connection
+   * is dropped
+   */
   virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
-  virtual Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() PURE;
-  virtual const Http::HeaderMap* getRequestHeaders() PURE;
+
+  /**
+   * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get socket for data
+   * streaming
+   */
+  virtual const Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() const PURE;
+
+  /**
+   * @return Http::HeaderMap* to be used by handler to parse header information sent with the
+   * request
+   */
+  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
 };
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
@@ -45,15 +65,17 @@ public:
 
   /**
    * Callback for admin URL handlers.
-   * @param url supplies the URL prefix to install the handler for.
+   * @param path_and_query supplies the URL prefix to install the handler for.
    * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
    * handler.
    * @param response supplies the buffer to fill in with the response body.
+   * @param admin_stream supplies the filter which invoked the handler, enables the handler to use
+   * its data
    * @return Http::Code the response code.
    */
   typedef std::function<Http::Code(absl::string_view path_and_query,
                                    Http::HeaderMap& response_headers, Buffer::Instance& response,
-                                   AdminStream& admin_filter)>
+                                   AdminStream& admin_stream)>
 
       HandlerCb;
 

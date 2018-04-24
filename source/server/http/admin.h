@@ -45,7 +45,7 @@ public:
             Server::Instance& server, Stats::ScopePtr&& listener_scope);
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
-                         Buffer::Instance& response, AdminStream& admin_filter);
+                         Buffer::Instance& response, AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
   Network::ListenerConfig& listener() { return listener_; }
@@ -236,7 +236,7 @@ private:
  * A terminal HTTP filter that implements server admin functionality.
  */
 class AdminFilter : public Http::StreamDecoderFilter,
-                    AdminStream,
+                    public AdminStream,
                     Logger::Loggable<Logger::Id::admin> {
 public:
   AdminFilter(AdminImpl& parent);
@@ -257,8 +257,10 @@ public:
     end_stream_on_complete_ = end_stream;
   }
   void addOnDestroyCallback(std::function<void()> cb) override;
-  Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() override { return callbacks_; }
-  const Http::HeaderMap* getRequestHeaders() override { return request_headers_; }
+  const Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() const override {
+    return callbacks_;
+  }
+  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
 
 private:
   /**
