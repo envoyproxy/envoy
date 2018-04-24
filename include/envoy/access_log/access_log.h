@@ -62,7 +62,7 @@ public:
    *                      the request headers.
    */
   virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                   const RequestInfo::RequestInfo& request_info) PURE;
+                   const Http::HeaderMap* response_trailers, const RequestInfo::RequestInfo& request_info) PURE;
 };
 
 typedef std::shared_ptr<Instance> InstanceSharedPtr;
@@ -76,6 +76,7 @@ public:
 
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
+                             const Http::HeaderMap& response_trailers,
                              const RequestInfo::RequestInfo& request_info) const PURE;
 };
 

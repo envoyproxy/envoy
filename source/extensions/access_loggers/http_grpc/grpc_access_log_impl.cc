@@ -75,6 +75,10 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
   for (const auto& header : config_.additional_response_headers_to_log()) {
     response_headers_to_log_.emplace_back(header);
   }
+
+  for (const auto& header : config_.additional_response_trailers_to_log()) {
+    response_trailers_to_log_.emplace_back(header);
+  }
 }
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
@@ -141,6 +145,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
                             const Http::HeaderMap* response_headers,
+                            const Http::HeaderMap* response_trailers,
                             const RequestInfo::RequestInfo& request_info) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
@@ -148,6 +153,9 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
   if (!response_headers) {
     response_headers = &empty_headers;
+  }
+  if (!response_trailers) {
+    response_trailers = &empty_headers;
   }
 
   if (filter_) {
@@ -311,6 +319,17 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
     for (const auto& header : response_headers_to_log_) {
       const Http::HeaderEntry* entry = response_headers->get(header);
+      if (entry != nullptr) {
+        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
+      }
+    }
+  }
+
+  if (!response_trailers_to_log_.empty()) {
+    auto* logged_headers = response_properties->mutable_response_trailers();
+
+    for (const auto& header : response_trailers_to_log_) {
+      const Http::HeaderEntry* entry = response_trailers->get(header);
       if (entry != nullptr) {
         logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
       }
