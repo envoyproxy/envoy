@@ -39,7 +39,7 @@ createConnPoolSettings() {
 
 class RedisClientImplTest : public testing::Test, public DecoderFactory {
 public:
-  // Redis::DecoderFactory
+  // RedisProxy::DecoderFactory
   DecoderPtr create(DecoderCallbacks& callbacks) override {
     callbacks_ = &callbacks;
     return DecoderPtr{decoder_};
@@ -384,7 +384,7 @@ public:
     conn_pool_.reset(new InstanceImpl(cluster_name_, cm_, *this, tls_, createConnPoolSettings()));
   }
 
-  // Redis::ConnPool::ClientFactory
+  // RedisProxy::ConnPool::ClientFactory
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&, const Config&) override {
     return ClientPtr{create_(host)};
   }
