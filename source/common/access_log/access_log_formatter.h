@@ -106,8 +106,8 @@ public:
   PlainStringFormatter(const std::string& str);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
+                     const RequestInfo::RequestInfo&) const override;
 
 private:
   std::string str_;
@@ -162,7 +162,8 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
-                     const Http::HeaderMap& response_trailers, const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap& response_trailers,
+                     const RequestInfo::RequestInfo&) const override;
 };
 
 /**

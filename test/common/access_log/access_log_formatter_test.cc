@@ -178,22 +178,26 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
 
   {
     RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("GET",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("/", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("/",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>());
-    EXPECT_EQ("GET", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("GET",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("-",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }
 
@@ -205,22 +209,26 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
 
   {
     ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("PUT",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter("test", ":method", absl::optional<size_t>());
-    EXPECT_EQ("test", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("test",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("PUT", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("PUT",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("-",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }
 
@@ -232,22 +240,26 @@ TEST(AccessLogFormatterTest, responseTrailerFormatter) {
 
   {
     ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>());
-    EXPECT_EQ("POST", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("POST",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseTrailerFormatter formatter("test-2", ":method", absl::optional<size_t>());
-    EXPECT_EQ("test-2", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("test-2",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseTrailerFormatter formatter(":path", ":method", absl::optional<size_t>());
-    EXPECT_EQ("POST", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("POST",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
     ResponseTrailerFormatter formatter("does_not_exist", "", absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("-",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }
 
@@ -360,16 +372,18 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "{}*JUST PLAIN string]";
     FormatterImpl formatter(format);
 
-    EXPECT_EQ(format, formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ(format,
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {
-    const std::string format =
-        "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):10%|%TRAIL(second?third):3%";
+    const std::string format = "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):"
+                               "10%|%TRAIL(second?third):3%";
 
     FormatterImpl formatter(format);
 
-    EXPECT_EQ("GET|G|PU|GET|POS", formatter.format(request_header, response_header, response_trailer, request_info));
+    EXPECT_EQ("GET|G|PU|GET|POS",
+              formatter.format(request_header, response_header, response_trailer, request_info));
   }
 
   {

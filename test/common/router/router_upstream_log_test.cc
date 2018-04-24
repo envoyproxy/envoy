@@ -249,7 +249,8 @@ TEST_F(RouterUpstreamLogTest, LogFailure) {
 
 TEST_F(RouterUpstreamLogTest, LogHeaders) {
   init(testUpstreamLog());
-  run(200, {{"x-envoy-original-path", "/foo"}}, {{"x-upstream-header", "abcdef"}}, {{"x-trailer", "value"}});
+  run(200, {{"x-envoy-original-path", "/foo"}}, {{"x-upstream-header", "abcdef"}},
+      {{"x-trailer", "value"}});
 
   EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(), "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 abcdef value\n");

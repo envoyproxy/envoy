@@ -804,7 +804,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   request_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_, request_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
+                      request_info_);
   }
 }
 

@@ -35,7 +35,8 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  log_file_->write(formatter_->format(*request_headers, *response_headers, *response_trailers, request_info));
+  log_file_->write(
+      formatter_->format(*request_headers, *response_headers, *response_trailers, request_info));
 }
 
 } // namespace File

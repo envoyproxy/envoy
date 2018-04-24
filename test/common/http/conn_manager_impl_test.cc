@@ -896,14 +896,14 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode());
-            EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
-            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-            EXPECT_NE(nullptr, request_info.routeEntry());
-          }));
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, request_info.routeEntry());
+      }));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -940,14 +940,14 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode());
-            EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
-            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-            EXPECT_NE(nullptr, request_info.routeEntry());
-          }));
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, request_info.routeEntry());
+      }));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -987,14 +987,14 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode());
-            EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
-            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-            EXPECT_EQ(nullptr, request_info.routeEntry());
-          }));
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_EQ(nullptr, request_info.routeEntry());
+      }));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
