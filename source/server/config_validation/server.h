@@ -89,6 +89,8 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
+  std::chrono::milliseconds statsFlushInterval() override { return config_->statsFlushInterval(); }
+
   // Server::ListenerComponentFactory
   std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
