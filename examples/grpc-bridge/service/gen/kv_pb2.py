@@ -21,7 +21,6 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_pb=_b('\n\x08kv.proto\x12\x02kv\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"\x1c\n\x0bGetResponse\x12\r\n\x05value\x18\x01 \x01(\t\"(\n\nSetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\x19\n\x0bSetResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x32T\n\x02KV\x12&\n\x03Get\x12\x0e.kv.GetRequest\x1a\x0f.kv.GetResponse\x12&\n\x03Set\x12\x0e.kv.SetRequest\x1a\x0f.kv.SetResponseb\x06proto3')
 )
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -39,7 +38,7 @@ _GETREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -70,7 +69,7 @@ _GETRESPONSE = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -101,14 +100,14 @@ _SETREQUEST = _descriptor.Descriptor(
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='value', full_name='kv.SetRequest.value', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -139,7 +138,7 @@ _SETRESPONSE = _descriptor.Descriptor(
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      options=None),
+      options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -160,6 +159,7 @@ DESCRIPTOR.message_types_by_name['GetRequest'] = _GETREQUEST
 DESCRIPTOR.message_types_by_name['GetResponse'] = _GETRESPONSE
 DESCRIPTOR.message_types_by_name['SetRequest'] = _SETREQUEST
 DESCRIPTOR.message_types_by_name['SetResponse'] = _SETRESPONSE
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GetRequest = _reflection.GeneratedProtocolMessageType('GetRequest', (_message.Message,), dict(
   DESCRIPTOR = _GETREQUEST,
@@ -190,110 +190,37 @@ SetResponse = _reflection.GeneratedProtocolMessageType('SetResponse', (_message.
 _sym_db.RegisterMessage(SetResponse)
 
 
-import grpc
-from grpc.beta import implementations as beta_implementations
-from grpc.beta import interfaces as beta_interfaces
-from grpc.framework.common import cardinality
-from grpc.framework.interfaces.face import utilities as face_utilities
 
+_KV = _descriptor.ServiceDescriptor(
+  name='KV',
+  full_name='kv.KV',
+  file=DESCRIPTOR,
+  index=0,
+  options=None,
+  serialized_start=142,
+  serialized_end=226,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='Get',
+    full_name='kv.KV.Get',
+    index=0,
+    containing_service=None,
+    input_type=_GETREQUEST,
+    output_type=_GETRESPONSE,
+    options=None,
+  ),
+  _descriptor.MethodDescriptor(
+    name='Set',
+    full_name='kv.KV.Set',
+    index=1,
+    containing_service=None,
+    input_type=_SETREQUEST,
+    output_type=_SETRESPONSE,
+    options=None,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_KV)
 
-class KVStub(object):
+DESCRIPTOR.services_by_name['KV'] = _KV
 
-  def __init__(self, channel):
-    """Constructor.
-
-    Args:
-      channel: A grpc.Channel.
-    """
-    self.Get = channel.unary_unary(
-        '/kv.KV/Get',
-        request_serializer=GetRequest.SerializeToString,
-        response_deserializer=GetResponse.FromString,
-        )
-    self.Set = channel.unary_unary(
-        '/kv.KV/Set',
-        request_serializer=SetRequest.SerializeToString,
-        response_deserializer=SetResponse.FromString,
-        )
-
-
-class KVServicer(object):
-
-  def Get(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
-  def Set(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
-
-def add_KVServicer_to_server(servicer, server):
-  rpc_method_handlers = {
-      'Get': grpc.unary_unary_rpc_method_handler(
-          servicer.Get,
-          request_deserializer=GetRequest.FromString,
-          response_serializer=GetResponse.SerializeToString,
-      ),
-      'Set': grpc.unary_unary_rpc_method_handler(
-          servicer.Set,
-          request_deserializer=SetRequest.FromString,
-          response_serializer=SetResponse.SerializeToString,
-      ),
-  }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'kv.KV', rpc_method_handlers)
-  server.add_generic_rpc_handlers((generic_handler,))
-
-
-class BetaKVServicer(object):
-  def Get(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def Set(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-
-
-class BetaKVStub(object):
-  def Get(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  Get.future = None
-  def Set(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  Set.future = None
-
-
-def beta_create_KV_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
-  request_deserializers = {
-    ('kv.KV', 'Get'): GetRequest.FromString,
-    ('kv.KV', 'Set'): SetRequest.FromString,
-  }
-  response_serializers = {
-    ('kv.KV', 'Get'): GetResponse.SerializeToString,
-    ('kv.KV', 'Set'): SetResponse.SerializeToString,
-  }
-  method_implementations = {
-    ('kv.KV', 'Get'): face_utilities.unary_unary_inline(servicer.Get),
-    ('kv.KV', 'Set'): face_utilities.unary_unary_inline(servicer.Set),
-  }
-  server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
-  return beta_implementations.server(method_implementations, options=server_options)
-
-
-def beta_create_KV_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
-  request_serializers = {
-    ('kv.KV', 'Get'): GetRequest.SerializeToString,
-    ('kv.KV', 'Set'): SetRequest.SerializeToString,
-  }
-  response_deserializers = {
-    ('kv.KV', 'Get'): GetResponse.FromString,
-    ('kv.KV', 'Set'): SetResponse.FromString,
-  }
-  cardinalities = {
-    'Get': cardinality.Cardinality.UNARY_UNARY,
-    'Set': cardinality.Cardinality.UNARY_UNARY,
-  }
-  stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
-  return beta_implementations.dynamic_stub(channel, 'kv.KV', cardinalities, options=stub_options)
 # @@protoc_insertion_point(module_scope)
