@@ -462,6 +462,8 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(6);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_);
@@ -510,6 +512,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(6);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, local_hosts_per_locality, local_hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_);
