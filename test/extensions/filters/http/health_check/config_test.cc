@@ -230,7 +230,6 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
   header.set_value("foo");
@@ -243,12 +242,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
   TestHealthCheckHeaderMatch(config, headers, true);
 }
 
-
 TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
-
 
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
