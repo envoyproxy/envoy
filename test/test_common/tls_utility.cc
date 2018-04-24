@@ -9,8 +9,7 @@ namespace Tls {
 namespace Test {
 
 std::vector<uint8_t> generateClientHello(const std::string& sni_name) {
-  const SSL_METHOD* method = SSLv23_method();
-  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(method));
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
 
   const long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
   SSL_CTX_set_options(ctx.get(), flags);

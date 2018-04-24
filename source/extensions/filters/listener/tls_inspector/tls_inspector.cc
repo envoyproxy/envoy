@@ -37,9 +37,16 @@ int sslIndex() {
 
 } // namespace
 
-Config::Config(Stats::Scope& scope)
+Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
-      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())) {
+      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      max_client_hello_size_(max_client_hello_size) {
+
+  if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
+    throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
+                                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
+  }
+
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_tlsext_servername_callback(
@@ -55,16 +62,11 @@ Config::Config(Stats::Scope& scope)
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-Filter::Filter(const ConfigSharedPtr config) : Filter(config, TLS_DEFAULT_MAX_CLIENT_HELLO) {}
+thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
-Filter::Filter(const ConfigSharedPtr config, uint32_t max_client_hello_size)
-    : config_(config), ssl_(config_->newSsl()) {
+Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
   SSL_set_ex_data(ssl_.get(), sslIndex(), this);
   SSL_set_accept_state(ssl_.get());
-
-  // TODO(ggreenway) PERF: Put a buffer in thread-local storage and have every Filter share
-  // the buffer.
-  buf_.resize(max_client_hello_size);
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -106,8 +108,7 @@ void Filter::onServername(absl::string_view name) {
   }
   clienthello_success_ = true;
 
-  // TODO(ggreenway): Notify the ConnectionSocket that this
-  // is a TLS connection.
+  // TODO(ggreenway): Notify the ConnectionSocket that this is a TLS connection.
 }
 
 void Filter::onRead() {
@@ -124,7 +125,8 @@ void Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_.data(), buf_.size(), MSG_PEEK);
+  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize());
+  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
   if (n == -1 && errno == EAGAIN) {
@@ -138,7 +140,7 @@ void Filter::onRead() {
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
   if (static_cast<uint64_t>(n) > read_) {
-    const uint8_t* data = buf_.data() + read_;
+    const uint8_t* data = buf_ + read_;
     const size_t len = n - read_;
     read_ = n;
     parseClientHello(data, len);
@@ -160,18 +162,22 @@ void Filter::done(bool success) {
 
 void Filter::parseClientHello(const void* data, size_t len) {
   // Ownership is passed to ssl_ in SSL_set_bio()
-  BIO* bio = BIO_new_mem_buf(data, len);
-  SSL_set_bio(ssl_.get(), bio, bio);
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
   // Make the mem-BIO return that there is more data
   // available beyond it's end
-  BIO_set_mem_eof_return(bio, -1);
+  BIO_set_mem_eof_return(bio.get(), -1);
+
+  SSL_set_bio(ssl_.get(), bio.get(), bio.get());
+  bio.release();
 
   int ret = SSL_do_handshake(ssl_.get());
 
+  // This should never succeed because an error is always returned from the SNI callback.
+  ASSERT(ret <= 0);
   switch (SSL_get_error(ssl_.get(), ret)) {
   case SSL_ERROR_WANT_READ:
-    if (read_ == buf_.size()) {
+    if (read_ == config_->maxClientHelloSize()) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
       config_->stats().client_hello_too_big_.inc();

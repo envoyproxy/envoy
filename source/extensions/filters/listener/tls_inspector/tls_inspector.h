@@ -39,14 +39,18 @@ struct TlsInspectorStats {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope);
+  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
+  uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
+
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  const uint32_t max_client_hello_size_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
@@ -57,14 +61,11 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr config);
-  Filter(const ConfigSharedPtr config, uint32_t max_client_hello_size);
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  static const size_t TLS_DEFAULT_MAX_CLIENT_HELLO = 64 * 1024;
-
   void parseClientHello(const void* data, size_t len);
   void onRead();
   void onTimeout();
@@ -77,9 +78,10 @@ private:
   Event::TimerPtr timer_;
 
   bssl::UniquePtr<SSL> ssl_;
-  std::vector<uint8_t> buf_;
   uint64_t read_{0};
   bool clienthello_success_{false};
+
+  static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;

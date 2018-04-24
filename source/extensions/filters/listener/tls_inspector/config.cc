@@ -20,7 +20,7 @@ public:
   Server::Configuration::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::ListenerFactoryContext& context) override {
-    ConfigSharedPtr config(new Config(context.scope()));
+    ConfigSharedPtr config(new Config(context.scope(), Config::TLS_MAX_CLIENT_HELLO));
     return [config](Network::ListenerFilterManager& filter_manager) -> void {
       filter_manager.addAcceptFilter(std::make_unique<Filter>(config));
     };
