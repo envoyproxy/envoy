@@ -465,14 +465,22 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
 }
 
 void HeaderMapImpl::remove(const std::regex& regex) {
-  for (auto i = headers_.begin(); i != headers_.end();) {
-    absl::string_view key = i->key().getStringView();
-    if (std::regex_search(key.begin(), key.end(), regex)) {
-      i = headers_.erase(i);
-    } else {
-      ++i;
+  headers_.remove_if([&](const HeaderEntryImpl& entry) {
+    absl::string_view key = entry.key().getStringView();
+    bool to_remove = std::regex_search(key.begin(), key.end(), regex);
+    if (to_remove) {
+      // If this header should be removed, make sure any references in the
+      // static lookup table are cleared as well.
+      StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.data());
+      if (cb) {
+        StaticLookupResponse ref_lookup_response = cb(*this);
+        if (ref_lookup_response.entry_) {
+          *ref_lookup_response.entry_ = nullptr;
+        }
+      }
     }
-  }
+    return to_remove;
+  });
 }
 
 HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl** entry,

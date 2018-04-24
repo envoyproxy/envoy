@@ -385,6 +385,13 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   headers.remove(std::regex(".*"));
   EXPECT_EQ(nullptr, headers.get(key2));
   EXPECT_EQ(nullptr, headers.get(key4));
+
+  // Add inline and remove by regex
+  headers.insertContentLength().value(5);
+  EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
+  EXPECT_EQ(1UL, headers.size());
+  headers.remove(std::regex("content"));
+  EXPECT_EQ(nullptr, headers.ContentLength());
 }
 
 TEST(HeaderMapImplTest, SetRemovesAllValues) {
