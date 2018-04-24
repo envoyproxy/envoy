@@ -162,14 +162,20 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
+  if (set_current_client_cert_details.cert()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
+  }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
   }
-  if (set_current_client_cert_details.cert()) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Cert);
+  if (set_current_client_cert_details.uri()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
+  }
+  if (set_current_client_cert_details.dns()) {
+    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {

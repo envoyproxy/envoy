@@ -45,6 +45,109 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
 
+TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
+  const std::string name = StatsSinkNames::get().STATSD;
+  auto defaultPrefix = Common::Statsd::getDefaultPrefix();
+
+  envoy::config::metrics::v2::StatsdSink sink_config;
+  envoy::api::v2::core::Address& address = *sink_config.mutable_address();
+  envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
+  socket_address.set_address("127.0.0.1");
+  socket_address.set_port_value(8125);
+  EXPECT_EQ(sink_config.prefix(), "");
+
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+  ASSERT_NE(factory, nullptr);
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(sink_config, *message);
+
+  NiceMock<Server::MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  ASSERT_NE(sink, nullptr);
+
+  auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
+  ASSERT_NE(udp_sink, nullptr);
+  EXPECT_EQ(udp_sink->getPrefix(), defaultPrefix);
+}
+
+TEST(StatsConfigTest, UdpSinkCustomPrefix) {
+  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string customPrefix = "prefix.test";
+
+  envoy::config::metrics::v2::StatsdSink sink_config;
+  envoy::api::v2::core::Address& address = *sink_config.mutable_address();
+  envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
+  socket_address.set_address("127.0.0.1");
+  socket_address.set_port_value(8125);
+  sink_config.set_prefix(customPrefix);
+  EXPECT_NE(sink_config.prefix(), "");
+
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+  ASSERT_NE(factory, nullptr);
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(sink_config, *message);
+
+  NiceMock<Server::MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  ASSERT_NE(sink, nullptr);
+
+  auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
+  ASSERT_NE(udp_sink, nullptr);
+  EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
+}
+
+TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
+  const std::string name = StatsSinkNames::get().STATSD;
+
+  envoy::config::metrics::v2::StatsdSink sink_config;
+  auto defaultPrefix = Common::Statsd::getDefaultPrefix();
+  sink_config.set_tcp_cluster_name("fake_cluster");
+
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+  ASSERT_NE(factory, nullptr);
+  EXPECT_EQ(sink_config.prefix(), "");
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(sink_config, *message);
+
+  NiceMock<Server::MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  ASSERT_NE(sink, nullptr);
+
+  auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
+  ASSERT_NE(tcp_sink, nullptr);
+  EXPECT_EQ(tcp_sink->getPrefix(), defaultPrefix);
+}
+
+TEST(StatsConfigTest, TcpSinkCustomPrefix) {
+  const std::string name = StatsSinkNames::get().STATSD;
+
+  envoy::config::metrics::v2::StatsdSink sink_config;
+  std::string prefix = "prefixTest";
+  sink_config.set_tcp_cluster_name("fake_cluster");
+  ASSERT_NE(sink_config.prefix(), prefix);
+  sink_config.set_prefix(prefix);
+  EXPECT_EQ(sink_config.prefix(), prefix);
+  Server::Configuration::StatsSinkFactory* factory =
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+  ASSERT_NE(factory, nullptr);
+
+  ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
+  MessageUtil::jsonConvert(sink_config, *message);
+
+  NiceMock<Server::MockInstance> server;
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  ASSERT_NE(sink, nullptr);
+
+  auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
+  ASSERT_NE(tcp_sink, nullptr);
+  EXPECT_EQ(tcp_sink->getPrefix(), prefix);
+}
+
 class StatsConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

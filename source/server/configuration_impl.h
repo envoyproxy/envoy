@@ -123,7 +123,7 @@ public:
                   Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
-  Upstream::ClusterManager& clusterManager() override { return *cluster_manager_; }
+  Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }

@@ -239,9 +239,8 @@ public:
   /**
    * Translate a nested config into a route-specific proto message provided by
    * the implementation factory.
-   * @param source a message (typically Struct) that contains the config for
-   *        the given factory's route-local configuration (as returned by
-   *        createEmptyRouteConfigProto).
+   * @param source a message that contains the opaque config for the given factory's route-local
+   *        configuration.
    * @param factory implementation factory with the method
    *        'createEmptyRouteConfigProto' to produce a proto to be filled with
    *        the translated configuration.

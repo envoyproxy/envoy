@@ -86,10 +86,9 @@ protected:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip, headers.get_("content-encoding"));
-    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data_, false));
-    drainBuffer();
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
     verifyCompressedData();
+    drainBuffer();
   }
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {

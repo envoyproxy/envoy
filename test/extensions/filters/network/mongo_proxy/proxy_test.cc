@@ -263,10 +263,30 @@ TEST_F(MongoProxyFilterTest, Stats) {
   }));
   filter_->onData(fake_data_, false);
 
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    CommandMessagePtr message(new CommandMessageImpl(0, 0));
+    message->database(std::string("Test database"));
+    message->commandName(std::string("Test command name"));
+    message->metadata(Bson::DocumentImpl::create());
+    message->commandArgs(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeCommand(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    CommandReplyMessagePtr message(new CommandReplyMessageImpl(0, 0));
+    message->metadata(Bson::DocumentImpl::create());
+    message->commandReply(Bson::DocumentImpl::create());
+    filter_->callbacks_->decodeCommandReply(std::move(message));
+  }));
+  filter_->onData(fake_data_, false);
+
   EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
   EXPECT_EQ(1U, store_.counter("test.op_insert").value());
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
   EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
+  EXPECT_EQ(1U, store_.counter("test.op_command").value());
+  EXPECT_EQ(1U, store_.counter("test.op_command_reply").value());
 }
 
 TEST_F(MongoProxyFilterTest, CommandStats) {

@@ -42,6 +42,13 @@ FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_
       stats_prefix, context);
 }
 
+Router::RouteSpecificFilterConfigConstSharedPtr
+FaultFilterFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) {
+  return std::make_shared<const Router::RouteSpecificFilterConfig>(Fault::FaultSettings(
+      MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
+          proto_config)));
+}
+
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
