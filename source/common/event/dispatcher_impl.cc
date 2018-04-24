@@ -84,7 +84,8 @@ Network::ClientConnectionPtr
 DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
                                        Network::Address::InstanceConstSharedPtr source_address,
                                        Network::TransportSocketPtr&& transport_socket,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                       Runtime::RandomGenerator& random) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                          std::move(transport_socket), options);

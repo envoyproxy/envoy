@@ -68,9 +68,10 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->connect();
 
   Network::ConnectionPtr server_connection;
@@ -168,9 +169,10 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   ClientContextConfigImpl client_ctx_config(client_ctx_proto);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+  Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   if (!client_session.empty()) {
     Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
@@ -744,10 +746,11 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -814,9 +817,10 @@ TEST_P(SslSocketTest, HalfClose) {
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory.createTransportSocket(), nullptr);
+      client_ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
   client_connection->connect();
@@ -896,9 +900,10 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
   Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
@@ -975,7 +980,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);
@@ -1013,7 +1018,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
 
   client_connection = dispatcher.createClientConnection(
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
@@ -1304,9 +1309,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
+  Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
   client_connection->addConnectionCallbacks(client_connection_callbacks);

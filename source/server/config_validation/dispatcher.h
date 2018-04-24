@@ -17,7 +17,8 @@ public:
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         Runtime::RandomGenerator&) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   Network::ListenerPtr createListener(Network::Socket&, Network::ListenerCallbacks&,

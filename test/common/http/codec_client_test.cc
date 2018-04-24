@@ -6,6 +6,7 @@
 #include "common/http/exception.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
@@ -263,7 +264,8 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+        random_);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -344,6 +346,7 @@ protected:
   NiceMock<Network::MockConnectionCallbacks> client_callbacks_;
   NiceMock<Http::MockStreamEncoder> inner_encoder_;
   NiceMock<Http::MockStreamDecoder> outer_decoder_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 // Send a block of data from upstream, and ensure it is received by the codec.

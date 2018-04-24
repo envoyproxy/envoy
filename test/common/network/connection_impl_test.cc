@@ -93,7 +93,8 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+        random_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
     const Network::ClientConnection& const_connection = *client_connection_;
@@ -180,6 +181,7 @@ protected:
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
   Address::InstanceConstSharedPtr source_address_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplTest,
@@ -242,7 +244,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   }
 
   client_connection_ = dispatcher_->createClientConnection(
-      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr, random_);
   client_connection_->addConnectionCallbacks(client_callbacks_);
   client_connection_->connect();
 
@@ -288,7 +290,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptions());
+            server_connection_->socketOptions(), random_);
       }));
 
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
@@ -336,7 +338,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
         upstream_connection_ = dispatcher_->createClientConnection(
             socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
-            server_connection_->socketOptions());
+            server_connection_->socketOptions(), random_);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
 
@@ -786,7 +788,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
-      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
+      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+      random_);
 
   MockConnectionStats connection_stats;
   client_connection_->setConnectionStats(connection_stats.toBufferStats());
@@ -1181,7 +1184,7 @@ public:
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), Network::Address::InstanceConstSharedPtr(),
-        Network::Test::createRawBufferSocket(), nullptr);
+        Network::Test::createRawBufferSocket(), nullptr, random_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
 
@@ -1263,7 +1266,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
   }
   ClientConnectionPtr connection =
       dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                        Network::Test::createRawBufferSocket(), nullptr);
+                                        Network::Test::createRawBufferSocket(), nullptr, random_);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
@@ -1277,7 +1280,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr, random_);
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);
