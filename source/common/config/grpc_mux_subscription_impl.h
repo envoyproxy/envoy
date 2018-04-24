@@ -50,7 +50,7 @@ public:
                    MessageUtil::anyConvert<ResourceType>);
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
     // supply those versions to onConfigUpdate() along with the top-level/transactional
-    // version_info. This way, both types of verisons can be tracked and exposed for debugging by
+    // version_info. This way, both types of versions can be tracked and exposed for debugging by
     // the configuration update targets.
     callbacks_->onConfigUpdate(typed_resources, version_info);
     stats_.update_success_.inc();
