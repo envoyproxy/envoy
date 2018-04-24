@@ -85,6 +85,24 @@ TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
+TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
+
+TEST(FilesystemImpl, CanonicalPathFail) {
+  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existant_file"), EnvoyException,
+                            "Unable to determine canonical path for /_some_non_existant_file");
+}
+
+TEST(FilesystemImpl, IllegalPath) {
+  EXPECT_FALSE(Filesystem::illegalPath("/"));
+  EXPECT_TRUE(Filesystem::illegalPath("/dev"));
+  EXPECT_TRUE(Filesystem::illegalPath("/dev/"));
+  EXPECT_TRUE(Filesystem::illegalPath("/proc"));
+  EXPECT_TRUE(Filesystem::illegalPath("/proc/"));
+  EXPECT_TRUE(Filesystem::illegalPath("/sys"));
+  EXPECT_TRUE(Filesystem::illegalPath("/sys/"));
+  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existant_file"));
+}
+
 TEST(FileSystemImpl, flushToLogFilePeriodically) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Event::MockTimer>* timer = new NiceMock<Event::MockTimer>(&dispatcher);
