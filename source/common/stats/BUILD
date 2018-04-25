@@ -21,6 +21,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:non_copyable",
         "//source/common/common:perf_annotation_lib",

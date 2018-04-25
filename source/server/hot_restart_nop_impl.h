@@ -5,6 +5,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "common/common/thread.h"
+#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,7 +15,14 @@ namespace Server {
  */
 class HotRestartNopImpl : public Server::HotRestart {
 public:
-  HotRestartNopImpl() {}
+  HotRestartNopImpl(Options& options)
+      : stats_set_options_(Stats::blockMemHashOptions(options.maxStats())) {
+    uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(stats_set_options_);
+    memory_.reset(new uint8_t[num_bytes]);
+    memset(memory_.get(), 0, num_bytes);
+    stats_allocator_ = std::make_unique<Stats::BlockRawStatDataAllocator>(
+        stats_set_options_, true, memory_.get(), stat_lock_);
+  }
 
   // Server::HotRestart
   void drainParentListeners() override {}
@@ -27,12 +35,15 @@ public:
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& statsAllocator() override { return stats_allocator_; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
 private:
+  BlockMemoryHashSetOptions stats_set_options_;
+  std::unique_ptr<uint8_t[]> memory_;
   Thread::MutexBasicLockable log_lock_;
+  Thread::MutexBasicLockable stat_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapRawStatDataAllocator stats_allocator_;
+  std::unique_ptr<Stats::BlockRawStatDataAllocator> stats_allocator_;
 };
 
 } // namespace Server

@@ -8,9 +8,14 @@
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
 
+#include "server/options_impl.h"
+
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
 
 namespace Envoy {
 namespace Stats {
@@ -467,6 +472,157 @@ TEST(TagProducerTest, CheckConstructor) {
       TagProducerImpl{stats_config}, EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
+
+class BlockRawStatDataAllocatorTest : public testing::Test {
+public:
+  void SetUp() override {
+    Stats::RawStatData::configureForTestsOnly(options_);
+    BlockMemoryHashSetOptions memory_hash_set_options_ =
+        Stats::blockMemHashOptions(options_.maxStats());
+    uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(memory_hash_set_options_);
+    memory_.reset(new uint8_t[num_bytes]);
+    memset(memory_.get(), 0, num_bytes);
+    allocator_ = std::make_unique<Stats::BlockRawStatDataAllocator>(memory_hash_set_options_, true,
+                                                                    memory_.get(), stat_lock_);
+  }
+
+  void TearDown() override {
+    // Configure it back so that later tests don't get the wonky values
+    // used here
+    NiceMock<Server::MockOptions> default_options;
+    Stats::RawStatData::configureForTestsOnly(default_options);
+  }
+
+  std::unique_ptr<uint8_t[]> memory_;
+  std::unique_ptr<Stats::BlockRawStatDataAllocator> allocator_;
+  NiceMock<Server::MockOptions> options_;
+  Thread::MutexBasicLockable stat_lock_;
+};
+
+TEST_F(BlockRawStatDataAllocatorTest, truncateKey) {
+  std::string key1(Stats::RawStatData::maxNameLength(), 'a');
+  Stats::RawStatData* stat1 = allocator_->alloc(key1);
+  std::string key2 = key1 + "a";
+  Stats::RawStatData* stat2 = allocator_->alloc(key2);
+  EXPECT_EQ(stat1, stat2);
+}
+
+TEST_F(BlockRawStatDataAllocatorTest, uniqueNaming) {
+
+  auto foo_1 = allocator_->alloc("foo");
+  auto foo_2 = allocator_->alloc("foo");
+  EXPECT_EQ(foo_1, foo_2);
+  auto bar_1 = allocator_->alloc("bar");
+  EXPECT_NE(foo_1, bar_1);
+  EXPECT_NE(foo_2, bar_1);
+}
+
+TEST_F(BlockRawStatDataAllocatorTest, allocFail) {
+  EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(2));
+  BlockRawStatDataAllocatorTest::SetUp();
+
+  Stats::RawStatData* s1 = allocator_->alloc("1");
+  Stats::RawStatData* s2 = allocator_->alloc("2");
+  Stats::RawStatData* s3 = allocator_->alloc("3");
+  EXPECT_NE(s1, nullptr);
+  EXPECT_NE(s2, nullptr);
+  EXPECT_EQ(s3, nullptr);
+}
+
+// Because the block memory is managed manually, make sure it meets
+// basic requirements:
+//   - Objects are correctly aligned so that std::atomic works properly
+//   - Objects don't overlap
+class BlockRawStatDataAllocatorAlignmentTest : public BlockRawStatDataAllocatorTest,
+                                               public testing::WithParamInterface<uint64_t> {
+public:
+  BlockRawStatDataAllocatorAlignmentTest() : name_len_(8 + GetParam()) {}
+
+  void SetUp() override {
+    EXPECT_CALL(options_, maxObjNameLength()).WillRepeatedly(Return(name_len_));
+    BlockRawStatDataAllocatorTest::SetUp();
+    EXPECT_EQ(name_len_, Stats::RawStatData::maxObjNameLength());
+  }
+
+  static const uint64_t num_stats_ = 8;
+  const uint64_t name_len_;
+};
+
+TEST_P(BlockRawStatDataAllocatorAlignmentTest, objectAlignment) {
+  std::set<Stats::RawStatData*> used;
+  for (uint64_t i = 0; i < num_stats_; i++) {
+    Stats::RawStatData* stat = allocator_->alloc(fmt::format("stat {}", i));
+    EXPECT_TRUE((reinterpret_cast<uintptr_t>(stat) % alignof(decltype(*stat))) == 0);
+    EXPECT_TRUE(used.find(stat) == used.end());
+    used.insert(stat);
+  }
+}
+
+TEST_P(BlockRawStatDataAllocatorAlignmentTest, objectOverlap) {
+  // Iterate through all stats forwards and backwards, writing to all fields, then read them back to
+  // make sure that writing to an adjacent stat didn't overwrite
+  struct TestStat {
+    Stats::RawStatData* stat_;
+    std::string name_;
+    uint64_t index_;
+  };
+  std::vector<TestStat> stats;
+  for (uint64_t i = 0; i < num_stats_; i++) {
+    std::string name = fmt::format("{}zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+                                   "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+                                   i)
+                           .substr(0, Stats::RawStatData::maxNameLength());
+    TestStat ts;
+    ts.stat_ = allocator_->alloc(name);
+    ts.name_ = ts.stat_->name_;
+    ts.index_ = i;
+
+    // If this isn't true then the hard coded part of the name isn't long enough to make the test
+    // valid.
+    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxNameLength());
+
+    stats.push_back(ts);
+  }
+
+  auto write = [](TestStat& ts) {
+    ts.stat_->value_ = ts.index_;
+    ts.stat_->pending_increment_ = ts.index_;
+    ts.stat_->flags_ = ts.index_;
+    ts.stat_->ref_count_ = ts.index_;
+    ts.stat_->unused_ = ts.index_;
+  };
+
+  auto verify = [](TestStat& ts) {
+    EXPECT_EQ(ts.stat_->key(), ts.name_);
+    EXPECT_EQ(ts.stat_->value_, ts.index_);
+    EXPECT_EQ(ts.stat_->pending_increment_, ts.index_);
+    EXPECT_EQ(ts.stat_->flags_, ts.index_);
+    EXPECT_EQ(ts.stat_->ref_count_, ts.index_);
+    EXPECT_EQ(ts.stat_->unused_, ts.index_);
+  };
+
+  for (TestStat& ts : stats) {
+    write(ts);
+  }
+
+  for (TestStat& ts : stats) {
+    verify(ts);
+  }
+
+  for (auto it = stats.rbegin(); it != stats.rend(); ++it) {
+    write(*it);
+  }
+
+  for (auto it = stats.rbegin(); it != stats.rend(); ++it) {
+    verify(*it);
+  }
+}
+
+INSTANTIATE_TEST_CASE_P(BlockRawStatDataAllocatorAlignmentTest,
+                        BlockRawStatDataAllocatorAlignmentTest,
+                        testing::Range(std::size_t{0},
+                                       alignof(Stats::RawStatData) + std::size_t{1}));
 
 } // namespace Stats
 } // namespace Envoy

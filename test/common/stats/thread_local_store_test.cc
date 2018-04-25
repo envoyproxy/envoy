@@ -4,9 +4,11 @@
 #include <unordered_map>
 
 #include "common/common/c_smart_ptr.h"
+#include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
@@ -25,55 +27,24 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-/**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
- */
-class TestAllocator : public RawStatDataAllocator {
-public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  RawStatData* alloc(const std::string& name) override {
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
-    } else {
-      stat_ref->ref_count_++;
-    }
-
-    return stat_ref.get();
-  }
-
-  void free(RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
-    }
-
-    FAIL();
-  }
-
-private:
-  static void freeAdapter(RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
-};
-
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
 public:
   StatsThreadLocalStoreTest() {
+    Stats::RawStatData::configureForTestsOnly(options_);
+    BlockMemoryHashSetOptions memory_hash_set_options_ =
+        Stats::blockMemHashOptions(options_.maxStats());
+    uint32_t num_bytes = BlockMemoryHashSet<Stats::RawStatData>::numBytes(memory_hash_set_options_);
+    memory_.reset(new uint8_t[num_bytes]);
+    memset(memory_.get(), 0, num_bytes);
+    allocator_ = std::make_unique<Stats::BlockRawStatDataAllocator>(memory_hash_set_options_, true,
+                                                                    memory_.get(), stat_lock_);
+
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
-      return alloc_.alloc(name);
+      return allocator_->alloc(name);
     }));
 
     ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
+      return allocator_->free(data);
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
@@ -84,9 +55,12 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
+  std::unique_ptr<uint8_t[]> memory_;
+  std::unique_ptr<Stats::BlockRawStatDataAllocator> allocator_;
+  NiceMock<Server::MockOptions> options_;
+  Thread::MutexBasicLockable stat_lock_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };

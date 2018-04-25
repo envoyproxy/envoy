@@ -35,6 +35,15 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
+  BlockMemoryHashSetOptions hash_set_options;
+  hash_set_options.capacity = max_stats;
+
+  // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
+  hash_set_options.num_slots = Primes::findPrimeLargerThan(hash_set_options.capacity / 2);
+  return hash_set_options;
+}
+
 size_t RawStatData::size() {
   // Normally the compiler would do this, but because name_ is a flexible-array-length
   // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
@@ -149,11 +158,51 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
   return false;
 }
 
+RawStatData* BlockRawStatDataAllocator::alloc(const std::string& name) {
+  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+
+  absl::string_view key = name;
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
+    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
+  }
+  auto value_created = stats_set_->insert(key);
+  Stats::RawStatData* data = value_created.first;
+  if (data == nullptr) {
+    return nullptr;
+  }
+  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
+  // automatically, but on recycled entries (value-created.second==false) we need to bump the
+  // ref-count.
+  if (!value_created.second) {
+    ++data->ref_count_;
+  }
+  return data;
+}
+
+void BlockRawStatDataAllocator::free(RawStatData& data) {
+  // We must hold the lock since the reference decrement can race with an initialize above.
+  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+  bool key_removed = stats_set_->remove(data.key());
+  ASSERT(key_removed);
+  memset(&data, 0, Stats::RawStatData::size());
+}
+
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
   return data;
+}
+
+void HeapRawStatDataAllocator::free(RawStatData& data) {
+  // This allocator does not ever have concurrent access to the raw data.
+  ASSERT(data.ref_count_ == 1);
+  ::free(&data);
 }
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
@@ -253,12 +302,6 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
     }
   }
   return names;
-}
-
-void HeapRawStatDataAllocator::free(RawStatData& data) {
-  // This allocator does not ever have concurrent access to the raw data.
-  ASSERT(data.ref_count_ == 1);
-  ::free(&data);
 }
 
 void RawStatData::initialize(absl::string_view key) {

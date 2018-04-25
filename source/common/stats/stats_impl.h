@@ -17,6 +17,7 @@
 #include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
+#include "common/common/block_memory_hash_set.h"
 #include "common/common/hash.h"
 #include "common/common/non_copyable.h"
 #include "common/common/utility.h"
@@ -28,6 +29,10 @@
 
 namespace Envoy {
 namespace Stats {
+
+typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
+
+BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats);
 
 class TagExtractorImpl : public TagExtractor {
 public:
@@ -406,12 +411,43 @@ private:
 };
 
 /**
- * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns
- * it.
+ * Implementation of RawStatDataAllocator which accepts a block of (potentially shared) memory.
+ */
+class BlockRawStatDataAllocator : public RawStatDataAllocator {
+public:
+  /**
+   * Creates a RawStatDataAllocator with an underlying MemoryHashMap to track stat names. Optionally
+   * works with shared memory, as in HotRestartImpl. Thread-safe but requires a lock as argument.
+   * @param options initialization parameters for BlockMemoryHashSet
+   * @param init true if the shared-memory should be initialized on construction. See the
+   * BlockMemoryHashSet constructor.
+   * @param memory the memory buffer for the set data.
+   * @param stat_lock a lock for thread safety.
+   * @return BlockRawStatDataAllocator newly constructed BlockRawStatDataAllocator.
+   */
+  BlockRawStatDataAllocator(const BlockMemoryHashSetOptions& options, bool init, uint8_t* memory,
+                            Thread::BasicLockable& stat_lock)
+      : stat_lock_(stat_lock) {
+    stats_set_ = std::make_unique<RawStatDataSet>(options, init, memory);
+  }
+
+  RawStatData* alloc(const std::string& name);
+  void free(RawStatData& data);
+  std::string version() { return stats_set_->version(); }
+
+private:
+  std::unique_ptr<RawStatDataSet> stats_set_;
+  // We must hold the stat lock when attaching to an existing memory segment
+  // because it might be actively written to while we sanityCheck it.
+  Thread::BasicLockable& stat_lock_;
+};
+
+/**
+ * Heap-based implementation of RawStatDataAllocator that just allocates a new structure in memory
+ * and returns it.
  */
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
-  // RawStatDataAllocator
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
 };

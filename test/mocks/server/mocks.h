@@ -156,11 +156,13 @@ public:
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
+  MOCK_METHOD0(statLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
   MOCK_METHOD0(statsAllocator, Stats::RawStatDataAllocator&());
 
 private:
   Thread::MutexBasicLockable log_lock_;
+  Thread::MutexBasicLockable stat_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapRawStatDataAllocator stats_allocator_;
 };

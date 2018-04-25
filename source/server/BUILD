@@ -128,6 +128,7 @@ envoy_cc_library(
     hdrs = ["hot_restart_nop_impl.h"],
     deps = [
         "//include/envoy/server:hot_restart_interface",
+        "//source/server:hot_restart_lib",
     ],
 )
 
