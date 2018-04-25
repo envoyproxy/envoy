@@ -777,7 +777,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   if (host->cluster().features() &
       ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
 
-    // Each connection will remove itself from the TcpConnectionsMap when it closes, via it's
+    // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
     while (true) {

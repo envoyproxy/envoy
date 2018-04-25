@@ -704,7 +704,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
-// Test that the correct feature() is set whn close_connections_on_host_health_failure is
+// Test that the correct feature() is set when close_connections_on_host_health_failure is
 // configured.
 TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   Stats::IsolatedStoreImpl stats;
