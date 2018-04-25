@@ -154,13 +154,17 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), Stats::RawStatData::maxNameLength());
   }
 
   auto ret = stats_set_.insert(std::pair<std::string, RawStatData*>(std::string(key), nullptr));
   RawStatData*& data = ret.first->second;
   if (ret.second) {
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-    data->initialize(name);
+    data->initialize(key);
   } else {
     ++data->ref_count_;
   }
