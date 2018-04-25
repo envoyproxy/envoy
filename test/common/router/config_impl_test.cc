@@ -3927,6 +3927,8 @@ virtual_hosts:
         redirect: { prefix_rewrite: "/https/prefix" , https_redirect: true }
       - match: { prefix: "/ignore-this/"}
         redirect: { prefix_rewrite: "/" }
+      - match: { prefix: "/ignore-this"}
+        redirect: { prefix_rewrite: "/" }
       - match: { prefix: "/ignore-substring"}
         redirect: { prefix_rewrite: "/" }
       - match: { prefix: "/service-hello/"}
@@ -3974,6 +3976,20 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers);
     EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-this", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-this/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
   }
   {
     Http::TestHeaderMapImpl headers = genRedirectHeaders(
