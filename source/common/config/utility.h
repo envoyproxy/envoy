@@ -263,13 +263,6 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::api::v2::core::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
-
-  /**
-   * Normalize URI path. Currently it only handles removing repeated slashes.
-   * @param path supplies the path to be normalized.
-   * @return std::string the normalized path.
-   */
-  static std::string normalizePath(absl::string_view path);
 };
 
 } // namespace Config

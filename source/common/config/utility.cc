@@ -228,11 +228,5 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-std::string Utility::normalizePath(absl::string_view path) {
-  std::vector<absl::string_view> segments = StringUtil::splitToken(path, "/", false);
-  bool has_trailing_slash = path.back() == '/';
-  return absl::StrCat("/", absl::StrJoin(segments, "/"), has_trailing_slash ? "/" : "");
-}
-
 } // namespace Config
 } // namespace Envoy

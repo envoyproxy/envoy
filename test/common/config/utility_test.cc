@@ -188,18 +188,6 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
   Utility::checkFilesystemSubscriptionBackingPath(test_path);
 }
 
-TEST(UtilityTest, NormalizePath) {
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok/a/b/c"));
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok//a//b//c"));
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("/ok///a///b///c"));
-  EXPECT_EQ("/ok/a/b/c", Utility::normalizePath("////ok/a/b/c"));
-
-  // Maintain the trailing slash.
-  EXPECT_EQ("/ok/a/b/c/", Utility::normalizePath("/ok/a/b/c/"));
-  EXPECT_EQ("/ok/a/b/c/", Utility::normalizePath("///ok/a/b/c///"));
-  EXPECT_EQ("/ok/a/b/c/", Utility::normalizePath("///ok////a////b////c///"));
-}
-
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
 // API configs along the dimension of ApiConfigSource type.
 TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
