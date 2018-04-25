@@ -873,13 +873,29 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(cp, cluster_manager_->httpConnPoolForCluster("fake_cluster", ResourcePriority::Default,
                                                          Http::Protocol::Http11, nullptr));
 
-  // Now remove it. This should drain the connection pool.
+  Network::MockClientConnection* connection = new Network::MockClientConnection();
+  ON_CALL(*cluster2->info_, features())
+      .WillByDefault(Return(ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE));
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Return(connection));
+  EXPECT_CALL(*connection, setBufferLimits(_));
+  EXPECT_CALL(*connection, addConnectionCallbacks(_));
+  auto conn_info = cluster_manager_->tcpConnForCluster("fake_cluster", nullptr);
+  EXPECT_EQ(conn_info.connection_.get(), connection);
+
+  // Now remove it. This should drain the connection pool, but not affect
+  // tcp connections.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
   EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*callbacks, onClusterRemoval(_)).Times(1);
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().size());
+
+  // Close the TCP connection. Success is no ASSERT or crash due to referencing
+  // the removed cluster.
+  EXPECT_CALL(*connection, dispatcher());
+  connection->raiseEvent(Network::ConnectionEvent::LocalClose);
 
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("foo"));
