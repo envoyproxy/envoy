@@ -87,6 +87,18 @@ message MapEntryMatch {
   repeated StringMatch values = 2;
 }
 
+// Specifies how to match IP addresses.
+message IpMatch {
+  // IP addresses in CIDR notation.
+  repeated envoy.api.v2.core.CidrRange cidrs = 1;
+}
+
+// Specifies how to match ports.
+message PortMatch {
+  // Port numbers.
+  repeated uint32 ports = 1;
+}
+
 // Permission defines a permission to access the service.
 message Permission {
   // Optional. A list of HTTP paths or gRPC methods.
@@ -106,6 +118,12 @@ message Permission {
       // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
       // The map key is the header name. The header specifies how the service is accessed.
       MapEntryMatch header = 1;
+
+      // Destination IP addresses.
+      IpMatch destination_ips = 2;
+
+      // Destination ports.
+      PortMatch destination_ports = 3;
     }
   }
 
@@ -128,7 +146,7 @@ message Principal {
       string service = 1;
 
       // Source IP addresses.
-      repeated envoy.api.v2.core.CidrRange ips = 2;
+      IpMatch source_ips = 2;
 
       // Header match. This matches to the "request.http.headers" field in
       // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
