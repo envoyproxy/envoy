@@ -780,6 +780,11 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
     // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
     // from host_tcp_conn_map_, so do not cache it between iterations.
+    //
+    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long time
+    // and halt other useful work. Consider breaking up this work. Note that this behavior is noted
+    // in the configuration documentation in cluster setting
+    // "close_connections_on_host_health_failure". Update the docs if this if this changes.
     while (true) {
       const auto& it = config.host_tcp_conn_map_.find(host);
       if (it == config.host_tcp_conn_map_.end()) {
