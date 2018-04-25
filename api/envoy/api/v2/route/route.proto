@@ -361,7 +361,25 @@ message RouteAction {
   //
   // .. note::
   //
-  //   As an example, given following config,
+  //   Take a careful attention to the use of trailing slash in match prefix value. A common
+  //   use-case is to have a rule to rewrite e.g. :code:`scheme://host/prefix` and
+  //   :code:`scheme://host/prefix/ok/1/2/3` to the root path of the host (:code:`scheme://host/`)
+  //   and :code:`scheme://host/ok/1/2/3` respectively.
+  //
+  //   The following config example exhibits that behavior.
+  //
+  //   .. code-block:: yaml
+  //
+  //     - match:
+  //         prefix: "/prefix/"
+  //       route:
+  //         prefix_rewrite: "/"
+  //     - match:
+  //         prefix: "/prefix"
+  //       route:
+  //         prefix_rewrite: "/"
+  //
+  //   If the match prefix value with trailing slash is removed, i.e.
   //
   //   .. code-block:: yaml
   //
@@ -370,7 +388,9 @@ message RouteAction {
   //     route:
   //       prefix_rewrite: "/"
   //
-  //   it rewrites :code:`/prefix` to :code:`/` and :code:`/prefix/foo` to :code:`/foo`.
+  //   it rewrites :code:`/prefix` to :code:`/`, but :code:`/prefix/ok` to :code:`//ok`, which
+  //   most of the time is not the intended result. However, it can be useful for the case of
+  //   replacing substring of a path segment. For example to rewrite :code:`/prefixok` to :code:`/ok`.
   string prefix_rewrite = 5;
 
   oneof host_rewrite_specifier {
@@ -587,7 +607,25 @@ message RedirectAction {
     //
     // .. note::
     //
-    //   As an example, given following config,
+    //   Take a careful attention to the use of trailing slash in match prefix value. A common
+    //   use-case is to have a rule to rewrite e.g. :code:`scheme://host/prefix` and
+    //   :code:`scheme://host/prefix/ok/1/2/3` to the root path of the host (:code:`scheme://host/`)
+    //   and :code:`scheme://host/ok/1/2/3` respectively.
+    //
+    //   The following config example exhibits that behavior.
+    //
+    //   .. code-block:: yaml
+    //
+    //     - match:
+    //         prefix: "/prefix/"
+    //       redirect:
+    //         prefix_rewrite: "/"
+    //     - match:
+    //         prefix: "/prefix"
+    //       redirect:
+    //         prefix_rewrite: "/"
+    //
+    //   If the match prefix value with trailing slash is removed, i.e.
     //
     //   .. code-block:: yaml
     //
@@ -596,7 +634,9 @@ message RedirectAction {
     //     redirect:
     //       prefix_rewrite: "/"
     //
-    //   it rewrites :code:`/prefix` to :code:`/` and :code:`/prefix/foo` to :code:`/foo`.
+    //   it rewrites :code:`/prefix` to :code:`/`, but :code:`/prefix/ok` to :code:`//ok`, which
+    //   most of the time is not the intended result. However, it can be useful for the case of
+    //   replacing substring of a path segment. For example to rewrite :code:`/prefixok` to :code:`/ok`.
     string prefix_rewrite = 5;
   }
 
