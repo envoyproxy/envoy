@@ -15,7 +15,7 @@ class RouteConfigProvider {
 public:
   struct ConfigInfo {
     // A reference to the currently loaded route configuration. Do not hold this reference beyond
-    // the caller's scope.
+    // the caller of configInfo()'s scope.
     const envoy::api::v2::RouteConfiguration& config_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of

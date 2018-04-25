@@ -29,12 +29,15 @@ message ConfigDump {
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
-// any CLI overrides that were merged.
+// any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
+// an Envoy configuration by reusing the output as the bootstrap configuration for another Envoy.
 message BootstrapConfigDump {
   envoy.config.bootstrap.v2.Bootstrap bootstrap = 1 [(gogoproto.nullable) = false];
 }
 
-// Envoy's listener manager fills this message with all currently known listeners.
+// Envoy's listener manager fills this message with all currently known listeners. Listener
+// configuration information can be used to recreate an Envoy configuration by populating all
+// listeners as static listeners or by returning them in a LDS response.
 message ListenersConfigDump {
   // This is the top level, "transactional," version information in the last processed LDS
   // discovery response. If there are only static bootstrap listeners, this field will be "".
@@ -42,8 +45,9 @@ message ListenersConfigDump {
 
   // Describes a dynamically loaded cluster via the LDS API.
   message DynamicListener {
-    // This is the top level, "transactional," version information in the last processed LDS
-    // discovery response. If there are only static bootstrap listeners, this field will be "".
+    // This is the per-resource version information. This version is currently taken from the
+    // transactional version_info field at the time that the listener was loaded. In the future,
+    // discrete per-listener versions may be supported by the API.
     string version_info = 1;
 
     // The listener config.
@@ -58,15 +62,21 @@ message ListenersConfigDump {
   repeated DynamicListener dynamic_active_listeners = 3 [(gogoproto.nullable) = false];
 
   // The dynamically loaded warming listeners These are listeners that are currently undergoing
-  // warming in preparation to service data plane traffic.
+  // warming in preparation to service data plane traffic. Note that if attempting to recreate an
+  // Envoy configuration from a configuration dump, the warming listeners should generally be
+  // discarded.
   repeated DynamicListener dynamic_warming_listeners = 4 [(gogoproto.nullable) = false];
 
   // The dynamically loaded draining listeners These are listeners that are currently undergoing
-  // draining in preparation to stop servicing data plane traffic.
+  // draining in preparation to stop servicing data plane traffic. Note that if attempting to
+  // recreate an Envoy configuration from a configuration dump, the draining listeners should
+  // generally be discarded.
   repeated DynamicListener dynamic_draining_listeners = 5 [(gogoproto.nullable) = false];
 }
 
-// Envoy's cluster manager fills this message with all currently known clusters.
+// Envoy's cluster manager fills this message with all currently known clusters. Cluster
+// configuration information can be used to recreate an Envoy configuration by populating all
+// clusters as static clusters or by returning them in a CDS response.
 message ClustersConfigDump {
   // This is the top level, "transactional," version information in the last processed CDS
   // discovery response. If there are only static bootstrap clusters, this field will be "".
@@ -76,7 +86,7 @@ message ClustersConfigDump {
   message DynamicCluster {
     // This is the per-resource version information. This version is currently taken from the
     // transactional version_info field at the time that the cluster was loaded. In the future,
-    // discrete per cluster versions may be supported by the API.
+    // discrete per-cluster versions may be supported by the API.
     string version_info = 1;
 
     // The cluster config.
@@ -91,13 +101,17 @@ message ClustersConfigDump {
   repeated DynamicCluster dynamic_active_clusters = 3 [(gogoproto.nullable) = false];
 
   // The dynamically loaded warming clusters. These are clusters that are currently undergoing
-  // warming in preparation to service data plane traffic.
+  // warming in preparation to service data plane traffic. Note that if attempting to recreate an
+  // Envoy configuration from a configuration dump, the warming clusters should generally be
+  // discarded.
   repeated DynamicCluster dynamic_warming_clusters = 4 [(gogoproto.nullable) = false];
 }
 
 // Envoy's RDS implementation fills this message with all currently loaded routes, as described by
 // their RouteConfiguration objects. Static routes configured in the bootstrap configuration are
-// separated from those configured dynamically via RDS.
+// separated from those configured dynamically via RDS. Route configuration information can be used
+// to recreate an Envoy configuration by populating all routes as static routes or by returning them
+// in RDS responses.
 message RoutesConfigDump {
   message DynamicRouteConfig {
     // This is the per-resource version information. This version is currently taken from the
