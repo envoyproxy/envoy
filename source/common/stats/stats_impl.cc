@@ -276,16 +276,13 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
     return;
   }
 
-  std::cout << data.key() << "\n";
   size_t key_removed = stats_set_.erase(std::string(data.key()));
-  std::cout << key_removed << "\n";
   ASSERT(key_removed >= 1);
   ::free(&data);
 }
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  std::cout << key << "\n";
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
