@@ -104,3 +104,13 @@ envoy_cc_library(
         "//source/common/singleton:threadsafe_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "tls_utility_lib",
+    srcs = ["tls_utility.cc"],
+    hdrs = ["tls_utility.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
+)

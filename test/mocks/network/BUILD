@@ -23,6 +23,7 @@ envoy_cc_mock(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:printers_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
