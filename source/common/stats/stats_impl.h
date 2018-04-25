@@ -414,6 +414,9 @@ public:
   // RawStatDataAllocator
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+
+private:
+  std::unordered_map<std::string, RawStatData*> stats_set_;
 };
 
 /**
