@@ -429,7 +429,7 @@ message Cluster {
   // Determines how Envoy selects the protocol used to speak to upstream hosts.
   ClusterProtocolSelection protocol_selection = 26;
 
-  // If an upstream host becomes unhealthy (as determined by the coonfigured health checks
+  // If an upstream host becomes unhealthy (as determined by the configured health checks
   // or outlier detection), immediately close all connections to the failed host.
   //
   // This is currently only supported for connections created by tcp_proxy.
