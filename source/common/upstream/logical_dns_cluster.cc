@@ -129,7 +129,7 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   PerThreadCurrentHostData& data = parent_.tls_->getTyped<PerThreadCurrentHostData>();
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
-                                     options),
+                                     options, parent_.random_),
           HostDescriptionConstSharedPtr{
               new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
 }

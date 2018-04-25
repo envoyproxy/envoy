@@ -1355,9 +1355,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   // 1 for client, 1 for server
   EXPECT_EQ(2UL, stats_store.counter("ssl.handshake").value());
 
+  Runtime::RandomGeneratorImpl random;
   client_connection = dispatcher.createClientConnection(
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      ssl_socket_factory.createTransportSocket(), nullptr);
+      ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
@@ -1405,10 +1406,11 @@ TEST_P(SslSocketTest, SslError) {
   Network::MockListenerCallbacks callbacks;
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
+  Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");
   client_connection->write(bad_data, false);
@@ -2048,7 +2050,7 @@ public:
         new ClientSslSocketFactory(*client_ctx_config_, *manager_, stats_store_));
     client_connection_ = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_,
-        client_ssl_socket_factory_->createTransportSocket(), nullptr);
+        client_ssl_socket_factory_->createTransportSocket(), nullptr, random_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     client_connection_->connect();
     read_filter_.reset(new Network::MockReadFilter());
@@ -2223,6 +2225,7 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   StrictMock<Network::MockConnectionCallbacks> client_callbacks_;
   Network::Address::InstanceConstSharedPtr source_address_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SslReadBufferLimitTest,

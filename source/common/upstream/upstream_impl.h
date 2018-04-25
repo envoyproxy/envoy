@@ -160,7 +160,8 @@ protected:
   static Network::ClientConnectionPtr
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    Network::Address::InstanceConstSharedPtr address,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options);
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Runtime::RandomGenerator& random);
 
 private:
   std::atomic<uint64_t> health_flags_{};

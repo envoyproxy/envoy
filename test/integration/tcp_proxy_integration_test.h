@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "source/common/runtime/runtime_impl.h"
+
 #include "test/integration/integration.h"
 #include "test/mocks/runtime/mocks.h"
 
@@ -40,6 +42,7 @@ public:
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
+  Runtime::RandomGeneratorImpl random;
 };
 
 } // namespace

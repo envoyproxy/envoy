@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
+	"//source/common/runtime:runtime_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
@@ -402,6 +403,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/runtime:runtime_lib",
         "//test/test_common:environment_lib",
     ],
 )
@@ -429,6 +431,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/test_common:utility_lib",
     ],

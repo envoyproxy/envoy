@@ -86,19 +86,20 @@ public:
 Host::CreateConnectionData
 HostImpl::createConnection(Event::Dispatcher& dispatcher,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+  return {createConnection(dispatcher, *cluster_, address_, options, random_), shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, random_),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Runtime::RandomGenerator& random) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options;
   if (cluster.features() & ClusterInfo::Features::FREEBIND) {
     cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
@@ -111,7 +112,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      cluster_options, random_);
+      cluster_options, random);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }

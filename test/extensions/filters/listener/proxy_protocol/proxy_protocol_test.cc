@@ -49,7 +49,7 @@ public:
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
                                                Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr);
+                                               Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
@@ -138,6 +138,7 @@ public:
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
+  Runtime::RandomGeneratorImpl random;
 };
 
 // Parameterize the listener socket address version.
@@ -333,7 +334,7 @@ public:
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
                                                Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr);
+                                               Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -412,6 +413,7 @@ public:
   Network::MockConnectionCallbacks server_callbacks_;
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
+  Runtime::RandomGeneratorImpl random;
 };
 
 // Parameterize the listener socket address version.
