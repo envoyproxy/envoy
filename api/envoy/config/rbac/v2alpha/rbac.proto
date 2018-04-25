@@ -10,15 +10,16 @@ package envoy.config.rbac.v2alpha;
 // :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against the RBAC policies.
 //
 // Here is an example of RBAC configuration. It has two policies:
-// * Service account "cluster.local/ns/default/sa/admin" has full access to the service.
-// * Any user can read ("GET") the service at paths with prefix "/products" or suffix "/reviews" when request header
-//   "version" set to either "v1" or "v2".
+// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry means full access)
+//   to the service.
+// * Any user (empty principal entry means any user) can read ("GET") the service at paths with prefix "/products" or
+//   suffix "/reviews" when request header "version" set to either "v1" or "v2".
 //
 //   action_type: ALLOW
 //   policies:
 //     "service-admin":
 //       permissions:
-//       - methods: ["*"]
+//       -
 //       principals:
 //       - name: "cluster.local/ns/default/sa/admin"
 //     "product-viewer":
@@ -30,7 +31,7 @@ package envoy.config.rbac.v2alpha;
 //             key: "version"
 //             values: ["v1", "v2"]
 //       principals:
-//       - name: "*"
+//       -
 //
 message RBAC {
   // Should we do white-list or black-list style access control.
@@ -108,7 +109,7 @@ message Permission {
   repeated StringMatch paths = 1;
 
   // Required. A list of HTTP methods (e.g., "GET", "POST").
-  // If set to ["*"], it applies to any method.
+  // If this field is unset, it applies to any method.
   repeated string methods = 2;
 
   // Definition of a custom condition.
@@ -133,10 +134,17 @@ message Permission {
 
 // Principal defines an identity or a group of identities.
 message Principal {
-  // Optional. The name of the principal. This matches to the "source.principal" field in
-  // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-  // If set to "*", it applies to any user.
-  string name = 1;
+  // Authentication attributes for principal. These could be filled out inside RBAC filter.
+  // Or if an authentication filter is used, they can be provided by the authentication filter.
+  message Authenticated {
+    // Optional. The name of the principal. This matches to the "source.principal" field in
+    // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
+    // If unset, it applies to any user.
+    string name = 1;
+  }
+
+  // Optional. Authenticated attributes that identify the principal.
+  Authenticated authenticated = 1;
 
   // Definition of a custom attribute to identify the principal.
   message Attribute {
