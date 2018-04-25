@@ -22,7 +22,7 @@ private:
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
-  GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot& google_tls_slot,
+  GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
                                Stats::Scope& scope,
                                const envoy::api::v2::core::GrpcService& config);
 
@@ -30,7 +30,7 @@ public:
 
 private:
   ThreadLocal::Instance& tls_;
-  ThreadLocal::Slot& google_tls_slot_;
+  ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
   const envoy::api::v2::core::GrpcService config_;
 };
