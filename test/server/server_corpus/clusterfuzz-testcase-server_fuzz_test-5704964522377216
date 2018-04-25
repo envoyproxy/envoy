@@ -1,0 +1,26 @@
+static_resources {
+  clusters {
+    name: "907501"
+    connect_timeout {
+      nanos: 45696
+    }
+    lb_policy: RING_HASH
+    tls_context {
+      sni: "www.google.com"
+    }
+    dns_lookup_family: V4_ONLY
+    lb_subset_config {
+      subset_selectors {
+        keys: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}

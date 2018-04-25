@@ -17,9 +17,9 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionTestHarness : public testing::TestWithParam<Address::IpVersion> {
+class SocketOptionTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  SocketOptionTestHarness() { socket_.local_address_.reset(); }
+  SocketOptionTest() { socket_.local_address_.reset(); }
 
   NiceMock<MockListenSocket> socket_;
   Api::MockOsSysCalls os_sys_calls_;

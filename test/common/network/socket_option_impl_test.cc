@@ -1,11 +1,11 @@
-#include "test/common/network/socket_option_test_harness.h"
+#include "test/common/network/socket_option_test.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionImplTest : public SocketOptionTestHarness {};
+class SocketOptionImplTest : public SocketOptionTest {};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SocketOptionImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
