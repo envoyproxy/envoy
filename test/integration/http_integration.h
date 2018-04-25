@@ -128,6 +128,7 @@ protected:
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();
+  void testUpstreamDisconnectWithTwoRequests();
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();
