@@ -154,17 +154,13 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
-    ENVOY_LOG_MISC(
-        warn,
-        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), Stats::RawStatData::maxNameLength());
   }
 
   auto ret = stats_set_.insert(std::pair<std::string, RawStatData*>(std::string(key), nullptr));
   RawStatData*& data = ret.first->second;
   if (ret.second) {
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-    data->initialize(key);
+    data->initialize(name);
   } else {
     ++data->ref_count_;
   }
@@ -285,6 +281,13 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
+  std::cout << key << "\n";
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), Stats::RawStatData::maxNameLength());
+  }
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
