@@ -1,0 +1,11 @@
+runtime {
+  symlink_root: "/"
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "]"
+    }
+  }
+}

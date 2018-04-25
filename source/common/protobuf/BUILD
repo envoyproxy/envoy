@@ -45,5 +45,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",
+        "@envoy_api//envoy/type:percent_cc",
     ],
 )

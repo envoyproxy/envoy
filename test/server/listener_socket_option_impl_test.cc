@@ -1,17 +1,17 @@
 #include "server/listener_socket_option_impl.h"
 
-#include "test/common/network/socket_option_test_harness.h"
+#include "test/common/network/socket_option_test.h"
 
 namespace Envoy {
 namespace Server {
 
-class ListenerSocketOptionImplTest : public Network::SocketOptionTestHarness {
+class ListenerSocketOptionImplTest : public Network::SocketOptionTest {
 public:
   void testSetSocketOptionSuccess(ListenerSocketOptionImpl& socket_option, int socket_level,
                                   Network::SocketOptionName option_name, int option_val,
                                   const std::set<Network::Socket::SocketState>& when) {
-    Network::SocketOptionTestHarness::testSetSocketOptionSuccess(socket_option, socket_level,
-                                                                 option_name, option_val, when);
+    Network::SocketOptionTest::testSetSocketOptionSuccess(socket_option, socket_level, option_name,
+                                                          option_val, when);
   }
 };
 

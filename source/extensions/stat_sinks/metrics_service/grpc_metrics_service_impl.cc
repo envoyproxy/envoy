@@ -61,6 +61,40 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer)
     : grpc_metrics_streamer_(grpc_metrics_streamer) {}
 
+void MetricsServiceSink::flushCounter(const Stats::Counter& counter, uint64_t) {
+  io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+  metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
+  metrics_family->set_name(counter.name());
+  auto* metric = metrics_family->add_metric();
+  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  auto* counter_metric = metric->mutable_counter();
+  counter_metric->set_value(counter.value());
+}
+
+void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
+  io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+  metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
+  metrics_family->set_name(gauge.name());
+  auto* metric = metrics_family->add_metric();
+  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  auto* gauage_metric = metric->mutable_gauge();
+  gauage_metric->set_value(value);
+}
+void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram) {
+  io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
+  metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
+  metrics_family->set_name(histogram.name());
+  auto* metric = metrics_family->add_metric();
+  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  auto* summary_metric = metric->mutable_summary();
+  const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
+  for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
+    auto* quantile = summary_metric->add_quantile();
+    quantile->set_quantile(hist_stats.supportedQuantiles()[i]);
+    quantile->set_value(hist_stats.computedQuantiles()[i]);
+  }
+}
+
 } // namespace MetricsService
 } // namespace StatSinks
 } // namespace Extensions

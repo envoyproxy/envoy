@@ -57,6 +57,23 @@ ssize_t fileSize(const std::string& path);
 std::string fileReadToEnd(const std::string& path);
 
 /**
+ * @param path some filesystem path.
+ * @return std::string the canonical path (see realpath(3)).
+ */
+std::string canonicalPath(const std::string& path);
+
+/**
+ * Determine if the path is on a list of paths Envoy will refuse to access. This
+ * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
+ * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
+ * returns false, it is up to the user to validate that supplied paths are
+ * valid.
+ * @param path some filesystem path.
+ * @return is the path on the blacklist?
+ */
+bool illegalPath(const std::string& path);
+
+/**
  * This is a file implementation geared for writing out access logs. It turn out that in certain
  * cases even if a standard file is opened with O_NONBLOCK, the kernel can still block when writing.
  * This implementation uses a flush thread per file, with the idea there there aren't that many

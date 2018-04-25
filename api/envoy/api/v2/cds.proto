@@ -335,8 +335,9 @@ message Cluster {
     // will provide better request distribution since each host in the
     // cluster will have more virtual nodes. Defaults to 1024. In the case
     // that total number of hosts is greater than the minimum, each host will
-    // be allocated a single virtual node.
-    google.protobuf.UInt64Value minimum_ring_size = 1;
+    // be allocated a single virtual node. This field is limited to 8M to bound
+    // resource use.
+    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {

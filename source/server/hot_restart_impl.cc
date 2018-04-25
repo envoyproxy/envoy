@@ -27,8 +27,8 @@ namespace Server {
 // from working. Operations code can then cope with this and do a full restart.
 const uint64_t SharedMemory::VERSION = 9;
 
-static SharedMemoryHashSetOptions sharedMemHashOptions(uint64_t max_stats) {
-  SharedMemoryHashSetOptions hash_set_options;
+static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
+  BlockMemoryHashSetOptions hash_set_options;
   hash_set_options.capacity = max_stats;
 
   // https://stackoverflow.com/questions/3980117/hash-table-why-size-should-be-prime
@@ -114,12 +114,12 @@ std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), stats_set_options_(sharedMemHashOptions(options.maxStats())),
+    : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
-    // We must hold the stat lock when attaching to an existing shared-memory segment
+    // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
     std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
@@ -150,7 +150,7 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   if (data == nullptr) {
     return nullptr;
   }
-  // For new entries (value-created.second==true), SharedMemoryHashSet calls Value::initialize()
+  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
   // automatically, but on recycled entries (value-created.second==false) we need to bump the
   // ref-count.
   if (!value_created.second) {
@@ -478,7 +478,7 @@ std::string HotRestartImpl::version() {
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
-  const SharedMemoryHashSetOptions options = sharedMemHashOptions(max_num_stats);
+  const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
   const size_t bytes = RawStatDataSet::numBytes(options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
   RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());

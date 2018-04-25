@@ -1,0 +1,150 @@
+static_resources {
+  listeners {
+    name: "listener_0"
+    address {
+      socket_address {
+        address: "0.0.0.0"
+        port_value: 10000
+      }
+    }
+    filter_chains {
+      filters {
+        name: "envoy.http_connection_manager"
+        config {
+          fields {
+            key: "http_filters"
+            value {
+              list_value {
+                values {
+                  struct_value {
+                    fields {
+                      key: "name"
+                      value {
+                        string_value: "envoy.router"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          fields {
+            key: "route_config"
+            value {
+              struct_value {
+                fields {
+                  key: "name"
+                  value {
+                    string_value: "local_route"
+                  }
+                }
+                fields {
+                  key: "virtual_hosts"
+                  value {
+                    list_value {
+                      values {
+                        struct_value {
+                          fields {
+                            key: "domains"
+                            value {
+                              list_value {
+                                values {
+                                  string_value: "*"
+                                }
+                              }
+                            }
+                          }
+                          fields {
+                            key: "name"
+                            value {
+                              string_value: "local_service"
+                            }
+                          }
+                          fields {
+                            key: "routes"
+                            value {
+                              list_value {
+                                values {
+                                  struct_value {
+                                    fields {
+                                      key: "match"
+                                      value {
+                                        struct_value {
+                                          fields {
+                                            key: "prefix"
+                                            value {
+                                              string_value: "/"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    fields {
+                                      key: "route"
+                                      value {
+                                        struct_value {
+                                          fields {
+                                            key: "cluster"
+                                            value {
+                                              string_value: "service_google"
+                                            }
+                                          }
+                                          fields {
+                                            key: "host_rewrite"
+                                            value {
+                                              string_value: "www.google.com"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          fields {
+            key: "stat_prefix"
+            value {
+              string_value: "ingress_http"
+            }
+          }
+        }
+      }
+    }
+  }
+  clusters {
+    name: "service_google"
+    type: LOGICAL_DNS
+    connect_timeout {
+      nanos: 250000000
+    }
+    hosts {
+      socket_address {
+        address: "google.com"
+        port_value: 443
+      }
+    }
+    tls_context {
+      sni: "www.google.com"
+    }
+    dns_lookup_family: V4_ONLY
+  }
+}
+admin {
+  access_log_path: "/tmp/admin_access.log"
+  address {
+    socket_address {
+      address: "127.0.0.1"
+      port_value: 9901
+    }
+  }
+}

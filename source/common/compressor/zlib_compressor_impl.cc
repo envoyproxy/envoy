@@ -60,6 +60,7 @@ bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
       RELEASE_ASSERT(result == Z_STREAM_END);
       return false;
     }
+    FALLTHRU;
   default:
     if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
       return false; // This means that zlib needs more input, so stop here.

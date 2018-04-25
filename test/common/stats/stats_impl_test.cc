@@ -8,6 +8,7 @@
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -466,6 +467,15 @@ TEST(TagProducerTest, CheckConstructor) {
   EXPECT_THROW_WITH_MESSAGE(
       TagProducerImpl{stats_config}, EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+}
+
+// Validate truncation behavior of RawStatData.
+TEST(RawStatDataTest, Truncate) {
+  HeapRawStatDataAllocator alloc;
+  const std::string long_string(RawStatData::maxNameLength() + 1, 'A');
+  RawStatData* stat{};
+  EXPECT_LOG_CONTAINS("warning", "is too long with", stat = alloc.alloc(long_string));
+  alloc.free(*stat);
 }
 
 } // namespace Stats
