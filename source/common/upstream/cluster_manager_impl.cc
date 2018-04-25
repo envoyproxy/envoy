@@ -672,6 +672,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   //                     redis/conn_pool_impl.cc. Will fix at the same time.
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
   host_http_conn_pool_map_.clear();
+  ASSERT(host_tcp_conn_map_.empty());
   for (auto& cluster : thread_local_clusters_) {
     if (&cluster.second->priority_set_ != local_priority_set_) {
       cluster.second.reset();
