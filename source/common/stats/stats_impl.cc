@@ -156,9 +156,11 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
   }
 
-  RawStatData* data = stats_set_[std::string(key)];
+  bool name_not_in_map = (stats_set_.find(std::string(key)) == stats_set_.end());
 
-  if (stats_set_.count(std::string(key)) == 1) { // TODO do better
+  RawStatData*& data = stats_set_[std::string(key)];
+
+  if (name_not_in_map) {
     // didn't exist before now, actually create
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
     data->initialize(name);
