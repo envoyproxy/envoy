@@ -34,6 +34,11 @@ public:
   virtual ssize_t write(int fd, const void* buffer, size_t num_bytes) PURE;
 
   /**
+   * @see recv (man 2 recv)
+   */
+  virtual ssize_t recv(int socket, void* buffer, size_t length, int flags) PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */

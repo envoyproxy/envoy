@@ -1,10 +1,10 @@
-#include "test/common/network/socket_option_test_harness.h"
+#include "test/common/network/socket_option_test.h"
 
 namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionImplTest : public SocketOptionTestHarness {};
+class SocketOptionImplTest : public SocketOptionTest {};
 
 // We fail to set the option if the socket FD is bad.
 TEST_F(SocketOptionImplTest, BadFd) {
