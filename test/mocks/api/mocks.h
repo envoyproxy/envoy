@@ -51,6 +51,8 @@ public:
   MOCK_METHOD1(close, int(int));
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
+  MOCK_METHOD4(recv, ssize_t(int socket, void* buffer, size_t length, int flags));
+
   MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));
   MOCK_METHOD1(shmUnlink, int(const char*));
   MOCK_METHOD2(ftruncate, int(int fd, off_t length));
