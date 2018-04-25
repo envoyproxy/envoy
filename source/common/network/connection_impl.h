@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
@@ -177,7 +178,8 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       Runtime::RandomGenerator& random);
 
   // Network::ClientConnection
   void connect() override;

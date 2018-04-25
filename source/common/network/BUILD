@@ -57,6 +57,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/ssl:ssl_socket_lib",
     ],
 )
