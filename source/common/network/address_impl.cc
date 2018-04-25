@@ -356,7 +356,7 @@ Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_por
   friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
 }
 
-int Ipv4InstanceRange::bind(int fd) const {
+int Ipv4InstanceRange::bind(int fd, Runtime::RandomGenerator&) const {
   // Implementing via linear search from the bottom of the range.
   // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
   for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
@@ -407,7 +407,7 @@ Ipv6InstanceRange::Ipv6InstanceRange(
 Ipv6InstanceRange::Ipv6InstanceRange(uint32_t starting_port, uint32_t ending_port)
     : Ipv6InstanceRange("", starting_port, ending_port) {}
 
-int Ipv6InstanceRange::bind(int fd) const {
+int Ipv6InstanceRange::bind(int fd, Runtime::RandomGenerator&) const {
   // Implementing via linear search from the bottom of the range.
   // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
   for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {

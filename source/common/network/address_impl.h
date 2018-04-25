@@ -242,7 +242,7 @@ class Ipv4InstanceRange : public InstanceRange {
   }
   virtual const std::string& asString() const override { return friendly_name_; }
   virtual const std::string& logicalName() const override { return friendly_name_; }
-  virtual int bind(int fd) const override;
+  virtual int bind(int fd, Runtime::RandomGenerator& random) const override;
   virtual const Ip* ip() const override { return &ip_; }
   virtual int socket(SocketType type) const override;
   virtual Type type() const override { return Type::Ip; }
@@ -273,7 +273,7 @@ class Ipv6InstanceRange : public InstanceRange {
   }
   const std::string& asString() const override { return friendly_name_; }
   const std::string& logicalName() const override { return friendly_name_; }
-  int bind(int fd) const override;
+  int bind(int fd, Runtime::RandomGenerator& random) const override;
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
   Type type() const override { return Type::Ip; }
@@ -303,7 +303,7 @@ class PipeInstanceRange : public InstanceRange {
   }
   const std::string& asString() const override { return instance_.asString(); }
   const std::string& logicalName() const override {return instance_.logicalName(); }
-  int bind(int fd) const override { return instance_.bind(fd); }
+  int bind(int fd, Runtime::RandomGenerator&) const override { return instance_.bind(fd); }
   const Ip* ip() const override { return nullptr; }
   uint32_t starting_port() const override { return 0; }
   uint32_t ending_port() const override { return 0; }

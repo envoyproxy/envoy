@@ -9,6 +9,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
 
 #include "absl/numeric/int128.h"
 
@@ -190,12 +191,13 @@ public:
   virtual const std::string& logicalName() const PURE;
 
   /**
-   * Bind a socket to this address. The socket should have been created with a call to socket() on
-   * an Instance of the same address family.
+   * Bind a socket to this address range. The socket should have been created with a call to 
+   * socket() on an Instance of the same address family.
    * @param fd supplies the platform socket handle.
+   * @param random may be used to randomize the port in the port range.
    * @return the platform error code.
    */
-  virtual int bind(int fd) const PURE;
+  virtual int bind(int fd, Runtime::RandomGenerator& random) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
