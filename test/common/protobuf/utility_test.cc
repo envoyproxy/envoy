@@ -232,6 +232,16 @@ TEST(DurationUtilTest, OutOfRange) {
     duration.set_nanos(-1);
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
   }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
 }
 
 } // namespace Envoy
