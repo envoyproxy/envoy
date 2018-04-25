@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+// Trace capture format for the capture transport socket extension. This dumbs plain text read/write
+// sequences on a socket.
+// TODO(htuch): Write a PCAP conversion utility for this proto, extend Trace to contain more useful
+// properties such as source/dest IP/port, timestamps etc.
+// [#proto-status: draft]
+
+package envoy.extensions.transport_socket.capture.v2alpha;
+option go_package = "v2";
+
+// Event in a capture trace.
+message Event {
+  message Read {
+    bytes data = 1;
+  }
+  message Write {
+    bytes data = 1;
+  }
+  oneof event_selector {
+    Read read = 1;
+    Write write = 2;
+  }
+}
+
+// Sequence of read/write events that constitute a captured trace on a socket.
+message Trace {
+  repeated Event events = 1;
+  // TODO(htuch): add trace ID, connection properties, e.g. source/dest IP/port, timestamps, etc.
+}

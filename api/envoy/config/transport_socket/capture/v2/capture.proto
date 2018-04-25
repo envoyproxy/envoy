@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.config.transport_socket.capture.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/base.proto";
+
+// Configuration for capture transport socket. This wraps another transport socket, providing the
+// ability to interpose and record in plain text any traffic that is surfaced to Envoy.
+message Capture {
+  // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
+  // identifier distinguishing the recorded trace for individual socket instances. This will have
+  // the proto schema described in envoy.extensions.transport_socket.capture.
+  string path_prefix = 1;
+
+  // If set, the dump will be in text proto format, with a .pb_text suffix. Otherwise, binary proto
+  // will be emitted.
+  bool text_format = 2;
+
+  // The underlying transport socket being wrapped.
+  api.v2.core.TransportSocket transport_socket = 3;
+}

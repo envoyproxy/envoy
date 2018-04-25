@@ -239,6 +239,7 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/transport_sockets/capture:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
@@ -366,6 +367,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/capture/v2:capture_cc",
+        "@envoy_api//envoy/extensions/transport_socket/capture/v2alpha:capture_cc",
     ],
 )
 

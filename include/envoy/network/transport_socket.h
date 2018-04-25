@@ -154,7 +154,7 @@ public:
   /**
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
-  virtual TransportSocketPtr createTransportSocket() const PURE;
+  virtual TransportSocketPtr createTransportSocket() PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;
