@@ -3,7 +3,8 @@
 TLS Inspector
 =============
 
-TLS inspector listener filter allows detecting the
+TLS inspector listener filter allows detecting whether the transport appears to be
+TLS or plaintext, and if it is TLS, it detects the
 `server name indication <https://en.wikipedia.org/wiki/Server_Name_Indication>`_
 from the client. This can be used to select a
 :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` via the

@@ -14,7 +14,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 
-//#include "common/config/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "openssl/bytestring.h"
@@ -24,20 +23,6 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
-
-namespace {
-
-// This could use the same index as Ssl::ContextImpl, but allocating 1 extra
-// index seems better than adding the coupling between components.
-int sslIndex() {
-  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
-    int ssl_index = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(ssl_index >= 0);
-    return ssl_index;
-  }());
-}
-
-} // namespace
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
@@ -53,7 +38,7 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_ex_data(ssl, sslIndex()));
+        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
         filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
 
         // Return an error to stop the handshake; we have what we wanted already.
@@ -67,7 +52,9 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  SSL_set_ex_data(ssl_.get(), sslIndex(), this);
+  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize());
+
+  SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
 
@@ -106,7 +93,7 @@ void Filter::onServername(absl::string_view name) {
     config_->stats().sni_found_.inc();
     cb_->socket().setRequestedServerName(name);
   } else {
-    config_->stats().no_sni_found_.inc();
+    config_->stats().sni_not_found_.inc();
   }
   clienthello_success_ = true;
 }
@@ -125,7 +112,6 @@ void Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize());
   ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
@@ -180,7 +166,7 @@ void Filter::parseClientHello(const void* data, size_t len) {
     if (read_ == config_->maxClientHelloSize()) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
-      config_->stats().client_hello_too_big_.inc();
+      config_->stats().client_hello_too_large_.inc();
       done(false);
     }
     break;
@@ -189,7 +175,7 @@ void Filter::parseClientHello(const void* data, size_t len) {
       config_->stats().tls_found_.inc();
       cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
     } else {
-      config_->stats().no_tls_found_.inc();
+      config_->stats().tls_not_found_.inc();
       cb_->socket().setDetectedTransportProtocol(
           TransportSockets::TransportSocketNames::get().RAW_BUFFER);
     }
