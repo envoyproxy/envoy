@@ -510,6 +510,21 @@ to
 with the effect that the LDS stream will be directed to *some_ads_cluster* over
 the shared ADS channel.
 
+.. _config_overview_v2_mgmt_con_issues:
+
+Management Server Unreachability
+--------------------------------
+
+When Envoy instance looses connectivity with the management server, Envoy will latch on to
+the previous configuration while actively retrying in the background to reestablish the 
+connection with the management server. 
+
+Envoy debug logs the fact that it is not able to establish a connection with the management server 
+every time it attempts a connection.
+
+:ref:`upstream_cx_connect_fail <config_cluster_manager_cluster_stats>` a cluster level statistic
+of the cluster pointing to management server provides a signal for monitoring this behavior.
+
 .. _config_overview_v2_status:
 
 Status
