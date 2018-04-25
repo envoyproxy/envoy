@@ -28,12 +28,12 @@ package envoy.config.rbac.v2alpha;
 //           name: "cluster.local/ns/default/sa/admin"
 //     "product-viewer":
 //       permissions:
-//       - paths: [prefix:"/products", suffix:"/reviews"]
+//       - paths: [prefix: "/products", suffix: "/reviews"]
 //         methods: ["GET"]
 //         conditions:
 //         - header:
 //             key: "version"
-//             values: ["v1", "v2"]
+//             values: [simple: "v1", simple: "v2"]
 //       principals:
 //       -
 //
