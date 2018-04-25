@@ -42,16 +42,34 @@ const Network::Address::InstanceConstSharedPtr
 getSourceAddress(const envoy::api::v2::Cluster& cluster,
                  const envoy::api::v2::core::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
-  if (cluster.upstream_bind_config().has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(
-        cluster.upstream_bind_config().source_address());
+  const envoy::api::v2::core::BindConfig* config = nullptr;
+  if (cluster.upstream_bind_config().has_source_address_port_range()) {
+    config = &cluster.upstream_bind_config();
+  } else if (bind_config.has_source_address_port_range()) {
+    config = &bind_config;
+  } else {
+    return nullptr;
   }
-  // If there's no source address in the cluster config, use any default from the bootstrap proto.
-  if (bind_config.has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(bind_config.source_address());
+    
+  envoy::api::v2::core::SocketAddress address;
+  address.set_protocol(config->source_address_port_range().protocol());
+  address.set_address(config->source_address_port_range().address());
+  switch (config->source_address_port_range().port_specifier_case()) {
+    case envoy::api::v2::core::SocketAddressPortRange::PORT_SPECIFIER_NOT_SET:
+    case envoy::api::v2::core::SocketAddressPortRange::kPortValue:
+      address.set_port_value(config->source_address_port_range().port_value());
+      break;
+    case envoy::api::v2::core::SocketAddressPortRange::kPortRange:
+      address.set_port_value(config->source_address_port_range().port_range().port_value_start());
+      break;
+    case envoy::api::v2::core::SocketAddressPortRange::kNamedPort:
+      address.set_named_port(config->source_address_port_range().named_port());
+      break;
   }
+  address.set_resolver_name(config->source_address_port_range().resolver_name());
+  address.set_ipv4_compat(config->source_address_port_range().ipv4_compat());
 
-  return nullptr;
+  return Network::Address::resolveProtoSocketAddress(address);
 }
 
 uint64_t parseFeatures(const envoy::api::v2::Cluster& config,

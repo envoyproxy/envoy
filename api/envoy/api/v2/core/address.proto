@@ -19,13 +19,14 @@ message Pipe {
   string path = 1 [(validate.rules).string.min_bytes = 1];
 }
 
+enum Protocol {
+  option (gogoproto.goproto_enum_prefix) = false;
+  TCP = 0;
+  // [#not-implemented-hide:]
+  UDP = 1;
+};
+
 message SocketAddress {
-  enum Protocol {
-    option (gogoproto.goproto_enum_prefix) = false;
-    TCP = 0;
-    // [#not-implemented-hide:]
-    UDP = 1;
-  }
   Protocol protocol = 1 [(validate.rules).enum.defined_only = true];
   // The address for this socket. :ref:`Listeners <config_listeners>` will bind
   // to the address or outbound connections will be made. An empty address is
@@ -69,12 +70,6 @@ message PortRange {
 // A set of socket addresses that include the same host address but may have a
 // range of ports.
 message SocketAddressPortRange {
-  enum Protocol {
-    option (gogoproto.goproto_enum_prefix) = false;
-    TCP = 0;
-    // [#not-implemented-hide:]
-    UDP = 1;
-  }
   Protocol protocol = 1 [(validate.rules).enum.defined_only = true];
   // The address for this socket. :ref:`Listeners <config_listeners>` will bind
   // to the address or outbound connections will be made. An empty address is
@@ -111,7 +106,7 @@ message SocketAddressPortRange {
 
 message BindConfig {
   // The address to bind to when creating a socket.
-  SocketAddress source_address = 1
+  SocketAddressPortRange source_address_port_range = 1
       [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
   // Whether to set the *IP_FREEBIND* option when creating the socket. When this
