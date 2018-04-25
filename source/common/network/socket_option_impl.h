@@ -103,29 +103,5 @@ private:
   const int value_;
 };
 
-class SocketOptionsImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
-public:
-  SocketOptionsImpl() {}
-
-  void addOption(std::unique_ptr<Socket::Option> option) { options_.push_back(std::move(option)); }
-
-  // Socket::Option
-  bool setOption(Socket& socket, Socket::SocketState state) const override {
-    bool good = true;
-    for (const auto& option : options_) {
-      if (!option->setOption(socket, state)) {
-        good = false;
-      }
-    }
-    return good;
-  }
-
-  // The common socket options don't require a hash key.
-  void hashKey(std::vector<uint8_t>&) const override {}
-
-private:
-  std::vector<std::unique_ptr<const Socket::Option>> options_;
-};
-
 } // namespace Network
 } // namespace Envoy

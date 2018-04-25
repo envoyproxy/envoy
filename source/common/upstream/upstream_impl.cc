@@ -82,10 +82,12 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   // Cluster IP_FREEBIND settings, when set, will override the cluster manager wide settings.
   if ((bind_config.freebind().value() && !config.upstream_bind_config().has_freebind()) ||
       config.upstream_bind_config().freebind().value()) {
-    cluster_options->emplace_back(Network::SocketOptionFactory::buildIpFreebindOptions());
+    Network::Socket::appendOptions(cluster_options,
+                                   Network::SocketOptionFactory::buildIpFreebindOptions());
   }
   if (config.upstream_connection_options().has_tcp_keepalive()) {
-    cluster_options->emplace_back(
+    Network::Socket::appendOptions(
+        cluster_options,
         Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
   }
   if (cluster_options->empty()) {

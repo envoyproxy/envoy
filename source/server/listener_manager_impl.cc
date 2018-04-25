@@ -132,13 +132,13 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   ASSERT(config.filter_chains().size() >= 1);
 
   if (config.has_transparent()) {
-    addListenSocketOption(Network::SocketOptionFactory::buildIpTransparentOptions());
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
   if (config.has_freebind()) {
-    addListenSocketOption(Network::SocketOptionFactory::buildIpFreebindOptions());
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
   if (config.has_tcp_fast_open_queue_length()) {
-    addListenSocketOption(Network::SocketOptionFactory::buildTcpFastOpenOptions(
+    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
         config.tcp_fast_open_queue_length().value()));
   }
 
@@ -294,21 +294,20 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
-    for (const auto& option : *listen_socket_options_) {
-      bool ok = option->setOption(*socket_, Network::Socket::SocketState::PostBind);
-      const std::string message =
-          fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-      if (!ok) {
-        ENVOY_LOG(warn, "{}", message);
-        throw EnvoyException(message);
-      } else {
-        ENVOY_LOG(debug, "{}", message);
-      }
-
-      // Add the options to the socket_ so that SocketState::Listening options can be
-      // set in the worker after listen()/evconnlistener_new() is called.
-      socket_->addOption(option);
+    bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
+                                            Network::Socket::SocketState::PostBind);
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
     }
+
+    // Add the options to the socket_ so that SocketState::Listening options can be
+    // set in the worker after listen()/evconnlistener_new() is called.
+    socket_->addOptions(listen_socket_options_);
   }
 }
 

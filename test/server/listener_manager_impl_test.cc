@@ -1442,10 +1442,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                                 const Network::Socket::OptionsSharedPtr& options,
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              (*options->begin())
-                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          EXPECT_EQ(options->size(), 2);
+          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                    Network::Socket::SocketState::PreBind));
           return listener_factory_.socket_;
         }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
@@ -1494,9 +1493,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              (*options->begin())
-                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                    Network::Socket::SocketState::PreBind));
           return listener_factory_.socket_;
         }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,

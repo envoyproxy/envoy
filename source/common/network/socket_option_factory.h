@@ -23,11 +23,11 @@ struct TcpKeepaliveConfig {
 
 class SocketOptionFactory : Logger::Loggable<Logger::Id::connection> {
 public:
-  static std::unique_ptr<Socket::Option>
+  static std::unique_ptr<Socket::Options>
   buildTcpKeepaliveOptions(Network::TcpKeepaliveConfig keepalive_config);
-  static std::unique_ptr<Socket::Option> buildIpFreebindOptions();
-  static std::unique_ptr<Socket::Option> buildIpTransparentOptions();
-  static std::unique_ptr<Socket::Option> buildTcpFastOpenOptions(uint32_t queue_length);
+  static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
+  static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
+  static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
 };
 } // namespace Network
 } // namespace Envoy
