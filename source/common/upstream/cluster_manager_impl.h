@@ -279,8 +279,12 @@ private:
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+
+    // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
+    // to prevent lifetime/ownership issues when a cluster is dynamically removed.
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
     std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
+
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };
