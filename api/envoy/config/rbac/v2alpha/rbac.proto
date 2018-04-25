@@ -9,6 +9,9 @@ package envoy.config.rbac.v2alpha;
 // The RBAC engine authorizes a request by evaluating the request context (expressed in the form of
 // :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against the RBAC policies.
 //
+// RBAC policies are additive. The policies are examined in order. A request is allowed once a matching policy
+// is found (suppose the `action_type` is ALLOW).
+//
 // Here is an example of RBAC configuration. It has two policies:
 // * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry means full access)
 //   to the service.
