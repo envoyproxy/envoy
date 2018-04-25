@@ -163,7 +163,6 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   auto ret = stats_set_.insert(std::pair<std::string, RawStatData*>(std::string(key), nullptr));
   RawStatData*& data = ret.first->second;
   if (ret.second) {
-    // didn't exist before now, actually create
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
     data->initialize(key);
   } else {
