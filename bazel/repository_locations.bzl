@@ -17,7 +17,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
-        commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
+        commit = "7cc9639699f64b750c0b82333dced9ea77e8436e",  # v0.6.5
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
