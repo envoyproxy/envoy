@@ -21,7 +21,8 @@ package envoy.config.rbac.v2alpha;
 //       permissions:
 //       -
 //       principals:
-//       - name: "cluster.local/ns/default/sa/admin"
+//         authenticated:
+//           name: "cluster.local/ns/default/sa/admin"
 //     "product-viewer":
 //       permissions:
 //       - paths: [prefix:"/products", suffix:"/reviews"]
