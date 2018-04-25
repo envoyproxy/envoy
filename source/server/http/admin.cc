@@ -521,12 +521,12 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   histograms_obj.SetObject();
   Stats::HistogramStatisticsImpl empty_statistics;
   rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
-  for (size_t i = 0; i < empty_statistics.supportedQuantiles().size(); ++i) {
+  for (double quantile : empty_statistics.supportedQuantiles()) {
     Value quantile_type;
-    quantile_type.SetDouble(empty_statistics.supportedQuantiles()[i] * 100);
+    quantile_type.SetDouble(quantile * 100);
     supported_quantile_array.PushBack(quantile_type, allocator);
   }
-  histograms_obj.AddMember("supported_quanlties", supported_quantile_array, allocator);
+  histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
