@@ -172,6 +172,7 @@ envoy_cc_test(
     srcs = ["socket_option_impl_test.cc"],
     deps = [
         ":socket_option_test_harness",
+        "//test/test_common:environment_lib",
     ],
 )
 
