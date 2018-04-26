@@ -936,7 +936,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
   parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
   // If we've sent anything downstream but per try timeout occurred
   // we still have time to wait for full response up until GlobalTimeout
-  if (!downstream_response_started_) {
+  if (!parent_.downstream_response_started_) {
     if (upstream_host_) {
       upstream_host_->stats().rq_timeout_.inc();
     }
