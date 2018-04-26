@@ -8,7 +8,7 @@ static_resources {
     hosts {
       socket_address {
         address: "google.com"
-        port_value: 443
+        port_value: 0
       }
     }
     tls_context {
