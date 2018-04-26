@@ -517,8 +517,12 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
+  Value histograms_container_obj;
+  histograms_container_obj.SetObject();
+
   Value histograms_obj;
   histograms_obj.SetObject();
+
   Stats::HistogramStatisticsImpl empty_statistics;
   rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
   for (double quantile : empty_statistics.supportedQuantiles()) {
@@ -553,11 +557,12 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       quantile_obj.AddMember("cumulative", cumulative_value, allocator);
       computed_quantile_array.PushBack(quantile_obj, allocator);
     }
-    histogram_obj.AddMember("computed_quantiles", computed_quantile_array, allocator);
+    histogram_obj.AddMember("values", computed_quantile_array, allocator);
     histogram_array.PushBack(histogram_obj, allocator);
   }
-  histograms_obj.AddMember("histograms", histogram_array, allocator);
-  stats_array.PushBack(histograms_obj, allocator);
+  histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
+  histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
+  stats_array.PushBack(histograms_container_obj, allocator);
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
   rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
