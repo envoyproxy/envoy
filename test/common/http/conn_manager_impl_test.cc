@@ -895,15 +895,15 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _))
-      .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode());
-            EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
-            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-            EXPECT_NE(nullptr, request_info.routeEntry());
-          }));
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, request_info.routeEntry());
+      }));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -927,6 +927,53 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
+  setup(false, "");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, request_info.routeEntry());
+      }));
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":method", "GET"},
+                              {":authority", "host"},
+                              {":path", "/"},
+                              {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+
+    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+    HeaderMapPtr response_trailers{new TestHeaderMapImpl{{"x-trailer", "1"}}};
+    filter->callbacks_->encodeTrailers(std::move(response_trailers));
+
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   setup(false, "");
 
@@ -939,15 +986,15 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
         callbacks.addAccessLogHandler(handler);
       }));
 
-  EXPECT_CALL(*handler, log(_, _, _))
-      .WillOnce(Invoke(
-          [](const HeaderMap*, const HeaderMap*, const RequestInfo::RequestInfo& request_info) {
-            EXPECT_TRUE(request_info.responseCode());
-            EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
-            EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
-            EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
-            EXPECT_EQ(nullptr, request_info.routeEntry());
-          }));
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const RequestInfo::RequestInfo& request_info) {
+        EXPECT_TRUE(request_info.responseCode());
+        EXPECT_EQ(request_info.responseCode().value(), uint32_t(400));
+        EXPECT_NE(nullptr, request_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, request_info.downstreamRemoteAddress());
+        EXPECT_EQ(nullptr, request_info.routeEntry());
+      }));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;

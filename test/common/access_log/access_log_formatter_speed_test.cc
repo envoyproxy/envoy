@@ -19,8 +19,11 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   size_t output_bytes = 0;
   Http::TestHeaderMapImpl request_headers;
   Http::TestHeaderMapImpl response_headers;
+  Http::TestHeaderMapImpl response_trailers;
   for (auto _ : state) {
-    output_bytes += formatter->format(request_headers, response_headers, *request_info).length();
+    output_bytes +=
+        formatter->format(request_headers, response_headers, response_trailers, *request_info)
+            .length();
   }
   benchmark::DoNotOptimize(output_bytes);
 }

@@ -40,8 +40,9 @@ public:
   ~MockInstance();
 
   // AccessLog::Instance
-  MOCK_METHOD3(log,
+  MOCK_METHOD4(log,
                void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+                    const Http::HeaderMap* response_trailers,
                     const RequestInfo::RequestInfo& request_info));
 };
 
