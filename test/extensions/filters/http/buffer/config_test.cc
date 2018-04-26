@@ -5,6 +5,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "extensions/filters/http/buffer/buffer_filter.h"
+
 using testing::NiceMock;
 using testing::_;
 
@@ -91,6 +93,24 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyRouteProto) {
             factory.createEmptyRouteConfigProto().get());
     EXPECT_NE(nullptr, config);
   });
+}
+
+TEST(BufferFilterConfigFactoryTest, BufferFilterRouteSpecificConfig) {
+  BufferFilterConfigFactory factory;
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  EXPECT_TRUE(proto_config.get());
+
+  auto& cfg =
+      dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute&>(*proto_config.get());
+  cfg.set_disabled(true);
+
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory.createRouteSpecificFilterConfig(*proto_config);
+  EXPECT_TRUE(route_config.get());
+
+  const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());
+  EXPECT_TRUE(inflated);
 }
 
 } // namespace BufferFilter
