@@ -24,6 +24,14 @@ Address::InstanceConstSharedPtr resolveProtoAddress(const envoy::api::v2::core::
  */
 Address::InstanceConstSharedPtr
 resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& address);
+
+/**
+ * Create an InstanceRange from a envoy::api::v2::core::SocketAddressPortRange.
+ * @param address_range supplies the socket address port range proto to resolve.
+ * @return pointer to the Instance.
+ */
+Address::InstanceRangeConstSharedPtr
+resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddressPortRange& address);
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

@@ -237,15 +237,17 @@ class Ipv4InstanceRange : public InstanceRange {
   Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_port);
 
   // Network::Address::InstanceRange
-  virtual bool operator==(const InstanceRange& rhs) const override {
+  bool operator==(const InstanceRange& rhs) const override {
     return asString() == rhs.asString();
   }
-  virtual const std::string& asString() const override { return friendly_name_; }
-  virtual const std::string& logicalName() const override { return friendly_name_; }
-  virtual int bind(int fd, Runtime::RandomGenerator& random) const override;
-  virtual const Ip* ip() const override { return &ip_; }
-  virtual int socket(SocketType type) const override;
-  virtual Type type() const override { return Type::Ip; }
+  const std::string& asString() const override { return friendly_name_; }
+  const std::string& logicalName() const override { return friendly_name_; }
+  int bind(int fd, Runtime::RandomGenerator& random) const override;
+  const Ip* ip() const override { return &ip_; }
+  uint32_t starting_port() const override { return starting_port_; }
+  uint32_t ending_port() const override {return ending_port_; }
+  int socket(SocketType type) const override;
+  Type type() const override { return Type::Ip; }
 
  private:
   std::string friendly_name_;
@@ -275,6 +277,8 @@ class Ipv6InstanceRange : public InstanceRange {
   const std::string& logicalName() const override { return friendly_name_; }
   int bind(int fd, Runtime::RandomGenerator& random) const override;
   const Ip* ip() const override { return &ip_; }
+  uint32_t starting_port() const override { return starting_port_; }
+  uint32_t ending_port() const override {return ending_port_; }
   int socket(SocketType type) const override;
   Type type() const override { return Type::Ip; }
 
