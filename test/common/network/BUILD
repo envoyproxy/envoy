@@ -179,8 +179,8 @@ envoy_cc_test(
     name = "addr_family_aware_socket_option_impl_test",
     srcs = ["addr_family_aware_socket_option_impl_test.cc"],
     deps = [
-        "//source/common/network:addr_family_aware_socket_option_lib",
         ":socket_option_test",
+        "//source/common/network:addr_family_aware_socket_option_lib",
     ],
 )
 
