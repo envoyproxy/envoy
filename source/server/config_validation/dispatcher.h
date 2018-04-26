@@ -16,7 +16,8 @@ class ValidationDispatcher : public DispatcherImpl {
 public:
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr,
-                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
+                         Network::Address::InstanceRangeConstSharedPtr,
+                         Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options,
                          Runtime::RandomGenerator&) override;
   Network::DnsResolverSharedPtr createDnsResolver(

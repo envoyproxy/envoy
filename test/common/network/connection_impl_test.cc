@@ -93,7 +93,7 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+        socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(), nullptr,
         random_);
     client_connection_->addConnectionCallbacks(client_callbacks_);
     EXPECT_EQ(nullptr, client_connection_->ssl());
@@ -180,7 +180,7 @@ protected:
   StrictMock<Network::MockConnectionCallbacks> server_callbacks_;
   std::shared_ptr<MockReadFilter> read_filter_;
   MockWatermarkBuffer* client_write_buffer_ = nullptr;
-  Address::InstanceConstSharedPtr source_address_;
+  Address::InstanceRangeConstSharedPtr source_address_range_;
   Runtime::RandomGeneratorImpl random_;
 };
 
@@ -244,7 +244,7 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   }
 
   client_connection_ = dispatcher_->createClientConnection(
-      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr, random_);
+      broadcast_address, source_address_range_, Network::Test::createRawBufferSocket(), nullptr, random_);
   client_connection_->addConnectionCallbacks(client_callbacks_);
   client_connection_->connect();
 
@@ -289,7 +289,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions(), random_);
       }));
 
@@ -337,7 +337,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
         server_connection_->addReadFilter(read_filter_);
 
         upstream_connection_ = dispatcher_->createClientConnection(
-            socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(),
+            socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(),
             server_connection_->socketOptions(), random_);
         upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
       }));
@@ -759,12 +759,12 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
 TEST_P(ConnectionImplTest, BindTest) {
   std::string address_string = TestUtility::getIpv4Loopback();
   if (GetParam() == Network::Address::IpVersion::v4) {
-    source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+    source_address_range_ = Network::Address::InstanceRangeConstSharedPtr{
+        new Network::Address::Ipv4InstanceRange(address_string, 0, 0)};
   } else {
     address_string = "::1";
-    source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+    source_address_range_ = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6InstanceRange(address_string, 0, 0)};
   }
   setUpBasicConnection();
   connect();
@@ -777,18 +777,18 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   // Swap the constraints from BindTest to create an address family mismatch.
   if (GetParam() == Network::Address::IpVersion::v6) {
     const std::string address_string = TestUtility::getIpv4Loopback();
-    source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv4Instance(address_string, 0)};
+    source_address_range_ = Network::Address::InstanceRangeConstSharedPtr{
+        new Network::Address::Ipv4InstanceRange(address_string, 0, 0)};
   } else {
     const std::string address_string = "::1";
-    source_address_ = Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance(address_string, 0)};
+    source_address_range_ = Network::Address::InstanceRangeConstSharedPtr{
+        new Network::Address::Ipv6InstanceRange(address_string, 0, 0)};
   }
   dispatcher_.reset(new Event::DispatcherImpl);
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
-      socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+      socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(), nullptr,
       random_);
 
   MockConnectionStats connection_stats;
@@ -1280,7 +1280,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   ClientConnectionPtr connection = dispatcher.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr, random_);
+      Network::Address::InstanceRangeConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr, random_);
   connection->connect();
   connection->noDelay(true);
   dispatcher.run(Event::Dispatcher::RunType::Block);

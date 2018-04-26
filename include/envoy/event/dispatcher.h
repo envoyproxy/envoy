@@ -53,7 +53,8 @@ public:
   /**
    * Create a client connection.
    * @param address supplies the address to connect to.
-   * @param source_address supplies an address to bind to or nullptr if no bind is necessary.
+   * @param source_address_range supplies an address range to bind to or nullptr if no 
+   *        bind is necessary.
    * @param transport_socket supplies a transport socket to be used by the connection.
    * @param options the socket options to be set on the underlying socket before anything is sent
    *        on the socket.
@@ -61,7 +62,7 @@ public:
    */
   virtual Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
+                         Network::Address::InstanceRangeConstSharedPtr source_address_range,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options,
                          Runtime::RandomGenerator& random) PURE;

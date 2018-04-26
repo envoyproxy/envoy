@@ -35,7 +35,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
@@ -134,7 +134,7 @@ TEST_P(ListenerImplTest, UseActualDst) {
   Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
@@ -171,7 +171,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      local_dst_address, Network::Address::InstanceConstSharedPtr(),
+      local_dst_address, Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
@@ -221,7 +221,7 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Utility::getCanonicalIpv4LoopbackAddress(), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      local_dst_address, Network::Address::InstanceConstSharedPtr(),
+      local_dst_address, Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 

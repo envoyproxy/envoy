@@ -350,8 +350,8 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
-    return source_address_;
+  const Network::Address::InstanceRangeConstSharedPtr& sourceAddressRange() const override {
+    return source_address_range_;
   };
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
@@ -388,7 +388,7 @@ private:
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  const Network::Address::InstanceConstSharedPtr source_address_;
+  const Network::Address::InstanceRangeConstSharedPtr source_address_range_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   Ssl::ContextManager& ssl_context_manager_;

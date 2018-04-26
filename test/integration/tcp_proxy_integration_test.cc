@@ -293,7 +293,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
   context_ = Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_);
   ssl_client_ =
-      dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+      dispatcher_->createClientConnection(address, Network::Address::InstanceRangeConstSharedPtr(),
                                           context_->createTransportSocket(), nullptr);
 
   // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth

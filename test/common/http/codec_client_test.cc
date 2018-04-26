@@ -264,7 +264,7 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr,
+        socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(), nullptr,
         random_);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
@@ -332,7 +332,7 @@ protected:
   Network::ListenerPtr upstream_listener_;
   Network::MockListenerCallbacks listener_callbacks_;
   Network::MockConnectionHandler connection_handler_;
-  Network::Address::InstanceConstSharedPtr source_address_;
+  Network::Address::InstanceRangeConstSharedPtr source_address_range_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
   Http::MockClientConnection* codec_;

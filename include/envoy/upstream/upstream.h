@@ -506,11 +506,11 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * Returns an optional source address for upstream connections to bind to.
+   * Returns an optional source address range for upstream connections to bind to.
    *
-   * @return a source address to bind to or nullptr if no bind need occur.
+   * @return a source address range to bind to or nullptr if no bind need occur.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+  virtual const Network::Address::InstanceRangeConstSharedPtr& sourceAddressRange() const PURE;
 
   /**
    * @return the configuration for load balancer subsets.

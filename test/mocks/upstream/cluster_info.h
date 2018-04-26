@@ -59,7 +59,7 @@ public:
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
-  MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(sourceAddressRange, const Network::Address::InstanceRangeConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
 

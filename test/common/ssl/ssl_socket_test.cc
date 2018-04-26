@@ -70,7 +70,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->connect();
 
@@ -171,7 +171,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   if (!client_session.empty()) {
@@ -749,7 +749,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -819,7 +819,7 @@ TEST_P(SslSocketTest, HalfClose) {
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->enableHalfClose(true);
   client_connection->addReadFilter(client_read_filter);
@@ -902,7 +902,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
@@ -979,7 +979,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket1.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -1017,7 +1017,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   EXPECT_EQ(0UL, stats_store.counter("ssl.session_reused").value());
 
   client_connection = dispatcher.createClientConnection(
-      socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
@@ -1311,7 +1311,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Runtime::RandomGeneratorImpl random;
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr, random);
 
   Network::MockConnectionCallbacks client_connection_callbacks;
@@ -1357,7 +1357,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   Runtime::RandomGeneratorImpl random;
   client_connection = dispatcher.createClientConnection(
-      socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket2.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr, random);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
   Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
@@ -1409,7 +1409,7 @@ TEST_P(SslSocketTest, SslError) {
   Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
       Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
   Buffer::OwnedImpl bad_data("bad_handshake_data");

@@ -38,8 +38,8 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-const Network::Address::InstanceConstSharedPtr
-getSourceAddress(const envoy::api::v2::Cluster& cluster,
+const Network::Address::InstanceRangeConstSharedPtr
+getSourceAddressRange(const envoy::api::v2::Cluster& cluster,
                  const envoy::api::v2::core::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   const envoy::api::v2::core::BindConfig* config = nullptr;
@@ -51,25 +51,7 @@ getSourceAddress(const envoy::api::v2::Cluster& cluster,
     return nullptr;
   }
     
-  envoy::api::v2::core::SocketAddress address;
-  address.set_protocol(config->source_address_port_range().protocol());
-  address.set_address(config->source_address_port_range().address());
-  switch (config->source_address_port_range().port_specifier_case()) {
-    case envoy::api::v2::core::SocketAddressPortRange::PORT_SPECIFIER_NOT_SET:
-    case envoy::api::v2::core::SocketAddressPortRange::kPortValue:
-      address.set_port_value(config->source_address_port_range().port_value());
-      break;
-    case envoy::api::v2::core::SocketAddressPortRange::kPortRange:
-      address.set_port_value(config->source_address_port_range().port_range().port_value_start());
-      break;
-    case envoy::api::v2::core::SocketAddressPortRange::kNamedPort:
-      address.set_named_port(config->source_address_port_range().named_port());
-      break;
-  }
-  address.set_resolver_name(config->source_address_port_range().resolver_name());
-  address.set_ipv4_compat(config->source_address_port_range().ipv4_compat());
-
-  return Network::Address::resolveProtoSocketAddress(address);
+  return Network::Address::resolveProtoSocketAddressRange(config->source_address_port_range());
 }
 
 uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
@@ -129,8 +111,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     cluster_options = options;
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      cluster_options, random);
+      address, cluster.sourceAddressRange(),
+      cluster.transportSocketFactory().createTransportSocket(), cluster_options, random);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -261,7 +243,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(getSourceAddress(config, bind_config)),
+      source_address_range_(getSourceAddressRange(config, bind_config)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),

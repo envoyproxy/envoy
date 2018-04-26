@@ -48,7 +48,7 @@ public:
         name_("proxy") {
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
-                                               Network::Address::InstanceConstSharedPtr(),
+                                               Network::Address::InstanceRangeConstSharedPtr(),
                                                Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
@@ -333,7 +333,7 @@ public:
         name_("proxy") {
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(local_dst_address_,
-                                               Network::Address::InstanceConstSharedPtr(),
+                                               Network::Address::InstanceRangeConstSharedPtr(),
                                                Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
 

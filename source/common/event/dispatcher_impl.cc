@@ -81,13 +81,14 @@ DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
 }
 
 Network::ClientConnectionPtr
-DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                                       Network::Address::InstanceConstSharedPtr source_address,
-                                       Network::TransportSocketPtr&& transport_socket,
-                                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Runtime::RandomGenerator& random) {
+DispatcherImpl::createClientConnection(
+    Network::Address::InstanceConstSharedPtr address,
+    Network::Address::InstanceRangeConstSharedPtr source_address_range,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Runtime::RandomGenerator& random) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
+  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address_range,
                                                          std::move(transport_socket), options,
                                                          random);
 }

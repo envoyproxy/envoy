@@ -31,7 +31,7 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& address);
  * @return pointer to the Instance.
  */
 Address::InstanceRangeConstSharedPtr
-resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddressPortRange& address);
+resolveProtoSocketAddressRange(const envoy::api::v2::core::SocketAddressPortRange& address);
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

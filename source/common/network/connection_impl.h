@@ -174,9 +174,10 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
+  // Note that a reference to the RandomGenerator will not be held by the constructor.
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const Address::InstanceConstSharedPtr& source_address,
+                       const Address::InstanceRangeConstSharedPtr& source_address_range,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        Runtime::RandomGenerator& random);

@@ -685,7 +685,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressRange()->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -694,7 +694,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     // Verify source address from cluster config is used when present.
     NiceMock<MockClusterManager> cm;
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressRange()->ip()->addressAsString());
   }
 
   {
@@ -702,7 +702,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressRange()->ip()->addressAsString());
   }
 }
 

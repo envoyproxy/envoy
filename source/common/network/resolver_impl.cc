@@ -44,7 +44,7 @@ public:
       InstanceConstSharedPtr instance = Network::Utility::parseInternetAddress(
           socket_address_port_range.address(), socket_address_port_range.port_value(),
           !socket_address_port_range.ipv4_compat());
-      // TODO(rdsmith): Assertion of some kind that this is an IP instance?
+      ASSERT(instance->type() == Type::Ip);
       switch (instance->ip()->version()) {
       case IpVersion::v4:
         return std::make_shared<Ipv4InstanceRange>(instance->ip()->addressAsString(),
@@ -72,7 +72,7 @@ public:
       InstanceConstSharedPtr instance = Network::Utility::parseInternetAddress(
           socket_address_port_range.address(), starting_port,
           !socket_address_port_range.ipv4_compat());
-      // TODO(rdsmith): Assertion of some kind that this is an IP instance?
+      ASSERT(instance->type() == Type::Ip);
       switch (instance->ip()->version()) {
       case IpVersion::v4:
         return std::make_shared<Ipv4InstanceRange>(instance->ip()->addressAsString(),
@@ -125,7 +125,7 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_addr
 }
 
 InstanceRangeConstSharedPtr
-resolveProtoSocketAddress(
+resolveProtoSocketAddressRange(
     const envoy::api::v2::core::SocketAddressPortRange& socket_address_port_range) {
   Resolver* resolver = nullptr;
   const std::string& resolver_name = socket_address_port_range.resolver_name();
