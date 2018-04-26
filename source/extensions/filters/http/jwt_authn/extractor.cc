@@ -70,6 +70,7 @@ public:
 
   void removeJwt(Http::HeaderMap&) const override {
     // TODO(qiwzhang): remove JWT from parameter.
+    NOT_REACHED;
   }
 
 private:
@@ -95,11 +96,11 @@ private:
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderLocationSpec {
-    HeaderLocationSpec(const Http::LowerCaseString& header, const std::string value_prefix)
+    HeaderLocationSpec(const Http::LowerCaseString& header, const std::string& value_prefix)
         : header_(header), value_prefix_(value_prefix) {}
     // The header name.
     Http::LowerCaseString header_;
-    // The value prefix.
+    // The value prefix. e.g. for "Bearer <token>", the value_prefix is "Bearer ".
     std::string value_prefix_;
     // Issuers that specified this header.
     std::unordered_set<std::string> specified_issuers_;
