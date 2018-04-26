@@ -4,10 +4,10 @@
 #include "envoy/config/metrics/v2/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
 #include "common/network/resolver_impl.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,13 +25,13 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                           false);
+                                                           false, statsd_sink.prefix());
   }
   case envoy::config::metrics::v2::StatsdSink::kTcpClusterName:
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
-        server.clusterManager(), server.stats());
+        server.clusterManager(), server.stats(), statsd_sink.prefix());
   default:
     // Verified by schema.
     NOT_REACHED;
@@ -43,7 +43,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::StatsdSink());
 }
 
-std::string StatsdSinkFactory::name() { return Config::StatsSinkNames::get().STATSD; }
+std::string StatsdSinkFactory::name() { return StatsSinkNames::get().STATSD; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

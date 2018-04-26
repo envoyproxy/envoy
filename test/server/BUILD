@@ -2,10 +2,15 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_hot_restart",
+)
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
 )
 
 envoy_package()
@@ -21,7 +26,6 @@ envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
     deps = [
-        "//source/common/config:well_known_names",
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/stat_sinks/statsd:config",
@@ -144,9 +148,33 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "listener_socket_option_impl_test",
+    srcs = ["listener_socket_option_impl_test.cc"],
+    deps = [
+        "//source/server:listener_socket_option_lib",
+        "//test/common/network:socket_option_test",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "server_fuzz_test",
+    srcs = ["server_fuzz_test.cc"],
+    corpus = "server_corpus",
+    deps = [
+        "//source/common/thread_local:thread_local_lib",
+        "//source/server:server_lib",
+        "//test/integration:integration_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+    ] + envoy_all_extensions(),
+)
+
+envoy_cc_test(
     name = "server_test",
     srcs = ["server_test.cc"],
     data = [
+        ":cluster_dupe_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
         "//test/config/integration:server.json",

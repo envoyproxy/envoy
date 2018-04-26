@@ -5,9 +5,10 @@
 #include "common/config/json_utility.h"
 #include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
-#include "common/config/well_known_names.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,8 +34,8 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     auto* filter = filter_chain->mutable_filters()->Add();
 
     // Translate v1 name to v2 name.
-    filter->set_name(
-        Config::NetworkFilterNames::get().v1_converter_.getV2Name(json_filter->getString("name")));
+    filter->set_name(Extensions::NetworkFilters::NetworkFilterNames::get().v1_converter_.getV2Name(
+        json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +

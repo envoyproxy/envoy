@@ -77,6 +77,7 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
+* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang-5.0.
 * `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-5.0.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
@@ -88,7 +89,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
 * `check_format`&mdash; run `clang-format` 5.0 and `buildifier` on entire source tree.
 * `fix_format`&mdash; run and enforce `clang-format` 5.0 and `buildifier` on entire source tree.
-* `doc`&mdash; build documentation tree in `generated/docs`.
+* `docs`&mdash; build documentation tree in `generated/docs`.
 
 # Testing changes to the build image as a developer
 

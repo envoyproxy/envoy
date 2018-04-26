@@ -37,6 +37,13 @@ DnsResolverImpl::DnsResolverImpl(
     std::vector<std::string> resolver_addrs;
     resolver_addrs.reserve(resolvers.size());
     for (const auto& resolver : resolvers) {
+      // This should be an IP address (i.e. not a pipe).
+      if (resolver->ip() == nullptr) {
+        ares_destroy(channel_);
+        ares_library_cleanup();
+        throw EnvoyException(
+            fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
+      }
       resolver_addrs.push_back(resolver->asString());
     }
     const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");

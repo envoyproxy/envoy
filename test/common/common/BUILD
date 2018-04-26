@@ -99,17 +99,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "token_bucket_impl_test",
+    srcs = ["token_bucket_impl_test.cc"],
+    deps = [
+        "//source/common/common:token_bucket_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
 envoy_cc_test(
-    name = "shared_memory_hash_set_test",
-    srcs = ["shared_memory_hash_set_test.cc"],
+    name = "block_memory_hash_set_test",
+    srcs = ["block_memory_hash_set_test.cc"],
     deps = [
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
-        "//source/common/common:shared_memory_hash_set_lib",
     ],
 )
 

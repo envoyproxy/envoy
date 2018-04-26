@@ -204,7 +204,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_.reset(new Config::GrpcMuxImpl(
         bootstrap.node(),
-        Config::Utility::factoryForApiConfigSource(
+        Config::Utility::factoryForGrpcApiConfigSource(
             *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
             ->create(),
         main_thread_dispatcher,
@@ -291,11 +291,12 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_.reset(new LoadStatsReporter(
-        bootstrap.node(), *this, stats,
-        Config::Utility::factoryForApiConfigSource(*async_client_manager_, load_stats_config, stats)
-            ->create(),
-        main_thread_dispatcher));
+    load_stats_reporter_.reset(
+        new LoadStatsReporter(bootstrap.node(), *this, stats,
+                              Config::Utility::factoryForGrpcApiConfigSource(
+                                  *async_client_manager_, load_stats_config, stats)
+                                  ->create(),
+                              main_thread_dispatcher));
   }
 }
 
@@ -478,8 +479,9 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
   Cluster& cluster_reference = *new_cluster;
   if (new_cluster->healthChecker() != nullptr) {
     new_cluster->healthChecker()->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, bool changed_state) {
-          if (changed_state && host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+        [this](HostSharedPtr host, HealthTransition changed_state) {
+          if (changed_state == HealthTransition::Changed &&
+              host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
             postThreadLocalHealthFailure(host);
           }
         });
@@ -759,7 +761,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    ASSERT(lb_factory_ == nullptr);
     lb_.reset(new SubsetLoadBalancer(cluster->lbType(), priority_set_, parent_.local_priority_set_,
                                      cluster->stats(), parent.parent_.runtime_,
                                      parent.parent_.random_, cluster->lbSubsetInfo(),

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.config.ratelimit.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/grpc_service.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Rate limit service]
+
+// Rate limit :ref:`configuration overview <config_rate_limit_service>`.
+message RateLimitServiceConfig {
+  oneof service_specifier {
+    option (validate.required) = true;
+
+    // Specifies the cluster manager cluster name that hosts the rate limit
+    // service. The client will connect to this cluster when it needs to make
+    // rate limit service requests. This field is deprecated and `grpc_service`
+    // should be used instead. The :ref:`Envoy gRPC client
+    // <envoy_api_field_core.GrpcService.envoy_grpc>` will be used when this field is
+    // specified.
+    string cluster_name = 1 [(validate.rules).string.min_bytes = 1, deprecated = true];
+
+    // Specifies the gRPC service that hosts the rate limit service. The client
+    // will connect to this cluster when it needs to make rate limit service
+    // requests.
+    envoy.api.v2.core.GrpcService grpc_service = 2;
+  }
+}

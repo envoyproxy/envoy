@@ -30,7 +30,7 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":lightstep_tracer_lib",
-        "//source/common/config:well_known_names",
+        "//source/extensions/tracers:well_known_names",
         "//source/server:configuration_lib",
     ],
 )

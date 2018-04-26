@@ -8,6 +8,12 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
+    # Health checkers
+    #
+
+    "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+
+    #
     # HTTP filters
     #
 
@@ -19,6 +25,7 @@ EXTENSIONS = {
     "envoy.filters.http.grpc_http1_bridge":             "//source/extensions/filters/http/grpc_http1_bridge:config",
     "envoy.filters.http.grpc_json_transcoder":          "//source/extensions/filters/http/grpc_json_transcoder:config",
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
+    "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
@@ -37,6 +44,8 @@ EXTENSIONS = {
     # NOTE: The original_dst filter is implicitly loaded if original_dst functionality is
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
+
+    "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
 
     #
     # Network filters

@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_library(
     name = "assert_lib",
     hdrs = ["assert.h"],
-    deps = [":logger_lib"],
+    deps = [":minimal_logger_lib"],
 )
 
 envoy_cc_library(
@@ -56,7 +56,7 @@ envoy_cc_library(
     hdrs = ["enum_to_int.h"],
 )
 
-# fmt_lib is automatically a dependency of all enovy_cc_library definitions.
+# fmt_lib is automatically a dependency of all envoy_cc_library definitions.
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
@@ -82,15 +82,28 @@ envoy_cc_library(
     deps = [":assert_lib"],
 )
 
+# Contains minimal code for logging to stderr.
 envoy_cc_library(
-    name = "logger_lib",
+    name = "minimal_logger_lib",
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
         ":macros",
+        "//include/envoy/thread:thread_interface",
+    ],
+)
+
+# All non-essential logger delegates should go here to reduce dependencies that
+# minimal_logger_lib maintains.
+envoy_cc_library(
+    name = "logger_lib",
+    srcs = ["logger_delegates.cc"],
+    hdrs = ["logger_delegates.h"],
+    deps = [
+        ":macros",
+        ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -140,7 +153,7 @@ envoy_cc_library(
 
 genrule(
     name = "generate_version_number",
-    srcs = ["@envoy_api//:VERSION"],
+    srcs = ["//:VERSION"],
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
 )
@@ -179,8 +192,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "shared_memory_hash_set_lib",
-    hdrs = ["shared_memory_hash_set.h"],
+    name = "block_memory_hash_set_lib",
+    hdrs = ["block_memory_hash_set.h"],
     deps = [
         ":assert_lib",
         ":logger_lib",
@@ -194,5 +207,16 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "token_bucket_impl_lib",
+    srcs = ["token_bucket_impl.cc"],
+    hdrs = ["token_bucket_impl.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "//include/envoy/common:token_bucket_interface",
+        "//source/common/common:utility_lib",
     ],
 )

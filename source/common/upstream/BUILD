@@ -112,12 +112,13 @@ envoy_cc_library(
     ],
     deps = [
         ":health_checker_base_lib",
+        # TODO(dio): Remove dependency to server.
+        "//include/envoy/server:health_checker_config_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
-        # TODO(mattklein123): The following should not be required once we allow pluggable health
-        # checkers.
-        "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        # TODO(dio): Remove dependency to health checkers extension when redis_health_check is removed.
+        "//source/extensions/health_checkers:well_known_names",
     ],
 )
 
@@ -266,7 +267,6 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
-        "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
@@ -286,7 +286,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
-        "//source/common/config:well_known_names",
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:config_schemas_lib",
@@ -313,7 +312,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:metadata_lib",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
     ],
@@ -344,6 +342,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
@@ -370,9 +369,9 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:logger_lib",
         "//source/common/config:metadata_lib",
-        "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],
 )

@@ -91,7 +91,6 @@ envoy_cc_test(
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
-        "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",

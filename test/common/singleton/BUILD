@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["manager_impl_test.cc"],
     deps = [
         "//source/common/singleton:manager_impl_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

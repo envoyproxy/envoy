@@ -101,6 +101,27 @@ _default_envoy_build_config = repository_rule(
     },
 )
 
+def _default_envoy_api_impl(ctx):
+    ctx.file("WORKSPACE", "")
+    ctx.file("BUILD.bazel", "")
+    api_dirs = [
+        "bazel",
+        "docs",
+        "envoy",
+        "examples",
+        "test",
+        "tools",
+    ]
+    for d in api_dirs:
+      ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
+
+_default_envoy_api = repository_rule(
+    implementation = _default_envoy_api_impl,
+    attrs = {
+        "api": attr.label(default="@envoy//api:BUILD"),
+    },
+)
+
 # Python dependencies. If these become non-trivial, we might be better off using a virtualenv to
 # wrap them, but for now we can treat them as first-class Bazel.
 def _python_deps():
@@ -140,11 +161,22 @@ def _go_deps(skip_targets):
         _repository_impl("io_bazel_rules_go")
 
 def _envoy_api_deps():
-    _repository_impl("envoy_api")
+    # Treat the data plane API as an external repo, this simplifies exporting the API to
+    # https://github.com/envoyproxy/data-plane-api.
+    if "envoy_api" not in native.existing_rules().keys():
+        _default_envoy_api(name="envoy_api")
 
     native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
+    )
+    _repository_impl(
+        name = "six_archive",
+        build_file = "@com_google_protobuf//:six.BUILD",
+    )
+    native.bind(
+        name = "six",
+        actual = "@six_archive//:six",
     )
 
 def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
@@ -194,11 +226,13 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
+    _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_gcovr_gcovr()
+    _com_github_google_libprotobuf_mutator()
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
@@ -230,6 +264,16 @@ def _com_github_bombela_backward():
     native.bind(
         name = "backward",
         actual = "@com_github_bombela_backward//:backward",
+    )
+
+def _com_github_circonus_labs_libcircllhist():
+    _repository_impl(
+        name = "com_github_circonus_labs_libcircllhist",
+        build_file = "@envoy//bazel/external:libcircllhist.BUILD",
+    )
+    native.bind(
+        name = "libcircllhist",
+        actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
     )
 
 def _com_github_cyan4973_xxhash():
@@ -280,6 +324,16 @@ def _com_github_gcovr_gcovr():
     native.bind(
         name = "gcovr",
         actual = "@com_github_gcovr_gcovr//:gcovr",
+    )
+
+def _com_github_google_libprotobuf_mutator():
+    _repository_impl(
+        name = "com_github_google_libprotobuf_mutator",
+        build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+    native.bind(
+        name = "libprotobuf_mutator",
+        actual = "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
     )
 
 def _io_opentracing_cpp():

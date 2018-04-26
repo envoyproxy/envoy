@@ -25,6 +25,7 @@ envoy_cc_library(
         ":config_tracker_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codes_interface",
+        "//include/envoy/http:header_map_interface",
         "//include/envoy/network:listen_socket_interface",
     ],
 )
@@ -62,6 +63,12 @@ envoy_cc_library(
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "health_checker_config_interface",
+    hdrs = ["health_checker_config.h"],
+    deps = ["//include/envoy/upstream:health_checker_interface"],
 )
 
 envoy_cc_library(

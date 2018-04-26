@@ -344,7 +344,8 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                metadata, 1, locality);
+                metadata, 1, locality,
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance());
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
@@ -505,11 +506,13 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Changed);
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_CALL(initialized, ready());
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+                               HealthTransition::Changed);
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -519,7 +522,8 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Changed);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
 
@@ -531,7 +535,8 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Changed);
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
 
@@ -543,7 +548,8 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1], true);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
+                               HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
 }

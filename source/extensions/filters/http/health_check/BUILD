@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 # L7 HTTP filter that implements health check responses
-# Public docs: https://github.com/envoyproxy/data-plane-api/blob/master/docs/root/configuration/http_filters/health_check_filter.rst
+# Public docs: docs/root/configuration/http_filters/health_check_filter.rst
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -39,7 +39,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:filter_json_lib",
-        "//source/common/config:well_known_names",
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/health_check:health_check_lib",
     ],
 )

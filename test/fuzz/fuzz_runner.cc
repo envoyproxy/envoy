@@ -26,8 +26,3 @@ extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv);
   return 0;
 }
-
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* buf, size_t len) {
-  Envoy::Fuzz::Runner::execute(buf, len);
-  return 0;
-}

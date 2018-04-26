@@ -63,6 +63,14 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 
   /**
+   * Create a health check connection for this host.
+   * @param dispatcher supplies the owning dispatcher.
+   * @return the connection data.
+   */
+  virtual CreateConnectionData
+  createHealthCheckConnection(Event::Dispatcher& dispatcher) const PURE;
+
+  /**
    * @return host specific gauges.
    */
   virtual std::list<Stats::GaugeSharedPtr> gauges() const PURE;
@@ -350,6 +358,7 @@ public:
   COUNTER  (update_success)                                                                        \
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
+  COUNTER  (update_no_rebuild)                                                                     \
   GAUGE    (version)
 // clang-format on
 

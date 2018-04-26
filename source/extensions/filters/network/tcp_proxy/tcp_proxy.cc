@@ -44,8 +44,8 @@ TcpProxyConfig::SharedConfig::SharedConfig(
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}.", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
   if (config.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(
-        Protobuf::util::TimeUtil::DurationToMilliseconds(config.idle_timeout()));
+    idle_timeout_ =
+        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(config.idle_timeout()));
   }
 }
 

@@ -18,7 +18,13 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
       interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
-      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)) {
+      interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
+      unhealthy_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_interval, interval_.count())),
+      unhealthy_edge_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_edge_interval, unhealthy_interval_.count())),
+      healthy_edge_interval_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
@@ -42,14 +48,25 @@ void HealthCheckerImplBase::incHealthy() {
   refreshHealthyStat();
 }
 
-std::chrono::milliseconds HealthCheckerImplBase::interval() const {
-  // See if the cluster has ever made a connection. If so, we use the defined HC interval. If not,
-  // we use a much slower interval to keep the host info relatively up to date in case we suddenly
-  // start sending traffic to this cluster. In general host updates are rare and this should
-  // greatly smooth out needless health checking.
+std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
+                                                          HealthTransition changed_state) const {
+  // See if the cluster has ever made a connection. If not, we use a much slower interval to keep
+  // the host info relatively up to date in case we suddenly start sending traffic to this cluster.
+  // In general host updates are rare and this should greatly smooth out needless health checking.
+  // If a connection has been established, we choose an interval based on the host's health. Please
+  // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
   if (cluster_.info()->stats().upstream_cx_total_.used()) {
-    base_time_ms = interval_.count();
+    switch (state) {
+    case HealthState::Unhealthy:
+      base_time_ms = changed_state == HealthTransition::Changed ? unhealthy_edge_interval_.count()
+                                                                : unhealthy_interval_.count();
+      break;
+    default:
+      base_time_ms = changed_state == HealthTransition::Changed ? healthy_edge_interval_.count()
+                                                                : interval_.count();
+      break;
+    }
   } else {
     base_time_ms = no_traffic_interval_.count();
   }
@@ -92,7 +109,7 @@ void HealthCheckerImplBase::refreshHealthyStat() {
   stats_.healthy_.set(local_process_healthy_);
 }
 
-void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, bool changed_state) {
+void HealthCheckerImplBase::runCallbacks(HostSharedPtr host, HealthTransition changed_state) {
   // When a parent process shuts down, it will kill all of the active health checking sessions,
   // which will decrement the healthy count and the healthy stat in the parent. If the child is
   // stable and does not update, the healthy stat will be wrong. This routine is called any time
@@ -163,7 +180,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
 
-  bool changed_state = false;
+  HealthTransition changed_state = HealthTransition::Unchanged;
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
@@ -171,7 +188,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
-      changed_state = true;
+      changed_state = HealthTransition::Changed;
     }
   }
 
@@ -180,19 +197,19 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
   parent_.runCallbacks(host_, changed_state);
 
   timeout_timer_->disableTimer();
-  interval_timer_->enableTimer(parent_.interval());
+  interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
 }
 
-void HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(FailureType type) {
+HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(FailureType type) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
-  bool changed_state = false;
+  HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     if (type != FailureType::Network || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
-      changed_state = true;
+      changed_state = HealthTransition::Changed;
     }
   }
 
@@ -205,12 +222,13 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(FailureType t
 
   first_check_ = false;
   parent_.runCallbacks(host_, changed_state);
+  return changed_state;
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(FailureType type) {
-  setUnhealthy(type);
+  HealthTransition changed_state = setUnhealthy(type);
   timeout_timer_->disableTimer();
-  interval_timer_->enableTimer(parent_.interval());
+  interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {

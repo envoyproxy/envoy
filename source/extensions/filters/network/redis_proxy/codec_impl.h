@@ -23,7 +23,7 @@ class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::redis> {
 public:
   DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
 
-  // Redis::Decoder
+  // RedisProxy::Decoder
   void decode(Buffer::Instance& data) override;
 
 private:
@@ -69,7 +69,7 @@ private:
  */
 class DecoderFactoryImpl : public DecoderFactory {
 public:
-  // Redis::DecoderFactory
+  // RedisProxy::DecoderFactory
   DecoderPtr create(DecoderCallbacks& callbacks) override {
     return DecoderPtr{new DecoderImpl(callbacks)};
   }
@@ -80,7 +80,7 @@ public:
  */
 class EncoderImpl : public Encoder {
 public:
-  // Redis::Encoder
+  // RedisProxy::Encoder
   void encode(const RespValue& value, Buffer::Instance& out) override;
 
 private:

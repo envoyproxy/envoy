@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "9df0c47bc034d60d73d216cd0e090707b3fbea58",  # chromium-65.0.3325.146
+        commit = "c386d2b324468137bcbf2e7a1020da7579f7ab48",  # chromium-66.0.3359.117
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
@@ -12,8 +12,12 @@ REPOSITORY_LOCATIONS = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",
     ),
+    com_github_circonus_labs_libcircllhist = dict(
+        commit = "97ef5e088fd01fa8ec5a86334a6308ac0d51ea6f",  # 2018-04-07
+        remote = "https://github.com/circonus-labs/libcircllhist",
+    ),
     com_github_cyan4973_xxhash = dict(
-        commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
+        commit = "7cc9639699f64b750c0b82333dced9ea77e8436e",  # v0.6.5
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
@@ -34,8 +38,12 @@ REPOSITORY_LOCATIONS = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
         remote = "https://github.com/gcovr/gcovr",
     ),
+    com_github_google_libprotobuf_mutator = dict(
+        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        remote = "https://github.com/google/libprotobuf-mutator",
+    ),
     com_github_grpc_grpc = dict(
-        commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1
+        commit = "bd44e485f69d70ca4095cea92decd98de3892aa6", # v1.11.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
@@ -75,10 +83,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "protobuf-3.5.0",
         urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
     ),
-    envoy_api = dict(
-        commit = "2dcc435e8ae1d35f8c3a4fa9f132778482fb1a78",
-        remote = "https://github.com/envoyproxy/data-plane-api",
-    ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
@@ -86,6 +90,11 @@ REPOSITORY_LOCATIONS = dict(
     io_bazel_rules_go = dict(
         commit = "0.10.3",
         remote = "https://github.com/bazelbuild/rules_go",
+    ),
+    six_archive = dict(
+        sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
+        strip_prefix = "",
+        urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
     ),
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.
