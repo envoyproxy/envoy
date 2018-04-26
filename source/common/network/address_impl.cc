@@ -22,6 +22,34 @@ namespace Address {
 
 namespace {
 
+// Choosing with replacement, the probability of failing to find an unbound port
+// in a port range of size r with f already bound ports after trying n times is
+// p(f,r,n) = (f/r)^n
+// Arbitrarily choosing a target probability of less than 0.5 that we will fail
+// to find a port in a range that is 80% full yields:
+// 	0.5 > (0.8)^n
+// 	n > log(0.5)/log(0.8) =~ 3.1
+// So we try four times to find a port.
+//
+// Note that choosing with replacement is only a good strategy for large port ranges;
+// if InstanceRanges with only a few ports in them are used, this file should
+// either choose without replacement or search linearly. 
+const int kBindingRangeNumberOfTries = 4;
+
+// Random port to try for port ranges.  
+uint32_t portToTry(uint32_t starting_port, uint32_t ending_port, Runtime::RandomGenerator& random) {
+  double unitary_scaled_random_value =
+      (static_cast<double>(random.random()) / std::numeric_limits<uint64_t>::max());
+  uint32_t port_to_try =
+      starting_port + static_cast<uint32_t>((ending_port + 1 - starting_port) *
+                                            unitary_scaled_random_value);
+  // port_to_try has prob(0) of being ending_port_ + 1, but prob(0) != never.
+  if (port_to_try == ending_port + 1) {
+    port_to_try = ending_port;
+  }
+  return port_to_try;
+}
+
 int socketFromSocketType(SocketType socketType, Type addressType, IpVersion ipVersion) {
 #if defined(__APPLE__)
   int flags = 0;
@@ -356,12 +384,12 @@ Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_por
   friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
 }
 
-int Ipv4InstanceRange::bind(int fd, Runtime::RandomGenerator&) const {
-  // Implementing via linear search from the bottom of the range.
-  // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
-  for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
+int Ipv4InstanceRange::bind(int fd, Runtime::RandomGenerator& random) const {
+  int tries = kBindingRangeNumberOfTries;
+  while (tries--) {
     sockaddr_in socket_address(ip_.ipv4_.address_);
-    socket_address.sin_port = static_cast<in_port_t>(port_to_try);
+    socket_address.sin_port =
+        static_cast<in_port_t>(portToTry(starting_port_, ending_port_, random));
     int ret = ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
     if (ret != EADDRINUSE)
       return ret;
