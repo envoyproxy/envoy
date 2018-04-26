@@ -31,28 +31,31 @@ namespace BufferFilter {
 
 class BufferFilterTest : public testing::Test {
 public:
-  BufferFilterTest()
-      : config_{new BufferFilterConfig{BufferFilter::generateStats("", store_), 1024 * 1024,
-                                       std::chrono::seconds(0)}},
-        filter_(config_) {
+  BufferFilterConfigSharedPtr setupConfig() {
+    envoy::config::filter::http::buffer::v2::Buffer proto_config;
+    proto_config.mutable_max_request_bytes()->set_value(1024 * 1024);
+    proto_config.mutable_max_request_time()->set_seconds(0);
+    return std::make_shared<BufferFilterConfig>(BufferFilterConfig(proto_config, "test", store_));
+  }
+
+  BufferFilterTest() : config_(setupConfig()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
   void expectTimerCreate() { timer_ = new NiceMock<Event::MockTimer>(&callbacks_.dispatcher_); }
 
-  void routeLocalConfig(const envoy::config::filter::http::buffer::v2::BufferPerRoute* route_cfg,
-                        const envoy::config::filter::http::buffer::v2::BufferPerRoute* vhost_cfg) {
-
+  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
+                        const Router::RouteSpecificFilterConfig* vhost_settings) {
     ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().BUFFER))
-        .WillByDefault(Return(route_cfg));
+        .WillByDefault(Return(route_settings));
     ON_CALL(callbacks_.route_->route_entry_.virtual_host_,
             perFilterConfig(HttpFilterNames::get().BUFFER))
-        .WillByDefault(Return(vhost_cfg));
+        .WillByDefault(Return(vhost_settings));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Stats::IsolatedStoreImpl store_;
-  std::shared_ptr<BufferFilterConfig> config_;
+  BufferFilterConfigSharedPtr config_;
   BufferFilter filter_;
   Event::MockTimer* timer_{};
 };
@@ -92,7 +95,7 @@ TEST_F(BufferFilterTest, RequestTimeout) {
   timer_->callback_();
 
   filter_.onDestroy();
-  EXPECT_EQ(1U, config_->stats_.rq_timeout_.value());
+  EXPECT_EQ(1U, config_->stats().rq_timeout_.value());
 }
 
 TEST_F(BufferFilterTest, TxResetAfterEndStream) {
@@ -121,7 +124,9 @@ TEST_F(BufferFilterTest, RouteConfigOverride) {
   buf->mutable_max_request_time()->set_seconds(456);
   envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
   vhost_cfg.set_disabled(true);
-  routeLocalConfig(&route_cfg, &vhost_cfg);
+  BufferFilterSettings route_settings(route_cfg);
+  BufferFilterSettings vhost_settings(vhost_cfg);
+  routeLocalConfig(&route_settings, &vhost_settings);
 
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(123ULL));
   expectTimerCreate();
@@ -137,7 +142,8 @@ TEST_F(BufferFilterTest, VHostConfigOverride) {
   auto* buf = vhost_cfg.mutable_buffer();
   buf->mutable_max_request_bytes()->set_value(789);
   buf->mutable_max_request_time()->set_seconds(1011);
-  routeLocalConfig(nullptr, &vhost_cfg);
+  BufferFilterSettings vhost_settings(vhost_cfg);
+  routeLocalConfig(nullptr, &vhost_settings);
 
   EXPECT_CALL(callbacks_, setDecoderBufferLimit(789ULL));
   expectTimerCreate();
@@ -150,7 +156,8 @@ TEST_F(BufferFilterTest, VHostConfigOverride) {
 TEST_F(BufferFilterTest, RouteDisabledConfigOverride) {
   envoy::config::filter::http::buffer::v2::BufferPerRoute vhost_cfg;
   vhost_cfg.set_disabled(true);
-  routeLocalConfig(nullptr, &vhost_cfg);
+  BufferFilterSettings vhost_settings(vhost_cfg);
+  routeLocalConfig(nullptr, &vhost_settings);
 
   Http::TestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers, false));

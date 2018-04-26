@@ -1,6 +1,5 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
@@ -20,13 +19,40 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-BufferFilter::BufferFilter(BufferFilterConfigConstSharedPtr config) : config_(config) {}
+BufferFilterSettings::BufferFilterSettings(
+    const envoy::config::filter::http::buffer::v2::Buffer& proto_config)
+    : disabled_(false),
+      max_request_bytes_(static_cast<uint64_t>(proto_config.max_request_bytes().value())),
+      max_request_time_(
+          std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(proto_config, max_request_time))) {}
+
+BufferFilterSettings::BufferFilterSettings(
+    const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config)
+    : disabled_(proto_config.disabled()),
+      max_request_bytes_(
+          proto_config.has_buffer()
+              ? static_cast<uint64_t>(proto_config.buffer().max_request_bytes().value())
+              : 0),
+      max_request_time_(std::chrono::seconds(
+          proto_config.has_buffer()
+              ? PROTOBUF_GET_SECONDS_REQUIRED(proto_config.buffer(), max_request_time)
+              : 0)) {}
+
+BufferFilterConfig::BufferFilterConfig(
+    const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(BufferFilter::generateStats(stats_prefix, scope)), settings_(proto_config) {}
+
+BufferFilter::BufferFilter(BufferFilterConfigSharedPtr config)
+    : config_(config), settings_(config->settings()) {}
 
 BufferFilter::~BufferFilter() { ASSERT(!request_timeout_); }
 
 void BufferFilter::initConfig() {
   ASSERT(!config_initialized_);
   config_initialized_ = true;
+
+  settings_ = config_->settings();
 
   if (!callbacks_->route() || !callbacks_->route()->routeEntry()) {
     return;
@@ -35,30 +61,11 @@ void BufferFilter::initConfig() {
   const std::string& name = HttpFilterNames::get().BUFFER;
   const auto* entry = callbacks_->route()->routeEntry();
 
-  const Protobuf::Message* raw_cfg =
-      entry->perFilterConfig(name) ?: entry->virtualHost().perFilterConfig(name);
+  const BufferFilterSettings* route_local =
+      entry->perFilterConfigTyped<BufferFilterSettings>(name)
+          ?: entry->virtualHost().perFilterConfigTyped<BufferFilterSettings>(name);
 
-  if (!raw_cfg) {
-    // No route-local config is specified.
-    return;
-  }
-
-  const auto* cfg =
-      dynamic_cast<const envoy::config::filter::http::buffer::v2::BufferPerRoute*>(raw_cfg);
-
-  if (cfg->disabled()) {
-    // Filter is disabled.
-    disabled_ = true;
-    return;
-  }
-
-  ASSERT(cfg->has_buffer());
-  const auto& buf = cfg->buffer();
-
-  // TODO(rodaine): use per-route update callbacks to pre-optimize this.
-  config_.reset(new BufferFilterConfig{
-      config_->stats_, static_cast<uint64_t>(buf.max_request_bytes().value()),
-      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(buf, max_request_time))});
+  settings_ = route_local ?: settings_;
 }
 
 Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
@@ -68,14 +75,14 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
   }
 
   initConfig();
-  if (disabled_) {
+  if (settings_->disabled()) {
     // The filter has been disabled for this route.
     return Http::FilterHeadersStatus::Continue;
   }
 
-  callbacks_->setDecoderBufferLimit(config_->max_request_bytes_);
+  callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
   request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
-  request_timeout_->enableTimer(config_->max_request_time_);
+  request_timeout_->enableTimer(settings_->maxRequestTime());
 
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -108,7 +115,7 @@ void BufferFilter::onDestroy() {
 void BufferFilter::onRequestTimeout() {
   Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::RequestTimeout,
                                 "buffer request timeout");
-  config_->stats_.rq_timeout_.inc();
+  config_->stats().rq_timeout_.inc();
 }
 
 void BufferFilter::resetInternalState() { request_timeout_.reset(); }
