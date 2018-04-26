@@ -97,7 +97,8 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   if (pretty_print) {
     json_options.add_whitespace = true;
   }
-  // Primitive types such as int32s and enums will not be serialized if they have the default value. This flag disables that behavior.
+  // Primitive types such as int32s and enums will not be serialized if they have the default value.
+  // This flag disables that behavior.
   if (always_print_primitive_fields) {
     json_options.always_print_primitive_fields = true;
   }

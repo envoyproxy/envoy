@@ -206,8 +206,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
 }
 
-HealthTransition
-HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(envoy::api::v2::core::HealthCheckFailureType type) {
+HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
+    envoy::api::v2::core::HealthCheckFailureType type) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
@@ -255,10 +255,10 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
 }
 
-void HealthCheckEventLoggerImpl::logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
-                                                   envoy::api::v2::core::HealthCheckFailureType failure_type,
-                                                   std::chrono::milliseconds timeout,
-                                                   uint32_t unhealthy_threshold) {
+void HealthCheckEventLoggerImpl::logEjectUnhealthy(
+    const HostDescriptionConstSharedPtr& host,
+    envoy::api::v2::core::HealthCheckFailureType failure_type, std::chrono::milliseconds timeout,
+    uint32_t unhealthy_threshold) {
   envoy::api::v2::core::HealthCheckEvent event;
   event.set_host_address(host->address()->asString());
   event.set_cluster_name(host->cluster().name());
@@ -268,7 +268,8 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(const HostDescriptionConstSha
   event.mutable_eject_unhealthy_event()->mutable_unhealthy_threshold()->set_value(
       unhealthy_threshold);
   // Make sure the failure type enum makes it into the JSON
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false, /* always_print_primitive_fields */ true);
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 

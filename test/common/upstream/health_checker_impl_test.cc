@@ -2674,11 +2674,10 @@ TEST(HealthCheckEventLoggerImplTest, All) {
 
   HealthCheckEventLoggerImpl event_logger(log_manager, "foo");
 
-  EXPECT_CALL(
-      *file,
-      write(absl::string_view{
-          "{\"host_address\":\"10.0.0.1:443\",\"cluster_name\":\"fake_cluster\","
-          "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\",\"timeout\":\"0.100s\",\"unhealthy_threshold\":10}}\n"}));
+  EXPECT_CALL(*file, write(absl::string_view{
+                         "{\"host_address\":\"10.0.0.1:443\",\"cluster_name\":\"fake_cluster\","
+                         "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\",\"timeout\":\"0."
+                         "100s\",\"unhealthy_threshold\":10}}\n"}));
   event_logger.logEjectUnhealthy(host, envoy::api::v2::core::HealthCheckFailureType::ACTIVE,
                                  std::chrono::milliseconds(100), 10);
 
