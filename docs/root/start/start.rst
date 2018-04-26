@@ -22,7 +22,7 @@ the same configuration.
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP
 proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
-intended to represent a realistic Envoy deployment.
+intended to represent a realistic Envoy deployment::
 
   $ docker pull envoyproxy/envoy:latest
   $ docker run --rm -d -p 10000:10000 envoyproxy/envoy:latest

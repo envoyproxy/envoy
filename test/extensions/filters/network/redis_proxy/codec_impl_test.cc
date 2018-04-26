@@ -20,7 +20,7 @@ class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallback
 public:
   RedisEncoderDecoderImplTest() : decoder_(*this) {}
 
-  // Redis::DecoderCallbacks
+  // RedisProxy::DecoderCallbacks
   void onRespValue(RespValuePtr&& value) override {
     decoded_values_.emplace_back(std::move(value));
   }
