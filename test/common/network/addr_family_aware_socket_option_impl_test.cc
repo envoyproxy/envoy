@@ -1,6 +1,6 @@
-#include "test/common/network/socket_option_test.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 
+#include "test/common/network/socket_option_test.h"
 
 namespace Envoy {
 namespace Network {
@@ -11,10 +11,11 @@ class AddrFailyAwareSocketOptionImplTest : public SocketOptionTest {};
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(AddrFailyAwareSocketOptionImplTest, SetOptionFailure) {
   EXPECT_CALL(socket_, fd()).WillOnce(Return(-1));
-  AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind, Network::SocketOptionName(std::make_pair(5, 10)), {}, 1};
-  EXPECT_LOG_CONTAINS("warning", "Failed to set IP socket option on non-IP socket",
-  EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind));
-  );
+  AddrFailyAwareSocketOptionImpl socket_option{
+      Socket::SocketState::PreBind, Network::SocketOptionName(std::make_pair(5, 10)), {}, 1};
+  EXPECT_LOG_CONTAINS(
+      "warning", "Failed to set IP socket option on non-IP socket",
+      EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind)););
 }
 
 // If a platform supports IPv4 socket option variant for an IPv4 address, it works
@@ -23,7 +24,8 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, SetOptionSuccess) {
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
-  AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind, Network::SocketOptionName(std::make_pair(5, 10)), {}, 1};
+  AddrFailyAwareSocketOptionImpl socket_option{
+      Socket::SocketState::PreBind, Network::SocketOptionName(std::make_pair(5, 10)), {}, 1};
   testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
                              {Socket::SocketState::PreBind});
 }
@@ -50,7 +52,8 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, V6EmptyOptionNames) {
                       EXPECT_FALSE(socket_option.setOption(socket_, Socket::SocketState::PreBind)));
 }
 
-// If a platform suppports IPv4 and IPv6 socket option variants for an IPv4 address, we apply the IPv4 varient
+// If a platform suppports IPv4 and IPv6 socket option variants for an IPv4 address, we apply the
+// IPv4 varient
 TEST_F(AddrFailyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
@@ -58,11 +61,9 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, V4IgnoreV6) {
 
   AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind,
                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                               Network::SocketOptionName(std::make_pair(6, 11)),
-                                               1};
+                                               Network::SocketOptionName(std::make_pair(6, 11)), 1};
   testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
                              {Socket::SocketState::PreBind});
-
 }
 
 // If a platform suppports IPv6 socket option variant for an IPv6 address it works
@@ -71,10 +72,8 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, V6Only) {
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
-  AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind,
-                                               {},
-                                               Network::SocketOptionName(std::make_pair(6, 11)),
-                                               1};
+  AddrFailyAwareSocketOptionImpl socket_option{
+      Socket::SocketState::PreBind, {}, Network::SocketOptionName(std::make_pair(6, 11)), 1};
   testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(6, 11)), 1,
                              {Socket::SocketState::PreBind});
 }
@@ -86,13 +85,10 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
-  AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind,
-                                               Network::SocketOptionName(std::make_pair(5, 10)),
-                                               {},
-                                               1};
+  AddrFailyAwareSocketOptionImpl socket_option{
+      Socket::SocketState::PreBind, Network::SocketOptionName(std::make_pair(5, 10)), {}, 1};
   testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(5, 10)), 1,
                              {Socket::SocketState::PreBind});
-
 }
 
 // If a platform suppports IPv4 and IPv6 socket option variants for an IPv6 address,
@@ -104,8 +100,7 @@ TEST_F(AddrFailyAwareSocketOptionImplTest, V6Precedence) {
 
   AddrFailyAwareSocketOptionImpl socket_option{Socket::SocketState::PreBind,
                                                Network::SocketOptionName(std::make_pair(5, 10)),
-                                               Network::SocketOptionName(std::make_pair(6, 11)),
-                                               1};
+                                               Network::SocketOptionName(std::make_pair(6, 11)), 1};
   testSetSocketOptionSuccess(socket_option, Network::SocketOptionName(std::make_pair(6, 11)), 1,
                              {Socket::SocketState::PreBind});
 }
