@@ -358,7 +358,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   {
     const std::string format = "{{%PROTOCOL%}}   %RESP(not exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
-                               "\t@%TRAIL(THIRD)%@\t%TRAIL(TEST?TEST-2)%[]";
+                               "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
     FormatterImpl formatter(format);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
@@ -378,7 +378,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format = "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):"
-                               "10%|%TRAIL(second?third):3%";
+                               "10%|%TRAILER(second?third):3%";
 
     FormatterImpl formatter(format);
 
@@ -438,10 +438,10 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%REQ(TEST:10%",
       "%REQ(",
       "%REQ(X?Y?Z)%",
-      "%TRAIL(TEST):%",
-      "%TRAIL(TEST):23u1%",
-      "%TRAIL(X?Y?Z)%",
-      "%TRAIL(:TEST):10",
+      "%TRAILER(TEST):%",
+      "%TRAILER(TEST):23u1%",
+      "%TRAILER(X?Y?Z)%",
+      "%TRAILER(:TEST):10",
       "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {

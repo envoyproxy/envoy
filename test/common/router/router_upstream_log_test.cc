@@ -37,7 +37,7 @@ absl::optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog(
   const std::string json_string = R"EOF(
   {
     "path": "/dev/null",
-    "format": "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST% %RESP(X-UPSTREAM-HEADER)% %TRAIL(X-TRAILER)%\n"
+    "format": "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   }
   )EOF";
 

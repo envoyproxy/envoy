@@ -164,7 +164,7 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
-%TRAIL(X?Y):Z%
+%TRAILER(X?Y):Z%
   HTTP
     Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
 

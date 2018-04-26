@@ -61,7 +61,7 @@ private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{std::strlen("REQ(")};
   static const size_t RespParamStart{std::strlen("RESP(")};
-  static const size_t TrailParamStart{std::strlen("TRAIL(")};
+  static const size_t TrailParamStart{std::strlen("TRAILER(")};
   static const size_t StartTimeParamStart{std::strlen("START_TIME(")};
 };
 

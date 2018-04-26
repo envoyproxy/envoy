@@ -171,7 +171,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         formatters.emplace_back(
             new ResponseHeaderFormatter(main_header, alternative_header, max_length));
-      } else if (token.find("TRAIL(") == 0) {
+      } else if (token.find("TRAILER(") == 0) {
         std::string main_header, alternative_header;
         absl::optional<size_t> max_length;
 
