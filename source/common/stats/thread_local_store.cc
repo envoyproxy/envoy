@@ -76,7 +76,7 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
       if (names.insert(hist_name).second) {
         ret.push_back(parent_hist);
       } else {
-        ENVOY_LOG(warn, "duplicate histogram {}{}: data loss will occur on output", scope->prefix_,
+        ENVOY_LOG(debug, "duplicate histogram {}{}: data loss will occur on output", scope->prefix_,
                   hist_name);
       }
     }
