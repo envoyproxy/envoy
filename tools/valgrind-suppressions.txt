@@ -1,38 +1,5 @@
 {
-  mismatched free/malloc/new/delete in gtest
-  Memcheck:Free
-  fun:free
-  fun:_ZN7testing8*
-}
-{
-  mismatched free/malloc/new/delete in global string allocated by gtest macros.
-  Memcheck:Free
-  fun:free
-  fun:__cxx_global_var_init.*
-}
-{
-  mismatched free/malloc/new/delete in global string allocated by gtest macros.
-  Memcheck:Free
-  fun:free
-  fun:*Test*
-  fun:__cxx_global_var_init.*
-}
-{
-  mismatched free/malloc/new/delete in protobufs
-  Memcheck:Free
-  fun:free
-  ...
-  fun:*google*protobuf*
-}
-{
-  mismatched free/malloc/new/delete in global sub I, whatever that is...
-  Memcheck:Free
-  fun:free
-  ...
-  fun:*libc_csu*
-}
-{
-  eliminate this warning altogether I suppose
+  eliminate new/free mismatch warnings altogether, as something in the current toolchain generates this scenario.
   Memcheck:Free
   fun:free
   ...
