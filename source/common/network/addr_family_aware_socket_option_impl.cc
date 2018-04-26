@@ -1,4 +1,4 @@
-#include "common/network/addr_family_aware_socket_impl.h"
+#include "common/network/addr_family_aware_socket_option_impl.h"
 
 #include "envoy/common/exception.h"
 
@@ -10,11 +10,11 @@
 namespace Envoy {
 namespace Network {
 
-bool AddrFamilyAwareSocketImpl::setOption(Socket& socket, Socket::SocketState state) const {
+bool AddrFailyAwareSocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
-bool AddrFamilyAwareSocketImpl::setIpSocketOption(
+bool AddrFailyAwareSocketOptionImpl::setIpSocketOption(
     Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
     const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   // If this isn't IP, we're out of luck.

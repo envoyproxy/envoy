@@ -188,9 +188,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "addr_family_aware_socket_lib",
-    srcs = ["addr_family_aware_socket_impl.cc"],
-    hdrs = ["addr_family_aware_socket_impl.h"],
+    name = "addr_family_aware_socket_option_lib",
+    srcs = ["addr_family_aware_socket_option_impl.cc"],
+    hdrs = ["addr_family_aware_socket_option_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
@@ -208,7 +208,7 @@ envoy_cc_library(
     hdrs = ["socket_option_factory.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":addr_family_aware_socket_lib",
+        ":addr_family_aware_socket_option_lib",
         ":address_lib",
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",

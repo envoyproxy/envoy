@@ -25,13 +25,9 @@ public:
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 
-  void testSetSocketOptionSuccess(SocketOptionImpl& socket_option,
+  void testSetSocketOptionSuccess(Socket::Option& socket_option,
                                   Network::SocketOptionName option_name, int option_val,
                                   const std::set<Socket::SocketState>& when) {
-    Address::Ipv4Instance address("1.2.3.4", 5678);
-    const int fd = address.socket(Address::SocketType::Stream);
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
-
     for (Socket::SocketState state : when) {
       if (option_name.has_value()) {
         EXPECT_CALL(os_sys_calls_, setsockopt_(_, option_name.value().first,

@@ -14,9 +14,9 @@
 namespace Envoy {
 namespace Network {
 
-class AddrFamilyAwareSocketImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
+class AddrFailyAwareSocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  AddrFamilyAwareSocketImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
+  AddrFailyAwareSocketOptionImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
                             SocketOptionName ipv6_optname, int value)
       : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
         ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}

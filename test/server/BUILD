@@ -131,7 +131,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
-        "//source/common/network:addr_family_aware_socket_lib",
+        "//source/common/network:addr_family_aware_socket_option_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
