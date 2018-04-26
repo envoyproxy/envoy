@@ -43,7 +43,7 @@ AsyncClientPtr AsyncClientFactoryImpl::create() {
 }
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
-    ThreadLocal::Instance& tls, ThreadLocal::Slot& google_tls_slot, Stats::Scope& scope,
+    ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
     const envoy::api::v2::core::GrpcService& config)
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
@@ -54,6 +54,8 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   UNREFERENCED_PARAMETER(scope_);
   UNREFERENCED_PARAMETER(config_);
   throw EnvoyException("Google C++ gRPC client is not linked");
+#else
+  ASSERT(google_tls_slot_ != nullptr);
 #endif
 }
 
@@ -61,7 +63,7 @@ AsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
-      tls_.dispatcher(), google_tls_slot_.getTyped<GoogleAsyncClientThreadLocal>(), stub_factory,
+      tls_.dispatcher(), google_tls_slot_->getTyped<GoogleAsyncClientThreadLocal>(), stub_factory,
       scope_, config_);
 #else
   return nullptr;
@@ -75,7 +77,8 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcSe
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
     return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check);
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
-    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, *google_tls_slot_, scope, config);
+    return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
+                                                          config);
   default:
     NOT_REACHED;
   }

@@ -35,14 +35,13 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  verifyStats(2, 0, 0, 1, 0);
+  verifyStats(1, 0, 0, 0, 0);
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({"cluster0", "cluster1"}, "");
   timer_cb_();
-  verifyStats(2, 0, 0, 1, 0);
+  verifyStats(1, 0, 0, 0, 0);
 }
 
 // Validate that When the management server gets multiple requests for the same version, it can

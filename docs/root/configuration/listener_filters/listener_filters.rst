@@ -9,3 +9,4 @@ Envoy has the follow builtin listener filters.
   :maxdepth: 2
 
   original_dst_filter
+  tls_inspector

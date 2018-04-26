@@ -39,7 +39,7 @@ message SocketAddress {
   string address = 2 [(validate.rules).string.min_bytes = 1];
   oneof port_specifier {
     option (validate.required) = true;
-    uint32 port_value = 3;
+    uint32 port_value = 3 [(validate.rules).uint32.lte = 65535];
     // This is only valid if :ref:`resolver_name
     // <envoy_api_field_core.SocketAddress.resolver_name>` is specified below and the
     // named resolver is capable of named port resolution.

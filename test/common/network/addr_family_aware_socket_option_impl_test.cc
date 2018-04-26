@@ -1,4 +1,4 @@
-#include "test/common/network/socket_option_test_harness.h"
+#include "test/common/network/socket_option_test.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 
 
@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class AddrFailyAwareSocketOptionImplTest : public SocketOptionTestHarness {};
+class AddrFailyAwareSocketOptionImplTest : public SocketOptionTest {};
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(AddrFailyAwareSocketOptionImplTest, SetOptionFailure) {

@@ -45,6 +45,8 @@ EXTENSIONS = {
     #       configured on the listener. Do not remove it in that case or configs will fail to load.
     "envoy.filters.listener.original_dst":              "//source/extensions/filters/listener/original_dst:config",
 
+    "envoy.filters.listener.tls_inspector":             "//source/extensions/filters/listener/tls_inspector:config",
+
     #
     # Network filters
     #

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <vector>
 
 #include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
@@ -305,7 +306,11 @@ public:
   MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setDetectedTransportProtocol, void(absl::string_view));
+  MOCK_CONST_METHOD0(detectedTransportProtocol, absl::string_view());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(setRequestedServerName, void(absl::string_view));
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());

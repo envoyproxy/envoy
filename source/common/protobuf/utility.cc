@@ -190,6 +190,11 @@ void validateDuration(const ProtobufWkt::Duration& duration) {
     throw DurationUtil::OutOfRangeException(
         fmt::format("Expected positive duration: {}", duration.DebugString()));
   }
+  if (duration.nanos() > 999999999 ||
+      duration.seconds() > Protobuf::util::TimeUtil::kDurationMaxSeconds) {
+    throw DurationUtil::OutOfRangeException(
+        fmt::format("Duration out-of-range: {}", duration.DebugString()));
+  }
 }
 
 } // namespace

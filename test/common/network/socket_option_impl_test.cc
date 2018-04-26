@@ -1,10 +1,10 @@
-#include "test/common/network/socket_option_test_harness.h"
+#include "test/common/network/socket_option_test.h"
 
 namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionImplTest : public SocketOptionTestHarness {};
+class SocketOptionImplTest : public SocketOptionTest {};
 
 TEST_F(SocketOptionImplTest, BadFd) {
   EXPECT_EQ(-1, SocketOptionImpl::setSocketOption(socket_, {}, 0));
