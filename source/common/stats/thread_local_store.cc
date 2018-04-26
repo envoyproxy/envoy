@@ -100,7 +100,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
-  ASSERT(!merge_in_progress_);
+  RELEASE_ASSERT(!merge_in_progress_);
   if (!shutting_down_) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
