@@ -72,8 +72,6 @@ public:
     // TODO(qiwzhang): remove JWT from parameter.
     NOT_REACHED;
   }
-
-private:
 };
 
 /**

@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
 
