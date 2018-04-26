@@ -90,6 +90,11 @@ public:
                                                           fmt::format("{}:{}", physical, port))};
   }
 
+  InstanceRangeConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddressPortRange& socket_address) override {
+    throw EnvoyException("Not yet implemented");
+  }
+
   void addMapping(const std::string& logical, const std::string& physical) {
     name_mappings_[logical] = physical;
   }
