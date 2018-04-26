@@ -16,6 +16,10 @@ namespace Ssl {
 
 SslSocket::SslSocket(Context& ctx, InitialState state)
     : ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+  if (ssl_ == nullptr) {
+    // ctxt_.newSsl() failed, we're going to fail later ops.
+    return;
+  }
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -28,11 +32,16 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
-  BIO* bio = BIO_new_socket(callbacks_->fd(), 0);
-  SSL_set_bio(ssl_.get(), bio, bio);
+  if (ssl_ != nullptr) {
+    BIO* bio = BIO_new_socket(callbacks_->fd(), 0);
+    SSL_set_bio(ssl_.get(), bio, bio);
+  }
 }
 
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
+  if (ssl_ == nullptr) {
+    return {PostIoAction::Close, 0, false};
+  }
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || !handshake_complete_) {
@@ -143,6 +152,9 @@ void SslSocket::drainErrorQueue() {
 }
 
 Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_stream) {
+  if (ssl_ == nullptr) {
+    return {PostIoAction::Close, 0, false};
+  }
   ASSERT(!shutdown_sent_ || write_buffer.length() == 0);
   if (!handshake_complete_) {
     PostIoAction action = doHandshake();
@@ -199,7 +211,12 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   return {PostIoAction::KeepOpen, total_bytes_written, false};
 }
 
-void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
+void SslSocket::onConnected() {
+  ASSERT(!handshake_complete_);
+  if (ssl_ == nullptr) {
+    callbacks_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  }
+}
 
 void SslSocket::shutdownSsl() {
   ASSERT(handshake_complete_);
@@ -327,7 +344,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   // Attempt to send a shutdown before closing the socket. It's possible this won't go out if
   // there is no room on the socket. We can extend the state machine to handle this at some point
   // if needed.
-  if (handshake_complete_) {
+  if (ssl_ != nullptr && handshake_complete_) {
     shutdownSsl();
   }
 }

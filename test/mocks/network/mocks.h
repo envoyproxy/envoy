@@ -381,6 +381,18 @@ public:
   const std::string physical_;
 };
 
+class MockTransportSocketCallbacks : public TransportSocketCallbacks {
+public:
+  MockTransportSocketCallbacks();
+  ~MockTransportSocketCallbacks();
+
+  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(connection, Network::Connection&());
+  MOCK_METHOD0(shouldDrainReadBuffer, bool());
+  MOCK_METHOD0(setReadBufferReady, void());
+  MOCK_METHOD1(raiseEvent, void(ConnectionEvent));
+};
+
 class MockTransportSocket : public TransportSocket {
 public:
   MockTransportSocket();
