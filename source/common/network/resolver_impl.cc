@@ -37,55 +37,29 @@ public:
 
   InstanceRangeConstSharedPtr
   resolve(const envoy::api::v2::core::SocketAddressPortRange& socket_address_port_range) override {
-    switch (socket_address_port_range.port_specifier_case()) {
-    case envoy::api::v2::core::SocketAddressPortRange::kPortValue:
-    // Default to port 0 if no port value is specified.
-    case envoy::api::v2::core::SocketAddressPortRange::PORT_SPECIFIER_NOT_SET: {
-      InstanceConstSharedPtr instance = Network::Utility::parseInternetAddress(
-          socket_address_port_range.address(), socket_address_port_range.port_value(),
-          !socket_address_port_range.ipv4_compat());
-      ASSERT(instance->type() == Type::Ip);
-      switch (instance->ip()->version()) {
-      case IpVersion::v4:
-        return std::make_shared<Ipv4InstanceRange>(instance->ip()->addressAsString(),
-                                                   instance->ip()->port(),
-                                                   instance->ip()->port());
-      case IpVersion::v6:
-        return std::make_shared<Ipv6InstanceRange>(instance->ip()->addressAsString(),
-                                                   instance->ip()->port(),
-                                                   instance->ip()->port());
-      }
+    uint32_t starting_port = socket_address_port_range.port_range().port_value_start();
+    uint32_t ending_port = socket_address_port_range.port_range().port_value_end();
+    if (ending_port < starting_port)  {
+      throw EnvoyException(
+          fmt::format("IP resolver given port range with end before start: [{}, {}]",
+                      starting_port, ending_port));
     }
-    case envoy::api::v2::core::SocketAddressPortRange::kPortRange: {
-      uint32_t starting_port = socket_address_port_range.port_range().port_value_start();
-      uint32_t ending_port = socket_address_port_range.port_range().port_value_end();
-      if (ending_port < starting_port)  {
-        throw EnvoyException(
-            fmt::format("IP resolver given port range with end before start: [{}, {}]",
-                        starting_port, ending_port));
-      }
-      if (static_cast<in_port_t>(ending_port) != ending_port) {
-        throw EnvoyException(
-            fmt::format("IP resolver given port to large for in_port_t: {}", ending_port));
-      }
+    if (static_cast<in_port_t>(ending_port) != ending_port) {
+      throw EnvoyException(
+          fmt::format("IP resolver given port to large for in_port_t: {}", ending_port));
+    }
 
-      InstanceConstSharedPtr instance = Network::Utility::parseInternetAddress(
-          socket_address_port_range.address(), starting_port,
-          !socket_address_port_range.ipv4_compat());
-      ASSERT(instance->type() == Type::Ip);
-      switch (instance->ip()->version()) {
+    InstanceConstSharedPtr instance = Network::Utility::parseInternetAddress(
+        socket_address_port_range.address(), starting_port,
+        !socket_address_port_range.ipv4_compat());
+    ASSERT(instance->type() == Type::Ip);
+    switch (instance->ip()->version()) {
       case IpVersion::v4:
         return std::make_shared<Ipv4InstanceRange>(instance->ip()->addressAsString(),
                                                    starting_port, ending_port);
       case IpVersion::v6:
         return std::make_shared<Ipv6InstanceRange>(instance->ip()->addressAsString(),
                                                    starting_port, ending_port);
-      }
-    }
-
-    default:
-      throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
-                                       socket_address_port_range.port_specifier_case()));
     }
   }
 

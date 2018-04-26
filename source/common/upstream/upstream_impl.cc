@@ -40,7 +40,7 @@ namespace {
 
 const Network::Address::InstanceRangeConstSharedPtr
 getSourceAddressRange(const envoy::api::v2::Cluster& cluster,
-                 const envoy::api::v2::core::BindConfig& bind_config) {
+                      const envoy::api::v2::core::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
   const envoy::api::v2::core::BindConfig* config = nullptr;
   if (cluster.upstream_bind_config().has_source_address_port_range()) {

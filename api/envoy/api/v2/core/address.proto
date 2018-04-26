@@ -59,7 +59,7 @@ message SocketAddress {
   bool ipv4_compat = 6;
 }
 
-// A range of port values
+// A range (inclusive) of port values
 message PortRange {
   // First element in the port range.
   uint32 port_value_start = 1 [(gogoproto.nullable) = false];
@@ -81,27 +81,20 @@ message SocketAddressPortRange {
   // <envoy_api_field_core.SocketAddress.resolver_name>` should be set unless default
   // (i.e. DNS) resolution is expected.
   string address = 2 [(validate.rules).string.min_bytes = 1];
-  oneof port_specifier {
-    option (validate.required) = true;
-    uint32 port_value = 3;
-    PortRange port_range = 4;
-    // This is only valid if :ref:`resolver_name
-    // <envoy_api_field_core.SocketAddress.resolver_name>` is specified below and the
-    // named resolver is capable of named port resolution.
-    string named_port = 5;
-  }
+
+  PortRange port_range = 3;
 
   // The name of the resolver. This must have been registered with Envoy. If this is
   // empty, a context dependent default applies. If address is a hostname this
   // should be set for resolution other than DNS. If the address is a concrete
   // IP address, no resolution will occur.
-  string resolver_name = 6;
+  string resolver_name = 4;
 
   // When binding to an IPv6 address above, this enables `IPv4 compatibity
   // <https://tools.ietf.org/html/rfc3493#page-11>`_. Binding to ``::`` will
   // allow both IPv4 and IPv6 connections, with peer IPv4 addresses mapped into
   // IPv6 space as ``::FFFF:<IPv4-address>``.
-  bool ipv4_compat = 7;
+  bool ipv4_compat = 5;
 }
 
 message BindConfig {
