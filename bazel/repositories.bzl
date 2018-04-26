@@ -226,7 +226,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _boringssl()
     _com_google_absl()
     _com_github_bombela_backward()
-    _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
     _com_github_fmtlib_fmt()
@@ -264,16 +263,6 @@ def _com_github_bombela_backward():
     native.bind(
         name = "backward",
         actual = "@com_github_bombela_backward//:backward",
-    )
-
-def _com_github_circonus_labs_libcircllhist():
-    _repository_impl(
-        name = "com_github_circonus_labs_libcircllhist",
-        build_file = "@envoy//bazel/external:libcircllhist.BUILD",
-    )
-    native.bind(
-        name = "libcircllhist",
-        actual = "@com_github_circonus_labs_libcircllhist//:libcircllhist",
     )
 
 def _com_github_cyan4973_xxhash():
