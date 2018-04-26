@@ -43,7 +43,7 @@ public:
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
     LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent,
-                 Envoy::Runtime::RandomGenerator& random);
+                 Runtime::RandomGenerator& random);
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -96,7 +96,7 @@ public:
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
     HostMap host_map_;
-    Envoy::Runtime::RandomGenerator& random_;
+    Runtime::RandomGenerator& random_;
   };
 
 private:

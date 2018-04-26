@@ -192,7 +192,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  Envoy::Runtime::RandomGenerator& randomGenerator() override { return random_; }
+  Runtime::RandomGenerator& randomGenerator() override { return random_; }
 
 private:
   /**

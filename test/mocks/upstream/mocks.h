@@ -167,7 +167,7 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
-  MOCK_METHOD0(randomGenerator, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(randomGenerator, Runtime::RandomGenerator&());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

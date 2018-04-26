@@ -197,7 +197,7 @@ public:
    * This method returns a RandomGenerator that can be used if needed during cluster 
    * configuration and connection.
    */
-  virtual Envoy::Runtime::RandomGenerator& randomGenerator() PURE;
+  virtual Runtime::RandomGenerator& randomGenerator() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

@@ -20,7 +20,7 @@ namespace Upstream {
 // and throws an exception otherwise.
 
 OriginalDstCluster::LoadBalancer::LoadBalancer(
-    PrioritySet& priority_set, ClusterSharedPtr& parent, Envoy::Runtime::RandomGenerator& random)
+    PrioritySet& priority_set, ClusterSharedPtr& parent, Runtime::RandomGenerator& random)
     : priority_set_(priority_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
       info_(parent->info()), random_(random) {
   // priority_set_ is initially empty.

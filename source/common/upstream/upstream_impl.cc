@@ -394,7 +394,7 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager,
-                                 Envoy::Runtime::RandomGenerator& random, bool added_via_api)
+                                 Runtime::RandomGenerator& random, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
                                                    ssl_context_manager, added_via_api)),
       random_(random) {
