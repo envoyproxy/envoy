@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionTest : public testing::Test {
+class SocketOptionTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   SocketOptionTest() { socket_.local_address_.reset(); }
 
@@ -28,8 +28,14 @@ public:
   void testSetSocketOptionSuccess(SocketOptionImpl& socket_option, int socket_level,
                                   Network::SocketOptionName option_name, int option_val,
                                   const std::set<Socket::SocketState>& when) {
-    Address::Ipv4Instance address("1.2.3.4", 5678);
-    const int fd = address.socket(Address::SocketType::Stream);
+    int fd;
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      Address::Ipv4Instance address("1.2.3.4", 5678);
+      fd = address.socket(Address::SocketType::Stream);
+    } else {
+      Address::Ipv6Instance address("::1", 5678);
+      fd = address.socket(Address::SocketType::Stream);
+    }
     EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
     for (Socket::SocketState state : when) {
