@@ -86,7 +86,9 @@ envoy_cc_library(
     name = "terminate_handler_lib",
     srcs = ["terminate_handler.cc"],
     hdrs = ["terminate_handler.h"],
+    tags = ["backtrace"],
     deps = [
+        "//source/common/common:logger_lib",
         "//source/common/common:non_copyable",
         "//source/server:backtrace_lib",
     ],

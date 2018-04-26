@@ -2,11 +2,12 @@
 
 #include <exception>
 
+#include "common/common/logger.h"
 #include "common/common/non_copyable.h"
 
 namespace Envoy {
 
-class TerminateHandler : NonCopyable {
+class TerminateHandler : NonCopyable, protected Logger::Loggable<Logger::Id::main> {
 public:
   TerminateHandler() : previous_terminate_(logOnTerminate()) {}
   ~TerminateHandler() { std::set_terminate(previous_terminate_); }
