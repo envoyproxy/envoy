@@ -3978,6 +3978,8 @@ virtual_hosts:
     EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
   }
   {
+    // The following matches to the redirect action match value equals to `/ignore-this` instead of
+    // `/ignore-this/`.
     Http::TestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/ignore-this", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
@@ -3985,6 +3987,8 @@ virtual_hosts:
     EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
   }
   {
+    // The following matches to the redirect action match value equals to `/ignore-this/` instead of
+    // `/ignore-this`.
     Http::TestHeaderMapImpl headers =
         genRedirectHeaders("redirect.lyft.com", "/ignore-this/", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
@@ -3992,6 +3996,8 @@ virtual_hosts:
     EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
   }
   {
+    // The same as previous test request, the following matches to the redirect action match value
+    // equals to `/ignore-this/` instead of `/ignore-this`.
     Http::TestHeaderMapImpl headers = genRedirectHeaders(
         "redirect.lyft.com", "/ignore-this/however/use/the/rest/of/this/path", false, false);
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();

@@ -359,38 +359,13 @@ message RouteAction {
   // swapped with this value. This option allows application URLs to be rooted
   // at a different path from those exposed at the reverse proxy layer.
   //
-  // .. note::
+  // .. attention::
   //
-  //   Take a careful attention to the use of trailing slash in match prefix value. A common
-  //   use-case is to have a rule to rewrite e.g. :code:`scheme://host/prefix` and
-  //   :code:`scheme://host/prefix/ok/1/2/3` to the root path of the host (:code:`scheme://host/`)
-  //   and :code:`scheme://host/ok/1/2/3` respectively.
-  //
-  //   The following config example exhibits that behavior.
-  //
-  //   .. code-block:: yaml
-  //
-  //     - match:
-  //         prefix: "/prefix/"
-  //       route:
-  //         prefix_rewrite: "/"
-  //     - match:
-  //         prefix: "/prefix"
-  //       route:
-  //         prefix_rewrite: "/"
-  //
-  //   If the match prefix value with trailing slash is removed, i.e.
-  //
-  //   .. code-block:: yaml
-  //
-  //     match:
-  //       prefix: "/prefix"
-  //     route:
-  //       prefix_rewrite: "/"
-  //
-  //   it rewrites :code:`/prefix` to :code:`/`, but :code:`/prefix/ok` to :code:`//ok`, which
-  //   most of the time is not the intended result. However, it can be useful for the case of
-  //   replacing substring of a path segment. For example to rewrite :code:`/prefixok` to :code:`/ok`.
+  //   Pay careful attention to the use of trailing slashes in the
+  //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
+  //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
+  //   rewriting */prefix* to */* and */prefix/etc* to */etc*
+  //   cannot be done in a single :ref:`Route <envoy_api_msg_route.Route>`.
   string prefix_rewrite = 5;
 
   oneof host_rewrite_specifier {
@@ -605,38 +580,10 @@ message RedirectAction {
     // should be swapped with this value. This option allows redirect URLs be dynamically created
     // based on the request.
     //
-    // .. note::
+    // .. attention::
     //
-    //   Take a careful attention to the use of trailing slash in match prefix value. A common
-    //   use-case is to have a rule to rewrite e.g. :code:`scheme://host/prefix` and
-    //   :code:`scheme://host/prefix/ok/1/2/3` to the root path of the host (:code:`scheme://host/`)
-    //   and :code:`scheme://host/ok/1/2/3` respectively.
-    //
-    //   The following config example exhibits that behavior.
-    //
-    //   .. code-block:: yaml
-    //
-    //     - match:
-    //         prefix: "/prefix/"
-    //       redirect:
-    //         prefix_rewrite: "/"
-    //     - match:
-    //         prefix: "/prefix"
-    //       redirect:
-    //         prefix_rewrite: "/"
-    //
-    //   If the match prefix value with trailing slash is removed, i.e.
-    //
-    //   .. code-block:: yaml
-    //
-    //     match:
-    //       prefix: "/prefix"
-    //     redirect:
-    //       prefix_rewrite: "/"
-    //
-    //   it rewrites :code:`/prefix` to :code:`/`, but :code:`/prefix/ok` to :code:`//ok`, which
-    //   most of the time is not the intended result. However, it can be useful for the case of
-    //   replacing substring of a path segment. For example to rewrite :code:`/prefixok` to :code:`/ok`.
+    //   Pay attention to the use of trailing slashes as mentioned in
+    //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5;
   }
 
