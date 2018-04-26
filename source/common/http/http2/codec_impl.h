@@ -37,12 +37,13 @@ const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
  */
 // clang-format off
 #define ALL_HTTP2_CODEC_STATS(COUNTER)                                                             \
-  COUNTER(rx_reset)                                                                                \
-  COUNTER(tx_reset)                                                                                \
   COUNTER(header_overflow)                                                                         \
-  COUNTER(trailers)                                                                                \
   COUNTER(headers_cb_no_stream)                                                                    \
-  COUNTER(too_many_header_frames)
+  COUNTER(rx_messaging_error)                                                                      \
+  COUNTER(rx_reset)                                                                                \
+  COUNTER(too_many_header_frames)                                                                  \
+  COUNTER(trailers)                                                                                \
+  COUNTER(tx_reset)
 // clang-format on
 
 /**
@@ -203,6 +204,7 @@ protected:
     bool waiting_for_non_informational_headers_ : 1;
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
+    bool reset_due_to_messaging_error_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
@@ -251,7 +253,7 @@ private:
   int onFrameReceived(const nghttp2_frame* frame);
   int onFrameSend(const nghttp2_frame* frame);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
-  int onInvalidFrame(int error_code);
+  int onInvalidFrame(int32_t stream_id, int error_code);
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
 
