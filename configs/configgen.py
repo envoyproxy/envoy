@@ -4,7 +4,7 @@ from collections import OrderedDict
 import os
 import sys
 import shutil
-import yaml
+# import yaml
 
 SCRIPT_DIR = os.path.dirname(__file__)
 OUT_DIR = sys.argv[1]
@@ -87,8 +87,8 @@ def generate_config(template_path, template, output_file, **context):
                              undefined=jinja2.StrictUndefined)
     raw_output = env.get_template(template).render(**context)
     print raw_output
-    with open(output_file, 'w') as fh:
-        yaml.dump(raw_output, fh)
+    # with open(output_file, 'w') as fh:
+        # yaml.dump(raw_output, fh)
 
 # Generate a demo config for the main front proxy. This sets up both HTTP and HTTPS listeners,
 # as well as a listener for the double proxy to connect to via SSL client authentication.
@@ -109,7 +109,7 @@ generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
 generate_config(SCRIPT_DIR, 'envoy_service_to_service_v2.template.yaml',
-                '{}/envoy_service_to_service.json'.format(OUT_DIR),
+                '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
                 internal_virtual_hosts=service_to_service_envoy_clusters,
                 external_virtual_hosts=external_virtual_hosts,
                 mongos_servers=mongos_servers)
