@@ -15,7 +15,7 @@ option (gogoproto.equal_all) = true;
 // [#protodoc-title: Health check logging]
 // [#proto-status: draft]
 
-message ActiveHealthCheckEvent {
+message HealthCheckEvent {
   string host_address = 1 [(validate.rules).string.min_bytes = 1];
   string cluster_name = 2 [(validate.rules).string.min_bytes = 1];
 
@@ -23,25 +23,34 @@ message ActiveHealthCheckEvent {
     option (validate.required) = true;
 
     // Host ejection.
-    ActiveHealthCheckEjectUnhealthy eject_unhealthy_event = 3;
+    HealthCheckEjectUnhealthy eject_unhealthy_event = 3;
 
     // Host addition.
-    ActiveHealthCheckAddHealthy add_healthy_event = 4;
+    HealthCheckAddHealthy add_healthy_event = 4;
   }
 }
 
-message ActiveHealthCheckEjectUnhealthy {
+enum HealthCheckFailureType {
+  ACTIVE = 0;
+  PASSIVE = 1;
+  NETWORK = 2;
+}
+
+message HealthCheckEjectUnhealthy {
+  // The type of failure that caused this ejection
+  HealthCheckFailureType failure_type = 1;
+
   // The timeout after which health checks fail for hosts in this cluster
-  google.protobuf.Duration timeout = 1 [(validate.rules).duration.required = true];
+  google.protobuf.Duration timeout = 2 [(validate.rules).duration.required = true];
 
   // The number of unhealthy health checks required before a host is marked
   // unhealthy. Note that for *http* health checking if a host responds with 503
   // this threshold is ignored and the host is considered unhealthy immediately.
-  google.protobuf.UInt32Value unhealthy_threshold = 2;
+  google.protobuf.UInt32Value unhealthy_threshold = 3;
 
 }
 
-message ActiveHealthCheckAddHealthy {
+message HealthCheckAddHealthy {
   // The number of healthy health checks required before a host is marked
   // healthy. Note that during startup, only a single successful health check is
   // required to mark a host healthy.

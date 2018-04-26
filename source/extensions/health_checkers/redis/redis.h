@@ -20,7 +20,7 @@ public:
       const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const Upstream::HealthCheckEventLoggerSharedPtr& event_logger,
+      Upstream::HealthCheckEventLoggerPtr&& event_logger,
       Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory);
 
   static const Extensions::NetworkFilters::RedisProxy::RespValue& pingHealthCheckRequest() {
@@ -40,8 +40,7 @@ private:
         public Extensions::NetworkFilters::RedisProxy::ConnPool::Config,
         public Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks,
         public Network::ConnectionCallbacks {
-    RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host,
-                                  const Upstream::HealthCheckEventLoggerSharedPtr& event_logger);
+    RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
     // ActiveHealthCheckSession
     void onInterval() override;
@@ -81,7 +80,7 @@ private:
 
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(Upstream::HostSharedPtr host) override {
-    return std::make_unique<RedisActiveHealthCheckSession>(*this, host, event_logger_);
+    return std::make_unique<RedisActiveHealthCheckSession>(*this, host);
   }
 
   Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory_;

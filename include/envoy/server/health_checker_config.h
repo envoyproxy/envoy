@@ -33,10 +33,10 @@ public:
   virtual Event::Dispatcher& dispatcher() PURE;
 
   /*
-   * @return Upstream::HealthCheckEventLoggerSharedPtr& the health check event logger for the
-   * created health checkers
+   * @return Upstream::HealthCheckEventLoggerPtr the health check event logger for the
+   * created health checkers. This function may not be idempotent.
    */
-  virtual const Upstream::HealthCheckEventLoggerSharedPtr& eventLogger() PURE;
+  virtual Upstream::HealthCheckEventLoggerPtr eventLogger() PURE;
 };
 
 /**

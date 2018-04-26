@@ -9,9 +9,9 @@ RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const Upstream::HealthCheckEventLoggerSharedPtr& event_logger,
+    Upstream::HealthCheckEventLoggerPtr&& event_logger,
     Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, event_logger),
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()) {
   if (!key_.empty()) {
     type_ = Type::Exists;
@@ -21,9 +21,8 @@ RedisHealthChecker::RedisHealthChecker(
 }
 
 RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession(
-    RedisHealthChecker& parent, const Upstream::HostSharedPtr& host,
-    const Upstream::HealthCheckEventLoggerSharedPtr& event_logger)
-    : ActiveHealthCheckSession(parent, host, event_logger), parent_(parent) {}
+    RedisHealthChecker& parent, const Upstream::HostSharedPtr& host)
+    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
 
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   if (current_request_) {
@@ -75,7 +74,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
-      handleFailure(FailureType::Active);
+      handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
     }
     break;
   case Type::Ping:
@@ -83,7 +82,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asString() == "PONG") {
       handleSuccess();
     } else {
-      handleFailure(FailureType::Active);
+      handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
     }
     break;
   default:
@@ -97,7 +96,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   current_request_ = nullptr;
-  handleFailure(FailureType::Network);
+  handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {

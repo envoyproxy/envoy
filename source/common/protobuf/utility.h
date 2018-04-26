@@ -213,7 +213,8 @@ public:
    * @return std::string of formatted JSON object.
    */
   static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              bool pretty_print = false);
+                                              bool pretty_print = false,
+                                              bool always_print_primitive_fields = false);
 
   /**
    * Extract JSON object from a google.protobuf.Message.

@@ -196,8 +196,9 @@ public:
 
 class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
-  MOCK_METHOD3(logEjectUnhealthy,
-               void(const HostDescriptionConstSharedPtr&, std::chrono::milliseconds, uint32_t));
+  MOCK_METHOD4(logEjectUnhealthy, void(const HostDescriptionConstSharedPtr&,
+                                       envoy::api::v2::core::HealthCheckFailureType,
+                                       std::chrono::milliseconds, uint32_t));
   MOCK_METHOD3(logAddHealthy, void(const HostDescriptionConstSharedPtr&, uint32_t, bool));
 };
 

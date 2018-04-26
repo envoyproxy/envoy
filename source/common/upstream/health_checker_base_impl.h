@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
@@ -45,18 +46,15 @@ public:
 protected:
   class ActiveHealthCheckSession {
   public:
-    enum class FailureType { Active, Passive, Network };
-
     virtual ~ActiveHealthCheckSession();
-    HealthTransition setUnhealthy(FailureType type);
+    HealthTransition setUnhealthy(envoy::api::v2::core::HealthCheckFailureType type);
     void start() { onIntervalBase(); }
 
   protected:
-    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host,
-                             const HealthCheckEventLoggerSharedPtr& event_logger);
+    ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess();
-    void handleFailure(FailureType type);
+    void handleFailure(envoy::api::v2::core::HealthCheckFailureType type);
 
     HostSharedPtr host_;
 
@@ -67,7 +65,6 @@ protected:
     void onTimeoutBase();
 
     HealthCheckerImplBase& parent_;
-    HealthCheckEventLoggerSharedPtr event_logger_;
     Event::TimerPtr interval_timer_;
     Event::TimerPtr timeout_timer_;
     uint32_t num_unhealthy_{};
@@ -79,8 +76,7 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random,
-                        const HealthCheckEventLoggerSharedPtr& event_logger);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
 
@@ -93,7 +89,7 @@ protected:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const bool reuse_connection_;
-  HealthCheckEventLoggerSharedPtr event_logger_;
+  HealthCheckEventLoggerPtr event_logger_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
@@ -139,6 +135,7 @@ public:
   virtual ~HealthCheckEventLoggerImpl() {}
 
   void logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+                         envoy::api::v2::core::HealthCheckFailureType failure_type,
                          std::chrono::milliseconds timeout, uint32_t unhealthy_threshold) override;
   void logAddHealthy(const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
                      bool first_check) override;
