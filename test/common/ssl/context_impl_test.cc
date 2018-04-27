@@ -331,6 +331,14 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
                           "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
+// Validate that empty SNI (according to C string rules) fails config validation.
+TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.set_sni(std::string("\000", 1));
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException, "Empty SNI names are not allowed");
+}
+
 // Multiple certificate hashes are not yet supported.
 // TODO(htuch): Support multiple hashes.
 TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
