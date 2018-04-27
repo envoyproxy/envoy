@@ -376,8 +376,12 @@ public:
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
+  typedef std::unordered_map<std::string, RawStatData*> StringRawDataMap;
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+
+private:
+  StringRawDataMap stats_set_;
 };
 
 /**

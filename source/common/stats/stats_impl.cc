@@ -150,9 +150,25 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  // This must be zero-initialized
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-  data->initialize(name);
+  absl::string_view key = name;
+
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
+    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), Stats::RawStatData::maxNameLength());
+  }
+
+  auto ret = stats_set_.insert(StringRawDataMap::value_type(std::string(key), nullptr));
+  RawStatData*& data = ret.first->second;
+  if (ret.second) {
+    data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
+    RELEASE_ASSERT(data);
+    data->initialize(key);
+  } else {
+    ++data->ref_count_;
+  }
   return data;
 }
 
@@ -256,18 +272,23 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
-  // This allocator does not ever have concurrent access to the raw data.
-  ASSERT(data.ref_count_ == 1);
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  size_t key_removed = stats_set_.erase(std::string(data.key()));
+  ASSERT(key_removed >= 1);
   ::free(&data);
 }
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  if (key.size() > maxNameLength()) {
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), maxNameLength());
+        key.size(), Stats::RawStatData::maxNameLength());
   }
   ref_count_ = 1;
 
