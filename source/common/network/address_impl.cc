@@ -128,7 +128,10 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
   }
 
   int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1);
+  if (fd == -1) {
+    throw EnvoyException(
+        fmt::format("socket failed for '{}, {}, {}': {}", domain, flags, 0, strerror(errno)));
+  }
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
