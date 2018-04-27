@@ -25,7 +25,7 @@ Server::Configuration::HttpFilterFactoryCb HealthCheckFilterConfig::createFilter
   auto header_match_data = std::make_shared<std::vector<Router::ConfigUtility::HeaderData>>();
 
   // TODO(mrice32): remove endpoint field at the end of the 1.7.0 deprecation cycle.
-  bool endpoint_set = !proto_config.endpoint().empty();
+  const bool endpoint_set = !proto_config.endpoint().empty();
   if (endpoint_set) {
     envoy::api::v2::route::HeaderMatcher matcher;
     matcher.set_name(Http::Headers::get().Path.get());

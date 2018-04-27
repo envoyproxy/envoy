@@ -62,7 +62,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
-  std::shared_ptr<std::vector<Router::ConfigUtility::HeaderData>> header_data_;
+  HeaderDataVectorSharedPtr header_data_;
 
   class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
   public:

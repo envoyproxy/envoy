@@ -102,7 +102,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
-void TestHealthCheckHeaderMatch(
+void testHealthCheckHeaderMatch(
     const envoy::config::filter::http::health_check::v2::HealthCheck& input_config,
     Http::TestHeaderMapImpl& input_headers, bool expect_health_check_response) {
   HealthCheckFilterConfig healthCheckFilterConfig;
@@ -142,6 +142,7 @@ void TestHealthCheckHeaderMatch(
   }
 }
 
+// Basic header match with two conditions should match if both conditions are satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -156,9 +157,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "foo"}};
 
-  TestHealthCheckHeaderMatch(config, headers, true);
+  testHealthCheckHeaderMatch(config, headers, true);
 }
 
+// The match should fail if a single header value fails to match.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -173,9 +175,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "bar"}};
 
-  TestHealthCheckHeaderMatch(config, headers, false);
+  testHealthCheckHeaderMatch(config, headers, false);
 }
 
+// If either of the specified headers is completely missing the match should fail.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -190,9 +193,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
 
   Http::TestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
 
-  TestHealthCheckHeaderMatch(config, headers, false);
+  testHealthCheckHeaderMatch(config, headers, false);
 }
 
+// If an endpoint is specified and the path matches, it should match regardless of any :path
+// conditions given in the headers field.
 TEST(HealthCheckFilterConfig, HealthCheckFilterEndpoint) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -206,9 +211,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterEndpoint) {
 
   Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "foo"}};
 
-  TestHealthCheckHeaderMatch(config, headers, true);
+  testHealthCheckHeaderMatch(config, headers, true);
 }
 
+// If an endpoint is specified and the path does not match, the filter should not match regardless
+// of any :path conditions given in the headers field.
 TEST(HealthCheckFilterConfig, HealthCheckFilterEndpointOverride) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -222,9 +229,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterEndpointOverride) {
 
   Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "bar"}};
 
-  TestHealthCheckHeaderMatch(config, headers, false);
+  testHealthCheckHeaderMatch(config, headers, false);
 }
 
+// Conditions for the same header should match if they are both satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -239,9 +247,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
-  TestHealthCheckHeaderMatch(config, headers, true);
+  testHealthCheckHeaderMatch(config, headers, true);
 }
 
+// Conditions on the same header should not match if one or more is not satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   envoy::config::filter::http::health_check::v2::HealthCheck config;
 
@@ -257,7 +266,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
-  TestHealthCheckHeaderMatch(config, headers, false);
+  testHealthCheckHeaderMatch(config, headers, false);
 }
 
 } // namespace HealthCheck
