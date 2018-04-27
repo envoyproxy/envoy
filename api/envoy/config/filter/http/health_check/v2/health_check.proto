@@ -32,7 +32,6 @@ message HealthCheck {
   // must be healthy in order for the filter to return a 200.
   map<string, envoy.type.Percent> cluster_min_healthy_percentages = 4;
 
-  // [#not-implemented-hide:]
   // Specifies a set of health check request headers to match on. The health check filter will
   // check a request’s headers against all the specified headers. To specify the health check
   // endpoint, set the ``:path`` header to match on. Note that if the
