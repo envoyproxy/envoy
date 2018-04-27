@@ -258,7 +258,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   }
 
   // Do not perform locality routing for small clusters.
-  uint64_t min_cluster_size =
+  uint64_t const min_cluster_size =
       runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
   if (host_set.healthyHosts().size() < min_cluster_size) {
     stats_.lb_zone_cluster_too_small_.inc();

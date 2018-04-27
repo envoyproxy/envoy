@@ -184,8 +184,8 @@ private:
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
-  uint32_t routing_enabled_;
-  uint64_t min_cluster_size_;
+  uint32_t const routing_enabled_;
+  uint64_t const min_cluster_size_;
 
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
