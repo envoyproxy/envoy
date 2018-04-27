@@ -2,6 +2,7 @@ syntax = "proto3";
 
 import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
+import "envoy/type/string_match.proto";
 
 package envoy.config.rbac.v2alpha;
 
@@ -64,32 +65,13 @@ message Policy {
  repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
-message StringMatch {
-  oneof match_pattern {
-    // The input string must match exactly the string specified here.
-    // Or it is a "*", which means that it matches any string.
-    string simple = 1;
-
-    // The input string must have the prefix specified here.
-    string prefix = 2;
-
-    // The input string must have the suffix specified here.
-    string suffix = 3;
-
-    // The input string must match the regular expression specified here.
-    // The regex grammar is defined `here
-    // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    string regex = 4;
- }
-}
-
 // Specifies how to match an entry in a map.
 message MapEntryMatch {
   // The key to select an entry from the map.
   string key = 1;
 
   // A list of matched values.
-  repeated StringMatch values = 2;
+  repeated envoy.type.StringMatch values = 2;
 }
 
 // Specifies how to match IP addresses.
@@ -110,7 +92,7 @@ message Permission {
   // gRPC methods must be presented as fully-qualified name in the form of
   // packageName.serviceName/methodName.
   // If this field is unset, it applies to any path.
-  repeated StringMatch paths = 1;
+  repeated envoy.type.StringMatch paths = 1;
 
   // Required. A list of HTTP methods (e.g., "GET", "POST").
   // If this field is unset, it applies to any method.
