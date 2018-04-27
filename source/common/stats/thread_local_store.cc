@@ -67,18 +67,14 @@ std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
-  // here. We need process global storage for histograms similar to how we have a central storage
-  // in shared memory for counters/gauges.
+  // here. We need to create global storage for histograms similar to how we have a central storage
+  // in shared memory for counters/gauges. In the interim, no de-dup is done here. This may result
+  // in histograms with duplicate names, but until shared storage is implementing it's ultimately
+  // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
     for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
-      const std::string& hist_name = name_histogram_pair.first;
       const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
-      if (names.insert(hist_name).second) {
-        ret.push_back(parent_hist);
-      } else {
-        ENVOY_LOG(debug, "duplicate histogram {}{}: data loss will occur on output", scope->prefix_,
-                  hist_name);
-      }
+      ret.push_back(parent_hist);
     }
   }
 
@@ -105,9 +101,8 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (ScopeImpl* scope : scopes_) {
-            for (const auto& name_histogram_pair :
-                 tls_->getTyped<TlsCache>().scope_cache_[scope].histograms_) {
+          for (const auto& scopes : tls_->getTyped<TlsCache>().scope_cache_) {
+            for (const auto& name_histogram_pair : scopes.second.histograms_) {
               const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
               tls_hist->beginMerge();
             }
@@ -263,7 +258,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   ParentHistogramSharedPtr* tls_ref = nullptr;
 
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].parent_histograms_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>()
+                   .scope_cache_[this->scope_id_]
+                   .parent_histograms_[final_name];
   }
 
   if (tls_ref && *tls_ref) {
@@ -272,16 +269,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
   std::unique_lock<std::mutex> lock(parent_.lock_);
   ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
-
-  std::vector<Tag> tags;
-  std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
   if (!central_ref) {
-    // Since MetricImpl only has move constructor, we are explicitly copying here.
-    std::string central_tag_extracted_name(tag_extracted_name);
-    std::vector<Tag> central_tags(tags);
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(new ParentHistogramImpl(final_name, parent_, *this,
-                                              std::move(central_tag_extracted_name),
-                                              std::move(central_tags)));
+                                              std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {
@@ -298,7 +290,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name];
   }
 
   if (tls_ref && *tls_ref) {

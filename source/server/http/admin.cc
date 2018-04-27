@@ -392,7 +392,6 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_histograms;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     all_stats.emplace(counter->name(), counter->value());
   }
@@ -401,6 +400,10 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
+  // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
+  // multimap here. This makes sure that duplicate histograms get output. When shared storage is
+  // implemented this can be switched back to a normal map.
+  std::multimap<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref =
