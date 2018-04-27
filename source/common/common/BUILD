@@ -98,9 +98,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "logger_lib",
     srcs = ["logger_delegates.cc"],
-    hdrs = [
-        "logger_delegates.h",
-    ],
+    hdrs = ["logger_delegates.h"],
     deps = [
         ":macros",
         ":minimal_logger_lib",
