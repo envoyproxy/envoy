@@ -10,7 +10,7 @@ package envoy.config.rbac.v2alpha;
 // :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against the RBAC policies.
 //
 // RBAC policies are additive. The policies are examined in order. A request is allowed once a matching policy
-// is found (suppose the `action_type` is ALLOW).
+// is found (suppose the `action` is ALLOW).
 //
 // Here is an example of RBAC configuration. It has two policies:
 // * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry means full access)
@@ -18,7 +18,7 @@ package envoy.config.rbac.v2alpha;
 // * Any user (empty principal entry means any user) can read ("GET") the service at paths with prefix "/products" or
 //   suffix "/reviews" when request header "version" set to either "v1" or "v2".
 //
-//   action_type: ALLOW
+//   action: ALLOW
 //   policies:
 //     "service-admin":
 //       permissions:
@@ -39,7 +39,7 @@ package envoy.config.rbac.v2alpha;
 //
 message RBAC {
   // Should we do white-list or black-list style access control.
-  enum ActionType {
+  enum Action {
     // The policies grant access to principals. The rest is denied. This is white-list style
     // access control. This is the default type.
     ALLOW = 0;
@@ -49,7 +49,7 @@ message RBAC {
     DENY = 1;
   }
 
-  ActionType action_type = 1;
+  Action action = 1;
 
   // Maps from policy name to policy.
   map<string, Policy> policies = 2;
@@ -60,7 +60,7 @@ message Policy {
  // Required. The set of permissions that define a role.
  repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
 
- // Required. List of principals that are assigned/denied the role based on “action_type”.
+ // Required. List of principals that are assigned/denied the role based on “action”.
  repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
