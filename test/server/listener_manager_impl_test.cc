@@ -1271,6 +1271,7 @@ class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::O
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   static int fd;
   fd = -1;
+  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:

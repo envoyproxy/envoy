@@ -44,7 +44,12 @@ public:
   void prepareFilter(
       bool pass_through,
       ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages = nullptr) {
-    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, "/healthcheck",
+    header_data_ = std::make_shared<std::vector<Router::ConfigUtility::HeaderData>>();
+    envoy::api::v2::route::HeaderMatcher matcher;
+    matcher.set_name(":path");
+    matcher.set_exact_match("/healthcheck");
+    header_data_->emplace_back(matcher);
+    filter_.reset(new HealthCheckFilter(context_, pass_through, cache_manager_, header_data_,
                                         cluster_min_healthy_percentages));
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
@@ -57,6 +62,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Http::TestHeaderMapImpl request_headers_no_hc_;
+  HeaderDataVectorSharedPtr header_data_;
 
   class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
   public:

@@ -91,21 +91,6 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   cb();
 }
 
-void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
-  ASSERT(std::this_thread::get_id() == main_thread_id_);
-  ASSERT(!shutdown_);
-  std::shared_ptr<std::atomic<uint64_t>> worker_count =
-      std::make_shared<std::atomic<uint64_t>>(registered_threads_.size());
-  for (Event::Dispatcher& dispatcher : registered_threads_) {
-    dispatcher.post([this, worker_count, cb, all_threads_complete_cb]() -> void {
-      cb();
-      if (--*worker_count == 0) {
-        main_thread_dispatcher_->post(all_threads_complete_cb);
-      }
-    });
-  }
-}
-
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
   ASSERT(!parent_.shutdown_);

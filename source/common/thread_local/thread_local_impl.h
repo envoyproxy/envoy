@@ -35,9 +35,6 @@ private:
     // ThreadLocal::Slot
     ThreadLocalObjectSharedPtr get() override;
     void runOnAllThreads(Event::PostCb cb) override { parent_.runOnAllThreads(cb); }
-    void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
-      parent_.runOnAllThreads(cb, main_callback);
-    }
     void set(InitializeCb cb) override;
 
     InstanceImpl& parent_;
@@ -51,7 +48,6 @@ private:
 
   void removeSlot(SlotImpl& slot);
   void runOnAllThreads(Event::PostCb cb);
-  void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback);
   static void setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr object);
 
   static thread_local ThreadLocalData thread_local_data_;

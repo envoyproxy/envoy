@@ -153,6 +153,7 @@ envoy_cc_test(
     deps = [
         "//source/server:listener_socket_option_lib",
         "//test/common/network:socket_option_test",
+        "//test/test_common:environment_lib",
     ],
 )
 

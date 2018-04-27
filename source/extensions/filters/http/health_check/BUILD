@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/router:config_utility_lib",
         "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
     ],
 )
@@ -39,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:filter_json_lib",
+        "//source/common/router:config_utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/health_check:health_check_lib",
     ],
