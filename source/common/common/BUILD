@@ -99,7 +99,6 @@ envoy_cc_library(
     name = "logger_lib",
     srcs = ["logger_delegates.cc"],
     hdrs = [
-        "logger.h",
         "logger_delegates.h",
     ],
     deps = [

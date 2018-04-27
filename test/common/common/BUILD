@@ -37,7 +37,7 @@ envoy_cc_test(
     srcs = ["fmt_test.cc"],
     deps = [
         "//source/common/common:fmt_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -57,7 +57,7 @@ envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",

@@ -88,7 +88,7 @@ envoy_cc_library(
     hdrs = ["terminate_handler.h"],
     tags = ["backtrace"],
     deps = [
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:non_copyable",
         "//source/server:backtrace_lib",
     ],
