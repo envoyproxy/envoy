@@ -533,8 +533,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
     const Network::Address::InstanceRangeConstSharedPtr& source_address_range,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Runtime::RandomGenerator& random)
+    const Network::ConnectionSocket::OptionsSharedPtr& options, Runtime::RandomGenerator& random)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
   if (options) {

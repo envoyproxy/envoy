@@ -33,16 +33,15 @@ namespace {
 //
 // Note that choosing with replacement is only a good strategy for large port ranges;
 // if InstanceRanges with only a few ports in them are used, this file should
-// either choose without replacement or search linearly. 
+// either choose without replacement or search linearly.
 const int kBindingRangeNumberOfTries = 4;
 
-// Random port to try for port ranges.  
+// Random port to try for port ranges.
 uint32_t portToTry(uint32_t starting_port, uint32_t ending_port, Runtime::RandomGenerator& random) {
   double unitary_scaled_random_value =
       (static_cast<double>(random.random()) / std::numeric_limits<uint64_t>::max());
-  uint32_t port_to_try =
-      starting_port + static_cast<uint32_t>((ending_port + 1 - starting_port) *
-                                            unitary_scaled_random_value);
+  uint32_t port_to_try = starting_port + static_cast<uint32_t>((ending_port + 1 - starting_port) *
+                                                               unitary_scaled_random_value);
   // port_to_try has prob(0) of being ending_port_ + 1, but prob(0) != never.
   if (port_to_try == ending_port + 1) {
     port_to_try = ending_port;
@@ -87,7 +86,7 @@ int socketFromSocketType(SocketType socketType, Type addressType, IpVersion ipVe
   return fd;
 }
 
-}  // namespace
+} // namespace
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
@@ -338,10 +337,8 @@ int PipeInstance::socket(SocketType type) const {
   return socketFromSocketType(type, Type::Pipe, static_cast<IpVersion>(0));
 }
 
-Ipv4InstanceRange::Ipv4InstanceRange(
-    const std::string& address,
-    uint32_t starting_port,
-    uint32_t ending_port) {
+Ipv4InstanceRange::Ipv4InstanceRange(const std::string& address, uint32_t starting_port,
+                                     uint32_t ending_port) {
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   int rc = inet_pton(AF_INET, address.c_str(), &ip_.ipv4_.address_.sin_addr);
@@ -356,8 +353,8 @@ Ipv4InstanceRange::Ipv4InstanceRange(
     throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
   }
   if (ending_port < starting_port) {
-    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
-                                     ending_port, starting_port));
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
   }
   starting_port_ = starting_port;
   ending_port_ = ending_port;
@@ -378,8 +375,8 @@ Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_por
     throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
   }
   if (ending_port < starting_port) {
-    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
-                                     ending_port, starting_port));
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
   }
   friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
 }
@@ -390,7 +387,8 @@ int Ipv4InstanceRange::bind(int fd, Runtime::RandomGenerator& random) const {
     sockaddr_in socket_address(ip_.ipv4_.address_);
     socket_address.sin_port =
         static_cast<in_port_t>(portToTry(starting_port_, ending_port_, random));
-    int ret = ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    int ret =
+        ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
     if (ret != EADDRINUSE)
       return ret;
   }
@@ -401,10 +399,8 @@ int Ipv4InstanceRange::socket(SocketType type) const {
   return socketFromSocketType(type, Type::Ip, IpVersion::v4);
 }
 
-Ipv6InstanceRange::Ipv6InstanceRange(
-    const std::string& address,
-    uint32_t starting_port,
-    uint32_t ending_port) {
+Ipv6InstanceRange::Ipv6InstanceRange(const std::string& address, uint32_t starting_port,
+                                     uint32_t ending_port) {
   memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
   ip_.ipv6_.address_.sin6_family = AF_INET6;
   if (!address.empty()) {
@@ -422,8 +418,8 @@ Ipv6InstanceRange::Ipv6InstanceRange(
     throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
   }
   if (ending_port < starting_port) {
-    throw EnvoyException(fmt::format("ending ip port '{}' < starting ip port '{}'",
-                                     ending_port, starting_port));
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
   }
   starting_port_ = starting_port;
   ending_port_ = ending_port;
@@ -441,7 +437,8 @@ int Ipv6InstanceRange::bind(int fd, Runtime::RandomGenerator&) const {
   for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
     sockaddr_in6 socket_address(ip_.ipv6_.address_);
     socket_address.sin6_port = static_cast<in_port_t>(port_to_try);
-    int ret = ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    int ret =
+        ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
     if (ret != EADDRINUSE)
       return ret;
   }

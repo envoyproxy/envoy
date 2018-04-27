@@ -160,7 +160,7 @@ public:
 typedef std::shared_ptr<const Instance> InstanceConstSharedPtr;
 
 /**
- * Interface for all network addresses that may include ranges of ports.  
+ * Interface for all network addresses that may include ranges of ports.
  */
 class InstanceRange {
 public:
@@ -184,14 +184,14 @@ public:
    * @return a human readable string for the address that represents the
    * logical/unresolved name.
    *
-   * This string has a source-dependent format and should be obviously 
-   * convertable to a set of names for Address::instances that can be resolved by 
+   * This string has a source-dependent format and should be obviously
+   * convertable to a set of names for Address::instances that can be resolved by
    * a Network::Address::Resolver.
    */
   virtual const std::string& logicalName() const PURE;
 
   /**
-   * Bind a socket to this address range. The socket should have been created with a call to 
+   * Bind a socket to this address range. The socket should have been created with a call to
    * socket() on an Instance of the same address family.
    * @param fd supplies the platform socket handle.
    * @param random may be used to randomize the port in the port range.
@@ -207,14 +207,14 @@ public:
 
   /**
    * @return the starting port of the port range (inclusive).
-   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to 
+   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to
    * a single pipe) this value will be 0.
    */
   virtual uint32_t starting_port() const PURE;
 
   /**
    * @return the ending port of the port range (inclusive).
-   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to 
+   * If this is a degenerate pipe InstanceRange (i.e. an address instance referring to
    * a single pipe) this value will be 0.
    */
   virtual uint32_t ending_port() const PURE;

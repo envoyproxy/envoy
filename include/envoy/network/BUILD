@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["address.h"],
     deps = [
         "//include/envoy/runtime:runtime_interface",
-    ]
+    ],
 )
 
 envoy_cc_library(

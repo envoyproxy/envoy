@@ -80,17 +80,14 @@ DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
                                                    std::move(transport_socket), true);
 }
 
-Network::ClientConnectionPtr
-DispatcherImpl::createClientConnection(
+Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
     Network::Address::InstanceConstSharedPtr address,
     Network::Address::InstanceRangeConstSharedPtr source_address_range,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Runtime::RandomGenerator& random) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options, Runtime::RandomGenerator& random) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address_range,
-                                                         std::move(transport_socket), options,
-                                                         random);
+  return std::make_unique<Network::ClientConnectionImpl>(
+      *this, address, source_address_range, std::move(transport_socket), options, random);
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(

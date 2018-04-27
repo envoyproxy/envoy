@@ -16,7 +16,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
-	"//source/common/runtime:runtime_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 

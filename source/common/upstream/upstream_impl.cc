@@ -50,7 +50,7 @@ getSourceAddressRange(const envoy::api::v2::Cluster& cluster,
   } else {
     return nullptr;
   }
-    
+
   return Network::Address::resolveProtoSocketAddressRange(config->source_address_port_range());
 }
 
@@ -605,7 +605,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, cm.randomGenerator(), added_via_api),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
+                      cm.randomGenerator(), added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {

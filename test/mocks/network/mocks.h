@@ -157,9 +157,8 @@ public:
 
   MOCK_METHOD1(resolve,
                Address::InstanceConstSharedPtr(const envoy::api::v2::core::SocketAddress&));
-  MOCK_METHOD1(resolve,
-               Address::InstanceRangeConstSharedPtr(
-                   const envoy::api::v2::core::SocketAddressPortRange&));
+  MOCK_METHOD1(resolve, Address::InstanceRangeConstSharedPtr(
+                            const envoy::api::v2::core::SocketAddressPortRange&));
   MOCK_CONST_METHOD0(name, std::string());
 };
 

@@ -264,8 +264,8 @@ public:
     dispatcher_.reset(new Event::DispatcherImpl);
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(), nullptr,
-        random_);
+        socket_.localAddress(), source_address_range_, Network::Test::createRawBufferSocket(),
+        nullptr, random_);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 

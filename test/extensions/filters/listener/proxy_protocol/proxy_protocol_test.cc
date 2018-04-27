@@ -47,9 +47,9 @@ public:
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy") {
     connection_handler_->addListener(*this);
-    conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
-                                               Network::Address::InstanceRangeConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr, random_);
+    conn_ = dispatcher_.createClientConnection(
+        socket_.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
@@ -332,9 +332,9 @@ public:
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy") {
     connection_handler_->addListener(*this);
-    conn_ = dispatcher_.createClientConnection(local_dst_address_,
-                                               Network::Address::InstanceRangeConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr, random_);
+    conn_ = dispatcher_.createClientConnection(
+        local_dst_address_, Network::Address::InstanceRangeConstSharedPtr(),
+        Network::Test::createRawBufferSocket(), nullptr, random_);
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))

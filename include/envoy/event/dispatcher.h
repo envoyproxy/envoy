@@ -53,13 +53,13 @@ public:
   /**
    * Create a client connection.
    * @param address supplies the address to connect to.
-   * @param source_address_range supplies an address range to bind to or nullptr if no 
+   * @param source_address_range supplies an address range to bind to or nullptr if no
    *        bind is necessary.
    * @param transport_socket supplies a transport socket to be used by the connection.
    * @param options the socket options to be set on the underlying socket before anything is sent
    *        on the socket.
-   * @param random a random generator to be used for aspects of client connection (e.g. binding 
-   *        to a port range) that may need to be randomized. 
+   * @param random a random generator to be used for aspects of client connection (e.g. binding
+   *        to a port range) that may need to be randomized.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
   virtual Network::ClientConnectionPtr

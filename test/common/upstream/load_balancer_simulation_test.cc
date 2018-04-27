@@ -22,16 +22,14 @@ namespace Envoy {
 namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 RandomGenerator& random,
-                                 const std::string& url, uint32_t weight = 1,
-                                 const std::string& zone = "") {
+                                 RandomGenerator& random, const std::string& url,
+                                 uint32_t weight = 1, const std::string& zone = "") {
   envoy::api::v2::core::Locality locality;
   locality.set_zone(zone);
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                   envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(),
-                   random)};
+  return HostSharedPtr{new HostImpl(
+      cluster, "", Network::Utility::resolveUrl(url),
+      envoy::api::v2::core::Metadata::default_instance(), weight, locality,
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), random)};
 }
 
 /**
