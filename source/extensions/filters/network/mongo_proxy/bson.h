@@ -40,6 +40,7 @@ public:
     DATETIME = 0x09,
     NULL_VALUE = 0x0A,
     REGEX = 0x0B,
+    SYMBOL = 0x0E,
     INT32 = 0x10,
     TIMESTAMP = 0x11,
     INT64 = 0x12
@@ -66,6 +67,7 @@ public:
 
   virtual double asDouble() const PURE;
   virtual const std::string& asString() const PURE;
+  virtual const std::string& asSymbol() const PURE;
   virtual const Document& asDocument() const PURE;
   virtual const Document& asArray() const PURE;
   virtual const std::string& asBinary() const PURE;
@@ -96,6 +98,7 @@ public:
 
   virtual DocumentSharedPtr addDouble(const std::string& key, double value) PURE;
   virtual DocumentSharedPtr addString(const std::string& key, std::string&& value) PURE;
+  virtual DocumentSharedPtr addSymbol(const std::string& key, std::string&& value) PURE;
   virtual DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) PURE;
   virtual DocumentSharedPtr addArray(const std::string& key, DocumentSharedPtr value) PURE;
   virtual DocumentSharedPtr addBinary(const std::string& key, std::string&& value) PURE;
