@@ -272,6 +272,7 @@ private:
     Tracing::SpanPtr span_;
     RequestInfo::RequestInfoImpl request_info_;
     Http::HeaderMap* upstream_headers_{};
+    Http::HeaderMap* upstream_trailers_{};
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;

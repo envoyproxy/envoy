@@ -46,7 +46,7 @@ public:
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo()));
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
-      return main_config.clusterManager();
+      return *main_config.clusterManager();
     }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))

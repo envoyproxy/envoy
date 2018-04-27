@@ -217,19 +217,19 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. This is required by SharedMemoryHashSet.
+   * and padding for alignment. This is required by BlockMemoryHashSet.
    */
   static size_t size();
 
   /**
    * Initializes this object to have the specified key,
    * a refcount of 1, and all other values zero. This is required by
-   * SharedMemoryHashSet.
+   * BlockMemoryHashSet.
    */
   void initialize(absl::string_view key);
 
   /**
-   * Returns a hash of the key. This is required by SharedMemoryHashSet.
+   * Returns a hash of the key. This is required by BlockMemoryHashSet.
    */
   static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
 
@@ -239,7 +239,7 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns the name as a string_view. This is required by SharedMemoryHashSet.
+   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
    */
   absl::string_view key() const {
     return absl::string_view(name_, strnlen(name_, maxNameLength()));

@@ -14,6 +14,8 @@
 #include "common/ssl/ssl_socket.h"
 #include "common/stats/stats_impl.h"
 
+#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"

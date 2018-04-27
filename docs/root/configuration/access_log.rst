@@ -164,6 +164,13 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%TRAILER(X?Y):Z%
+  HTTP
+    Same as **%REQ(X?Y):Z%** but taken from HTTP response trailers.
+
+  TCP
+    Not implemented ("-").
+
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,

@@ -369,6 +369,13 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
 }
 
+TEST_P(AdminInstanceTest, TracingStatsDisabled) {
+  const std::string& name = admin_.tracingStats().service_forced_.name();
+  for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
+    EXPECT_NE(counter->name(), name) << "Unexpected tracing stat found in server stats: " << name;
+  }
+}
+
 TEST(PrometheusStatsFormatter, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";

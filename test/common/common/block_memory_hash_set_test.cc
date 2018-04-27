@@ -4,17 +4,17 @@
 #include <memory>
 #include <string>
 
+#include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
-#include "common/common/shared_memory_hash_set.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-// Tests SharedMemoryHashSet.
-class SharedMemoryHashSetTest : public testing::Test {
+// Tests BlockMemoryHashSet.
+class BlockMemoryHashSetTest : public testing::Test {
 protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
@@ -40,12 +40,12 @@ protected:
     static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
   };
 
-  typedef SharedMemoryHashSet<TestValue>::ValueCreatedPair ValueCreatedPair;
+  typedef BlockMemoryHashSet<TestValue>::ValueCreatedPair ValueCreatedPair;
 
   template <class TestValueClass> void setUp() {
     options_.capacity = 100;
     options_.num_slots = 5;
-    const uint32_t mem_size = SharedMemoryHashSet<TestValueClass>::numBytes(options_);
+    const uint32_t mem_size = BlockMemoryHashSet<TestValueClass>::numBytes(options_);
     memory_.reset(new uint8_t[mem_size]);
     memset(memory_.get(), 0, mem_size);
   }
@@ -55,9 +55,9 @@ protected:
    * bits and the keys in each slot.
    */
   template <class TestValueClass>
-  std::string hashSetToString(SharedMemoryHashSet<TestValueClass>& hs) {
+  std::string hashSetToString(BlockMemoryHashSet<TestValueClass>& hs) {
     std::string ret;
-    static const uint32_t sentinal = SharedMemoryHashSet<TestValueClass>::Sentinal;
+    static const uint32_t sentinal = BlockMemoryHashSet<TestValueClass>::Sentinal;
     std::string control_string =
         fmt::format("{} size={} free_cell_index={}", hs.control_->options.toString(),
                     hs.control_->size, hs.control_->free_cell_index);
@@ -72,15 +72,15 @@ protected:
     return ret;
   }
 
-  SharedMemoryHashSetOptions options_;
+  BlockMemoryHashSetOptions options_;
   std::unique_ptr<uint8_t[]> memory_;
 };
 
-TEST_F(SharedMemoryHashSetTest, initAndAttach) {
+TEST_F(BlockMemoryHashSetTest, initAndAttach) {
   setUp<TestValue>();
   {
-    SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());  // init
-    SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get()); // attach
+    BlockMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());  // init
+    BlockMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get()); // attach
   }
 
   // If we tweak an option, we can no longer attach it.
@@ -88,7 +88,7 @@ TEST_F(SharedMemoryHashSetTest, initAndAttach) {
   bool constructor_threw = false;
   try {
     options_.capacity = 99;
-    SharedMemoryHashSet<TestValue> hash_set3(options_, false, memory_.get());
+    BlockMemoryHashSet<TestValue> hash_set3(options_, false, memory_.get());
     constructor_completed = false;
   } catch (const std::exception& e) {
     constructor_threw = true;
@@ -97,10 +97,10 @@ TEST_F(SharedMemoryHashSetTest, initAndAttach) {
   EXPECT_FALSE(constructor_completed);
 }
 
-TEST_F(SharedMemoryHashSetTest, putRemove) {
+TEST_F(BlockMemoryHashSetTest, putRemove) {
   setUp<TestValue>();
   {
-    SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
+    BlockMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
     hash_set1.sanityCheck();
     EXPECT_EQ(0, hash_set1.size());
     EXPECT_EQ(nullptr, hash_set1.get("no such key"));
@@ -121,7 +121,7 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
 
   {
     // Now init a new hash-map with the same memory.
-    SharedMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get());
+    BlockMemoryHashSet<TestValue> hash_set2(options_, false, memory_.get());
     EXPECT_EQ(1, hash_set2.size());
     EXPECT_EQ(nullptr, hash_set2.get("no such key"));
     EXPECT_EQ(6789, hash_set2.get("good key")->number) << hashSetToString<TestValue>(hash_set2);
@@ -134,9 +134,9 @@ TEST_F(SharedMemoryHashSetTest, putRemove) {
   }
 }
 
-TEST_F(SharedMemoryHashSetTest, tooManyValues) {
+TEST_F(BlockMemoryHashSetTest, tooManyValues) {
   setUp<TestValue>();
-  SharedMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
+  BlockMemoryHashSet<TestValue> hash_set1(options_, true, memory_.get());
   std::vector<std::string> keys;
   for (uint32_t i = 0; i < options_.capacity + 1; ++i) {
     keys.push_back(fmt::format("key{}", i));
@@ -178,9 +178,9 @@ TEST_F(SharedMemoryHashSetTest, tooManyValues) {
   hash_set1.sanityCheck();
 }
 
-TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
+TEST_F(BlockMemoryHashSetTest, severalKeysZeroHash) {
   setUp<TestValueZeroHash>();
-  SharedMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
+  BlockMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
   hash_set1.insert("one").first->number = 1;
   hash_set1.insert("two").first->number = 2;
   hash_set1.insert("three").first->number = 3;
@@ -192,9 +192,9 @@ TEST_F(SharedMemoryHashSetTest, severalKeysZeroHash) {
   hash_set1.sanityCheck();
 }
 
-TEST_F(SharedMemoryHashSetTest, sanityCheckZeroedMemoryDeathTest) {
+TEST_F(BlockMemoryHashSetTest, sanityCheckZeroedMemoryDeathTest) {
   setUp<TestValueZeroHash>();
-  SharedMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
+  BlockMemoryHashSet<TestValueZeroHash> hash_set1(options_, true, memory_.get());
   memset(memory_.get(), 0, hash_set1.numBytes());
   EXPECT_DEATH(hash_set1.sanityCheck(), "");
 }

@@ -263,8 +263,12 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  ASSERT(key.size() <= maxNameLength());
-  ASSERT(absl::string_view::npos == key.find(':'));
+  if (key.size() > maxNameLength()) {
+    ENVOY_LOG_MISC(
+        warn,
+        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
+        key.size(), maxNameLength());
+  }
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.

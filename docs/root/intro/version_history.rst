@@ -4,6 +4,7 @@ Version history
 1.7.0 (Pending)
 ===============
 
+* access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * admin: added :http:get:`/config_dump` for dumping current configs

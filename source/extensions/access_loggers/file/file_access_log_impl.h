@@ -17,6 +17,7 @@ public:
 
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+           const Http::HeaderMap* response_trailers,
            const RequestInfo::RequestInfo& request_info) override;
 
 private:

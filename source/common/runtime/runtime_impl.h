@@ -143,10 +143,12 @@ private:
     DIR* dir_;
   };
 
-  void walkDirectory(const std::string& path, const std::string& prefix);
+  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth);
 
   const std::string path_;
   Api::OsSysCalls& os_sys_calls_;
+  // Maximum recursion depth for walkDirectory().
+  const uint32_t MaxWalkDepth = 16;
 };
 
 /**

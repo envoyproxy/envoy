@@ -108,8 +108,10 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   Protobuf::util::JsonOptions json_options;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
-  // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  if (!status.ok()) {
+    throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
+                                     status.ToString(), source.DebugString()));
+  }
   MessageUtil::loadFromJson(json, dest);
 }
 
@@ -128,6 +130,9 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   switch (kind) {
+  case ProtobufWkt::Value::KIND_NOT_SET:
+    return v2.kind_case() == ProtobufWkt::Value::KIND_NOT_SET;
+
   case ProtobufWkt::Value::kNullValue:
     return true;
 
@@ -176,6 +181,32 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   default:
     NOT_REACHED;
   }
+}
+
+namespace {
+
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  if (duration.seconds() < 0 || duration.nanos() < 0) {
+    throw DurationUtil::OutOfRangeException(
+        fmt::format("Expected positive duration: {}", duration.DebugString()));
+  }
+  if (duration.nanos() > 999999999 ||
+      duration.seconds() > Protobuf::util::TimeUtil::kDurationMaxSeconds) {
+    throw DurationUtil::OutOfRangeException(
+        fmt::format("Duration out-of-range: {}", duration.DebugString()));
+  }
+}
+
+} // namespace
+
+uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration);
+  return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
+}
+
+uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration);
+  return Protobuf::util::TimeUtil::DurationToSeconds(duration);
 }
 
 } // namespace Envoy
