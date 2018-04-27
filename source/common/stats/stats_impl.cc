@@ -160,10 +160,11 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
         key.size(), Stats::RawStatData::maxNameLength());
   }
 
-  auto ret = stats_set_.insert(std::pair<std::string, RawStatData*>(std::string(key), nullptr));
+  auto ret = stats_set_.insert(StringRawDataMap::value_type(std::string(key), nullptr));
   RawStatData*& data = ret.first->second;
   if (ret.second) {
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
+    RELEASE_ASSERT(data);
     data->initialize(key);
   } else {
     ++data->ref_count_;
