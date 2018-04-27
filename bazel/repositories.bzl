@@ -73,16 +73,22 @@ def _build_recipe_repository_impl(ctxt):
 
     # Run the build script.
     environment = {}
-    print("Fetching external dependencies...")
+    if ("ENVOY_BAZEL_VERBOSE" in ctxt.os.environ):
+        print("Fetching external dependencies...")
     result = ctxt.execute(
         ["./repositories.sh"] + ctxt.attr.recipes,
         environment = environment,
         quiet = False,
     )
-    print(result.stdout)
-    print(result.stderr)
-    print("External dep build exited with return code: %d" % result.return_code)
+    if ("ENVOY_BAZEL_VERBOSE" in ctxt.os.environ):
+        print(result.stdout)
+        print(result.stderr)
+        print("External dep build exited with return code: %d" % result.return_code)
     if result.return_code != 0:
+        if ("ENVOY_BAZEL_VERBOSE" not in ctxt.os.environ):
+            print(result.stdout)
+            print(result.stderr)
+            print("External dep build exited with return code: %d" % result.return_code)
         print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
               "for errors and ensure all prerequisites at " +
               "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
