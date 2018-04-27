@@ -26,6 +26,8 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
 }
 
 void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
+  init_failure_ = true;
+
   Code http_code = Code::InternalServerError;
   switch (failure_reason) {
   case UpstreamFailureReason::CONNECT_FAILED:
@@ -45,6 +47,11 @@ void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
 Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
             end_stream);
+
+  if (init_failure_) {
+    ENVOY_LOG(debug, "WsHandlerImpl::onData init_failure_ == true; discarding");
+    return Network::FilterStatus::StopIteration;
+  }
 
   // If we are connected to upstream, then data should have been drained already.
   // And if we're not connected yet, it is expected that TcpProxy will readDisable(true)

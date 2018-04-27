@@ -62,6 +62,7 @@ private:
   Buffer::OwnedImpl queued_data_;
   bool queued_end_stream_{false};
   bool is_connected_{false};
+  bool init_failure_{false};
 };
 
 typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;
