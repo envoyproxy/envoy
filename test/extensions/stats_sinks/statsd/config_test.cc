@@ -2,7 +2,6 @@
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
-
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
