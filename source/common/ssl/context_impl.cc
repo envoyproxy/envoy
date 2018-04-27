@@ -411,13 +411,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
-    if (SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str()) == 0) {
-      const uint64_t err = ERR_get_error();
-      ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err, ERR_lib_error_string(err),
-                     ERR_func_error_string(err), ERR_reason_error_string(err));
-
-      return nullptr;
-    }
+    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
+    RELEASE_ASSERT(rc);
   }
 
   return ssl_con;

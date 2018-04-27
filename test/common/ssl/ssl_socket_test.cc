@@ -2278,27 +2278,5 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   disconnect();
 }
 
-// When an invalid SNI is set on a client socket, the socket instantly closes
-// and behaves closed.
-TEST(SslSocketFailTest, BadSni) {
-  Stats::IsolatedStoreImpl stats_store;
-  Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
-  envoy::api::v2::auth::UpstreamTlsContext client_ctx_proto;
-  client_ctx_proto.set_sni(std::string(1024, 'A'));
-  ClientContextConfigImpl client_ctx_config(client_ctx_proto);
-  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
-  SslSocket socket(*client_ctx, InitialState::Client);
-  Network::MockTransportSocketCallbacks callbacks;
-  socket.setTransportSocketCallbacks(callbacks);
-  EXPECT_CALL(callbacks, raiseEvent(Network::ConnectionEvent::RemoteClose));
-  socket.onConnected();
-  Buffer::OwnedImpl data("hello");
-  const Network::IoResult read_result = socket.doRead(data);
-  EXPECT_EQ(Network::PostIoAction::Close, read_result.action_);
-  const Network::IoResult write_result = socket.doWrite(data, false);
-  EXPECT_EQ(Network::PostIoAction::Close, write_result.action_);
-}
-
 } // namespace Ssl
 } // namespace Envoy

@@ -196,9 +196,6 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
-MockTransportSocketCallbacks::MockTransportSocketCallbacks() {}
-MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
-
 MockTransportSocket::MockTransportSocket() {}
 MockTransportSocket::~MockTransportSocket() {}
 
