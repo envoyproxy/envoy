@@ -57,12 +57,14 @@ FormatterImpl::FormatterImpl(const std::string& format) {
 
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
                                   const Http::HeaderMap& response_headers,
+                                  const Http::HeaderMap& response_trailers,
                                   const RequestInfo::RequestInfo& request_info) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const FormatterPtr& formatter : formatters_) {
-    log_line += formatter->format(request_headers, response_headers, request_info);
+    log_line +=
+        formatter->format(request_headers, response_headers, response_trailers, request_info);
   }
 
   return log_line;
@@ -169,6 +171,14 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
 
         formatters.emplace_back(
             new ResponseHeaderFormatter(main_header, alternative_header, max_length));
+      } else if (token.find("TRAILER(") == 0) {
+        std::string main_header, alternative_header;
+        absl::optional<size_t> max_length;
+
+        parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
+
+        formatters.emplace_back(
+            new ResponseTrailerFormatter(main_header, alternative_header, max_length));
       } else if (token.find(DYNAMIC_META_TOKEN) == 0) {
         std::string filter_namespace;
         absl::optional<size_t> max_length;
@@ -285,6 +295,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
 }
 
 std::string RequestInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                         const Http::HeaderMap&,
                                          const RequestInfo::RequestInfo& request_info) const {
   return field_extractor_(request_info);
 }
@@ -292,6 +303,7 @@ std::string RequestInfoFormatter::format(const Http::HeaderMap&, const Http::Hea
 PlainStringFormatter::PlainStringFormatter(const std::string& str) : str_(str) {}
 
 std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                         const Http::HeaderMap&,
                                          const RequestInfo::RequestInfo&) const {
   return str_;
 }
@@ -329,6 +341,7 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
 
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
+                                            const Http::HeaderMap&,
                                             const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(response_headers);
 }
@@ -339,9 +352,20 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
     : HeaderFormatter(main_header, alternative_header, max_length) {}
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
-                                           const Http::HeaderMap&,
+                                           const Http::HeaderMap&, const Http::HeaderMap&,
                                            const RequestInfo::RequestInfo&) const {
   return HeaderFormatter::format(request_headers);
+}
+
+ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
+                                                   const std::string& alternative_header,
+                                                   absl::optional<size_t> max_length)
+    : HeaderFormatter(main_header, alternative_header, max_length) {}
+
+std::string ResponseTrailerFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                             const Http::HeaderMap& response_trailers,
+                                             const RequestInfo::RequestInfo&) const {
+  return HeaderFormatter::format(response_trailers);
 }
 
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
@@ -381,6 +405,7 @@ DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_nam
     : MetadataFormatter(filter_namespace, path, max_length) {}
 
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                             const Http::HeaderMap&,
                                              const RequestInfo::RequestInfo& request_info) const {
   return MetadataFormatter::format(request_info.dynamicMetadata());
 }
@@ -388,6 +413,7 @@ std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http:
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
 
 std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                       const Http::HeaderMap&,
                                        const RequestInfo::RequestInfo& request_info) const {
   if (date_formatter_.formatString().empty()) {
     return AccessLogDateTimeFormatter::fromTime(request_info.startTime());

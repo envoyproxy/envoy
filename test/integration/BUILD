@@ -221,7 +221,7 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
