@@ -4,7 +4,7 @@ from collections import OrderedDict
 import os
 import sys
 import shutil
-# import yaml
+import yaml
 
 SCRIPT_DIR = os.path.dirname(__file__)
 OUT_DIR = sys.argv[1]
@@ -86,9 +86,9 @@ def generate_config(template_path, template, output_file, **context):
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path, followlinks=True),
                              undefined=jinja2.StrictUndefined)
     raw_output = env.get_template(template).render(**context)
-    print raw_output
-    # with open(output_file, 'w') as fh:
-        # yaml.dump(raw_output, fh)
+    # print raw_output
+    with open(output_file, 'w') as fh:
+        yaml.dump(raw_output, fh)
 
 # Generate a demo config for the main front proxy. This sets up both HTTP and HTTPS listeners,
 # as well as a listener for the double proxy to connect to via SSL client authentication.
