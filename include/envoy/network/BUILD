@@ -11,6 +11,9 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
+    deps = [
+        "//include/envoy/runtime:runtime_interface",
+    ],
 )
 
 envoy_cc_library(

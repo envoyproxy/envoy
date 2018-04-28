@@ -54,12 +54,12 @@ Network::ClientConnectionPtr SslIntegrationTest::makeSslClientConnection(bool al
         address, Network::Address::InstanceConstSharedPtr(),
         san ? client_ssl_ctx_alpn_san_->createTransportSocket()
             : client_ssl_ctx_alpn_->createTransportSocket(),
-        nullptr);
+        nullptr, random_);
   } else {
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                san ? client_ssl_ctx_san_->createTransportSocket()
                                                    : client_ssl_ctx_plain_->createTransportSocket(),
-                                               nullptr);
+                                               nullptr, random_);
   }
 }
 

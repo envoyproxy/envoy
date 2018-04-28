@@ -37,11 +37,12 @@ public:
 
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
+                         Network::Address::InstanceRangeConstSharedPtr source_address_range,
                          Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         RandomGenerator&) override {
     return Network::ClientConnectionPtr{
-        createClientConnection_(address, source_address, transport_socket, options)};
+        createClientConnection_(address, source_address_range, transport_socket, options)};
   }
 
   FileEventPtr createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,
@@ -81,7 +82,7 @@ public:
   MOCK_METHOD4(
       createClientConnection_,
       Network::ClientConnection*(Network::Address::InstanceConstSharedPtr address,
-                                 Network::Address::InstanceConstSharedPtr source_address,
+                                 Network::Address::InstanceRangeConstSharedPtr source_address,
                                  Network::TransportSocketPtr& transport_socket,
                                  const Network::ConnectionSocket::OptionsSharedPtr& options));
   MOCK_METHOD1(createDnsResolver,

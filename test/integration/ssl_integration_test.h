@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "source/common/runtime/runtime_impl.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
@@ -36,6 +38,7 @@ private:
   Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;
   Network::TransportSocketFactoryPtr client_ssl_ctx_san_;
   Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_san_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 } // namespace Ssl

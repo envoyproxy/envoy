@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/logger.h"
@@ -173,11 +174,13 @@ private:
  */
 class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnection {
 public:
+  // Note that a reference to the RandomGenerator will not be held by the constructor.
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
-                       const Address::InstanceConstSharedPtr& source_address,
+                       const Address::InstanceRangeConstSharedPtr& source_address_range,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       Runtime::RandomGenerator& random);
 
   // Network::ClientConnection
   void connect() override;

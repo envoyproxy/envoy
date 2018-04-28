@@ -14,10 +14,10 @@ namespace Event {
  */
 class ValidationDispatcher : public DispatcherImpl {
 public:
-  Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr,
-                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr, Network::Address::InstanceRangeConstSharedPtr,
+      Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Runtime::RandomGenerator&) override;
   Network::DnsResolverSharedPtr createDnsResolver(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
   Network::ListenerPtr createListener(Network::Socket&, Network::ListenerCallbacks&,

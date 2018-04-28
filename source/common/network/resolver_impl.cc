@@ -35,6 +35,34 @@ public:
     }
   }
 
+  InstanceRangeConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddressPortRange& socket_address_port_range) override {
+    uint32_t starting_port = socket_address_port_range.port_range().port_value_start();
+    uint32_t ending_port = socket_address_port_range.port_range().port_value_end();
+    if (ending_port < starting_port) {
+      throw EnvoyException(
+          fmt::format("IP resolver given port range with end before start: [{}, {}]", starting_port,
+                      ending_port));
+    }
+    if (static_cast<in_port_t>(ending_port) != ending_port) {
+      throw EnvoyException(
+          fmt::format("IP resolver given port to large for in_port_t: {}", ending_port));
+    }
+
+    InstanceConstSharedPtr instance =
+        Network::Utility::parseInternetAddress(socket_address_port_range.address(), starting_port,
+                                               !socket_address_port_range.ipv4_compat());
+    ASSERT(instance->type() == Type::Ip);
+    switch (instance->ip()->version()) {
+    case IpVersion::v4:
+      return std::make_shared<Ipv4InstanceRange>(instance->ip()->addressAsString(), starting_port,
+                                                 ending_port);
+    case IpVersion::v6:
+      return std::make_shared<Ipv6InstanceRange>(instance->ip()->addressAsString(), starting_port,
+                                                 ending_port);
+    }
+  }
+
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
 };
 
@@ -68,6 +96,22 @@ resolveProtoSocketAddress(const envoy::api::v2::core::SocketAddress& socket_addr
     throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
   }
   return resolver->resolve(socket_address);
+}
+
+InstanceRangeConstSharedPtr resolveProtoSocketAddressRange(
+    const envoy::api::v2::core::SocketAddressPortRange& socket_address_port_range) {
+  Resolver* resolver = nullptr;
+  const std::string& resolver_name = socket_address_port_range.resolver_name();
+  if (resolver_name.empty()) {
+    resolver =
+        Registry::FactoryRegistry<Resolver>::getFactory(Config::AddressResolverNames::get().IP);
+  } else {
+    resolver = Registry::FactoryRegistry<Resolver>::getFactory(resolver_name);
+  }
+  if (resolver == nullptr) {
+    throw EnvoyException(fmt::format("Unknown address resolver: {}", resolver_name));
+  }
+  return resolver->resolve(socket_address_port_range);
 }
 
 } // namespace Address

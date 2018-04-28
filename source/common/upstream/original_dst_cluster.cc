@@ -19,9 +19,10 @@ namespace Upstream {
 // OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
 // and throws an exception otherwise.
 
-OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent)
+OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent,
+                                               Runtime::RandomGenerator& random)
     : priority_set_(priority_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
-      info_(parent->info()) {
+      info_(parent->info()), random_(random) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -64,7 +65,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             info_, info_->name() + dst_addr.asString(), std::move(host_ip_port),
             envoy::api::v2::core::Metadata::default_instance(), 1,
             envoy::api::v2::core::Locality().default_instance(),
-            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), random_));
 
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
         // Add the new host to the map. We just failed to find it in
@@ -97,7 +98,8 @@ OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                        Event::Dispatcher& dispatcher, bool added_via_api)
-    : ClusterImplBase(config, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
+    : ClusterImplBase(config, cm.bindConfig(), runtime, stats, ssl_context_manager,
+                      cm.randomGenerator(), added_via_api),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
                                    PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {

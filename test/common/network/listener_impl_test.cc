@@ -1,6 +1,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -31,10 +32,11 @@ static void errorCallbackTest(Address::IpVersion version) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher.createListener(socket, listener_callbacks, true, false);
+  Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
   EXPECT_CALL(listener_callbacks, onAccept_(_, _))
@@ -129,10 +131,11 @@ TEST_P(ListenerImplTest, UseActualDst) {
   Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks1, true, true);
   Network::MockListenerCallbacks listener_callbacks2;
   Network::TestListenerImpl listenerDst(dispatcher, socketDst, listener_callbacks2, false, false);
+  Runtime::RandomGeneratorImpl random;
 
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      socket.localAddress(), Network::Address::InstanceRangeConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).Times(0);
@@ -163,12 +166,13 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
   Network::MockConnectionHandler connection_handler;
   // Do not redirect since use_original_dst is false.
   Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, true);
+  Runtime::RandomGeneratorImpl random;
 
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      local_dst_address, Network::Address::InstanceRangeConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_)).WillOnce(Return(local_dst_address));
@@ -210,14 +214,15 @@ TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
 
   // Do not redirect since use_original_dst is false.
   Network::TestListenerImpl listener(dispatcher, socket, listener_callbacks, true, true);
+  Runtime::RandomGeneratorImpl random;
 
   auto listener_address = Network::Utility::getAddressWithPort(
       *Network::Test::getCanonicalLoopbackAddress(version_), socket.localAddress()->ip()->port());
   auto local_dst_address = Network::Utility::getAddressWithPort(
       *Network::Utility::getCanonicalIpv4LoopbackAddress(), socket.localAddress()->ip()->port());
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
-      local_dst_address, Network::Address::InstanceConstSharedPtr(),
-      Network::Test::createRawBufferSocket(), nullptr);
+      local_dst_address, Network::Address::InstanceRangeConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), nullptr, random);
   client_connection->connect();
 
   EXPECT_CALL(listener, getLocalAddress(_))

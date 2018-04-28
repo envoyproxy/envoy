@@ -56,7 +56,6 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  int socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -97,6 +96,8 @@ public:
   int socket(SocketType type) const override;
 
 private:
+  friend class Ipv4InstanceRange; // For access to helper classes.
+
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -156,6 +157,8 @@ public:
   int socket(SocketType type) const override;
 
 private:
+  friend class Ipv6InstanceRange; // For access to help structures.
+
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
@@ -216,6 +219,98 @@ private:
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
+};
+
+// Implementations of InstanceRange
+
+class Ipv4InstanceRange : public InstanceRange {
+public:
+  /**
+   * Construct from a string IPv4 address such as "1.2.3.4" as well as a starting and ending port.
+   */
+  Ipv4InstanceRange(const std::string& address, uint32_t starting_port, uint32_t ending_port);
+
+  /**
+   * Construct from a starting and ending port. The IPv4 address will be set to "any" and is
+   * suitable for binding a port to any available address.
+   */
+  Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_port);
+
+  // Network::Address::InstanceRange
+  bool operator==(const InstanceRange& rhs) const override { return asString() == rhs.asString(); }
+  const std::string& asString() const override { return friendly_name_; }
+  const std::string& logicalName() const override { return friendly_name_; }
+  int bind(int fd, Runtime::RandomGenerator& random) const override;
+  const Ip* ip() const override { return &ip_; }
+  uint32_t starting_port() const override { return starting_port_; }
+  uint32_t ending_port() const override { return ending_port_; }
+  int socket(SocketType type) const override;
+  Type type() const override { return Type::Ip; }
+
+private:
+  std::string friendly_name_;
+  Ipv4Instance::IpHelper ip_; // Valid except for port()
+  uint32_t starting_port_;
+  uint32_t ending_port_;
+};
+
+class Ipv6InstanceRange : public InstanceRange {
+public:
+  /**
+   * Construct from a string IPv4 address such as "1.2.3.4" as well as a starting and ending port.
+   */
+  Ipv6InstanceRange(const std::string& address, uint32_t starting_port, uint32_t ending_port);
+
+  /**
+   * Construct from a starting and ending port. The IPv4 address will be set to "any" and is
+   * suitable for binding a port to any available address.
+   */
+  Ipv6InstanceRange(uint32_t starting_port, uint32_t ending_port);
+
+  // Network::Address::InstanceRange
+  bool operator==(const InstanceRange& rhs) const override { return asString() == rhs.asString(); }
+  const std::string& asString() const override { return friendly_name_; }
+  const std::string& logicalName() const override { return friendly_name_; }
+  int bind(int fd, Runtime::RandomGenerator& random) const override;
+  const Ip* ip() const override { return &ip_; }
+  uint32_t starting_port() const override { return starting_port_; }
+  uint32_t ending_port() const override { return ending_port_; }
+  int socket(SocketType type) const override;
+  Type type() const override { return Type::Ip; }
+
+private:
+  std::string friendly_name_;
+  Ipv6Instance::IpHelper ip_; // Valid except for port()
+  uint32_t starting_port_;
+  uint32_t ending_port_;
+};
+
+class PipeInstanceRange : public InstanceRange {
+public:
+  /**
+   * Construct from an existing unix address.
+   */
+  explicit PipeInstanceRange(const sockaddr_un* address, socklen_t ss_len)
+      : instance_(address, ss_len) {}
+
+  /**
+   * Construct from a string pipe path.
+   */
+  explicit PipeInstanceRange(const std::string& pipe_path) : instance_(pipe_path) {}
+
+  // InstanceRange
+  bool operator==(const InstanceRange& rhs) const override { return asString() == rhs.asString(); }
+  const std::string& asString() const override { return instance_.asString(); }
+  const std::string& logicalName() const override { return instance_.logicalName(); }
+  int bind(int fd, Runtime::RandomGenerator&) const override { return instance_.bind(fd); }
+  const Ip* ip() const override { return nullptr; }
+  uint32_t starting_port() const override { return 0; }
+  uint32_t ending_port() const override { return 0; }
+  int socket(SocketType type) const override { return instance_.socket(type); }
+  Type type() const override { return Type::Pipe; }
+
+private:
+  PipeInstance instance_;
 };
 
 } // namespace Address

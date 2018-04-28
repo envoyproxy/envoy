@@ -7,6 +7,8 @@
 
 #include "common/http/codec_client.h"
 
+#include "source/common/runtime/runtime_impl.h"
+
 #include "test/config/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/server.h"
@@ -197,6 +199,8 @@ protected:
   bool autonomous_upstream_{false};
 
   bool enable_half_close_{false};
+
+  Runtime::RandomGeneratorImpl random_;
 
 private:
   // The codec type for the client-to-Envoy connection

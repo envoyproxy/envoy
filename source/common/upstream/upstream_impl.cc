@@ -38,20 +38,20 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-const Network::Address::InstanceConstSharedPtr
-getSourceAddress(const envoy::api::v2::Cluster& cluster,
-                 const envoy::api::v2::core::BindConfig& bind_config) {
+const Network::Address::InstanceRangeConstSharedPtr
+getSourceAddressRange(const envoy::api::v2::Cluster& cluster,
+                      const envoy::api::v2::core::BindConfig& bind_config) {
   // The source address from cluster config takes precedence.
-  if (cluster.upstream_bind_config().has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(
-        cluster.upstream_bind_config().source_address());
-  }
-  // If there's no source address in the cluster config, use any default from the bootstrap proto.
-  if (bind_config.has_source_address()) {
-    return Network::Address::resolveProtoSocketAddress(bind_config.source_address());
+  const envoy::api::v2::core::BindConfig* config = nullptr;
+  if (cluster.upstream_bind_config().has_source_address_port_range()) {
+    config = &cluster.upstream_bind_config();
+  } else if (bind_config.has_source_address_port_range()) {
+    config = &bind_config;
+  } else {
+    return nullptr;
   }
 
-  return nullptr;
+  return Network::Address::resolveProtoSocketAddressRange(config->source_address_port_range());
 }
 
 uint64_t parseFeatures(const envoy::api::v2::Cluster& config,
@@ -86,19 +86,20 @@ public:
 Host::CreateConnectionData
 HostImpl::createConnection(Event::Dispatcher& dispatcher,
                            const Network::ConnectionSocket::OptionsSharedPtr& options) const {
-  return {createConnection(dispatcher, *cluster_, address_, options), shared_from_this()};
+  return {createConnection(dispatcher, *cluster_, address_, options, random_), shared_from_this()};
 }
 
 Host::CreateConnectionData
 HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr),
+  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), nullptr, random_),
           shared_from_this()};
 }
 
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            Network::Address::InstanceConstSharedPtr address,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options) {
+                           const Network::ConnectionSocket::OptionsSharedPtr& options,
+                           Runtime::RandomGenerator& random) {
   Network::ConnectionSocket::OptionsSharedPtr cluster_options;
   if (cluster.features() & ClusterInfo::Features::FREEBIND) {
     cluster_options = std::make_shared<Network::ConnectionSocket::Options>();
@@ -110,8 +111,8 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     cluster_options = options;
   }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      cluster_options);
+      address, cluster.sourceAddressRange(),
+      cluster.transportSocketFactory().createTransportSocket(), cluster_options, random);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -242,7 +243,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
-      source_address_(getSourceAddress(config, bind_config)),
+      source_address_range_(getSourceAddressRange(config, bind_config)),
       lb_ring_hash_config_(envoy::api::v2::Cluster::RingHashLbConfig(config.ring_hash_lb_config())),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
@@ -392,9 +393,11 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
+                                 Ssl::ContextManager& ssl_context_manager,
+                                 Runtime::RandomGenerator& random, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
-                                                   ssl_context_manager, added_via_api)) {
+                                                   ssl_context_manager, added_via_api)),
+      random_(random) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -602,14 +605,15 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
+                      cm.randomGenerator(), added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
         envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), random_)});
   }
 }
 
@@ -753,7 +757,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api),
+                             cm.randomGenerator(), added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
@@ -837,7 +841,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               envoy::api::v2::core::Metadata::default_instance(), 1,
               envoy::api::v2::core::Locality().default_instance(),
-              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(),
+              parent_.random_));
         }
 
         HostVector hosts_added;

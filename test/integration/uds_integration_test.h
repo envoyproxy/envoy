@@ -6,6 +6,8 @@
 #include "common/http/codec_client.h"
 #include "common/stats/stats_impl.h"
 
+#include "source/common/runtime/runtime_impl.h"
+
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
@@ -46,6 +48,7 @@ public:
 
 protected:
   const bool abstract_namespace_;
+  Runtime::RandomGeneratorImpl random;
 };
 
 class UdsListenerIntegrationTest

@@ -22,14 +22,14 @@ namespace Envoy {
 namespace Upstream {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 const std::string& url, uint32_t weight = 1,
-                                 const std::string& zone = "") {
+                                 RandomGenerator& random, const std::string& url,
+                                 uint32_t weight = 1, const std::string& zone = "") {
   envoy::api::v2::core::Locality locality;
   locality.set_zone(zone);
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                   envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+  return HostSharedPtr{new HostImpl(
+      cluster, "", Network::Utility::resolveUrl(url),
+      envoy::api::v2::core::Metadata::default_instance(), weight, locality,
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), random)};
 }
 
 /**
@@ -133,7 +133,7 @@ public:
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        ret->push_back(newTestHost(info_, url, 1, zone));
+        ret->push_back(newTestHost(info_, random_, url, 1, zone));
       }
     }
 
@@ -152,7 +152,7 @@ public:
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        zone_hosts.push_back(newTestHost(info_, url, 1, zone));
+        zone_hosts.push_back(newTestHost(info_, random, url, 1, zone));
       }
 
       ret.push_back(std::move(zone_hosts));
@@ -173,6 +173,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  Runtime::RandomGeneratorImpl random_;
 };
 
 TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {

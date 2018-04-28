@@ -29,6 +29,14 @@ public:
   resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
 
   /**
+   * Resolve a custom address string and port range to an Address::InstanceRange.
+   * @param socket_address_port_range supplies the socket address port range to resolve.
+   * @return InstanceRangeConstSharedPtr appropriate Address::InstanceRange.
+   */
+  virtual InstanceRangeConstSharedPtr
+  resolve(const envoy::api::v2::core::SocketAddressPortRange& socket_address) PURE;
+
+  /**
    * @return std::string the identifying name for a particular implementation of
    * a resolver.
    */

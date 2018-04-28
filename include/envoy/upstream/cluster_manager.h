@@ -192,6 +192,12 @@ public:
    */
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+
+  /**
+   * This method returns a RandomGenerator that can be used if needed during cluster
+   * configuration and connection.
+   */
+  virtual Runtime::RandomGenerator& randomGenerator() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

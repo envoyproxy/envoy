@@ -136,10 +136,12 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
         return client_write_buffer_;
       }));
 
+  Runtime::RandomGeneratorImpl random;
   connection_ = dispatcher.createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
+      Network::Address::InstanceRangeConstSharedPtr(), Network::Test::createRawBufferSocket(),
+      nullptr, random);
 
   ON_CALL(*client_write_buffer_, drain(_))
       .WillByDefault(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::baseDrain));
@@ -221,7 +223,8 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port)),
-      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr));
+      Network::Address::InstanceRangeConstSharedPtr(), Network::Test::createRawBufferSocket(),
+      nullptr, random_));
 
   connection->enableHalfClose(enable_half_close_);
   return connection;

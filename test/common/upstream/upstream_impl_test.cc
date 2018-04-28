@@ -343,9 +343,11 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
+  Runtime::RandomGeneratorImpl randomGenerator;
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance());
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(),
+                randomGenerator);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
@@ -683,7 +685,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
+    EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddressRange()->asString());
   }
 
   const std::string cluster_address = "5.6.7.8";
@@ -692,7 +694,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     // Verify source address from cluster config is used when present.
     NiceMock<MockClusterManager> cm;
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressRange()->ip()->addressAsString());
   }
 
   {
@@ -700,7 +702,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
-    EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
+    EXPECT_EQ(cluster_address, cluster.info()->sourceAddressRange()->ip()->addressAsString());
   }
 }
 

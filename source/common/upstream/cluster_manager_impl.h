@@ -192,6 +192,8 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
+  Runtime::RandomGenerator& randomGenerator() override { return random_; }
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent

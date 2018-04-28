@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "source/envoy/common/runtime/runtime_impl.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
@@ -55,6 +57,7 @@ private:
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
+  RandomGeneratorImpl random_;
 };
 } // namespace Xfcc
 } // namespace Envoy

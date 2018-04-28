@@ -68,7 +68,7 @@ HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::crea
   return [&]() -> Network::ClientConnectionPtr {
     Network::ClientConnectionPtr conn(dispatcher_->createClientConnection(
         Network::Utility::resolveUrl(fmt::format("unix://{}", getListenerSocketName())),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+        Network::Address::InstanceRangeConstSharedPtr(), Network::Test::createRawBufferSocket(),
         nullptr));
     conn->enableHalfClose(enable_half_close_);
     return conn;

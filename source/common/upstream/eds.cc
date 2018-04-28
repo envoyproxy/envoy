@@ -23,7 +23,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api),
+                             cm.randomGenerator(), added_via_api),
       cm_(cm), local_info_(local_info),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
@@ -83,7 +83,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       priority_state[priority].first->emplace_back(new HostImpl(
           info_, "", resolveProtoAddress(lb_endpoint.endpoint().address()), lb_endpoint.metadata(),
           lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
-          lb_endpoint.endpoint().health_check_config()));
+          lb_endpoint.endpoint().health_check_config(), random_));
       const auto& health_status = lb_endpoint.health_status();
       if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
           health_status == envoy::api::v2::core::HealthStatus::DRAINING ||

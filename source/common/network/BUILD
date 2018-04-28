@@ -16,6 +16,7 @@ envoy_cc_library(
         "//include/envoy/network:address_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 
@@ -56,6 +57,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/ssl:ssl_socket_lib",
     ],
 )

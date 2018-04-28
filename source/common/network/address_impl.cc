@@ -14,10 +14,79 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+namespace {
+
+// Choosing with replacement, the probability of failing to find an unbound port
+// in a port range of size r with f already bound ports after trying n times is
+// p(f,r,n) = (f/r)^n
+// Arbitrarily choosing a target probability of less than 0.5 that we will fail
+// to find a port in a range that is 80% full yields:
+// 	0.5 > (0.8)^n
+// 	n > log(0.5)/log(0.8) =~ 3.1
+// So we try four times to find a port.
+//
+// Note that choosing with replacement is only a good strategy for large port ranges;
+// if InstanceRanges with only a few ports in them are used, this file should
+// either choose without replacement or search linearly.
+const int kBindingRangeNumberOfTries = 4;
+
+// Random port to try for port ranges.
+uint32_t portToTry(uint32_t starting_port, uint32_t ending_port, Runtime::RandomGenerator& random) {
+  double unitary_scaled_random_value =
+      (static_cast<double>(random.random()) / std::numeric_limits<uint64_t>::max());
+  uint32_t port_to_try = starting_port + static_cast<uint32_t>((ending_port + 1 - starting_port) *
+                                                               unitary_scaled_random_value);
+  // port_to_try has prob(0) of being ending_port_ + 1, but prob(0) != never.
+  if (port_to_try == ending_port + 1) {
+    port_to_try = ending_port;
+  }
+  return port_to_try;
+}
+
+int socketFromSocketType(SocketType socketType, Type addressType, IpVersion ipVersion) {
+#if defined(__APPLE__)
+  int flags = 0;
+#else
+  int flags = SOCK_NONBLOCK;
+#endif
+
+  if (socketType == SocketType::Stream) {
+    flags |= SOCK_STREAM;
+  } else {
+    flags |= SOCK_DGRAM;
+  }
+
+  int domain;
+  if (addressType == Type::Ip) {
+    if (ipVersion == IpVersion::v6) {
+      domain = AF_INET6;
+    } else {
+      ASSERT(ipVersion == IpVersion::v4);
+      domain = AF_INET;
+    }
+  } else {
+    ASSERT(addressType == Type::Pipe);
+    domain = AF_UNIX;
+  }
+
+  int fd = ::socket(domain, flags, 0);
+  RELEASE_ASSERT(fd != -1);
+
+#ifdef __APPLE__
+  // Cannot set SOCK_NONBLOCK as a ::socket flag.
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+#endif
+
+  return fd;
+}
+
+} // namespace
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
@@ -100,44 +169,6 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
-#if defined(__APPLE__)
-  int flags = 0;
-#else
-  int flags = SOCK_NONBLOCK;
-#endif
-
-  if (socketType == SocketType::Stream) {
-    flags |= SOCK_STREAM;
-  } else {
-    flags |= SOCK_DGRAM;
-  }
-
-  int domain;
-  if (type() == Type::Ip) {
-    IpVersion version = ip()->version();
-    if (version == IpVersion::v6) {
-      domain = AF_INET6;
-    } else {
-      ASSERT(version == IpVersion::v4);
-      domain = AF_INET;
-    }
-  } else {
-    ASSERT(type() == Type::Pipe);
-    domain = AF_UNIX;
-  }
-
-  int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1);
-
-#ifdef __APPLE__
-  // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
-#endif
-
-  return fd;
-}
-
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_ = *address;
   char str[INET_ADDRSTRLEN];
@@ -180,7 +211,9 @@ int Ipv4Instance::connect(int fd) const {
                    sizeof(ip_.ipv4_.address_));
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+int Ipv4Instance::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v4);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -235,7 +268,7 @@ int Ipv6Instance::connect(int fd) const {
 }
 
 int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
+  const int fd = socketFromSocketType(type, Type::Ip, IpVersion::v6);
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
@@ -300,7 +333,121 @@ int PipeInstance::connect(int fd) const {
   return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+int PipeInstance::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Pipe, static_cast<IpVersion>(0));
+}
+
+Ipv4InstanceRange::Ipv4InstanceRange(const std::string& address, uint32_t starting_port,
+                                     uint32_t ending_port) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+  ip_.ipv4_.address_.sin_family = AF_INET;
+  int rc = inet_pton(AF_INET, address.c_str(), &ip_.ipv4_.address_.sin_addr);
+  if (1 != rc) {
+    throw EnvoyException(fmt::format("invalid ipv4 address '{}'", address));
+  }
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  if (ending_port < starting_port) {
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
+  }
+  starting_port_ = starting_port;
+  ending_port_ = ending_port;
+  friendly_name_ = fmt::format("{}:{}-{}", address, starting_port, ending_port);
+  ip_.friendly_address_ = address;
+}
+
+Ipv4InstanceRange::Ipv4InstanceRange(uint32_t starting_port, uint32_t ending_port) {
+  memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
+  ip_.ipv4_.address_.sin_family = AF_INET;
+  ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
+  ip_.friendly_address_ = "0.0.0.0";
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  if (ending_port < starting_port) {
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
+  }
+  friendly_name_ = fmt::format("0.0.0.0:{}-{}", starting_port, ending_port);
+}
+
+int Ipv4InstanceRange::bind(int fd, Runtime::RandomGenerator& random) const {
+  int tries = kBindingRangeNumberOfTries;
+  while (tries--) {
+    sockaddr_in socket_address(ip_.ipv4_.address_);
+    socket_address.sin_port =
+        static_cast<in_port_t>(portToTry(starting_port_, ending_port_, random));
+    int ret =
+        ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    if (ret != EADDRINUSE)
+      return ret;
+  }
+  return EADDRINUSE;
+}
+
+int Ipv4InstanceRange::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v4);
+}
+
+Ipv6InstanceRange::Ipv6InstanceRange(const std::string& address, uint32_t starting_port,
+                                     uint32_t ending_port) {
+  memset(&ip_.ipv6_.address_, 0, sizeof(ip_.ipv6_.address_));
+  ip_.ipv6_.address_.sin6_family = AF_INET6;
+  if (!address.empty()) {
+    if (1 != inet_pton(AF_INET6, address.c_str(), &ip_.ipv6_.address_.sin6_addr)) {
+      throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));
+    }
+  } else {
+    ip_.ipv6_.address_.sin6_addr = in6addr_any;
+  }
+
+  if (static_cast<in_port_t>(starting_port) != starting_port) {
+    throw EnvoyException(fmt::format("invalid starting ip port '{}'", starting_port));
+  }
+  if (static_cast<in_port_t>(ending_port) != ending_port) {
+    throw EnvoyException(fmt::format("invalid ending ip port '{}'", ending_port));
+  }
+  if (ending_port < starting_port) {
+    throw EnvoyException(
+        fmt::format("ending ip port '{}' < starting ip port '{}'", ending_port, starting_port));
+  }
+  starting_port_ = starting_port;
+  ending_port_ = ending_port;
+
+  ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
+  friendly_name_ = fmt::format("[{}]:{}-{}", ip_.friendly_address_, starting_port, ending_port);
+}
+
+Ipv6InstanceRange::Ipv6InstanceRange(uint32_t starting_port, uint32_t ending_port)
+    : Ipv6InstanceRange("", starting_port, ending_port) {}
+
+int Ipv6InstanceRange::bind(int fd, Runtime::RandomGenerator&) const {
+  // Implementing via linear search from the bottom of the range.
+  // TODO(rdsmith): Make this random when you have access to a RandomGenerator.
+  for (uint32_t port_to_try = starting_port_; port_to_try <= ending_port_; ++port_to_try) {
+    sockaddr_in6 socket_address(ip_.ipv6_.address_);
+    socket_address.sin6_port = static_cast<in_port_t>(port_to_try);
+    int ret =
+        ::bind(fd, reinterpret_cast<const sockaddr*>(&socket_address), sizeof(socket_address));
+    if (ret != EADDRINUSE)
+      return ret;
+  }
+  return EADDRINUSE;
+}
+
+int Ipv6InstanceRange::socket(SocketType type) const {
+  return socketFromSocketType(type, Type::Ip, IpVersion::v6);
+}
 
 } // namespace Address
 } // namespace Network
