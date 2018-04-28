@@ -53,7 +53,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
@@ -183,7 +183,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

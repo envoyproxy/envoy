@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["backtrace.h"],
     external_deps = ["backward"],
     tags = ["backtrace"],
-    deps = ["//source/common/common:logger_lib"],
+    deps = ["//source/common/common:minimal_logger_lib"],
 )
 
 envoy_cc_library(
@@ -32,7 +32,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
@@ -80,7 +80,7 @@ envoy_cc_library(
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -97,7 +97,7 @@ envoy_cc_library(
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
@@ -274,6 +274,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/config:bootstrap_json_lib",

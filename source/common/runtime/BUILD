@@ -21,7 +21,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
