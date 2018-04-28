@@ -45,7 +45,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",

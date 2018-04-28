@@ -93,7 +93,7 @@ envoy_cc_test_library(
     hdrs = ["logging.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
