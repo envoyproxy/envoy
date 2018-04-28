@@ -1598,6 +1598,28 @@ TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
   expectSetsockoptSoKeepalive(7, {}, {});
 }
 
+TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpKeepaliveCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_probes: 7
+          keepalive_time: 4
+          keepalive_interval: 1
+  )EOF";
+  initialize(yaml);
+  expectSetsockoptSoKeepalive(7, 4, 1);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
