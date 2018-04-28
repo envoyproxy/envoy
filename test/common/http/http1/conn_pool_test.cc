@@ -520,17 +520,17 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseWithoutHeader) {
 
   conn_pool_.expectAndRunUpstreamReady();
 
-  EXPECT_CALL(*conn_pool_.test_clients_[1].codec_, newStream(_))
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks2.pool_ready_, ready());
-  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   callbacks2.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
   response_headers.reset(new TestHeaderMapImpl{{":status", "200"}});
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
-  conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
 
