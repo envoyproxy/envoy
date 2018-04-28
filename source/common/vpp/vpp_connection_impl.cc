@@ -1,4 +1,4 @@
-#include "common/network/connection_impl.h"
+#include "common/vpp/vpp_connection_impl.h"
 
 #include <netinet/tcp.h>
 #include <sys/socket.h>
@@ -18,14 +18,16 @@
 #include "common/network/address_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/vpp/vpp_buffer.h"
 #include "common/network/utility.h"
+#include "common/event/dispatcher_impl.h"
 
 namespace Envoy {
 namespace Network {
 
-void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
-                                              uint64_t& previous_total, Stats::Counter& stat_total,
-                                              Stats::Gauge& stat_current) {
+void VppConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
+                                                 uint64_t& previous_total, Stats::Counter& stat_total,
+                                                 Stats::Gauge& stat_current) {
   if (delta) {
     stat_total.add(delta);
   }
@@ -41,19 +43,25 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
   }
 }
 
-std::atomic<uint64_t> ConnectionImpl::next_global_id_;
+std::atomic<uint64_t> VppConnectionImpl::next_global_id_;
 
-ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
+VppConnectionImpl::VppConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
-      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                      [this]() -> void { this->onLowWatermark(); },
+      socket_(std::move(socket)),
+      read_buffer_(new Vpp::VppBufferImpl()),
+      write_buffer_(new Vpp::VppBufferImpl([this]() -> void { this->onLowWatermark(); },
                                       [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), id_(++next_global_id_) {
+      dispatcher_(dispatcher), id_(++VppConnectionImpl::next_global_id_) {
 
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd() != -1);
+  dynamic_cast<Vpp::VppBufferImpl*>(write_buffer_.get())->setIsRead(false);
+  dynamic_cast<Vpp::VppBufferImpl*>(write_buffer_.get())->setSessionId(socket_.get()->fd());
+
+  dynamic_cast<Vpp::VppBufferImpl*>(read_buffer_.get())->setIsRead(true);
+  dynamic_cast<Vpp::VppBufferImpl*>(read_buffer_.get())->setSessionId(socket_.get()->fd());
 
   if (!connected) {
     connecting_ = true;
@@ -61,14 +69,23 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
+
+  /*
+   * Using the -1 FD trick with libevent... we won't need the double
+   * callback pattern that listener uses I don't think as we can just activate
+   * this file-event... in fact listener can be refactored to look more like this..
+   */
   file_event_ = dispatcher_.createFileEvent(
-      fd(), [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
+      -1, [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  dynamic_cast<Vpp::VppBufferImpl *>(read_buffer_.get())->registerVppRxIoEventCallback(
+          dynamic_cast<Event::DispatcherImpl &>(dispatcher_), this);
 }
 
-ConnectionImpl::~ConnectionImpl() {
+VppConnectionImpl::~VppConnectionImpl() {
   ASSERT(fd() == -1);
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -78,19 +95,19 @@ ConnectionImpl::~ConnectionImpl() {
   close(ConnectionCloseType::NoFlush);
 }
 
-void ConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
+void VppConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   filter_manager_.addWriteFilter(filter);
 }
 
-void ConnectionImpl::addFilter(FilterSharedPtr filter) { filter_manager_.addFilter(filter); }
+void VppConnectionImpl::addFilter(FilterSharedPtr filter) { filter_manager_.addFilter(filter); }
 
-void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
+void VppConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
   filter_manager_.addReadFilter(filter);
 }
 
-bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
+bool VppConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
-void ConnectionImpl::close(ConnectionCloseType type) {
+void VppConnectionImpl::close(ConnectionCloseType type) {
   if (fd() == -1) {
     return;
   }
@@ -116,7 +133,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   }
 }
 
-Connection::State ConnectionImpl::state() const {
+Connection::State VppConnectionImpl::state() const {
   if (fd() == -1) {
     return State::Closed;
   } else if (close_with_flush_) {
@@ -126,7 +143,7 @@ Connection::State ConnectionImpl::state() const {
   }
 }
 
-void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
+void VppConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
   }
@@ -145,9 +162,10 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   raiseEvent(close_type);
 }
 
-Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
+Event::Dispatcher& VppConnectionImpl::dispatcher() { return dispatcher_; }
 
-void ConnectionImpl::noDelay(bool enable) {
+void VppConnectionImpl::noDelay(bool enable) {
+  return;
   // There are cases where a connection to localhost can immediately fail (e.g., if the other end
   // does not have enough fds, reaches a backlog limit, etc.). Because we run with deferred error
   // events, the calling code may not yet know that the connection has failed. This is one call
@@ -181,16 +199,21 @@ void ConnectionImpl::noDelay(bool enable) {
 #endif
 
   RELEASE_ASSERT(0 == rc);
+  UNREFERENCED_PARAMETER(rc);
 }
 
-uint64_t ConnectionImpl::id() const { return id_; }
+uint64_t VppConnectionImpl::id() const { return id_; }
 
-void ConnectionImpl::onRead(uint64_t read_buffer_size) {
+void VppConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (!read_enabled_) {
+    if (read_buffer_size)
+      read_deferred_ = true;
     return;
   }
 
-  if (read_buffer_size == 0 && !read_end_stream_) {
+  if (read_deferred_) {
+    read_deferred_ = false;
+  } else if (read_buffer_size == 0 && !read_end_stream_) {
     return;
   }
 
@@ -201,7 +224,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     //
     // I don't know of any cases where this actually happens (we should stop
     // reading the socket after EOF), but this check guards against any bugs
-    // in ConnectionImpl or strangeness in the OS events (epoll, kqueue, etc)
+    // in VppConnectionImpl or strangeness in the OS events (epoll, kqueue, etc)
     // and maintains the guarantee for filters.
     if (read_end_stream_raised_) {
       // No further data can be delivered after end_stream
@@ -214,7 +237,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   filter_manager_.onRead();
 }
 
-void ConnectionImpl::enableHalfClose(bool enabled) {
+void VppConnectionImpl::enableHalfClose(bool enabled) {
   // This code doesn't correctly ensure that EV_CLOSE isn't set if reading is disabled
   // when enabling half-close. This could be fixed, but isn't needed right now, so just
   // ASSERT that it doesn't happen.
@@ -223,7 +246,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
   enable_half_close_ = enabled;
 }
 
-void ConnectionImpl::readDisable(bool disable) {
+void VppConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
   ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
 
@@ -262,13 +285,13 @@ void ConnectionImpl::readDisable(bool disable) {
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain. Instead fake an event to make sure the buffered data
     // gets processed regardless.
-    if (read_buffer_.length() > 0) {
+    if (read_buffer_->length() > 0) {
       file_event_->activate(Event::FileReadyType::Read);
     }
   }
 }
 
-void ConnectionImpl::raiseEvent(ConnectionEvent event) {
+void VppConnectionImpl::raiseEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
     // TODO(mattklein123): If we close while raising a connected event we should not raise further
     // connected events.
@@ -285,15 +308,18 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return read_enabled_; }
+bool VppConnectionImpl::readEnabled() const { return read_enabled_; }
 
-void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
+void VppConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
+  callbacks_.push_back(&cb);
+  file_event_->activate(Event::FileReadyType::Write);
+}
 
-void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
+void VppConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
 }
 
-void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+void VppConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
   ASSERT(!end_stream || enable_half_close_);
 
   if (write_end_stream_) {
@@ -327,6 +353,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
     // we never change existing write_buffer_ chain elements between calls to SSL_write(). That code
     // might need to change if we ever copy here.
     write_buffer_->move(data);
+    data.drain(data.length());
 
     // Activating a write event before the socket is connected has the side-effect of tricking
     // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
@@ -337,7 +364,7 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void ConnectionImpl::setBufferLimits(uint32_t limit) {
+void VppConnectionImpl::setBufferLimits(uint32_t limit) {
   read_buffer_limit_ = limit;
 
   // Due to the fact that writes to the connection and flushing data from the connection are done
@@ -359,11 +386,11 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // bytes) would not trigger watermarks but a blocked socket (move |limit| bytes, flush 0 bytes)
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
-    static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
+    static_cast<Vpp::VppBufferImpl*>(write_buffer_.get())->setWatermarks(limit + 1);
   }
 }
 
-void ConnectionImpl::onLowWatermark() {
+void VppConnectionImpl::onLowWatermark() {
   ENVOY_CONN_LOG(debug, "onBelowWriteBufferLowWatermark", *this);
   ASSERT(above_high_watermark_);
   above_high_watermark_ = false;
@@ -372,7 +399,7 @@ void ConnectionImpl::onLowWatermark() {
   }
 }
 
-void ConnectionImpl::onHighWatermark() {
+void VppConnectionImpl::onHighWatermark() {
   ENVOY_CONN_LOG(debug, "onAboveWriteBufferHighWatermark", *this);
   ASSERT(!above_high_watermark_);
   above_high_watermark_ = true;
@@ -381,7 +408,31 @@ void ConnectionImpl::onHighWatermark() {
   }
 }
 
-void ConnectionImpl::onFileEvent(uint32_t events) {
+void VppConnectionImpl::onIoEvent(uint32_t events) {
+
+  ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
+
+  if (events & Event::FileReadyType::Closed) {
+    // We never ask for both early close and read at the same time. If we are reading, we want to
+    // consume all available data.
+    ASSERT(!(events & Event::FileReadyType::Read));
+    ENVOY_CONN_LOG(debug, "remote early close", *this);
+    closeSocket(ConnectionEvent::RemoteClose);
+    return;
+  }
+
+  if (events & Event::FileReadyType::Write) {
+    onWriteReady();
+  }
+
+  // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
+  // In this case ignore write event processing.
+  if (fd() != -1 && (events & Event::FileReadyType::Read)) {
+    onReadReady();
+  }
+}
+
+void VppConnectionImpl::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
   if (immediate_error_event_ != ConnectionEvent::Connected) {
@@ -419,13 +470,13 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   }
 }
 
-void ConnectionImpl::onReadReady() {
+void VppConnectionImpl::onReadReady() {
   ENVOY_CONN_LOG(trace, "read ready", *this);
 
   ASSERT(!connecting_);
 
-  IoResult result = transport_socket_->doRead(read_buffer_);
-  uint64_t new_buffer_size = read_buffer_.length();
+  IoResult result = transport_socket_->doRead(*read_buffer_);
+  uint64_t new_buffer_size = read_buffer_->length();
   updateReadBufferStats(result.bytes_processed_, new_buffer_size);
 
   // If this connection doesn't have half-close semantics, translate end_stream into
@@ -436,7 +487,7 @@ void ConnectionImpl::onReadReady() {
   }
 
   read_end_stream_ |= result.end_stream_read_;
-  if (result.bytes_processed_ != 0 || result.end_stream_read_) {
+  if (read_deferred_ || (result.bytes_processed_ != 0) || result.end_stream_read_) {
     // Skip onRead if no bytes were processed. For instance, if the connection was closed without
     // producing more data.
     onRead(new_buffer_size);
@@ -449,14 +500,16 @@ void ConnectionImpl::onReadReady() {
   }
 }
 
-void ConnectionImpl::onWriteReady() {
+void VppConnectionImpl::onWriteReady() {
   ENVOY_CONN_LOG(trace, "write ready", *this);
 
   if (connecting_) {
-    int error;
-    socklen_t error_size = sizeof(error);
-    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == rc);
+    int error = 0;
+//DAW_DEBUG
+//    socklen_t error_size = sizeof(error);
+//    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
+//    ASSERT(0 == rc);
+//    UNREFERENCED_PARAMETER(rc);
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -477,7 +530,10 @@ void ConnectionImpl::onWriteReady() {
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
-  updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
+  if (result.bytes_processed_) {
+      updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
+      write_buffer_->drain(result.bytes_processed_);
+  }
 
   if (result.action_ == PostIoAction::Close) {
     // It is possible (though unlikely) for the connection to have already been closed during the
@@ -499,42 +555,43 @@ void ConnectionImpl::onWriteReady() {
   }
 }
 
-void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
+void VppConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   ASSERT(!connection_stats_);
   connection_stats_.reset(new ConnectionStats(stats));
 }
 
-void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
+void VppConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
   if (!connection_stats_) {
     return;
   }
 
-  ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
-                                           connection_stats_->read_total_,
-                                           connection_stats_->read_current_);
+  VppConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
+                                              connection_stats_->read_total_,
+                                              connection_stats_->read_current_);
 }
 
-void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
+void VppConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
   if (!connection_stats_) {
     return;
   }
 
-  ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
-                                           connection_stats_->write_total_,
-                                           connection_stats_->write_current_);
+  VppConnectionImplUtility::updateBufferStats(num_written, new_size,
+                                              last_write_buffer_size_,
+                                              connection_stats_->write_total_,
+                                              connection_stats_->write_current_);
 }
 
-bool ConnectionImpl::bothSidesHalfClosed() {
+bool VppConnectionImpl::bothSidesHalfClosed() {
   // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-ClientConnectionImpl::ClientConnectionImpl(
+VppClientConnectionImpl::VppClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,
-    const Network::Address::InstanceConstSharedPtr&,
+    const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
+    : VppConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
   if (options) {
     for (const auto& option : *options) {
@@ -548,9 +605,23 @@ ClientConnectionImpl::ClientConnectionImpl(
       }
     }
   }
+  if (source_address != nullptr) {
+    const int rc = source_address->bind(fd());
+    if (rc < 0) {
+      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+                     strerror(errno));
+      bind_error_ = true;
+      // Set a special error state to ensure asynchronous close to give the owner of the
+      // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+      immediate_error_event_ = ConnectionEvent::LocalClose;
+
+      // Trigger a write event to close this connection out-of-band.
+      file_event_->activate(Event::FileReadyType::Write);
+    }
+  }
 }
 
-void ClientConnectionImpl::connect() {
+void VppClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
   const int rc = socket_->remoteAddress()->connect(fd());
   if (rc == 0) {

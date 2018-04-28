@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
+        "//source/common/vpp:vpp_connection_lib",
         "//source/common/network:dns_lib",
         "//source/common/network:listener_lib",
     ],

@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vcl/vppcom.h>
 
 #include "envoy/network/address.h"
 
@@ -26,6 +27,14 @@ namespace Address {
  */
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                                     bool v6only = true);
+
+/**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
+ * @param ep A vppcom_endpt_t *
+ * @return InstanceConstSharedPtr the address.
+ */
+Address::InstanceConstSharedPtr addressFromSockAddr(const vppcom_endpt_t& ep);
 
 /**
  * Obtain an address from a bound file descriptor. Raises an EnvoyException on failure.
@@ -73,6 +82,11 @@ public:
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
   explicit Ipv4Instance(const sockaddr_in* address);
+
+  /**
+   * Construct from an existing VppCom Endpt_t *
+   */
+  explicit Ipv4Instance(const vppcom_endpt_t& ep);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.

@@ -14,6 +14,7 @@ class TransportSocketNameValues {
 public:
   const std::string RAW_BUFFER = "raw_buffer";
   const std::string SSL = "ssl";
+  const std::string VPP = "vpp";
 };
 
 typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;
