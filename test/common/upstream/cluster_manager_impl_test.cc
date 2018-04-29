@@ -1306,18 +1306,18 @@ public:
   void expectSetsockoptFreebind() {
     if (!ENVOY_SOCKET_IP_FREEBIND.has_value()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(
-              Invoke([this](Network::Address::InstanceConstSharedPtr,
-                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options)
-                         -> Network::ClientConnection* {
-                EXPECT_NE(nullptr, options.get());
-                EXPECT_EQ(1, options->size());
-                NiceMock<Network::MockConnectionSocket> socket;
-                EXPECT_FALSE(
-                    (*options->begin())->setOption(socket, Network::Socket::SocketState::PreBind));
-                return connection_;
-              }));
+          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                                  Network::Address::InstanceConstSharedPtr,
+                                  Network::TransportSocketPtr&,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
+                               -> Network::ClientConnection* {
+            EXPECT_NE(nullptr, options.get());
+            EXPECT_EQ(1, options->size());
+            NiceMock<Network::MockConnectionSocket> socket;
+            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
+                                                        Network::Socket::SocketState::PreBind)));
+            return connection_;
+          }));
       cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
       return;
     }
@@ -1332,12 +1332,12 @@ public:
               EXPECT_NE(nullptr, options.get());
               EXPECT_EQ(1, options->size());
               NiceMock<Network::MockConnectionSocket> socket;
-              EXPECT_TRUE(
-                  (*options->begin())->setOption(socket, Network::Socket::SocketState::PreBind));
+              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
+                                                         Network::Socket::SocketState::PreBind)));
               return connection_;
             }));
-    EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND.value(), _, sizeof(int)))
+    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
+                                          ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
@@ -1439,6 +1439,185 @@ TEST_F(FreebindTest, FreebindClusterOverride) {
   )EOF";
   initialize(yaml);
   expectSetsockoptFreebind();
+}
+
+// Validate that when tcp keepalives are set in the Cluster, we see the socket
+// option propagated to setsockopt(). This is as close to an end-to-end test as we have for this
+// feature, due to the complexity of creating an integration test involving the network stack. We
+// only test the IPv4 case here, as the logic around IPv4/IPv6 handling is tested generically in
+// tcp_keepalive_option_impl_test.cc.
+class TcpKeepaliveTest : public ClusterManagerImplTest {
+public:
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
+
+  void TearDown() override { factory_.tls_.shutdownThread(); }
+
+  void expectSetsockoptSoKeepalive(absl::optional<int> keepalive_probes,
+                                   absl::optional<int> keepalive_time,
+                                   absl::optional<int> keepalive_interval) {
+    if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
+      EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                                  Network::Address::InstanceConstSharedPtr,
+                                  Network::TransportSocketPtr&,
+                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
+                               -> Network::ClientConnection* {
+            EXPECT_NE(nullptr, options.get());
+            EXPECT_EQ(1, options->size());
+            NiceMock<Network::MockConnectionSocket> socket;
+            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
+                                                        Network::Socket::SocketState::PreBind)));
+            return connection_;
+          }));
+      cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+      return;
+    }
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr,
+                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr& options)
+                       -> Network::ClientConnection* {
+              EXPECT_NE(nullptr, options.get());
+              NiceMock<Network::MockConnectionSocket> socket;
+              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
+                                                         Network::Socket::SocketState::PreBind)));
+              return connection_;
+            }));
+    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first,
+                                          ENVOY_SOCKET_SO_KEEPALIVE.value().second, _, sizeof(int)))
+        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+          EXPECT_EQ(1, *static_cast<const int*>(optval));
+          return 0;
+        }));
+    if (keepalive_probes.has_value()) {
+      EXPECT_CALL(os_sys_calls,
+                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPCNT.value().first,
+                              ENVOY_SOCKET_TCP_KEEPCNT.value().second, _, sizeof(int)))
+          .WillOnce(
+              Invoke([&keepalive_probes](int, int, int, const void* optval, socklen_t) -> int {
+                EXPECT_EQ(keepalive_probes.value(), *static_cast<const int*>(optval));
+                return 0;
+              }));
+    }
+    if (keepalive_time.has_value()) {
+      EXPECT_CALL(os_sys_calls,
+                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPIDLE.value().first,
+                              ENVOY_SOCKET_TCP_KEEPIDLE.value().second, _, sizeof(int)))
+          .WillOnce(Invoke([&keepalive_time](int, int, int, const void* optval, socklen_t) -> int {
+            EXPECT_EQ(keepalive_time.value(), *static_cast<const int*>(optval));
+            return 0;
+          }));
+    }
+    if (keepalive_interval.has_value()) {
+      EXPECT_CALL(os_sys_calls,
+                  setsockopt_(_, ENVOY_SOCKET_TCP_KEEPINTVL.value().first,
+                              ENVOY_SOCKET_TCP_KEEPINTVL.value().second, _, sizeof(int)))
+          .WillOnce(
+              Invoke([&keepalive_interval](int, int, int, const void* optval, socklen_t) -> int {
+                EXPECT_EQ(keepalive_interval.value(), *static_cast<const int*>(optval));
+                return 0;
+              }));
+    }
+    auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
+
+  void expectNoSocketOptions() {
+    EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+        .WillOnce(
+            Invoke([this](Network::Address::InstanceConstSharedPtr,
+                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                          const Network::ConnectionSocket::OptionsSharedPtr& options)
+                       -> Network::ClientConnection* {
+              EXPECT_EQ(nullptr, options.get());
+              return connection_;
+            }));
+    auto conn_data = cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
+    EXPECT_EQ(connection_, conn_data.connection_.get());
+  }
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+};
+
+TEST_F(TcpKeepaliveTest, TcpKeepaliveUnset) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpKeepaliveCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+  )EOF";
+  initialize(yaml);
+  expectNoSocketOptions();
+}
+
+TEST_F(TcpKeepaliveTest, TcpKeepaliveCluster) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpKeepaliveCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_connection_options:
+        tcp_keepalive: {}
+  )EOF";
+  initialize(yaml);
+  expectSetsockoptSoKeepalive({}, {}, {});
+}
+
+TEST_F(TcpKeepaliveTest, TcpKeepaliveClusterProbes) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpKeepaliveCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_probes: 7
+  )EOF";
+  initialize(yaml);
+  expectSetsockoptSoKeepalive(7, {}, {});
+}
+
+TEST_F(TcpKeepaliveTest, TcpKeepaliveWithAllOptions) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: TcpKeepaliveCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_probes: 7
+          keepalive_time: 4
+          keepalive_interval: 1
+  )EOF";
+  initialize(yaml);
+  expectSetsockoptSoKeepalive(7, 4, 1);
 }
 
 } // namespace

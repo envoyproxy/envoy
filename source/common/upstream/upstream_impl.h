@@ -356,6 +356,10 @@ public:
   // Server::Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
 
+  const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
+    return cluster_socket_options_;
+  };
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -393,6 +397,7 @@ private:
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
+  const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
 };
 
 /**
