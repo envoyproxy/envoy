@@ -84,7 +84,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
     main_thread_dispatcher_->post(
-        [this, scope]() -> void { clearScopeFromCaches(scope->scope_id_); });
+        [ this, scope_id = scope->scope_id_ ]()->void { clearScopeFromCaches(scope_id); });
   }
 }
 
