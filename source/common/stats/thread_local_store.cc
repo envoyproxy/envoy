@@ -83,7 +83,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post([this, scope]() -> void { clearScopeFromCaches(scope); });
+    main_thread_dispatcher_->post(
+        [this, scope]() -> void { clearScopeFromCaches(scope->scope_id_); });
   }
 }
 
@@ -91,14 +92,13 @@ std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::v
   return tag_producer_->produceTags(name, tags);
 }
 
-void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
+void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
-    tls_->runOnAllThreads([ this, id = scope->scope_id_ ]()->void {
-      tls_->getTyped<TlsCache>().scope_cache_.erase(id);
-    });
+    tls_->runOnAllThreads(
+        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); });
   }
 }
 
