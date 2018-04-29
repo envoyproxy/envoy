@@ -523,6 +523,8 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   Value histograms_obj;
   histograms_obj.SetObject();
 
+  // It is not possible for the supported quantiles to differ across histograms, so it is ok to 
+  // send them once.
   Stats::HistogramStatisticsImpl empty_statistics;
   rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
   for (double quantile : empty_statistics.supportedQuantiles()) {

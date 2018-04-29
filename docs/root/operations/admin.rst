@@ -190,7 +190,10 @@ The fields are:
 
   .. http:get:: /stats?format=json
 
-  Outputs /stats in JSON format. This can be used for programmatic access of stats.
+  Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
+  will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
+  that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
+  that has the computed quantile for each histogram.
 
   .. http:get:: /stats?format=prometheus
 
