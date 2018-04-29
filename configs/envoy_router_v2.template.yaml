@@ -1,4 +1,4 @@
-{%- import 'routing_helper.template.yaml' as helper with context -%}
+{% import 'routing_helper_v2.template.yaml' as helper with context -%}
 virtual_hosts:
 - name: www
   require_ssl: all
