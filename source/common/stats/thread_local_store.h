@@ -83,7 +83,8 @@ private:
 
   struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
+        : scope_id_(next_scope_id_++), parent_(parent),
+          prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
 
     // Stats::Scope
@@ -95,13 +96,22 @@ private:
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
 
+    static std::atomic<uint64_t> next_scope_id_;
+
+    const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
     TlsCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
-    std::unordered_map<ScopeImpl*, TlsCacheEntry> scope_cache_;
+    // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
+    // during scope destruction. An ID is required vs. use the address of the scope pointer because
+    // it's possible that the memory allactor will recyle the scope pointer immediately upon
+    // destruction, leading to a situation in which a new scope with the same address is used to
+    // reference the cache, and then subsequently cache flushed, leaving nothing in the central
+    // store.
+    std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
   struct SafeAllocData {
