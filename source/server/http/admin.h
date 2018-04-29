@@ -32,6 +32,32 @@ namespace Envoy {
 namespace Server {
 
 /**
+ * Implementation of Server::AdminStream.
+ */
+class AdminStreamImpl : public AdminStream {
+public:
+  AdminStreamImpl(Http::StreamDecoderFilterCallbacks& callbacks, Http::HeaderMap& request_headers,
+                  std::list<std::function<void()>>& on_destroy_callbacks)
+      : callbacks_(callbacks), request_headers_(request_headers),
+        on_destroy_callbacks_(on_destroy_callbacks){};
+  void setEndStreamOnComplete(const bool& end_stream) override {
+    end_stream_on_complete_ = end_stream;
+  }
+  void addOnDestroyCallback(std::function<void()> cb) override;
+  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override {
+    return callbacks_;
+  }
+  const Http::HeaderMap& getRequestHeaders() const override { return request_headers_; }
+  bool end_stream_on_complete() { return end_stream_on_complete_; }
+
+private:
+  const Http::StreamDecoderFilterCallbacks& callbacks_;
+  const Http::HeaderMap& request_headers_;
+  std::list<std::function<void()>>& on_destroy_callbacks_;
+  bool end_stream_on_complete_ = true;
+};
+
+/**
  * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
@@ -235,9 +261,7 @@ private:
 /**
  * A terminal HTTP filter that implements server admin functionality.
  */
-class AdminFilter : public Http::StreamDecoderFilter,
-                    public AdminStream,
-                    Logger::Loggable<Logger::Id::admin> {
+class AdminFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::Id::admin> {
 public:
   AdminFilter(AdminImpl& parent);
 
@@ -252,15 +276,9 @@ public:
     callbacks_ = &callbacks;
   }
 
-  // AdminStream
-  void setEndStreamOnComplete(const bool& end_stream) override {
-    end_stream_on_complete_ = end_stream;
-  }
-  void addOnDestroyCallback(std::function<void()> cb) override;
-  const Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() const override {
-    return callbacks_;
-  }
-  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+  Http::StreamDecoderFilterCallbacks& callbacks() { return *callbacks_; }
+  std::list<std::function<void()>>& onDestroyCallbacksList() { return *on_destroy_callbacks_; }
+  Http::HeaderMap& requestHeaders() { return *request_headers_; }
 
 private:
   /**
@@ -271,8 +289,7 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
-  std::list<std::function<void()>> on_destroy_callbacks_;
-  bool end_stream_on_complete_ = true;
+  std::list<std::function<void()>>* on_destroy_callbacks_ = nullptr;
 };
 
 /**

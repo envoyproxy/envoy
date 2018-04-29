@@ -36,13 +36,13 @@ public:
    * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get socket for data
    * streaming
    */
-  virtual const Http::StreamDecoderFilterCallbacks* getDecoderFilterCallbacks() const PURE;
+  virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
    * @return Http::HeaderMap* to be used by handler to parse header information sent with the
    * request
    */
-  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+  virtual const Http::HeaderMap& getRequestHeaders() const PURE;
 };
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds

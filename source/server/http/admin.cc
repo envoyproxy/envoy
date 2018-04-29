@@ -151,12 +151,14 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 void AdminFilter::onDestroy() {
-  for (const auto& callback : on_destroy_callbacks_) {
-    callback();
+  if (on_destroy_callbacks_ != nullptr) {
+    for (const auto& callback : *on_destroy_callbacks_) {
+      callback();
+    }
   }
 }
 
-void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
+void AdminStreamImpl::addOnDestroyCallback(std::function<void()> cb) {
   on_destroy_callbacks_.push_back(std::move(cb));
 }
 
@@ -663,7 +665,9 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
-  Http::Code code = parent_.runCallback(path, *header_map, response, *this);
+
+  AdminStreamImpl admin_stream(*callbacks_, *request_headers_, *on_destroy_callbacks_);
+  Http::Code code = parent_.runCallback(path, *header_map, response, admin_stream);
 
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -680,10 +684,10 @@ void AdminFilter::onComplete() {
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
   callbacks_->encodeHeaders(std::move(header_map),
-                            end_stream_on_complete_ && response.length() == 0);
+                            admin_stream.end_stream_on_complete() && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, end_stream_on_complete_);
+    callbacks_->encodeData(response, admin_stream.end_stream_on_complete());
   }
 }
 
@@ -787,7 +791,7 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
       if (handler.mutates_server_state_) {
         const absl::string_view method =
-            admin_stream.getRequestHeaders()->Method()->value().getStringView();
+            admin_stream.getRequestHeaders().Method()->value().getStringView();
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);

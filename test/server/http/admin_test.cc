@@ -92,7 +92,9 @@ public:
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
     admin_filter_.decodeHeaders(request_headers_, false);
-    return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
+    AdminStreamImpl admin_stream(admin_filter_.callbacks(), request_headers_,
+                                 admin_filter_.onDestroyCallbacksList());
+    return admin_.runCallback(path_and_query, response_headers, response, admin_stream);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -156,9 +158,11 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
   admin_filter_.decodeHeaders(request_headers_, false);
-  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
-                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
-                                                              data, admin_filter_)));
+  AdminStreamImpl admin_stream(admin_filter_.callbacks(), request_headers_,
+                               admin_filter_.onDestroyCallbacksList());
+  EXPECT_NO_LOGS(EXPECT_EQ(
+      Http::Code::InternalServerError,
+      admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data, admin_stream)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
