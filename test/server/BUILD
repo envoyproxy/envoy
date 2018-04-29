@@ -131,6 +131,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/network:addr_family_aware_socket_option_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
@@ -144,16 +145,6 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "listener_socket_option_impl_test",
-    srcs = ["listener_socket_option_impl_test.cc"],
-    deps = [
-        "//source/server:listener_socket_option_lib",
-        "//test/common/network:socket_option_test",
-        "//test/test_common:environment_lib",
     ],
 )
 

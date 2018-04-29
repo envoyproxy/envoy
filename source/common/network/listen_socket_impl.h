@@ -27,11 +27,18 @@ public:
       fd_ = -1;
     }
   }
-  void addOption(const OptionConstSharedPtr& option) override {
+  void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
     }
+  }
+  void addOption(const OptionConstSharedPtr& option) override {
+    ensureOptions();
     options_->emplace_back(std::move(option));
+  }
+  void addOptions(const OptionsSharedPtr& options) override {
+    ensureOptions();
+    Network::Socket::appendOptions(options_, options);
   }
   const OptionsSharedPtr& options() const override { return options_; }
 
