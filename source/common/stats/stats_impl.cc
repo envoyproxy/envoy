@@ -150,7 +150,7 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  std::unique_lock<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(mutex_);
 
   absl::string_view key = name;
 
@@ -274,7 +274,7 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
-  std::unique_lock<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(mutex_);
 
   ASSERT(data.ref_count_ > 0);
   if (--data.ref_count_ > 0) {

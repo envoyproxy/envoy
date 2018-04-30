@@ -419,7 +419,7 @@ public:
 private:
   typedef std::unordered_map<std::string, RawStatData*> StringRawDataMap;
   StringRawDataMap stats_;
-  mutable std::mutex lock_;
+  std::mutex mutex_;
 };
 
 /**
