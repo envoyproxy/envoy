@@ -7,6 +7,7 @@
 #include "envoy/extensions/transport_socket/capture/v2alpha/capture.pb.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
@@ -223,7 +224,8 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
     return makeSslClientConnection(false, false);
   };
 
-  // First request.
+  // First request (ID will be +1 since the client will also bump).
+  const uint64_t first_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
   Http::TestHeaderMapImpl post_request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
@@ -238,11 +240,12 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(path_prefix_ + "_0.pb", trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 
   // Verify a second request hits a different file.
+  const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   codec_client_ = makeHttpConnection(creator());
   Http::TestHeaderMapImpl get_request_headers{
       {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
@@ -256,7 +259,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(path_prefix_ + "_1.pb", trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
@@ -267,12 +270,13 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(false, false);
   };
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(path_prefix_ + "_0.pb_text", trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }

@@ -361,6 +361,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",

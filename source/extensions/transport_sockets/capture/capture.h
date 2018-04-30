@@ -12,7 +12,7 @@ namespace Capture {
 
 class CaptureSocket : public Network::TransportSocket {
 public:
-  CaptureSocket(const std::string& path, bool text_format,
+  CaptureSocket(const std::string& path_prefix, bool text_format,
                 Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
@@ -27,10 +27,11 @@ public:
   const Ssl::Connection* ssl() const override;
 
 private:
-  const std::string path_;
+  const std::string& path_prefix_;
   const bool text_format_;
   envoy::extensions::transport_socket::capture::v2alpha::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
+  Network::TransportSocketCallbacks* callbacks_{};
 };
 
 class CaptureSocketFactory : public Network::TransportSocketFactory {
@@ -39,14 +40,13 @@ public:
                        Network::TransportSocketFactoryPtr&& transport_socket_factory);
 
   // Network::TransportSocketFactory
-  Network::TransportSocketPtr createTransportSocket() override;
+  Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
   const std::string path_prefix_;
   const bool text_format_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
-  uint32_t socket_id_{};
 };
 
 } // namespace Capture

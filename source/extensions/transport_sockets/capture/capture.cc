@@ -1,6 +1,7 @@
 #include "extensions/transport_sockets/capture/capture.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 
 namespace Envoy {
@@ -8,11 +9,13 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Capture {
 
-CaptureSocket::CaptureSocket(const std::string& path, bool text_format,
+CaptureSocket::CaptureSocket(const std::string& path_prefix, bool text_format,
                              Network::TransportSocketPtr&& transport_socket)
-    : path_(path), text_format_(text_format), transport_socket_(std::move(transport_socket)) {}
+    : path_prefix_(path_prefix), text_format_(text_format),
+      transport_socket_(std::move(transport_socket)) {}
 
 void CaptureSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
+  callbacks_ = &callbacks;
   transport_socket_->setTransportSocketCallbacks(callbacks);
 }
 
@@ -21,7 +24,13 @@ std::string CaptureSocket::protocol() const { return transport_socket_->protocol
 bool CaptureSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
 void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
-  std::ofstream proto_stream(path_);
+  // The caller should have invoked setTransportSocketCallbacks() prior to this.
+  ASSERT(callbacks_ != nullptr);
+  const std::string path = fmt::format("{}_{}.{}", path_prefix_, callbacks_->connection().id(),
+                                       text_format_ ? "pb_text" : "pb");
+  ENVOY_LOG_MISC(debug, "Writing socket trace for [C{}] to {}", callbacks_->connection().id(),
+                 path);
+  std::ofstream proto_stream(path);
   if (text_format_) {
     proto_stream << trace_.DebugString();
   } else {
@@ -66,10 +75,9 @@ CaptureSocketFactory::CaptureSocketFactory(
     : path_prefix_(path_prefix), text_format_(text_format),
       transport_socket_factory_(std::move(transport_socket_factory)) {}
 
-Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket() {
-  return std::make_unique<CaptureSocket>(
-      fmt::format("{}_{}.{}", path_prefix_, socket_id_++, text_format_ ? "pb_text" : "pb"),
-      text_format_, transport_socket_factory_->createTransportSocket());
+Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket() const {
+  return std::make_unique<CaptureSocket>(path_prefix_, text_format_,
+                                         transport_socket_factory_->createTransportSocket());
 }
 
 bool CaptureSocketFactory::implementsSecureTransport() const {

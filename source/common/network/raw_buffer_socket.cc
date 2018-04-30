@@ -87,7 +87,7 @@ std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
-TransportSocketPtr RawBufferSocketFactory::createTransportSocket() {
+TransportSocketPtr RawBufferSocketFactory::createTransportSocket() const {
   return std::make_unique<RawBufferSocket>();
 }
 
