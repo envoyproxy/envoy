@@ -241,6 +241,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::transport_socket::capture::v2::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 
@@ -260,6 +261,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  EXPECT_EQ(second_id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
@@ -277,6 +279,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::transport_socket::capture::v2::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
+  EXPECT_EQ(id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
