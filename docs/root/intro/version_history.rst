@@ -4,6 +4,7 @@ Version history
 1.7.0 (Pending)
 ===============
 
+* access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * admin: added :http:get:`/config_dump` for dumping current configs
@@ -28,6 +29,11 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
+* health check http filter: added
+  :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
+  to trigger health check response. Deprecated the
+  :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -52,7 +58,8 @@ Version history
   :ref:`cluster specific <envoy_api_field_Cluster.upstream_bind_config>` options.
 * sockets: added `IP_TRANSPARENT` socket option support for :ref:`listeners
   <envoy_api_field_Listener.transparent>`.
-* stats: added support for histograms.
+* sockets: added `SO_KEEPALIVE` socket option for upstream connections
+  :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
