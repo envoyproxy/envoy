@@ -57,6 +57,15 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
   if (cluster_.info()->stats().upstream_cx_total_.used()) {
+    // When healthy/unhealthy threshold is configured the health transition of a host will be
+    // delayed. In this situation Envoy should use the edge interval settings between health checks.
+    //
+    // Example scenario for an unhealthy host with healthy_threshold set to 3:
+    // - check fails, host is still unhealthy and next check happens after unhealthy_interval;
+    // - check succeeds, host is still unhealthy and next check happens after healthy_edge_interval;
+    // - check succeeds, host is still unhealthy and next check happens after healthy_edge_interval;
+    // - check succeeds, host is now healthy and next check happens after interval;
+    // - check succeeds, host is still healthy and next check happens after interval.
     switch (state) {
     case HealthState::Unhealthy:
       base_time_ms = changed_state == HealthTransition::ChangePending
