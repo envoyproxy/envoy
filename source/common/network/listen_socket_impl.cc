@@ -30,12 +30,8 @@ void ListenSocketImpl::doBind() {
 }
 
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-  if (options) {
-    for (const auto& option : *options) {
-      if (!option->setOption(*this, SocketState::PreBind)) {
-        throw EnvoyException("ListenSocket: Setting socket options failed");
-      }
-    }
+  if (!Network::Socket::applyOptions(options, *this, Socket::SocketState::PreBind)) {
+    throw EnvoyException("ListenSocket: Setting socket options failed");
   }
 }
 

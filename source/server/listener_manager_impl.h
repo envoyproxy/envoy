@@ -249,12 +249,19 @@ public:
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::core::Metadata& listenerMetadata() const override { return metadata_; };
-  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
+  void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
+  }
+  void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) override {
+    ensureSocketOptions();
     listen_socket_options_->emplace_back(std::move(option));
+  }
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+    ensureSocketOptions();
+    Network::Socket::appendOptions(listen_socket_options_, options);
   }
 
   // Network::DrainDecision

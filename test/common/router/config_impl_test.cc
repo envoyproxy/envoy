@@ -3925,6 +3925,14 @@ virtual_hosts:
         redirect: { prefix_rewrite: "/new/regex-prefix/" }
       - match: { prefix: "/http/prefix"}
         redirect: { prefix_rewrite: "/https/prefix" , https_redirect: true }
+      - match: { prefix: "/ignore-this/"}
+        redirect: { prefix_rewrite: "/" }
+      - match: { prefix: "/ignore-this"}
+        redirect: { prefix_rewrite: "/" }
+      - match: { prefix: "/ignore-substring"}
+        redirect: { prefix_rewrite: "/" }
+      - match: { prefix: "/service-hello/"}
+        redirect: { prefix_rewrite: "/" }
   )EOF";
 
   NiceMock<Runtime::MockLoader> runtime;
@@ -3968,6 +3976,62 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers);
     EXPECT_EQ("https://redirect.lyft.com/https/prefix/", redirect->newPath(headers));
+  }
+  {
+    // The following matches to the redirect action match value equals to `/ignore-this` instead of
+    // `/ignore-this/`.
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-this", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
+  }
+  {
+    // The following matches to the redirect action match value equals to `/ignore-this/` instead of
+    // `/ignore-this`.
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-this/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/", redirect->newPath(headers));
+  }
+  {
+    // The same as previous test request, the following matches to the redirect action match value
+    // equals to `/ignore-this/` instead of `/ignore-this`.
+    Http::TestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/ignore-this/however/use/the/rest/of/this/path", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/however/use/the/rest/of/this/path",
+              redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-this/use/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/use/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-substringto/use/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/to/use/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/ignore-substring-to/use/", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/-to/use/", redirect->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/service-hello/a/b/c", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers);
+    EXPECT_EQ("http://redirect.lyft.com/a/b/c", redirect->newPath(headers));
   }
 }
 

@@ -1411,7 +1411,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
       .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr,
                            const Network::Socket::OptionsSharedPtr& options,
                            bool) -> Network::SocketSharedPtr {
-        EXPECT_NE(options.get(), nullptr);
+        EXPECT_EQ(options, nullptr);
         return listener_factory_.socket_;
       }));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), true);
@@ -1443,15 +1443,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                                 const Network::Socket::OptionsSharedPtr& options,
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
-          EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              (*options->begin())
-                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          EXPECT_EQ(options->size(), 2);
+          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                    Network::Socket::SocketState::PreBind));
           return listener_factory_.socket_;
         }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
     EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_TRANSPARENT.value(), _, sizeof(int)))
+                setsockopt_(_, ENVOY_SOCKET_IP_TRANSPARENT.value().first,
+                            ENVOY_SOCKET_IP_TRANSPARENT.value().second, _, sizeof(int)))
         .Times(2)
         .WillRepeatedly(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
@@ -1494,13 +1494,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(
-              (*options->begin())
-                  ->setOption(*listener_factory_.socket_, Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                    Network::Socket::SocketState::PreBind));
           return listener_factory_.socket_;
         }));
-    EXPECT_CALL(os_sys_calls,
-                setsockopt_(_, IPPROTO_IP, ENVOY_SOCKET_IP_FREEBIND.value(), _, sizeof(int)))
+    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
+                                          ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
         .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
           EXPECT_EQ(1, *static_cast<const int*>(optval));
           return 0;
