@@ -23,6 +23,7 @@ namespace Stats {
  * - Overallaping scopes with proper reference counting (2 scopes with the same name will point to
  *   the same backing stats).
  * - Scope deletion.
+ * - Lockless in the fast path.
  *
  * This implementation is complicated so here is a rough overview of the threading model.
  * - The store can be used before threading is initialized. This is needed during server init.
@@ -34,10 +35,9 @@ namespace Stats {
  * - Scopes are entirely owned by the caller. The store only keeps weak pointers.
  * - When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
  *   data owned by the destroyed scope.
- * - NOTE: It is theoretically possible that when a scope is deleted, it could be reallocated
- *         with the same address, and a cache flush operation could race and delete cache data
- *         for the new scope. This is extremely unlikely, and if it happens the cache will be
- *         repopulated on the next access.
+ * - Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
+ *   created at the same address as a recently deleted scope, cache references will not accidently
+ *   reference the old scope which may be about to be cache flushed.
  * - Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
  *   called since these are very uncommon operations.
  * - Though this implementation is designed to work with a fixed shared memory space, it will fall
@@ -110,7 +110,8 @@ private:
     // because it's possible that the memory allocator will recyle the scope pointer immediately
     // upon destruction, leading to a situation in which a new scope with the same address is used
     // to reference the cache, and then subsequently cache flushed, leaving nothing in the central
-    // store.
+    // store. See the overview for more information. This complexity is required for lockless
+    // operation in the fast path.
     std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
