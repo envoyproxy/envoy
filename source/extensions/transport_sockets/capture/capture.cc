@@ -3,6 +3,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/network/utility.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,10 +28,18 @@ bool CaptureSocket::canFlushClose() { return transport_socket_->canFlushClose();
 void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
   // The caller should have invoked setTransportSocketCallbacks() prior to this.
   ASSERT(callbacks_ != nullptr);
+  auto* connection = trace_.mutable_connection();
+  connection->set_id(callbacks_->connection().id());
+  Network::Utility::addressToProtobufAddress(*callbacks_->connection().localAddress(),
+                                             *connection->mutable_local_address());
+  Network::Utility::addressToProtobufAddress(*callbacks_->connection().remoteAddress(),
+                                             *connection->mutable_remote_address());
   const std::string path = fmt::format("{}_{}.{}", path_prefix_, callbacks_->connection().id(),
                                        text_format_ ? "pb_text" : "pb");
   ENVOY_LOG_MISC(debug, "Writing socket trace for [C{}] to {}", callbacks_->connection().id(),
                  path);
+  ENVOY_LOG_MISC(trace, "Socket trace for [C{}]: {}", callbacks_->connection().id(),
+                 trace_.DebugString());
   std::ofstream proto_stream(path);
   if (text_format_) {
     proto_stream << trace_.DebugString();
@@ -45,7 +55,12 @@ Network::IoResult CaptureSocket::doRead(Buffer::Instance& buffer) {
     // TODO(htuch): avoid linearizing
     char* data = static_cast<char*>(buffer.linearize(buffer.length())) +
                  (buffer.length() - result.bytes_processed_);
-    trace_.add_events()->mutable_read()->set_data(data, result.bytes_processed_);
+    auto* event = trace_.add_events();
+    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count()));
+    event->mutable_read()->set_data(data, result.bytes_processed_);
   }
 
   return result;
@@ -58,7 +73,12 @@ Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stre
   if (result.bytes_processed_ > 0) {
     // TODO(htuch): avoid linearizing.
     char* data = static_cast<char*>(copy.linearize(result.bytes_processed_));
-    trace_.add_events()->mutable_write()->set_data(data, result.bytes_processed_);
+    auto* event = trace_.add_events();
+    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count()));
+    event->mutable_write()->set_data(data, result.bytes_processed_);
   }
   return result;
 }

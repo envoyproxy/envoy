@@ -17,6 +17,8 @@ envoy_cc_library(
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf",
         "@envoy_api//envoy/extensions/transport_socket/capture/v2:capture_cc",
     ],
 )
