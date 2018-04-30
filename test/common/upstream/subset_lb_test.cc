@@ -78,6 +78,11 @@ public:
     return matches_;
   }
 
+  Router::MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct&) const override {
+    return nullptr;
+  }
+
 private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };

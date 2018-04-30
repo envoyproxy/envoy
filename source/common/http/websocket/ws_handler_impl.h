@@ -35,7 +35,7 @@ public:
                 Network::ReadFilterCallbacks* read_callbacks);
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return route_entry_.metadataMatchCriteria();
   }
 
