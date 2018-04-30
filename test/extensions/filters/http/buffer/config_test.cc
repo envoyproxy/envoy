@@ -1,11 +1,10 @@
+#include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/buffer/config.h"
 
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "extensions/filters/http/buffer/buffer_filter.h"
 
 using testing::NiceMock;
 using testing::_;
