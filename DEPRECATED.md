@@ -19,6 +19,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
   deprecated. Use `custom_health_check` with name `envoy.health_checkers.redis` instead. Prior
   to 1.7, `redis_health_check` can be used, but warning is logged.
 * `SAN` is replaced by `URI` in the `x-forwarded-client-cert` header.
+* The `endpoint` field in the http health check filter is deprecated in favor of the `headers`
+  field where one can specify HeaderMatch objects to match on.
 
 ## Version 1.6.0 (March 20, 2018)
 

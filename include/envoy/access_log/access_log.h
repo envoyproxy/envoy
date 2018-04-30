@@ -58,10 +58,12 @@ public:
    * Log a completed request.
    * @param request_headers supplies the incoming request headers after filtering.
    * @param response_headers supplies response headers.
+   * @param response_trailers supplies response trailers.
    * @param request_info supplies additional information about the request not contained in
    *                      the request headers.
    */
   virtual void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+                   const Http::HeaderMap* response_trailers,
                    const RequestInfo::RequestInfo& request_info) PURE;
 };
 
@@ -76,6 +78,7 @@ public:
 
   virtual std::string format(const Http::HeaderMap& request_headers,
                              const Http::HeaderMap& response_headers,
+                             const Http::HeaderMap& response_trailers,
                              const RequestInfo::RequestInfo& request_info) const PURE;
 };
 

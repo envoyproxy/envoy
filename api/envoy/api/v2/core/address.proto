@@ -58,6 +58,20 @@ message SocketAddress {
   bool ipv4_compat = 6;
 }
 
+message TcpKeepalive {
+  // Maximum number of keepalive probes to send without response before deciding
+  // the connection is dead. Default is to use the OS level configuration (unless
+  // overridden, Linux defaults to 9.)
+  google.protobuf.UInt32Value keepalive_probes = 1;
+  // The number of seconds a connection needs to be idle before keep-alive probes
+  // start being sent. Default is to use the OS level configuration (unless
+  // overridden, Linux defaults to 7200s (ie 2 hours.)
+  google.protobuf.UInt32Value keepalive_time = 2;
+  // The number of seconds between keep-alive probes. Default is to use the OS
+  // level configuration (unless overridden, Linux defaults to 75s.)
+  google.protobuf.UInt32Value keepalive_interval = 3;
+}
+
 message BindConfig {
   // The address to bind to when creating a socket.
   SocketAddress source_address = 1

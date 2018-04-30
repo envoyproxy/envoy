@@ -45,6 +45,8 @@ public:
 
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
+  // A string for a small buffer filter, which can be used with addFilter()
+  static const std::string SMALL_BUFFER_FILTER;
   // a string for a health check filter which can be used with addFilter()
   static const std::string DEFAULT_HEALTH_CHECK_FILTER;
   // a string for a squash filter which can be used with addFilter()

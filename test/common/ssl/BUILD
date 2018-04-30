@@ -31,6 +31,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

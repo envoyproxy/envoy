@@ -17,102 +17,6 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * A histogram that is stored in TLS and used to record values per thread. This holds two
- * histograms, one to collect the values and other as backup that is used for merge process. The
- * swap happens during the merge process.
- */
-class ThreadLocalHistogramImpl : public Histogram, public MetricImpl {
-public:
-  ThreadLocalHistogramImpl(const std::string& name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags);
-
-  ~ThreadLocalHistogramImpl();
-
-  void merge(histogram_t* target);
-
-  /**
-   * Called in the beginning of merge process. Swaps the histogram used for collection so that we do
-   * not have to lock the histogram in high throughput TLS writes.
-   */
-  void beginMerge() {
-    // This switches the current_active_ between 1 and 0.
-    current_active_ = otherHistogramIndex();
-  }
-
-  // Stats::Histogram
-  void recordValue(uint64_t value) override;
-  bool used() const override { return flags_ & Flags::Used; }
-
-private:
-  uint64_t otherHistogramIndex() const { return 1 - current_active_; }
-  uint64_t current_active_;
-  histogram_t* histograms_[2];
-  std::atomic<uint16_t> flags_;
-  std::thread::id created_thread_id_;
-};
-
-typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
-
-class TlsScope;
-
-/**
- * Log Linear Histogram implementation that is stored in the main thread.
- */
-class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
-public:
-  ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
-                      std::string&& tag_extracted_name, std::vector<Tag>&& tags);
-
-  virtual ~ParentHistogramImpl();
-
-  void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
-
-  bool used() const override;
-  void recordValue(uint64_t value) override;
-  /**
-   * This method is called during the main stats flush process for each of the histograms. It
-   * iterates through the TLS histograms and collects the histogram data of all of them
-   * in to "interval_histogram". Then the collected "interval_histogram" is merged to a
-   * "cumulative_histogram".
-   */
-  void merge() override;
-
-  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
-  const HistogramStatistics& cumulativeStatistics() const override {
-    return cumulative_statistics_;
-  }
-
-private:
-  bool usedLockHeld() const;
-
-  Store& parent_;
-  TlsScope& tls_scope_;
-  histogram_t* interval_histogram_;
-  histogram_t* cumulative_histogram_;
-  HistogramStatisticsImpl interval_statistics_;
-  HistogramStatisticsImpl cumulative_statistics_;
-  mutable std::mutex merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_;
-};
-
-typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
-
-/**
- * Class used to create ThreadLocalHistogram in the scope.
- */
-class TlsScope : public Scope {
-public:
-  virtual ~TlsScope() {}
-
-  // TODO(ramaraochavali): Allow direct TLS access for the advanced consumers.
-  /**
-   * @return a ThreadLocalHistogram within the scope's namespace.
-   * @param name name of the histogram with scope prefix attached.
-   */
-  virtual Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) PURE;
-};
-
-/**
  * Store implementation with thread local caching. This implementation supports the following
  * features:
  * - Thread local per scope stat caching.
@@ -140,28 +44,8 @@ public:
  *   back to heap allocated stats if needed. NOTE: In this case, overlapping scopes will not share
  *   the same backing store. This is to keep things simple, it could be done in the future if
  *   needed.
- *
- * The threading model for managing histograms is as described below.
- * Each Histogram implementation will have 2 parts.
- *  - "main" thread parent which is called "ParentHistogram".
- *  - "per-thread" collector which is called "ThreadLocalHistogram".
- * Worker threads will write to ParentHistogram which checks whether a TLS histogram is available.
- * If there is one it will write to it, otherwise creates new one and writes to it.
- * During the flush process the following sequence is followed.
- *  - The main thread starts the flush process by posting a message to every worker which tells the
- *    worker to swap its "active" histogram with its "backup" histogram. This is acheived via a call
- *    to "beginMerge" method.
- *  - Each TLS histogram has 2 histograms it makes use of, swapping back and forth. It manages a
- *    current_active index via which it writes to the correct histogram.
- *  - When all workers have done, the main thread continues with the flush process where the
- *    "actual" merging happens.
- *  - As the active histograms are swapped in TLS histograms, on the main thread, we can be sure
- *    that no worker is writing into the "backup" histogram.
- *  - The main thread now goes through all histograms, collect them across each worker and
- *    accumulates in to "interval" histograms.
- *  - Finally the main "interval" histogram is merged to "cumulative" histogram.
  */
-class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
+class ThreadLocalStoreImpl : public StoreRoot {
 public:
   ThreadLocalStoreImpl(RawStatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
@@ -178,11 +62,8 @@ public:
   };
 
   // Stats::Store
-  // TODO(ramaraochavali): Consider changing the implementation of these methods to use vectors and
-  // use std::sort, rather than inserting into a map and pulling it out for better performance.
   std::list<CounterSharedPtr> counters() const override;
   std::list<GaugeSharedPtr> gauges() const override;
-  std::list<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -193,23 +74,14 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
 
-  void mergeHistograms(PostMergeCb mergeCb) override;
-
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
     std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
+    std::unordered_map<std::string, HistogramSharedPtr> histograms_;
   };
 
-  struct CentralCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
-  };
-
-  struct ScopeImpl : public TlsScope {
+  struct ScopeImpl : public Scope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
         : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
     ~ScopeImpl();
@@ -222,11 +94,10 @@ private:
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
-    Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
-    CentralCacheEntry central_cache_;
+    TlsCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -242,7 +113,6 @@ private:
   void clearScopeFromCaches(ScopeImpl* scope);
   void releaseScopeCrossThread(ScopeImpl* scope);
   SafeAllocData safeAlloc(const std::string& name);
-  void mergeInternal(PostMergeCb mergeCb);
 
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
@@ -253,7 +123,6 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   std::atomic<bool> shutting_down_{};
-  std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
 };

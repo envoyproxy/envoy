@@ -27,6 +27,7 @@ public:
       const LoadBalancerSubsetInfo& subsets,
       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  ~SubsetLoadBalancer();
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -144,6 +145,7 @@ private:
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
+  Common::CallbackHandle* original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr fallback_subset_;
 

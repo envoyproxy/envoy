@@ -170,7 +170,7 @@ http_logs:
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, request_info);
   }
 
   {
@@ -198,7 +198,7 @@ http_logs:
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, request_info);
   }
 
   {
@@ -293,7 +293,7 @@ http_logs:
       response_headers_bytes: 10
       response_body_bytes: 20
 )EOF");
-    access_log_->log(&request_headers, &response_headers, request_info);
+    access_log_->log(&request_headers, &response_headers, nullptr, request_info);
   }
 
   {
@@ -323,7 +323,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, request_info);
   }
 }
 
@@ -340,6 +340,11 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
   config_.add_additional_response_headers_to_log("X-Custom-Empty");
   config_.add_additional_response_headers_to_log("X-Envoy-Immediate-Health-Check-Fail");
   config_.add_additional_response_headers_to_log("X-Envoy-Upstream-Service-Time");
+
+  config_.add_additional_response_trailers_to_log("X-Logged-Trailer");
+  config_.add_additional_response_trailers_to_log("X-Missing-Trailer");
+  config_.add_additional_response_trailers_to_log("X-Empty-Trailer");
+
   init();
 
   {
@@ -361,6 +366,12 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
         {"x-custom-empty", ""},
+    };
+
+    Http::TestHeaderMapImpl response_trailers{
+        {"x-logged-trailer", "value"},
+        {"x-empty-trailer", ""},
+        {"x-unlogged-trailer", "2"},
     };
 
     expectLog(R"EOF(
@@ -393,8 +404,11 @@ http_logs:
         "x-custom-response": "custom_value"
         "x-custom-empty": ""
         "x-envoy-immediate-health-check-fail": "true"
+      response_trailers:
+        "x-logged-trailer": "value"
+        "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, request_info);
+    access_log_->log(&request_headers, &response_headers, &response_trailers, request_info);
   }
 }
 
