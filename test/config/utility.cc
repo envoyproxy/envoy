@@ -72,6 +72,14 @@ config:
     max_request_time : 120s
 )EOF";
 
+const std::string ConfigHelper::SMALL_BUFFER_FILTER =
+    R"EOF(
+name: envoy.buffer
+config:
+    max_request_bytes : 1024
+    max_request_time : 5s
+)EOF";
+
 const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
     R"EOF(
 name: envoy.health_check
