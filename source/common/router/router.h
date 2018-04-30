@@ -168,7 +168,8 @@ public:
       const auto& request_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
       const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != request_metadata.end()) {
-        metadata_match_ = route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+        metadata_match_ =
+            route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
         return metadata_match_.get();
       }
       return route_entry_->metadataMatchCriteria();

@@ -92,9 +92,7 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    return matches_.get();
-  }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
