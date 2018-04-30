@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/config/transport_socket/capture/v2/capture.pb.h"
-#include "envoy/extensions/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/extensions/transport_socket/capture/v2/capture.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -239,7 +239,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
+  envoy::extensions::transport_socket::capture::v2::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
@@ -275,7 +275,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
+  envoy::extensions::transport_socket::capture::v2::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));

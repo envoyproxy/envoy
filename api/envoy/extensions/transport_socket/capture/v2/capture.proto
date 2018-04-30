@@ -4,9 +4,8 @@ syntax = "proto3";
 // sequences on a socket.
 // TODO(htuch): Write a PCAP conversion utility for this proto, extend Trace to contain more useful
 // properties such as source/dest IP/port, timestamps etc.
-// [#proto-status: draft]
 
-package envoy.extensions.transport_socket.capture.v2alpha;
+package envoy.extensions.transport_socket.capture.v2;
 option go_package = "v2";
 
 // Event in a capture trace.

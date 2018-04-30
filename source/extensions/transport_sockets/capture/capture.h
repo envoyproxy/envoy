@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-#include "envoy/extensions/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/extensions/transport_socket/capture/v2/capture.pb.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -29,7 +29,7 @@ public:
 private:
   const std::string& path_prefix_;
   const bool text_format_;
-  envoy::extensions::transport_socket::capture::v2alpha::Trace trace_;
+  envoy::extensions::transport_socket::capture::v2::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketCallbacks* callbacks_{};
 };
