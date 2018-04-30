@@ -30,5 +30,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

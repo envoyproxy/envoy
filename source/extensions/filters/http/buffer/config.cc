@@ -23,10 +23,8 @@ Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilt
   ASSERT(proto_config.has_max_request_bytes());
   ASSERT(proto_config.has_max_request_time());
 
-  BufferFilterConfigConstSharedPtr filter_config(new BufferFilterConfig{
-      BufferFilter::generateStats(stats_prefix, context.scope()),
-      static_cast<uint64_t>(proto_config.max_request_bytes().value()),
-      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(proto_config, max_request_time))});
+  BufferFilterConfigSharedPtr filter_config(
+      new BufferFilterConfig(proto_config, stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
   };
@@ -48,6 +46,13 @@ Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilt
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::buffer::v2::Buffer&>(
           proto_config),
       stats_prefix, context);
+}
+
+Router::RouteSpecificFilterConfigConstSharedPtr
+BufferFilterConfigFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) {
+  return std::make_shared<const BufferFilterSettings>(
+      MessageUtil::downcastAndValidate<
+          const envoy::config::filter::http::buffer::v2::BufferPerRoute&>(proto_config));
 }
 
 /**
