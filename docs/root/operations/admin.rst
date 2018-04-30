@@ -195,6 +195,44 @@ The fields are:
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
   that has the computed quantile for each histogram.
 
+  The JSON structure would as shown below.
+
+  .. code-block:: json
+
+  {
+    "stats": [
+        {
+            "name": "example.counter",
+            "value": 0
+        },
+        {
+            "name": "example.gauge",
+            "value": 0
+        },
+        {
+            "histograms": {
+                "supported_quantiles": [...],
+                "computed_quantiles": [
+                    {
+                        "name": "example.histogram",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": null
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": null
+                            },
+                            ...
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+  }
+
   .. http:get:: /stats?format=prometheus
 
   or alternatively,

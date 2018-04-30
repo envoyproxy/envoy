@@ -167,10 +167,10 @@ TEST_P(IntegrationAdminTest, Admin) {
   Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
   EXPECT_TRUE(statsjson->hasObject("stats"));
 
-  bool has_histograms = false;
+  uint64_t histogram_count = 0;
   for (Json::ObjectSharedPtr obj_ptr : statsjson->getObjectArray("stats")) {
     if (obj_ptr->hasObject("histograms")) {
-      has_histograms = true;
+      histogram_count++;
       const Json::ObjectSharedPtr& histograms_ptr = obj_ptr->getObject("histograms");
       // Validate that both supported_quantiles and computed_quantiles are present in JSON.
       EXPECT_TRUE(histograms_ptr->hasObject("supported_quantiles"));
@@ -190,8 +190,8 @@ TEST_P(IntegrationAdminTest, Admin) {
     }
   }
 
-  // Validate that the stats JSON has histograms.
-  EXPECT_TRUE(has_histograms);
+  // Validate that the stats JSON has exactly one histograms element.
+  EXPECT_EQ(1, histogram_count);
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
