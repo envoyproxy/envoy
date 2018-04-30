@@ -412,12 +412,14 @@ private:
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
-  typedef std::unordered_map<std::string, RawStatData*> StringRawDataMap;
+  ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
 
 private:
-  StringRawDataMap stats_set_;
+  typedef std::unordered_map<std::string, RawStatData*> StringRawDataMap;
+  StringRawDataMap stats_;
+  mutable std::mutex lock_;
 };
 
 /**

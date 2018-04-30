@@ -150,6 +150,8 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
+  std::unique_lock<std::mutex> lock(lock_);
+
   absl::string_view key = name;
 
   if (key.size() > Stats::RawStatData::maxNameLength()) {
@@ -160,7 +162,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
         key.size(), Stats::RawStatData::maxNameLength());
   }
 
-  auto ret = stats_set_.insert(StringRawDataMap::value_type(std::string(key), nullptr));
+  auto ret = stats_.insert(StringRawDataMap::value_type(std::string(key), nullptr));
   RawStatData*& data = ret.first->second;
   if (ret.second) {
     data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
@@ -272,12 +274,14 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
+  std::unique_lock<std::mutex> lock(lock_);
+
   ASSERT(data.ref_count_ > 0);
   if (--data.ref_count_ > 0) {
     return;
   }
 
-  size_t key_removed = stats_set_.erase(std::string(data.key()));
+  size_t key_removed = stats_.erase(std::string(data.key()));
   ASSERT(key_removed >= 1);
   ::free(&data);
 }
