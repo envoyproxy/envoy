@@ -364,8 +364,22 @@ message RouteAction {
   //   Pay careful attention to the use of trailing slashes in the
   //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
   //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
-  //   rewriting */prefix* to */* and */prefix/etc* to */etc*
-  //   cannot be done in a single :ref:`Route <envoy_api_msg_route.Route>`.
+  //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
+  //   :ref:`Route <envoy_api_msg_route.Route>`, as shown by the below config entries:
+  //
+  //   .. code-block:: yaml
+  //
+  //     - match:
+  //         prefix: "/prefix/"
+  //       route:
+  //         prefix_rewrite: "/"
+  //     - match:
+  //         prefix: "/prefix"
+  //       route:
+  //         prefix_rewrite: "/"
+  //
+  //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
+  //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5;
 
   oneof host_rewrite_specifier {
