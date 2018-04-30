@@ -876,6 +876,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
                                                      config.response_headers_to_remove());
 }
 
+RouteSpecificFilterConfig::~RouteSpecificFilterConfig() {}
+
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs) {
   for (const auto& cfg : configs) {

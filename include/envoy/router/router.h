@@ -239,7 +239,7 @@ class Config;
  */
 class RouteSpecificFilterConfig {
 public:
-  virtual ~RouteSpecificFilterConfig() {}
+  virtual ~RouteSpecificFilterConfig() PURE;
 };
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
