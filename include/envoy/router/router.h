@@ -334,6 +334,9 @@ public:
 
 typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
 
+class MetadataMatchCriteria;
+typedef std::unique_ptr<const MetadataMatchCriteria> MetadataMatchCriteriaConstPtr;
+
 class MetadataMatchCriteria {
 public:
   virtual ~MetadataMatchCriteria() {}
@@ -345,6 +348,15 @@ public:
    */
   virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
   metadataMatchCriteria() const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteriaImpl, merging existing
+   * metadata criteria this criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the
+   * ProtobufWkt::Struct taking precedence.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
 /**

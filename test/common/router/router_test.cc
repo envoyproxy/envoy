@@ -466,8 +466,9 @@ TEST_F(RouterTest, AddMultipleCookies) {
 TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_.metadataMatchCriteria()); }
 
 TEST_F(RouterTest, MetadataMatchCriteria) {
-  MockMetadataMatchCriteria matches;
+  envoy::api::v2::core::Metadata metadata;
 
+  EXPECT_CALL(callbacks_.request_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -491,6 +492,9 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
+  envoy::api::v2::core::Metadata metadata;
+
+  EXPECT_CALL(callbacks_.request_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
