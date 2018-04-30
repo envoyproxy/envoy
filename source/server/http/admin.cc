@@ -151,10 +151,8 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 void AdminFilter::onDestroy() {
-  if (on_destroy_callbacks_ != nullptr) {
-    for (const auto& callback : *on_destroy_callbacks_) {
-      callback();
-    }
+  for (const auto& callback : *on_destroy_callbacks_) {
+    callback();
   }
 }
 
@@ -684,10 +682,10 @@ void AdminFilter::onComplete() {
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
   callbacks_->encodeHeaders(std::move(header_map),
-                            admin_stream.end_stream_on_complete() && response.length() == 0);
+                            admin_stream.endStreamOnComplete() && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, admin_stream.end_stream_on_complete());
+    callbacks_->encodeData(response, admin_stream.endStreamOnComplete());
   }
 }
 

@@ -43,6 +43,11 @@ public:
    * request
    */
   virtual const Http::HeaderMap& getRequestHeaders() const PURE;
+
+  /**
+   * @return bool value of end_stream_on_complete
+   */
+  virtual bool endStreamOnComplete() const PURE;
 };
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
@@ -52,8 +57,8 @@ public:
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
-         Buffer::Instance& data, AdminStream& admin_filter) -> Http::Code {                        \
-    return X(path_and_query, response_headers, data, admin_filter);                                \
+         Buffer::Instance& data, AdminStream& admin_stream) -> Http::Code {                        \
+    return X(path_and_query, response_headers, data, admin_stream);                                \
   }
 
 /**

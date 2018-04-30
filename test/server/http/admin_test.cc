@@ -91,9 +91,11 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
+    Http::MockStreamDecoderFilterCallbacks callbacks;
+    std::list<std::function<void()>> on_destroy_callbacks{};
     admin_filter_.decodeHeaders(request_headers_, false);
-    AdminStreamImpl admin_stream(admin_filter_.callbacks(), request_headers_,
-                                 admin_filter_.onDestroyCallbacksList());
+    AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
+
     return admin_.runCallback(path_and_query, response_headers, response, admin_stream);
   }
 
@@ -158,8 +160,10 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
   admin_filter_.decodeHeaders(request_headers_, false);
-  AdminStreamImpl admin_stream(admin_filter_.callbacks(), request_headers_,
-                               admin_filter_.onDestroyCallbacksList());
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  std::list<std::function<void()>> on_destroy_callbacks{};
+
+  AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
   EXPECT_NO_LOGS(EXPECT_EQ(
       Http::Code::InternalServerError,
       admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data, admin_stream)));
@@ -210,6 +214,26 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
+}
+
+// TODO (@trabetti) : could be better to test in integration testing, to see the resopnse header
+// is set to streaming. But then will get stuck.
+TEST_P(AdminInstanceTest, StreamingResponse) {
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     AdminStream& admin_stream) -> Http::Code {
+    admin_stream.setEndStreamOnComplete(false);
+
+    // check that value is set to false
+    if (admin_stream.endStreamOnComplete())
+      return Http::Code::NotAcceptable;
+    return Http::Code::OK;
+  };
+
+  // Add non removable handler.
+  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {

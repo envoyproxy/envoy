@@ -48,7 +48,7 @@ public:
     return callbacks_;
   }
   const Http::HeaderMap& getRequestHeaders() const override { return request_headers_; }
-  bool end_stream_on_complete() { return end_stream_on_complete_; }
+  bool endStreamOnComplete() const override { return end_stream_on_complete_; }
 
 private:
   const Http::StreamDecoderFilterCallbacks& callbacks_;
@@ -276,10 +276,6 @@ public:
     callbacks_ = &callbacks;
   }
 
-  Http::StreamDecoderFilterCallbacks& callbacks() { return *callbacks_; }
-  std::list<std::function<void()>>& onDestroyCallbacksList() { return *on_destroy_callbacks_; }
-  Http::HeaderMap& requestHeaders() { return *request_headers_; }
-
 private:
   /**
    * Called when an admin request has been completely received.
@@ -289,7 +285,8 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
-  std::list<std::function<void()>>* on_destroy_callbacks_ = nullptr;
+  std::unique_ptr<std::list<std::function<void()>>> on_destroy_callbacks_ =
+      std::make_unique<std::list<std::function<void()>>>();
 };
 
 /**
