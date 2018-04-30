@@ -1,6 +1,16 @@
 licenses(["notice"])  # Apache 2
 
 py_binary(
+    name = "capture2pcap",
+    srcs = ["capture2pcap.py"],
+    licenses = ["notice"],  # Apache 2
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/extensions/transport_socket/capture/v2:capture_py",
+    ],
+)
+
+py_binary(
     name = "generate_listeners",
     srcs = ["generate_listeners.py"],
     licenses = ["notice"],  # Apache 2
