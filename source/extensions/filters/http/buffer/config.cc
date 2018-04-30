@@ -50,9 +50,9 @@ Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilt
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 BufferFilterConfigFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) {
-  return std::make_shared<const BufferFilterSettings>(BufferFilterSettings(
+  return std::make_shared<const BufferFilterSettings>(
       MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::buffer::v2::BufferPerRoute&>(proto_config)));
+          const envoy::config::filter::http::buffer::v2::BufferPerRoute&>(proto_config));
 }
 
 /**
