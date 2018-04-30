@@ -20,7 +20,7 @@ namespace Stats {
  * Store implementation with thread local caching. This implementation supports the following
  * features:
  * - Thread local per scope stat caching.
- * - Overallaping scopes with proper reference counting (2 scopes with the same name will point to
+ * - Overlapping scopes with proper reference counting (2 scopes with the same name will point to
  *   the same backing stats).
  * - Scope deletion.
  * - Lockless in the fast path.
