@@ -407,7 +407,7 @@ public:
   ~MockTransportSocketFactory();
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
-  MOCK_METHOD0(createTransportSocket, TransportSocketPtr());
+  MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
 };
 
 } // namespace Network
