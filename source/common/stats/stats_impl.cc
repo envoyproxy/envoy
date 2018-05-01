@@ -150,12 +150,12 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  std::unique_lock<std::mutex> lock(mutex_);
-
-  absl::string_view key = name;
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-  data->initialize(key);
+  data->initialize(name);
+
+  std::unique_lock<std::mutex> lock(mutex_);
   auto ret = stats_.insert(data);
+  lock.unlock();
 
   if (!ret.second) {
     ::free(data);
