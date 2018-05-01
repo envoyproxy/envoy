@@ -1,23 +1,26 @@
 """Tool to convert Envoy capture trace format to PCAP.
 
-Uses od and text2pcap (part of Wireshark) utilities to translate the Envoy capture trace proto
-format to a PCAP file suitable for consuming in Wireshark and other tools in the PCAP ecosystem. The
-TCP stream in the output PCAP is synthesized based on the known IP/port/timestamps that Envoy
-produces in its capture files; it is not a literal wire capture.
+Uses od and text2pcap (part of Wireshark) utilities to translate the Envoy
+capture trace proto format to a PCAP file suitable for consuming in Wireshark
+and other tools in the PCAP ecosystem. The TCP stream in the output PCAP is
+synthesized based on the known IP/port/timestamps that Envoy produces in its
+capture files; it is not a literal wire capture.
 
 Usage:
 
 bazel run @envoy_api//tools:capture2pcap <capture .pb/.pb_text> <pcap path>
 
-TODO(htuch):
-- Tests.
-- Fix issue in timezone offset.
+Known issues:
+- IPv6 PCAP generation has malformed TCP packets. This appears to be a text2pcap
+issue.
 """
 
+import datetime
 import socket
 import StringIO
 import subprocess as sp
 import sys
+import time
 
 from google.protobuf import text_format
 
@@ -27,7 +30,10 @@ from envoy.extensions.common.tap.v2alpha import capture_pb2
 def DumpEvent(direction, timestamp, data):
   dump = StringIO.StringIO()
   dump.write('%s\n' % direction)
-  dump.write('%s\n' % timestamp.ToDatetime())
+  # Adjust to local timezone
+  adjusted_dt = timestamp.ToDatetime() - datetime.timedelta(
+      seconds=time.altzone)
+  dump.write('%s\n' % adjusted_dt)
   od = sp.Popen(
       ['od', '-Ax', '-tx1', '-v'],
       stdout=sp.PIPE,
@@ -66,14 +72,12 @@ def Capture2Pcap(capture_path, pcap_path):
   except socket.error:
     pass
 
-  text2pcap = sp.Popen(
-      [
-          'text2pcap', '-D', '-t', '%Y-%m-%d %H:%M:%S.', '-6' if ipv6 else '-4',
-          '%s,%s' % (remote_address, local_address), '-T',
-          '%d,%d' % (remote_port, local_port), '-', pcap_path
-      ],
-      stdout=sp.PIPE,
-      stdin=sp.PIPE)
+  text2pcap_args = [
+      'text2pcap', '-D', '-t', '%Y-%m-%d %H:%M:%S.', '-6' if ipv6 else '-4',
+      '%s,%s' % (remote_address, local_address), '-T',
+      '%d,%d' % (remote_port, local_port), '-', pcap_path
+  ]
+  text2pcap = sp.Popen(text2pcap_args, stdout=sp.PIPE, stdin=sp.PIPE)
   text2pcap.communicate('\n'.join(dumps))
 
 
