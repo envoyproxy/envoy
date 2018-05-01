@@ -11,10 +11,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Capture {
 
-CaptureSocket::CaptureSocket(const std::string& path_prefix, bool text_format,
-                             Network::TransportSocketPtr&& transport_socket)
-    : path_prefix_(path_prefix), text_format_(text_format),
-      transport_socket_(std::move(transport_socket)) {}
+CaptureSocket::CaptureSocket(
+    const std::string& path_prefix,
+    envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
+    Network::TransportSocketPtr&& transport_socket)
+    : path_prefix_(path_prefix), format_(format), transport_socket_(std::move(transport_socket)) {}
 
 void CaptureSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
@@ -34,14 +35,16 @@ void CaptureSocket::closeSocket(Network::ConnectionEvent event) {
                                              *connection->mutable_local_address());
   Network::Utility::addressToProtobufAddress(*callbacks_->connection().remoteAddress(),
                                              *connection->mutable_remote_address());
+  const bool text_format =
+      format_ == envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT;
   const std::string path = fmt::format("{}_{}.{}", path_prefix_, callbacks_->connection().id(),
-                                       text_format_ ? "pb_text" : "pb");
+                                       text_format ? "pb_text" : "pb");
   ENVOY_LOG_MISC(debug, "Writing socket trace for [C{}] to {}", callbacks_->connection().id(),
                  path);
   ENVOY_LOG_MISC(trace, "Socket trace for [C{}]: {}", callbacks_->connection().id(),
                  trace_.DebugString());
   std::ofstream proto_stream(path);
-  if (text_format_) {
+  if (text_format) {
     proto_stream << trace_.DebugString();
   } else {
     trace_.SerializeToOstream(&proto_stream);
@@ -79,6 +82,7 @@ Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stre
             std::chrono::system_clock::now().time_since_epoch())
             .count()));
     event->mutable_write()->set_data(data, result.bytes_processed_);
+    event->mutable_write()->set_end_stream(end_stream);
   }
   return result;
 }
@@ -90,13 +94,14 @@ Ssl::Connection* CaptureSocket::ssl() { return transport_socket_->ssl(); }
 const Ssl::Connection* CaptureSocket::ssl() const { return transport_socket_->ssl(); }
 
 CaptureSocketFactory::CaptureSocketFactory(
-    const std::string& path_prefix, bool text_format,
+    const std::string& path_prefix,
+    envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
     Network::TransportSocketFactoryPtr&& transport_socket_factory)
-    : path_prefix_(path_prefix), text_format_(text_format),
+    : path_prefix_(path_prefix), format_(format),
       transport_socket_factory_(std::move(transport_socket_factory)) {}
 
 Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket() const {
-  return std::make_unique<CaptureSocket>(path_prefix_, text_format_,
+  return std::make_unique<CaptureSocket>(path_prefix_, format_,
                                          transport_socket_factory_->createTransportSocket());
 }
 

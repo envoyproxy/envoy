@@ -2,7 +2,8 @@
 
 #include <fstream>
 
-#include "envoy/extensions/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/extensions/common/tap/v2alpha/capture.pb.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -12,7 +13,8 @@ namespace Capture {
 
 class CaptureSocket : public Network::TransportSocket {
 public:
-  CaptureSocket(const std::string& path_prefix, bool text_format,
+  CaptureSocket(const std::string& path_prefix,
+                envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
                 Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
@@ -28,15 +30,16 @@ public:
 
 private:
   const std::string& path_prefix_;
-  const bool text_format_;
-  envoy::extensions::transport_socket::capture::v2alpha::Trace trace_;
+  const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
+  envoy::extensions::common::tap::v2alpha::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketCallbacks* callbacks_{};
 };
 
 class CaptureSocketFactory : public Network::TransportSocketFactory {
 public:
-  CaptureSocketFactory(const std::string& path_prefix, bool text_format,
+  CaptureSocketFactory(const std::string& path_prefix,
+                       envoy::config::transport_socket::capture::v2alpha::FileSink::Format format,
                        Network::TransportSocketFactoryPtr&& transport_socket_factory);
 
   // Network::TransportSocketFactory
@@ -45,7 +48,7 @@ public:
 
 private:
   const std::string path_prefix_;
-  const bool text_format_;
+  const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
 };
 

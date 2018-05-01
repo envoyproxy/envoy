@@ -6,7 +6,7 @@ py_binary(
     licenses = ["notice"],  # Apache 2
     visibility = ["//visibility:public"],
     deps = [
-        "//envoy/extensions/transport_socket/capture/v2alpha:capture_py",
+        "//envoy/extensions/common/tap/v2alpha:capture_py",
     ],
 )
 

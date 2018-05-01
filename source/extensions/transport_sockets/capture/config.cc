@@ -26,8 +26,9 @@ Network::TransportSocketFactoryPtr UpstreamCaptureSocketConfigFactory::createTra
       outer_config.transport_socket(), inner_config_factory);
   auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  return std::make_unique<CaptureSocketFactory>(
-      outer_config.path_prefix(), outer_config.text_format(), std::move(inner_transport_factory));
+  return std::make_unique<CaptureSocketFactory>(outer_config.file_sink().path_prefix(),
+                                                outer_config.file_sink().format(),
+                                                std::move(inner_transport_factory));
 }
 
 Network::TransportSocketFactoryPtr
@@ -44,8 +45,9 @@ DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
       name, server_names, skip_ssl_context_update, *inner_factory_config, context);
-  return std::make_unique<CaptureSocketFactory>(
-      outer_config.path_prefix(), outer_config.text_format(), std::move(inner_transport_factory));
+  return std::make_unique<CaptureSocketFactory>(outer_config.file_sink().path_prefix(),
+                                                outer_config.file_sink().format(),
+                                                std::move(inner_transport_factory));
 }
 
 ProtobufTypes::MessagePtr CaptureSocketConfigFactory::createEmptyConfigProto() {
