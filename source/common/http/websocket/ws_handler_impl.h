@@ -54,6 +54,8 @@ private:
     void onGoAway() override {}
   };
 
+  enum class ConnectState { PreConnect, Connected, Failed };
+
   HeaderMap& request_headers_;
   const RequestInfo::RequestInfo& request_info_;
   const Router::RouteEntry& route_entry_;
@@ -61,7 +63,7 @@ private:
   NullHttpConnectionCallbacks http_conn_callbacks_;
   Buffer::OwnedImpl queued_data_;
   bool queued_end_stream_{false};
-  bool is_connected_{false};
+  ConnectState state_{ConnectState::PreConnect};
 };
 
 typedef std::unique_ptr<WsHandlerImpl> WsHandlerImplPtr;
