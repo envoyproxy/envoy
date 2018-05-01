@@ -267,14 +267,15 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
-  std::unique_lock<std::mutex> lock(mutex_);
-
   ASSERT(data.ref_count_ > 0);
   if (--data.ref_count_ > 0) {
     return;
   }
 
+  std::unique_lock<std::mutex> lock(mutex_);
   size_t key_removed = stats_.erase(&data);
+  lock.unlock();
+
   ASSERT(key_removed >= 1);
   ::free(&data);
 }
