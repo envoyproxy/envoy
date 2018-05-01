@@ -133,9 +133,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()) {
 
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(
-      config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
-      context_.initManager(), route_config_provider_manager_);
+  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
+                                                                   route_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
