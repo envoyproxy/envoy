@@ -56,3 +56,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "dispatcher_test",
+    srcs = ["dispatcher_test.cc"],
+    deps = [
+        "//source/common/event:libevent_lib",
+        "//source/server/config_validation:api_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
