@@ -40,9 +40,7 @@ public:
                   std::list<std::function<void()>>& on_destroy_callbacks)
       : callbacks_(callbacks), request_headers_(request_headers),
         on_destroy_callbacks_(on_destroy_callbacks){};
-  void setEndStreamOnComplete(const bool& end_stream) override {
-    end_stream_on_complete_ = end_stream;
-  }
+  void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
   const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override {
     return callbacks_;

@@ -216,9 +216,8 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
-// TODO (@trabetti) : could be better to test in integration testing, to see the resopnse header
-// is set to streaming. But then will get stuck.
 TEST_P(AdminInstanceTest, StreamingResponse) {
+  // Add an handler that sets end_stream_on_complete on the AdminStream object.
   auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
                      AdminStream& admin_stream) -> Http::Code {
     admin_stream.setEndStreamOnComplete(false);
@@ -234,6 +233,23 @@ TEST_P(AdminInstanceTest, StreamingResponse) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
+}
+
+// TODO (@trabetti) : attempt to cover the new getDecoderFilterCallbacks() on AdminStream. Does not
+// work. better idea?
+TEST_P(AdminInstanceTest, GetCallbacks) {
+  // Test the getDecoderFilterCallbacks() function on AdminStream.
+  auto method = Http::Headers::get().MethodValues.Get;
+  request_headers_.insertMethod().value(method.data(), method.size());
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  // ON_CALL(callbacks, streamId()).WillByDefault(testing::Return(1234));
+  std::list<std::function<void()>> on_destroy_callbacks{};
+  admin_filter_.decodeHeaders(request_headers_, false);
+  AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
+  // const Http::MockStreamDecoderFilterCallbacks& got_callbacks =
+  //    admin_stream.getDecoderFilterCallbacks();
+  // uint64_t result = admin_stream.getDecoderFilterCallbacks().streamId();
+  // EXPECT_EQ(got_callbacks.streamId(), 1234);
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {

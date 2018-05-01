@@ -183,7 +183,7 @@ public:
   /**
    * @return the flush interval of stats sinks.
    */
-  virtual std::chrono::milliseconds statsFlushInterval() PURE;
+  virtual const std::chrono::milliseconds& statsFlushInterval() PURE;
 };
 
 } // namespace Server

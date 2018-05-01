@@ -22,30 +22,30 @@ public:
 
   /**
    * @param end_stream set to false for streaming response. Default is true, which will close
-   * connection on socket
+   * connection on socket.
    */
-  virtual void setEndStreamOnComplete(const bool& end_stream) PURE;
+  virtual void setEndStreamOnComplete(bool end_stream) PURE;
 
   /**
    * @param cb callback to be added to the list of callbacks invoked by onDestroy() when connection
-   * is dropped
+   * is dropped.
    */
   virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
 
   /**
    * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get socket for data
-   * streaming
+   * streaming.
    */
   virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
    * @return Http::HeaderMap* to be used by handler to parse header information sent with the
-   * request
+   * request.
    */
   virtual const Http::HeaderMap& getRequestHeaders() const PURE;
 
   /**
-   * @return bool value of end_stream_on_complete
+   * @return bool value of end_stream_on_complete.
    */
   virtual bool endStreamOnComplete() const PURE;
 };
@@ -75,7 +75,7 @@ public:
    * handler.
    * @param response supplies the buffer to fill in with the response body.
    * @param admin_stream supplies the filter which invoked the handler, enables the handler to use
-   * its data
+   * its data.
    * @return Http::Code the response code.
    */
   typedef std::function<Http::Code(absl::string_view path_and_query,
