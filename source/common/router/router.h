@@ -24,6 +24,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
+#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -168,8 +169,12 @@ public:
       const auto& request_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
       const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
       if (filter_it != request_metadata.end()) {
-        metadata_match_ =
-            route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+        if (route_entry_->metadataMatchCriteria() != nullptr) {
+          metadata_match_ =
+              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+        } else {
+          metadata_match_ = std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+        }
         return metadata_match_.get();
       }
       return route_entry_->metadataMatchCriteria();

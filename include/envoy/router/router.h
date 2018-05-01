@@ -350,7 +350,7 @@ public:
   metadataMatchCriteria() const PURE;
 
   /**
-   * Creates a new MetadataMatchCriteriaImpl, merging existing
+   * Creates a new MetadataMatchCriteria, merging existing
    * metadata criteria this criteria. The result criteria is the
    * combination of both sets of criteria, with those from the
    * ProtobufWkt::Struct taking precedence.

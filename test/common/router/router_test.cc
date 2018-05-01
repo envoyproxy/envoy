@@ -107,6 +107,54 @@ public:
     return AssertionSuccess();
   }
 
+  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
+    ProtobufWkt::Struct request_struct, route_struct;
+    ProtobufWkt::Value val;
+
+    // populate metadata like RequestInfo.setDynamicMetadata() would
+    val.set_string_value("v3.1");
+    auto& fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    (*callbacks_.request_info_.metadata_.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+      request_struct;
+
+    // populate route entry's metadata which will be overridden
+    val.set_string_value("v3.0");
+    fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+        .WillByDefault(Return(&route_entry_matches));
+    } else {
+      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+        .WillByDefault(Return(nullptr));
+    }
+
+    EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
+      .WillOnce(
+                Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                    Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+                    auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+                    EXPECT_EQ(match.size(), 1);
+                    auto it = match.begin();
+                    EXPECT_EQ((*it)->name(), "version");
+                    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+                    return &cm_.conn_pool_;
+                  }));
+    EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+    expectResponseTimerCreate();
+
+    Http::TestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    router_.decodeHeaders(headers, true);
+
+    // When the router filter gets reset we should cancel the pool request.
+    EXPECT_CALL(cancellable_, cancel());
+    router_.onDestroy();
+  }
+
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -469,9 +517,6 @@ TEST_F(RouterTest, AddMultipleCookies) {
 TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_.metadataMatchCriteria()); }
 
 TEST_F(RouterTest, MetadataMatchCriteria) {
-  envoy::api::v2::core::Metadata metadata;
-
-  EXPECT_CALL(callbacks_.request_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
@@ -495,49 +540,14 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromRequest) {
-  envoy::api::v2::core::Metadata metadata;
-  ProtobufWkt::Struct request_struct, route_struct;
-  ProtobufWkt::Value val;
-  MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+  verifyMetadataMatchCriteriaFromRequest(true);
+}
 
-  // populate metadata like RequestInfo.setDynamicMetadata() would
-  val.set_string_value("v3.1");
-  auto& fields_map = *request_struct.mutable_fields();
-  fields_map["version"] = val;
-  (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
-      request_struct;
-
-  EXPECT_CALL(callbacks_.request_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
-  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
-      .WillByDefault(Return(&route_entry_matches));
-
-  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(
-          Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-            EXPECT_EQ(match.size(), 1);
-            auto it = match.begin();
-            EXPECT_EQ((*it)->name(), "version");
-            EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
-            return &cm_.conn_pool_;
-          }));
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel());
-  router_.onDestroy();
+TEST_F(RouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
+  verifyMetadataMatchCriteriaFromRequest(false);
 }
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
-  envoy::api::v2::core::Metadata metadata;
-
-  EXPECT_CALL(callbacks_.request_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
