@@ -3,8 +3,8 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
-#include "common/router/config_utility.h"
 
 #include "extensions/filters/http/health_check/health_check.h"
 
