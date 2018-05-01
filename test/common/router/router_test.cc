@@ -115,8 +115,9 @@ public:
     val.set_string_value("v3.1");
     auto& fields_map = *request_struct.mutable_fields();
     fields_map["version"] = val;
-    (*callbacks_.request_info_.metadata_.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
-      request_struct;
+    (*callbacks_.request_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
 
     // populate route entry's metadata which will be overridden
     val.set_string_value("v3.0");
@@ -126,23 +127,23 @@ public:
 
     if (route_entry_has_match) {
       ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
-        .WillByDefault(Return(&route_entry_matches));
+          .WillByDefault(Return(&route_entry_matches));
     } else {
       ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
-        .WillByDefault(Return(nullptr));
+          .WillByDefault(Return(nullptr));
     }
 
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
-      .WillOnce(
-                Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
-                    Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-                    auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-                    EXPECT_EQ(match.size(), 1);
-                    auto it = match.begin();
-                    EXPECT_EQ((*it)->name(), "version");
-                    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
-                    return &cm_.conn_pool_;
-                  }));
+        .WillOnce(
+            Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
+                       Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+              auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+              EXPECT_EQ(match.size(), 1);
+              auto it = match.begin();
+              EXPECT_EQ((*it)->name(), "version");
+              EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+              return &cm_.conn_pool_;
+            }));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
     expectResponseTimerCreate();
 
