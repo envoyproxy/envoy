@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/transport_socket/capture/v2/capture.pb.h"
-#include "envoy/extensions/transport_socket/capture/v2/capture.pb.h"
+#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/extensions/transport_socket/capture/v2alpha/capture.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -197,7 +197,7 @@ public:
       // Configure outer capture transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.capture");
-      envoy::config::transport_socket::capture::v2::Capture capture_config;
+      envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
       capture_config.set_path_prefix(path_prefix_);
       capture_config.set_text_format(text_format_);
       capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
@@ -239,7 +239,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::transport_socket::capture::v2::Trace trace;
+  envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
   EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
@@ -277,7 +277,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::transport_socket::capture::v2::Trace trace;
+  envoy::extensions::transport_socket::capture::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
   EXPECT_EQ(id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));

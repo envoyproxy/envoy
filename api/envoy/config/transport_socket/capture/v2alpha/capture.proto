@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.transport_socket.capture.v2;
+package envoy.config.transport_socket.capture.v2alpha;
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";

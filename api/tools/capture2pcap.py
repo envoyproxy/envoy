@@ -21,7 +21,7 @@ import sys
 
 from google.protobuf import text_format
 
-from envoy.extensions.transport_socket.capture.v2 import capture_pb2
+from envoy.extensions.transport_socket.capture.v2alpha import capture_pb2
 
 
 def DumpEvent(direction, timestamp, data):

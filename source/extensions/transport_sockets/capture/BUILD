@@ -19,7 +19,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/extensions/transport_socket/capture/v2:capture_cc",
+        "@envoy_api//envoy/extensions/transport_socket/capture/v2alpha:capture_cc",
     ],
 )
 
@@ -35,6 +35,6 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/capture/v2:capture_cc",
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
     ],
 )

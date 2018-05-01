@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/capture/config.h"
 
-#include "envoy/config/transport_socket/capture/v2/capture.pb.h"
-#include "envoy/config/transport_socket/capture/v2/capture.pb.validate.h"
+#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -18,7 +18,7 @@ Network::TransportSocketFactoryPtr UpstreamCaptureSocketConfigFactory::createTra
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   const auto& outer_config = MessageUtil::downcastAndValidate<
-      const envoy::config::transport_socket::capture::v2::Capture&>(message);
+      const envoy::config::transport_socket::capture::v2alpha::Capture&>(message);
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());
@@ -36,7 +36,7 @@ DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
     bool skip_ssl_context_update, const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   const auto& outer_config = MessageUtil::downcastAndValidate<
-      const envoy::config::transport_socket::capture::v2::Capture&>(message);
+      const envoy::config::transport_socket::capture::v2alpha::Capture&>(message);
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());
@@ -49,7 +49,7 @@ DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
 }
 
 ProtobufTypes::MessagePtr CaptureSocketConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::transport_socket::capture::v2::Capture>();
+  return std::make_unique<envoy::config::transport_socket::capture::v2alpha::Capture>();
 }
 
 static Registry::RegisterFactory<UpstreamCaptureSocketConfigFactory,
