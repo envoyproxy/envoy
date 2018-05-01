@@ -417,8 +417,16 @@ public:
   void free(RawStatData& data) override;
 
 private:
-  typedef std::unordered_map<std::string, RawStatData*> StringRawDataMap;
-  StringRawDataMap stats_;
+  struct RawStatDataHash_ {
+    size_t operator()(const RawStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  };
+  struct RawStatDataCompare_ {
+    bool operator()(const RawStatData* a, const RawStatData* b) const {
+      return (a->key() == b->key());
+    }
+  };
+  typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
+  StringRawDataSet stats_;
   std::mutex mutex_;
 };
 

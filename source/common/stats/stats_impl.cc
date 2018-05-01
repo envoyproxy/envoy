@@ -153,25 +153,17 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   std::unique_lock<std::mutex> lock(mutex_);
 
   absl::string_view key = name;
+  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
+  data->initialize(key);
+  auto ret = stats_.insert(data);
 
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
-    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
-    ENVOY_LOG_MISC(
-        warn,
-        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), Stats::RawStatData::maxNameLength());
-  }
-
-  auto ret = stats_.insert(StringRawDataMap::value_type(std::string(key), nullptr));
-  RawStatData*& data = ret.first->second;
-  if (ret.second) {
-    data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-    RELEASE_ASSERT(data);
-    data->initialize(key);
+  if (!ret.second) {
+    ::free(data);
+    ++(*ret.first)->ref_count_;
+    return *ret.first;
   } else {
-    ++data->ref_count_;
+    return data;
   }
-  return data;
 }
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
@@ -281,7 +273,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
     return;
   }
 
-  size_t key_removed = stats_.erase(std::string(data.key()));
+  size_t key_removed = stats_.erase(&data);
   ASSERT(key_removed >= 1);
   ::free(&data);
 }
