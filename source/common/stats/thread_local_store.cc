@@ -83,7 +83,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post([this, scope]() -> void { clearScopeFromCaches(scope); });
+    main_thread_dispatcher_->post(
+        [ this, scope_id = scope->scope_id_ ]()->void { clearScopeFromCaches(scope_id); });
   }
 }
 
@@ -91,13 +92,13 @@ std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::v
   return tag_producer_->produceTags(name, tags);
 }
 
-void ThreadLocalStoreImpl::clearScopeFromCaches(ScopeImpl* scope) {
+void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope); });
+        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); });
   }
 }
 
@@ -114,6 +115,8 @@ ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::s
   }
 }
 
+std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
+
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
@@ -125,7 +128,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // is no cache entry.
   CounterSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].counters_[final_name];
+    tls_ref =
+        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
   }
 
   // If we have a valid cache entry, return it.
@@ -176,7 +180,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   std::string final_name = prefix_ + name;
   GaugeSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].gauges_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
   }
 
   if (tls_ref && *tls_ref) {
@@ -206,7 +210,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::string final_name = prefix_ + name;
   HistogramSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this].histograms_[final_name];
+    tls_ref =
+        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[final_name];
   }
 
   if (tls_ref && *tls_ref) {
