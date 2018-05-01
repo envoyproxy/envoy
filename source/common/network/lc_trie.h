@@ -163,7 +163,7 @@ private:
     // Length of the cidr range.
     int length_;
     // Tag(s) for this entry.
-    std::unordered_set<std::string> tags_;
+    TagSet tags_;
   };
 
   /**
@@ -188,7 +188,7 @@ private:
         node = next_node.get();
       }
       if (node->tags == nullptr) {
-        node->tags = std::make_shared<std::unordered_set<std::string>>();
+        node->tags = std::make_shared<TagSet>();
       }
       node->tags->insert(prefix.tags_.begin(), prefix.tags_.end());
     }
@@ -208,11 +208,18 @@ private:
             if (tags != nullptr) {
               if (node->tags == nullptr) {
                 node->tags = tags;
-              } else if (tags != nullptr) {
+              } else {
                 node->tags->insert(tags->begin(), tags->end());
               }
             }
-            // Ensure that the node has either zero or two children.
+            // If a node has exactly one child, create a second child node
+            // that inherits the union of all tags set by any ancestor nodes.
+            // This gives the trie an important new property: all the configured
+            // prefixes end up at the leaves of the trie. As no leaf is nested
+            // under another leaf (or one of them would not be a leaf!), the
+            // leaves of the trie upon completion of this leaf-push operation
+            // will form a set of disjoint prefixes (no nesting) that can be
+            // used to build an LC trie.
             if (node->children[0] != nullptr && node->children[1] == nullptr) {
               node->children[1] = std::make_unique<Node>();
             } else if (node->children[0] == nullptr && node->children[1] != nullptr) {
@@ -240,7 +247,7 @@ private:
   private:
     struct Node {
       std::unique_ptr<Node> children[2];
-      std::shared_ptr<std::unordered_set<std::string>> tags;
+      TagSetSharedPtr tags;
     };
     typedef std::unique_ptr<Node> NodePtr;
     NodePtr root_;
@@ -595,7 +602,7 @@ LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) 
     address = node.address_;
   }
 
-  // The path taken through the trie to match the ip_address  may have contained skips,
+  // The path taken through the trie to match the ip_address may have contained skips,
   // so it is necessary to check whether the the matched prefix really contains the
   // ip_address.
   const auto& prefix = ip_prefixes_[address];

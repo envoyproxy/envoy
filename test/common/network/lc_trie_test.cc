@@ -46,7 +46,6 @@ public:
   std::unique_ptr<LcTrie> trie_;
 };
 
-// TODO(ccaraman): Add a performance and memory benchmark test.
 // Use the default constructor values.
 TEST_F(LcTrieTest, IPv4Defaults) {
   std::vector<std::vector<std::string>> cidr_range_strings = {
