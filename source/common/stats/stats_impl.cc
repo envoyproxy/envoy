@@ -155,13 +155,13 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 
   std::unique_lock<std::mutex> lock(mutex_);
   auto ret = stats_.insert(data);
-  RawStatData* existingData = *ret.first;
+  RawStatData* existing_data = *ret.first;
   lock.unlock();
 
   if (!ret.second) {
     ::free(data);
-    ++existingData->ref_count_;
-    return existingData;
+    ++existing_data->ref_count_;
+    return existing_data;
   } else {
     return data;
   }
