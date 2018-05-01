@@ -13,6 +13,9 @@ bazel run @envoy_api//tools:capture2pcap <capture .pb/.pb_text> <pcap path>
 Known issues:
 - IPv6 PCAP generation has malformed TCP packets. This appears to be a text2pcap
 issue.
+
+TODO(htuch):
+- Figure out IPv6 PCAP issue above, or file a bug once the root cause is clear.
 """
 
 import datetime

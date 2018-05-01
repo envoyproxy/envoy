@@ -197,9 +197,12 @@ public:
       // Configure outer capture transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.capture");
-      envoy::config::common::tap::v2alpha::Capture capture_config;
-      capture_config.set_path_prefix(path_prefix_);
-      capture_config.set_text_format(text_format_);
+      envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
+      auto* file_sink = capture_config.mutable_file_sink();
+      file_sink->set_path_prefix(path_prefix_);
+      file_sink->set_format(
+          text_format_ ? envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT
+                       : envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_BINARY);
       capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
       MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config());
       // Nuke TLS context from legacy location.

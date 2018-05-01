@@ -3,6 +3,8 @@ syntax = "proto3";
 package envoy.config.transport_socket.capture.v2alpha;
 option go_package = "v2";
 
+// [#protodoc-title: Capture]
+
 import "envoy/api/v2/core/base.proto";
 
 // File sink.
@@ -14,9 +16,11 @@ message FileSink {
 
   // File format.
   enum Format {
-    // Binary proto format as per envoy.extensions.common.tap.v2alpha.Trace.
+    // Binary proto format as per :ref:`Trace
+    // <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
     PROTO_BINARY = 0;
-    // Text proto format as per envoy.extensions.common.tap.v2alpha.Trace.
+    // Text proto format as per :ref:`Trace
+    // <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
     PROTO_TEXT = 1;
   }
   Format format = 2;
