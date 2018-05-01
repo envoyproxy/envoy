@@ -237,11 +237,20 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   EXPECT_EQ(256, response_->body().size());
   checkStats();
+  envoy::api::v2::core::Address expected_local_address;
+  Network::Utility::addressToProtobufAddress(*codec_client_->connection()->remoteAddress(),
+                                             expected_local_address);
+  envoy::api::v2::core::Address expected_remote_address;
+  Network::Utility::addressToProtobufAddress(*codec_client_->connection()->localAddress(),
+                                             expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::common::tap::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.connection().id());
+  EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
+  EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 
@@ -261,6 +270,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  // Validate second connection ID.
   EXPECT_EQ(second_id, trace.connection().id());
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
@@ -279,7 +289,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::extensions::common::tap::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
-  EXPECT_EQ(id, trace.connection().id());
+  // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
