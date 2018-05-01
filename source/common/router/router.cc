@@ -804,7 +804,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   request_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, request_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
+                      request_info_);
   }
 }
 
@@ -833,6 +834,7 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
+  upstream_trailers_ = trailers.get();
   parent_.onUpstreamTrailers(std::move(trailers));
 }
 

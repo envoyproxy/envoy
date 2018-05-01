@@ -396,6 +396,10 @@ public:
     addListenSocketOption_(option);
   }
   MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+    addListenSocketOptions_(options);
+  }
+  MOCK_METHOD1(addListenSocketOptions_, void(const Network::Socket::OptionsSharedPtr&));
 };
 
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {

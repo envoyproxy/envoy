@@ -41,7 +41,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 30]
+// [#comment:next free field: 31]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -428,6 +428,9 @@ message Cluster {
 
   // Determines how Envoy selects the protocol used to speak to upstream hosts.
   ClusterProtocolSelection protocol_selection = 26;
+
+  // Optional options for upstream connections.
+  envoy.api.v2.UpstreamConnectionOptions upstream_connection_options = 30;
 }
 
 // An extensible structure containing the address Envoy should bind to when
@@ -435,4 +438,9 @@ message Cluster {
 message UpstreamBindConfig {
   // The address Envoy should bind to when establishing upstream connections.
   core.Address source_address = 1;
+}
+
+message UpstreamConnectionOptions {
+  // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
+  core.TcpKeepalive tcp_keepalive = 1;
 }

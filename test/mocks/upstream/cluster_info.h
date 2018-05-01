@@ -62,6 +62,7 @@ public:
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};
@@ -78,6 +79,7 @@ public:
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
 };
 

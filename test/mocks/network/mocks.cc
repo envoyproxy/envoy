@@ -174,6 +174,7 @@ MockFilterChainFactory::~MockFilterChainFactory() {}
 MockListenSocket::MockListenSocket() : local_address_(new Address::Ipv4Instance(80)) {
   ON_CALL(*this, localAddress()).WillByDefault(ReturnRef(local_address_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
+  ON_CALL(*this, fd()).WillByDefault(Return(-1));
 }
 
 MockListenSocket::~MockListenSocket() {}

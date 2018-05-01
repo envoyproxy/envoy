@@ -34,6 +34,10 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
     const std::string tags_join = absl::StrJoin(tags, ",");
     Http::Utility::appendToHeader(headers.insertEnvoyIpTags().value(), tags_join);
 
+    // We must clear the route cache or else we can't match on x-envoy-ip-tags.
+    // TODO(rgs): this should either be configurable, because it's expensive, or optimized.
+    callbacks_->clearRouteCache();
+
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.

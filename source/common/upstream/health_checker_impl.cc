@@ -626,6 +626,9 @@ std::ostream& operator<<(std::ostream& out, HealthTransition changed_state) {
   case HealthTransition::Changed:
     out << "Changed";
     break;
+  case HealthTransition::ChangePending:
+    out << "ChangePending";
+    break;
   }
   return out;
 }

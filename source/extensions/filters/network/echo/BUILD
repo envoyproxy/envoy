@@ -19,7 +19,7 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 

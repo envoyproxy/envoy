@@ -34,7 +34,7 @@ void HealthCheckCacheManager::onTimer() {
 
 Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& headers,
                                                            bool end_stream) {
-  if (headers.Path()->value() == endpoint_.c_str()) {
+  if (Router::ConfigUtility::matchHeaders(headers, *header_match_data_)) {
     health_check_request_ = true;
     callbacks_->requestInfo().healthCheck(true);
 
