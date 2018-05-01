@@ -15,7 +15,7 @@ namespace Http {
  * Classes and methods for manipulating and chcecking HTTP headers.
  */
 class HeaderUtility {
- public:
+public:
   enum class HeaderMatchType { Value, Regex, Range };
 
   // A HeaderData specifies one of exact value or regex or range element
@@ -44,4 +44,3 @@ class HeaderUtility {
 };
 } // namespace Http
 } // namespace Envoy
-    

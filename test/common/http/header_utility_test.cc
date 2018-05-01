@@ -1,8 +1,8 @@
 #include <regex>
 #include <vector>
 
-#include "envoy/json/json_object.h"
 #include "envoy/api/v2/route/route.pb.h"
+#include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
 #include "common/json/json_loader.h"
@@ -21,13 +21,13 @@ envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::strin
 }
 
 TEST(HeaderDataConstructorTest, JsonConstructor) {
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(
-    "{\"name\":\"test-header\", \"value\":\"value\"}");
+  Json::ObjectSharedPtr json =
+      Json::Factory::loadFromString("{\"name\":\"test-header\", \"value\":\"value\"}");
 
   HeaderUtility::HeaderData header_data = HeaderUtility::HeaderData(*json);
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
   EXPECT_EQ("value", header_data.value_);
 }
 
@@ -37,10 +37,10 @@ name: test-header
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
   EXPECT_EQ("", header_data.value_);
 }
 
@@ -51,10 +51,10 @@ value: value
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
   EXPECT_EQ("value", header_data.value_);
 }
 
@@ -66,10 +66,10 @@ regex: true
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex, header_data.header_match_type_);
   EXPECT_EQ("", header_data.value_);
 }
 
@@ -80,10 +80,10 @@ exact_match: value
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
   EXPECT_EQ("value", header_data.value_);
 }
 
@@ -94,10 +94,10 @@ regex_match: value
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex, header_data.header_match_type_);
   EXPECT_EQ("", header_data.value_);
 }
 
@@ -110,10 +110,10 @@ range_match:
   )EOF";
 
   HeaderUtility::HeaderData header_data =
-    HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
 
   EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Range ,header_data.header_match_type_);
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Range, header_data.header_match_type_);
   EXPECT_EQ("", header_data.value_);
   EXPECT_EQ(0, header_data.range_.start());
   EXPECT_EQ(-10, header_data.range_.end());
@@ -139,8 +139,8 @@ regex_match: (a|b)
 
 TEST(MatchHeadersTest, MustMatchAllHeaderData) {
   TestHeaderMapImpl matching_headers_1{{"match-header-A", "1"}, {"match-header-B", "2"}};
-  TestHeaderMapImpl matching_headers_2{{"match-header-A", "3"}, {"match-header-B", "4"},
-      {"match-header-C", "5"}};
+  TestHeaderMapImpl matching_headers_2{
+      {"match-header-A", "3"}, {"match-header-B", "4"}, {"match-header-C", "5"}};
   TestHeaderMapImpl unmatching_headers_1{{"match-header-A", "6"}};
   TestHeaderMapImpl unmatching_headers_2{{"match-header-B", "7"}};
   TestHeaderMapImpl unmatching_headers_3{{"match-header-A", "8"}, {"match-header-C", "9"}};
@@ -181,7 +181,7 @@ name: match-header
 TEST(MatchHeadersTest, HeaderExactMatch) {
   TestHeaderMapImpl matching_headers{{"match-header", "match-value"}};
   TestHeaderMapImpl unmatching_headers{{"match-header", "other-value"},
-      {"other-header", "match-value"}};
+                                       {"other-header", "match-value"}};
   const std::string yaml = R"EOF(
 name: match-header
 exact_match: match-value
@@ -195,8 +195,7 @@ exact_match: match-value
 
 TEST(MatchHeadersTest, HeaderRegexMatch) {
   TestHeaderMapImpl matching_headers{{"match-header", "123"}};
-  TestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
-      {"match-header", "123.456"}};
+  TestHeaderMapImpl unmatching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
   const std::string yaml = R"EOF(
 name: match-header
 regex_match: \d{3}
@@ -210,8 +209,10 @@ regex_match: \d{3}
 
 TEST(MatchHeadersTest, HeaderRangeMatch) {
   TestHeaderMapImpl matching_headers{{"match-header", "-1"}};
-  TestHeaderMapImpl unmatching_headers{{"match-header", "0"}, {"match-header", "somestring"},
-      {"match-header", "10.9"}, {"match-header", "-1somestring"}};
+  TestHeaderMapImpl unmatching_headers{{"match-header", "0"},
+                                       {"match-header", "somestring"},
+                                       {"match-header", "10.9"},
+                                       {"match-header", "-1somestring"}};
   const std::string yaml = R"EOF(
 name: match-header
 range_match:

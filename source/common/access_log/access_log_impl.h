@@ -10,8 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/protobuf/protobuf.h"
 #include "common/http/header_utility.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace AccessLog {

@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Http {
 
-  // HeaderMatcher will consist of one of the below two options:
+// HeaderMatcher will consist of one of the below two options:
 // 1.value (string) and regex (bool)
 //   An empty header value allows for matching to be only based on header presence.
 //   Regex is an opt-in. Unless explicitly mentioned, the header values will be used for

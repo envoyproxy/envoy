@@ -270,12 +270,12 @@ envoy_cc_library(
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
     deps = [
-       "@envoy_api//envoy/api/v2/route:route_cc",
-       "@envoy_api//envoy/type:range_cc",
-       "//include/envoy/http:header_map_interface",
-       "//include/envoy/json:json_object_interface",
-       "//source/common/common:utility_lib",
-       "//source/common/config:rds_json_lib",
-       "//source/common/protobuf:utility_lib",
-    ]
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/config:rds_json_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/type:range_cc",
+    ],
 )
