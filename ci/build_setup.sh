@@ -116,7 +116,7 @@ mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
 
-export BUILDIFIER_BIN="/usr/lib/go/bin/buildifier"
+export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 
 function cleanup() {
   # Remove build artifacts. This doesn't mess with incremental builds as these
