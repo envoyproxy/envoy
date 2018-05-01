@@ -481,8 +481,11 @@ TEST(RawStatDataTest, Truncate) {
 TEST(RawStatDataTest, HeapAlloc) {
   HeapRawStatDataAllocator alloc;
   RawStatData* stat_1 = alloc.alloc("ref_name");
+  EXPECT_NE(stat_1, nullptr);
   RawStatData* stat_2 = alloc.alloc("ref_name");
+  EXPECT_NE(stat_2, nullptr);
   RawStatData* stat_3 = alloc.alloc("not_ref_name");
+  EXPECT_NE(stat_3, nullptr);
   EXPECT_EQ(stat_1, stat_2);
   EXPECT_NE(stat_1, stat_3);
   EXPECT_NE(stat_2, stat_3);
