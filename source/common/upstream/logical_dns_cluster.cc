@@ -28,7 +28,8 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
   const auto& hosts = cluster.hosts();
-  if (hosts.size() != 1) {
+  const auto& endpoints = cluster.endpoints();
+  if (hosts.size() != 1 && endpoints.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
@@ -46,10 +47,15 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& socket_address = hosts[0].socket_address();
+  const auto& socket_address =
+      endpoints.empty() ? hosts[0].socket_address() : endpoints[0].address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
+
+  health_check_config_ =
+      endpoints.empty() ? envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()
+                        : endpoints[0].health_check_config();
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -88,6 +94,8 @@ void LogicalDnsCluster::startResolve() {
             // Capture URL to avoid a race with another update.
             tls_->runOnAllThreads([this, new_address]() -> void {
               tls_->getTyped<PerThreadCurrentHostData>().current_resolved_address_ = new_address;
+              tls_->getTyped<PerThreadCurrentHostData>().health_check_config_ =
+                  health_check_config_;
             });
           }
 
@@ -129,8 +137,8 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options),
-          HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
+          HostDescriptionConstSharedPtr{new RealHostDescription(
+              data.current_resolved_address_, data.health_check_config_, shared_from_this())}};
 }
 
 } // namespace Upstream

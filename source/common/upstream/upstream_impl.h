@@ -535,7 +535,8 @@ public:
 private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url);
+                  const std::string& url,
+                  const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config);
     ~ResolveTarget();
     void startResolve();
 
@@ -545,6 +546,7 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;

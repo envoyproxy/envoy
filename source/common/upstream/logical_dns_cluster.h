@@ -56,9 +56,16 @@ private:
   };
 
   struct RealHostDescription : public HostDescription {
-    RealHostDescription(Network::Address::InstanceConstSharedPtr address,
-                        HostConstSharedPtr logical_host)
-        : address_(address), logical_host_(logical_host) {}
+    RealHostDescription(
+        Network::Address::InstanceConstSharedPtr address,
+        const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+        HostConstSharedPtr logical_host)
+        : address_(address),
+          health_check_address_(health_check_config.port_value() == 0
+                                    ? address
+                                    : Network::Utility::getAddressWithPort(
+                                          *address, health_check_config.port_value())),
+          logical_host_(logical_host) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
@@ -80,14 +87,16 @@ private:
     }
     // TODO(dio): To support different address port.
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-      return address_;
+      return health_check_address_;
     }
     Network::Address::InstanceConstSharedPtr address_;
+    Network::Address::InstanceConstSharedPtr health_check_address_;
     HostConstSharedPtr logical_host_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
     Network::Address::InstanceConstSharedPtr current_resolved_address_;
+    envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
   };
 
   void startResolve();
@@ -105,6 +114,7 @@ private:
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
+  envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
 };
 
 } // namespace Upstream

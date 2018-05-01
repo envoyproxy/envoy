@@ -307,6 +307,109 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
+TEST(StrictDnsClusterImplTest, BasicEndpoints) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  // gmock matches in LIFO order which is why these are swapped.
+  ResolverData resolver2(*dns_resolver, dispatcher);
+  ResolverData resolver1(*dns_resolver, dispatcher);
+
+  const std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+    dns_refresh_rate: 4s
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    endpoints:
+    - address:
+        socket_address:
+          address: localhost1
+          port_value: 11001
+      health_check_config:
+        port_value: 8000
+    - address:
+        socket_address:
+          address: localhost2
+          port_value: 11002
+      health_check_config:
+        port_value: 8000
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+
+  ReadyWatcher membership_updated;
+  cluster.prioritySet().addMemberUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+
+  cluster.initialize([] {});
+
+  resolver1.expectResolve(*dns_resolver);
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Make sure we de-dup the same address.
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(0UL,
+            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_EQ(cluster.info().get(), &host->cluster());
+  }
+
+  // Make sure we cancel.
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  resolver2.expectResolve(*dns_resolver);
+  resolver2.timer_->callback_();
+
+  EXPECT_CALL(resolver1.active_dns_query_, cancel());
+  EXPECT_CALL(resolver2.active_dns_query_, cancel());
+}
+
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -378,6 +481,35 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
+TEST(StaticClusterImplTest, StaticEndpoints) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    endpoints:
+    - address:
+        socket_address:
+          address: 10.0.0.1
+          port_value: 443
+      health_check_config:
+        port_value: 8000
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  StaticClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager, cm,
+                            false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+
 TEST(StaticClusterImplTest, AltStatName) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
@@ -387,7 +519,7 @@ TEST(StaticClusterImplTest, AltStatName) {
     name: staticcluster
     alt_stat_name: staticcluster_stats
     connect_timeout: 0.25s
-    type: STRICT_DNS
+    type: STATIC
     lb_policy: ROUND_ROBIN
     hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
   )EOF";
