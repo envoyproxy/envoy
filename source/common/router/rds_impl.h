@@ -148,10 +148,7 @@ private:
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
-  RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-                                 Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
+  RouteConfigProviderManagerImpl(Server::Admin& admin);
 
   // RouteConfigProviderManager
   std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
@@ -176,12 +173,6 @@ private:
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
   std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
-  Runtime::Loader& runtime_;
-  Event::Dispatcher& dispatcher_;
-  Runtime::RandomGenerator& random_;
-  const LocalInfo::LocalInfo& local_info_;
-  ThreadLocal::SlotAllocator& tls_;
-  Server::Admin& admin_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigProviderImpl;

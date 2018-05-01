@@ -50,9 +50,7 @@ HttpConnectionManagerFilterConfigFactory::createFilter(
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
-                context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal(), context.admin());
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(

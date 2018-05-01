@@ -49,9 +49,8 @@ public:
   RdsImplTest() : request_(&factory_context_.cluster_manager_.async_client_) {
     EXPECT_CALL(factory_context_.admin_.config_tracker, addReturnsRaw("routes", _))
         .WillOnce(Return(new Server::MockConfigTracker::MockEntryOwner()));
-    route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
-        factory_context_.runtime_loader_, factory_context_.dispatcher_, factory_context_.random_,
-        factory_context_.local_info_, factory_context_.thread_local_, factory_context_.admin_));
+    route_config_provider_manager_.reset(
+        new RouteConfigProviderManagerImpl(factory_context_.admin_));
   }
   ~RdsImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
@@ -380,9 +379,8 @@ public:
     EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
         .WillOnce(DoAll(SaveArg<1>(&config_tracker_callback_),
                         Return(new Server::MockConfigTracker::MockEntryOwner())));
-    route_config_provider_manager_.reset(new RouteConfigProviderManagerImpl(
-        factory_context_.runtime_loader_, factory_context_.dispatcher_, factory_context_.random_,
-        factory_context_.local_info_, factory_context_.thread_local_, factory_context_.admin_));
+    route_config_provider_manager_.reset(
+        new RouteConfigProviderManagerImpl(factory_context_.admin_));
   }
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
 

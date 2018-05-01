@@ -141,13 +141,9 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
-    Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
-    : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
-      tls_(tls), admin_(admin) {
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
   config_tracker_entry_ =
-      admin_.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+      admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_);
