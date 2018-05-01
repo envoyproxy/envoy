@@ -685,8 +685,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     : server_(server), profile_path_(profile_path),
       socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
-      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
-                                                                       server_.stats())),
+      tracing_stats_(
+          Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},

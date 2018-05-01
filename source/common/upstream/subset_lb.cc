@@ -36,11 +36,13 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   }
 
   // Configure future updates.
-  priority_set.addMemberUpdateCb(
+  original_priority_set_callback_handle_ = priority_set.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         update(priority, hosts_added, hosts_removed);
       });
 }
+
+SubsetLoadBalancer::~SubsetLoadBalancer() { original_priority_set_callback_handle_->remove(); }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {

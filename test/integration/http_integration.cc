@@ -936,6 +936,57 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
+void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1.
+  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     1024, *response_);
+  waitForNextUpstreamRequest();
+
+  // Request 2.
+  IntegrationStreamDecoderPtr response2{new IntegrationStreamDecoder(*dispatcher_)};
+  IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
+  codec_client2->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                             {":path", "/test/long/url"},
+                                                             {":scheme", "http"},
+                                                             {":authority", "host"}},
+                                     512, *response2);
+
+  // Response 1.
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+  fake_upstream_connection_->close();
+  response_->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Response 2.
+  fake_upstream_connection_->waitForDisconnect();
+  fake_upstream_connection_.reset();
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(1024, true);
+  response2->waitForEndStream();
+  codec_client2->close();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
+}
+
 void HttpIntegrationTest::testTwoRequests() {
   initialize();
 

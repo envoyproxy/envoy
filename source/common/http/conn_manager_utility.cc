@@ -133,6 +133,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
+    request_headers.removeEnvoyIpTags();
 
     for (const Http::LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
@@ -213,6 +214,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     }
     for (const auto& detail : config.setCurrentClientCertDetails()) {
       switch (detail) {
+      case Http::ClientCertDetailsType::Cert: {
+        const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
+        if (!peer_cert.empty()) {
+          client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
+        }
+        break;
+      }
       case Http::ClientCertDetailsType::Subject:
         // The "Subject" key still exists even if the subject is empty.
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
@@ -223,12 +231,18 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         // The "SAN" key still exists even if the SAN is empty.
         client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
         break;
-      case Http::ClientCertDetailsType::Cert:
-        const std::string peer_cert = connection.ssl()->urlEncodedPemEncodedPeerCertificate();
-        if (!peer_cert.empty()) {
-          client_cert_details.push_back("Cert=\"" + peer_cert + "\"");
+      case Http::ClientCertDetailsType::URI:
+        client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
+        break;
+      case Http::ClientCertDetailsType::DNS: {
+        const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
+        if (!dns_sans.empty()) {
+          for (const std::string& dns : dns_sans) {
+            client_cert_details.push_back("DNS=" + dns);
+          }
         }
         break;
+      }
       }
     }
   }

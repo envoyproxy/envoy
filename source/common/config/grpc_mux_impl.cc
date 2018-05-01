@@ -216,7 +216,7 @@ void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   stream_ = nullptr;
-  handleFailure();
+  setRetryTimer();
 }
 
 } // namespace Config

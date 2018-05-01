@@ -5,7 +5,6 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/api/v2/auth/auth.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/duration.proto";
@@ -97,9 +96,7 @@ message VirtualHost {
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
 
-  // [#not-implemented-hide:]
-  // Return a 401/403 when auth checks fail.
-  auth.AuthAction auth = 9;
+  reserved 9;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -143,9 +140,7 @@ message Route {
   // Decorator for the matched route.
   Decorator decorator = 5;
 
-  // [#not-implemented-hide:]
-  // Return a 401/403 when auth checks fail.
-  auth.AuthAction auth = 6;
+  reserved 6;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as

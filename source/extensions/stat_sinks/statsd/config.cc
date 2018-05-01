@@ -25,13 +25,13 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
-                                                           false);
+                                                           false, statsd_sink.prefix());
   }
   case envoy::config::metrics::v2::StatsdSink::kTcpClusterName:
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
     return std::make_unique<Common::Statsd::TcpStatsdSink>(
         server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
-        server.clusterManager(), server.stats());
+        server.clusterManager(), server.stats(), statsd_sink.prefix());
   default:
     // Verified by schema.
     NOT_REACHED;

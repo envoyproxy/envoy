@@ -269,6 +269,9 @@ message HTTPResponseProperties {
 
   // Map of additional headers configured to be logged.
   map<string, string> response_headers = 4;
+
+  // Map of trailers configured to be logged.
+  map<string, string> response_trailers = 5;
 }
 
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.

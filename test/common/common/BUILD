@@ -37,7 +37,7 @@ envoy_cc_test(
     srcs = ["fmt_test.cc"],
     deps = [
         "//source/common/common:fmt_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -57,7 +57,7 @@ envoy_cc_test(
     name = "log_macros_test",
     srcs = ["log_macros_test.cc"],
     deps = [
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -115,11 +115,11 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "shared_memory_hash_set_test",
-    srcs = ["shared_memory_hash_set_test.cc"],
+    name = "block_memory_hash_set_test",
+    srcs = ["block_memory_hash_set_test.cc"],
     deps = [
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:hash_lib",
-        "//source/common/common:shared_memory_hash_set_lib",
     ],
 )
 

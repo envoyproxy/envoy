@@ -66,6 +66,11 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
           fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
     }
 
+    if (!Network::Socket::applyOptions(socket.options(), socket, Socket::SocketState::Listening)) {
+      throw CreateListenerException(fmt::format(
+          "cannot set post-listen socket option on socket: {}", socket.localAddress()->asString()));
+    }
+
     evconnlistener_set_error_cb(listener_.get(), errorCallback);
   }
 }

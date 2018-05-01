@@ -16,23 +16,6 @@ package_group(
 )
 
 api_proto_library(
-    name = "auth",
-    srcs = ["auth.proto"],
-    visibility = [":friends"],
-    deps = [
-        ":cert",
-    ],
-)
-
-api_go_proto_library(
-    name = "auth",
-    proto = ":auth",
-    deps = [
-        ":cert_go_proto",
-    ],
-)
-
-api_proto_library(
     name = "cert",
     srcs = ["cert.proto"],
     visibility = [":friends"],

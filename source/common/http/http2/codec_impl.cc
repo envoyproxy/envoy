@@ -52,7 +52,7 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       remote_end_stream_(false), data_deferred_(false),
       waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false) {
+      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
   }
@@ -483,12 +483,18 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   return 0;
 }
 
-int ConnectionImpl::onInvalidFrame(int error_code) {
+int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {}", connection_, nghttp2_strerror(error_code));
 
-  // The stream is about to be closed due to an invalid header. Don't kill the
-  // entire connection if one stream has bad headers.
-  if (error_code == NGHTTP2_ERR_HTTP_HEADER) {
+  // The stream is about to be closed due to an invalid header or messaging. Don't kill the
+  // entire connection if one stream has bad headers or messaging.
+  if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
+    stats_.rx_messaging_error_.inc();
+    StreamImpl* stream = getStream(stream_id);
+    if (stream != nullptr) {
+      // See comment below in onStreamClose() for why we do this.
+      stream->reset_due_to_messaging_error_ = true;
+    }
     return 0;
   }
 
@@ -504,14 +510,26 @@ ssize_t ConnectionImpl::onSend(const uint8_t* data, size_t length) {
 }
 
 int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-
   StreamImpl* stream = getStream(stream_id);
   if (stream) {
     ENVOY_CONN_LOG(debug, "stream closed: {}", connection_, error_code);
     if (!stream->remote_end_stream_ || !stream->local_end_stream_) {
-      stream->runResetCallbacks(error_code == NGHTTP2_REFUSED_STREAM
-                                    ? StreamResetReason::RemoteRefusedStreamReset
-                                    : StreamResetReason::RemoteReset);
+      StreamResetReason reason;
+      if (stream->reset_due_to_messaging_error_) {
+        // Unfortunately, the nghttp2 API makes it incredibly difficult to clearly understand
+        // the flow of resets. I.e., did the reset originate locally? Was it remote? Here,
+        // we attempt to track cases in which we sent a reset locally due to an invalid frame
+        // received from the remote. We only do that in two cases currently (HTTP messaging layer
+        // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
+        // about). In other cases we treat invalid frames as a protocol error and just kill
+        // the connection.
+        reason = StreamResetReason::LocalReset;
+      } else {
+        reason = error_code == NGHTTP2_REFUSED_STREAM ? StreamResetReason::RemoteRefusedStreamReset
+                                                      : StreamResetReason::RemoteReset;
+      }
+
+      stream->runResetCallbacks(reason);
     }
 
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
@@ -711,8 +729,9 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(
       callbacks_,
-      [](nghttp2_session*, const nghttp2_frame*, int error_code, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(error_code);
+      [](nghttp2_session*, const nghttp2_frame* frame, int error_code, void* user_data) -> int {
+        return static_cast<ConnectionImpl*>(user_data)->onInvalidFrame(frame->hd.stream_id,
+                                                                       error_code);
       });
 }
 

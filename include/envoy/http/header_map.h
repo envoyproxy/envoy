@@ -466,6 +466,12 @@ public:
   virtual void remove(const LowerCaseString& key) PURE;
 
   /**
+   * Remove all instances of headers where the key begins with the supplied prefix.
+   * @param prefix supplies the prefix to match header keys against.
+   */
+  virtual void removePrefix(const LowerCaseString& prefix) PURE;
+
+  /**
    * @return the number of headers in the map.
    */
   virtual size_t size() const PURE;

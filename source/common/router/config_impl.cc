@@ -524,7 +524,8 @@ void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
   }
 }
 
-const Protobuf::Message* RouteEntryImplBase::perFilterConfig(const std::string& name) const {
+const RouteSpecificFilterConfig*
+RouteEntryImplBase::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
 
@@ -551,13 +552,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
-const Protobuf::Message*
+const RouteSpecificFilterConfig*
 RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& name) const {
-  const Protobuf::Message* cfg = per_filter_configs_.get(name);
-  if (cfg != nullptr) {
-    return cfg;
-  }
-  return DynamicRouteEntry::perFilterConfig(name);
+  const auto cfg = per_filter_configs_.get(name);
+  return cfg != nullptr ? cfg : DynamicRouteEntry::perFilterConfig(name);
 }
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
@@ -735,7 +733,7 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
 
-const Protobuf::Message* VirtualHostImpl::perFilterConfig(const std::string& name) const {
+const RouteSpecificFilterConfig* VirtualHostImpl::perFilterConfig(const std::string& name) const {
   return per_filter_configs_.get(name);
 }
 
@@ -878,7 +876,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
                                                      config.response_headers_to_remove());
 }
 
-PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs) {
+PerFilterConfigs::PerFilterConfigs(
+    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs) {
   for (const auto& cfg : configs) {
     const std::string& name = cfg.first;
     const ProtobufWkt::Struct& struct_config = cfg.second;
@@ -886,13 +885,17 @@ PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt:
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
-    configs_[name] = Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory);
+    auto object = factory.createRouteSpecificFilterConfig(
+        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory));
+    if (object) {
+      configs_[name] = object;
+    }
   }
 }
 
-const Protobuf::Message* PerFilterConfigs::get(const std::string& name) const {
-  auto cfg = configs_.find(name);
-  return cfg == configs_.end() ? nullptr : cfg->second.get();
+const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
+  auto it = configs_.find(name);
+  return it == configs_.end() ? nullptr : it->second.get();
 }
 
 } // namespace Router

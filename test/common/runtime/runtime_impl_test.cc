@@ -245,5 +245,21 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
+TEST(DiskLayer, IllegalPath) {
+  Api::MockOsSysCalls mock_os_syscalls;
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", mock_os_syscalls), EnvoyException,
+                            "Invalid path: /dev");
+}
+
+// Validate that we catch recursion that goes too deep in the runtime filesystem
+// walk.
+TEST(DiskLayer, Loop) {
+  Api::OsSysCallsImpl os_syscalls;
+  EXPECT_THROW_WITH_MESSAGE(
+      DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
+                os_syscalls),
+      EnvoyException, "Walk recursion depth exceded 16");
+}
+
 } // namespace Runtime
 } // namespace Envoy

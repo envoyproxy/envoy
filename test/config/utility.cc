@@ -296,9 +296,9 @@ void ConfigHelper::addSslConfig() {
   auto* validation_context = common_tls_context->mutable_validation_context();
   validation_context->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-  validation_context->add_verify_certificate_hash("9E:D6:53:36:49:26:9C:69:4F:71:7E:87:29:A1:C8:B5:"
-                                                  "50:06:FD:51:01:3C:0E:0D:42:94:91:6E:00:D7:EA:"
-                                                  "04");
+  validation_context->add_verify_certificate_hash(
+      "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
+      "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
 
   auto* tls_certificate = common_tls_context->add_tls_certificates();
   tls_certificate->mutable_certificate_chain()->set_filename(

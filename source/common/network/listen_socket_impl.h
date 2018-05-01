@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -26,11 +27,18 @@ public:
       fd_ = -1;
     }
   }
-  void addOption(const OptionConstSharedPtr& option) override {
+  void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
     }
+  }
+  void addOption(const OptionConstSharedPtr& option) override {
+    ensureOptions();
     options_->emplace_back(std::move(option));
+  }
+  void addOptions(const OptionsSharedPtr& options) override {
+    ensureOptions();
+    Network::Socket::appendOptions(options_, options);
   }
   const OptionsSharedPtr& options() const override { return options_; }
 
@@ -89,9 +97,21 @@ public:
   }
   bool localAddressRestored() const override { return local_address_restored_; }
 
+  void setDetectedTransportProtocol(absl::string_view protocol) override {
+    transport_protocol_ = std::string(protocol);
+  }
+  absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
+
+  void setRequestedServerName(absl::string_view server_name) override {
+    server_name_ = std::string(server_name);
+  }
+  absl::string_view requestedServerName() const override { return server_name_; }
+
 protected:
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};
+  std::string transport_protocol_;
+  std::string server_name_;
 };
 
 // ConnectionSocket used with server connections.

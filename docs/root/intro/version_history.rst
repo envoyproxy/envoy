@@ -4,6 +4,7 @@ Version history
 1.7.0 (Pending)
 ===============
 
+* access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
@@ -26,7 +27,14 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
+* health check http filter: added
+  :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
+  to trigger health check response. Deprecated the
+  :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
+* listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
+  :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
@@ -43,6 +51,8 @@ Version history
   :ref:`cluster specific <envoy_api_field_Cluster.upstream_bind_config>` options.
 * sockets: added `IP_TRANSPARENT` socket option support for :ref:`listeners
   <envoy_api_field_Listener.transparent>`.
+* sockets: added `SO_KEEPALIVE` socket option for upstream connections
+  :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.

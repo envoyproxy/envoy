@@ -358,6 +358,7 @@ public:
   COUNTER  (update_success)                                                                        \
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
+  COUNTER  (update_no_rebuild)                                                                     \
   GAUGE    (version)
 // clang-format on
 
@@ -396,8 +397,6 @@ public:
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
-    // Use IP_FREEBIND socket option when binding.
-    static const uint64_t FREEBIND = 0x4;
   };
 
   virtual ~ClusterInfo() {}
@@ -520,6 +519,13 @@ public:
    * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
   virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+
+  /**
+   *
+   * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
+   *         connections for this cluster.
+   */
+  virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
