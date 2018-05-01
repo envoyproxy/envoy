@@ -62,6 +62,9 @@ uint64_t parseFeatures(const envoy::api::v2::Cluster& config) {
   if (config.protocol_selection() == envoy::api::v2::Cluster::USE_DOWNSTREAM_PROTOCOL) {
     features |= ClusterInfoImpl::Features::USE_DOWNSTREAM_PROTOCOL;
   }
+  if (config.close_connections_on_host_health_failure()) {
+    features |= ClusterInfoImpl::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE;
+  }
   return features;
 }
 

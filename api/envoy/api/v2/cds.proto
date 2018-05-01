@@ -41,7 +41,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 31]
+// [#comment:next free field: 32]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -431,6 +431,21 @@ message Cluster {
 
   // Optional options for upstream connections.
   envoy.api.v2.UpstreamConnectionOptions upstream_connection_options = 30;
+
+  // If an upstream host becomes unhealthy (as determined by the configured health checks
+  // or outlier detection), immediately close all connections to the failed host.
+  //
+  // .. note::
+  //
+  //   This is currently only supported for connections created by tcp_proxy.
+  //
+  // .. note::
+  //
+  //   The current implementation of this feature closes all connections immediately when
+  //   the unhealthy status is detected. If there are a large number of connections open
+  //   to an upstream host that becomes unhealthy, Envoy may spend a substantial amount of
+  //   time exclusively closing these connections, and not processing any other traffic.
+  bool close_connections_on_host_health_failure = 31;
 }
 
 // An extensible structure containing the address Envoy should bind to when
