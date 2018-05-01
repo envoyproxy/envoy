@@ -613,11 +613,11 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.addCopy("test-header", "present");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderExactMatch) {
@@ -636,16 +636,16 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.addCopy("test-header", "exact-match-value");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "not-exact-match-value");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderRegexMatch) {
@@ -663,21 +663,21 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.addCopy("test-header", "123");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "1234");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "123.456");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
 TEST_F(AccessLogImplTest, HeaderRangeMatch) {
@@ -697,31 +697,31 @@ config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
 
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.addCopy("test-header", "-1");
   EXPECT_CALL(*file_, write(_));
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "0");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "somestring");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "10.9");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   request_headers_.remove("test-header");
   request_headers_.addCopy("test-header", "-1somestring");
   EXPECT_CALL(*file_, write(_)).Times(0);
-  log->log(&request_headers_, &response_headers_, request_info_);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
 } // namespace
