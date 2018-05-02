@@ -47,8 +47,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
-        commit = "11ea3fa47ee2a658647dfde55e51ce5a41245ca2",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.1
+        commit = "4ea8bda9aed08ad45d6db2a030a1464e8d9b783f",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.7.0
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
