@@ -7,15 +7,18 @@
 
 #include "server/config_validation/api.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 
 // Define fixture which allocates ValidationDispatcher.
-class ConfigValidation : public ::testing::Test {
-public:
+class ConfigValidation
+    : public ::testing::TestWithParam<Network::Address::IpVersion> {
+ public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
@@ -32,12 +35,25 @@ private:
 
 // Simple test which creates a connection to fake upstream client. This is to test if
 // ValidationDispatcher can call createClientConnection without crashing.
-TEST_F(ConfigValidation, createConnection) {
+TEST_P(ConfigValidation, createConnection) {
+  Network::Address::InstanceConstSharedPtr address;
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    address = Network::Address::InstanceConstSharedPtr(
+        new Network::Address::Ipv4Instance("127.0.0.1"));
+  } else {
+    address = Network::Address::InstanceConstSharedPtr(
+        new Network::Address::Ipv6Instance("::1"));
+  }
   dispatcher_->createClientConnection(
-      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-      Network::Test::createRawBufferSocket(), nullptr);
+      address, address, Network::Test::createRawBufferSocket(), nullptr);
   SUCCEED();
 }
 
+INSTANTIATE_TEST_CASE_P(
+    IpVersions, ConfigValidation,
+    testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+    TestUtility::ipTestParamsToString);
+
 } // namespace Envoy
+
+
