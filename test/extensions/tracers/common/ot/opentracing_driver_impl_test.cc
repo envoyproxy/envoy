@@ -38,7 +38,6 @@ public:
 
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
-
 private:
   const OpenTracingDriver::PropagationMode propagation_mode_;
   const opentracing::mocktracer::InMemoryRecorder* recorder_;
