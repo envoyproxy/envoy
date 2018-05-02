@@ -432,13 +432,19 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
       }
     }
 
-    // Compute schedule offset if we already have been balancing for this
-    // locality.
-    const uint64_t offset =
-        hosts.size() == 0
-            ? 0
-            : (scheduler_.find(source) != scheduler_.end() ? scheduler_[source].rr_index_ : seed_) %
-                  hosts.size();
+    // Compute schedule offset for unweighted before deleting the existing
+    // scheduler.
+    uint64_t unweighted_offset = 0;
+    if (hosts.size() > 0) {
+      // If we already have been balancing for this locality, continue where we
+      // left off; a rebuild with the same hosts will have the expected RR
+      // across the rebuild. Otherwise, start with the LB seed.
+      if (scheduler_.find(source) != scheduler_.end()) {
+        unweighted_offset = scheduler_[source].rr_index_;
+      } else {
+        unweighted_offset = seed_ % hosts.size();
+      }
+    }
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     scheduler.weighted_ = weighted;
@@ -452,12 +458,14 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
         scheduler.edf_.add(host->weight(), host);
       }
       // Cycle through hosts to achieve the intended offset behavior.
-      for (uint32_t i = 0; i < offset; ++i) {
+      // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the
+      // schedule across refreshes for the weighted case.
+      for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
         auto host = scheduler.edf_.pick();
         scheduler.edf_.add(host->weight(), host);
       }
     } else {
-      scheduler.rr_index_ = offset;
+      scheduler.rr_index_ = unweighted_offset;
     }
   };
   // Populate EdfSchedulers for each valid HostsSource value for the host set
@@ -488,9 +496,6 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
     // We do not expire any hosts from the host list without rebuilding the scheduler.
     ASSERT(host != nullptr);
     scheduler.edf_.add(host->weight(), host);
-    // Track the number of picks so we can pick up where we left off when
-    // rebuilding.
-    ++scheduler.rr_index_;
     return host;
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);

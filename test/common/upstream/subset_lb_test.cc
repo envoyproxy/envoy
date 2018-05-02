@@ -388,14 +388,8 @@ TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
   HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
   modifyHosts({added_host}, {host_set_.hosts_.back()});
 
-  if (GetParam() == REMOVES_FIRST) {
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
-    EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
-  } else {
-    ASSERT(GetParam() == SIMULTANEOUS);
-    EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  }
+  EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {

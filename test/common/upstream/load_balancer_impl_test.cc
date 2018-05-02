@@ -407,6 +407,8 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
@@ -415,8 +417,6 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};

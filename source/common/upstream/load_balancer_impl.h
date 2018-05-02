@@ -210,7 +210,9 @@ private:
  * simple index to acheive O(1) scheduling in that case.
  * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
  * support large ranges of weights or arbitrary precision floating weights, we could construct an
- * explicit schedule, since m will be a small constant factor in O(m * n).
+ * explicit schedule, since m will be a small constant factor in O(m * n). This
+ * could also be done on a thread aware LB, avoiding creating multiple EDF
+ * instances.
  */
 class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
@@ -228,9 +230,7 @@ private:
   struct Scheduler {
     // EdfScheduler for weighted RR.
     EdfScheduler<const Host> edf_;
-    // Simple clock hand for when we do unweighted. We also maintain this to
-    // provide the total number of picks when weighted, since this allows us to
-    // resume in the schedule on a rebuild where we left off.
+    // Simple clock hand for when we do unweighted.
     size_t rr_index_{};
     bool weighted_{};
   };
