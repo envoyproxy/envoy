@@ -34,9 +34,7 @@ class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
-  Router::RouteConfigProviderManagerImpl route_config_provider_manager_{
-      context_.runtime(),   context_.dispatcher(),  context_.random(),
-      context_.localInfo(), context_.threadLocal(), context_.admin()};
+  Router::RouteConfigProviderManagerImpl route_config_provider_manager_{context_.admin()};
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {

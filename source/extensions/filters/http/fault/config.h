@@ -28,7 +28,8 @@ public:
   }
 
   Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) override;
+  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
+                                  Server::Configuration::FactoryContext&) override;
 
   std::string name() override { return HttpFilterNames::get().FAULT; }
 

@@ -11,7 +11,6 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/filter_config.h" // TODO(rodaine): break dependency on server
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -222,7 +221,7 @@ const std::string& DecoratorImpl::getOperation() const { return operation_; }
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
-                                       Runtime::Loader& loader)
+                                       Server::Configuration::FactoryContext& factory_context)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
@@ -232,7 +231,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
-      runtime_(loadRuntimeData(route.match())), loader_(loader),
+      runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
@@ -248,7 +247,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config()) {
+      per_filter_configs_(route.per_filter_config(), factory_context) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -275,7 +274,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(
-          this, runtime_key_prefix + "." + cluster.name(), loader_, cluster));
+          this, runtime_key_prefix + "." + cluster.name(), factory_context, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -530,14 +529,16 @@ RouteEntryImplBase::perFilterConfig(const std::string& name) const {
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase* parent, const std::string runtime_key, Runtime::Loader& loader,
+    const RouteEntryImplBase* parent, const std::string runtime_key,
+    Server::Configuration::FactoryContext& factory_context,
     const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster)
-    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key), loader_(loader),
+    : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
+      loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.per_filter_config()) {
+      per_filter_configs_(cluster.per_filter_config(), factory_context) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -560,8 +561,8 @@ RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& nam
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                            const envoy::api::v2::route::Route& route,
-                                           Runtime::Loader& loader)
-    : RouteEntryImplBase(vhost, route, loader), prefix_(route.match().prefix()) {}
+                                           Server::Configuration::FactoryContext& factory_context)
+    : RouteEntryImplBase(vhost, route, factory_context), prefix_(route.match().prefix()) {}
 
 void PrefixRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -585,8 +586,8 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers
 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
-                                       Runtime::Loader& loader)
-    : RouteEntryImplBase(vhost, route, loader), path_(route.match().path()) {}
+                                       Server::Configuration::FactoryContext& factory_context)
+    : RouteEntryImplBase(vhost, route, factory_context), path_(route.match().path()) {}
 
 void PathRouteEntryImpl::finalizeRequestHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
@@ -629,8 +630,8 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
                                          const envoy::api::v2::route::Route& route,
-                                         Runtime::Loader& loader)
-    : RouteEntryImplBase(vhost, route, loader),
+                                         Server::Configuration::FactoryContext& factory_context)
+    : RouteEntryImplBase(vhost, route, factory_context),
       regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
       regex_str_(route.match().regex()) {}
 
@@ -662,14 +663,15 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
 }
 
 VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
-                                 const ConfigImpl& global_route_config, Runtime::Loader& runtime,
-                                 Upstream::ClusterManager& cm, bool validate_clusters)
+                                 const ConfigImpl& global_route_config,
+                                 Server::Configuration::FactoryContext& factory_context,
+                                 bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config()) {
+      per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;
@@ -692,18 +694,18 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     const bool has_regex =
         route.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex;
     if (has_prefix) {
-      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, runtime));
+      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, factory_context));
     } else if (has_path) {
-      routes_.emplace_back(new PathRouteEntryImpl(*this, route, runtime));
+      routes_.emplace_back(new PathRouteEntryImpl(*this, route, factory_context));
     } else {
       ASSERT(has_regex);
-      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, runtime));
+      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, factory_context));
     }
 
     if (validate_clusters) {
-      routes_.back()->validateClusters(cm);
+      routes_.back()->validateClusters(factory_context.clusterManager());
       if (!routes_.back()->shadowPolicy().cluster().empty()) {
-        if (!cm.get(routes_.back()->shadowPolicy().cluster())) {
+        if (!factory_context.clusterManager().get(routes_.back()->shadowPolicy().cluster())) {
           throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
                                            routes_.back()->shadowPolicy().cluster()));
         }
@@ -758,11 +760,12 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& 
 }
 
 RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_config,
-                           const ConfigImpl& global_route_config, Runtime::Loader& runtime,
-                           Upstream::ClusterManager& cm, bool validate_clusters) {
+                           const ConfigImpl& global_route_config,
+                           Server::Configuration::FactoryContext& factory_context,
+                           bool validate_clusters) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
-                                                          runtime, cm, validate_clusters));
+                                                          factory_context, validate_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       if ("*" == domain) {
@@ -860,11 +863,12 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   return nullptr;
 }
 
-ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-                       Upstream::ClusterManager& cm, bool validate_clusters_default)
+ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+                       Server::Configuration::FactoryContext& factory_context,
+                       bool validate_clusters_default)
     : name_(config.name()) {
   route_matcher_.reset(new RouteMatcher(
-      config, *this, runtime, cm,
+      config, *this, factory_context,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default)));
 
   for (const std::string& header : config.internal_only_headers()) {
@@ -877,7 +881,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime
 }
 
 PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs) {
+    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+    Server::Configuration::FactoryContext& factory_context) {
   for (const auto& cfg : configs) {
     const std::string& name = cfg.first;
     const ProtobufWkt::Struct& struct_config = cfg.second;
@@ -886,7 +891,8 @@ PerFilterConfigs::PerFilterConfigs(
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
     auto object = factory.createRouteSpecificFilterConfig(
-        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory));
+        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory),
+        factory_context);
     if (object) {
       configs_[name] = object;
     }
