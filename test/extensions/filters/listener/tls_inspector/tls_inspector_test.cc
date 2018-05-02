@@ -106,6 +106,8 @@ TEST_F(TlsInspectorTest, SniRegistered) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(1, cfg_->stats().sni_found_.value());
 }
 
 // Test with the ClientHello spread over multiple socket reads.
@@ -138,6 +140,8 @@ TEST_F(TlsInspectorTest, MultipleReads) {
   while (!got_continue) {
     file_event_callback_(Event::FileReadyType::Read);
   }
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(1, cfg_->stats().sni_found_.value());
 }
 
 // Test that the filter correctly handles a ClientHello with no SNI present
@@ -154,6 +158,8 @@ TEST_F(TlsInspectorTest, NoSni) {
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(1, cfg_->stats().sni_not_found_.value());
 }
 
 // Test that the filter fails if the ClientHello is larger than the
@@ -172,6 +178,7 @@ TEST_F(TlsInspectorTest, ClientHelloTooBig) {
       }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
 }
 
 // Test that the filter fails on non-SSL data
@@ -188,9 +195,9 @@ TEST_F(TlsInspectorTest, NotSsl) {
         memcpy(buffer, data.data(), data.size());
         return data.size();
       }));
-  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("raw_buffer")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
 
 } // namespace TlsInspector
