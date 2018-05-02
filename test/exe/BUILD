@@ -42,3 +42,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "terminate_handler_test",
+    srcs = ["terminate_handler_test.cc"],
+    tags = ["backtrace"],
+    deps = [
+        "//source/exe:terminate_handler_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

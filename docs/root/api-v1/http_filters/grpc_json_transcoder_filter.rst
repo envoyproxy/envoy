@@ -33,9 +33,10 @@ proto_descriptor
   services.
 
 services
-  *(required, array)* A list of strings that supplies the service names that the
-  transcoder will translate. If the service name doesn't exist in ``proto_descriptor``, Envoy
-  will fail at startup. The ``proto_descriptor`` may contain more services than the service names
+  *(required, array)* A list of strings that supplies the fully qualified service names
+  (i.e. "package_name.service_name") that the transcoder will translate.
+  If the service name doesn't exist in ``proto_descriptor``, Envoy will fail at startup. 
+  The ``proto_descriptor`` may contain more services than the service names
   specified here, but they won't be translated.
 
 print_options

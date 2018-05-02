@@ -1,8 +1,9 @@
 #!/bin/bash -e
 
 # buildifier
-export GOPATH=/usr/lib/go
-go get github.com/bazelbuild/buildifier/buildifier
+curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/0.11.1/buildifier \
+  && echo 'd7d41def74991a34dfd2ac8a73804ff11c514c024a901f64ab07f45a3cf0cfef  /usr/local/bin/buildifier' | sha256sum --check \
+  && chmod +x /usr/local/bin/buildifier
 
 # GCC for everything.
 export CC=gcc

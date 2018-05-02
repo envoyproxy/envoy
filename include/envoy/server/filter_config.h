@@ -136,6 +136,8 @@ public:
    * Store socket options to be set on the listen socket before listening.
    */
   virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
+
+  virtual void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
 };
 
 /**
@@ -310,7 +312,7 @@ public:
    * config. Returned object will be stored in the loaded route configuration.
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message&) {
+  createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
     return nullptr;
   }
 

@@ -345,6 +345,14 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
 
+// Validate that SubsetLoadBalancer unregisters its priority set member update
+// callback. Regression for heap-use-after-free.
+TEST_F(SubsetLoadBalancerTest, DeregisterCallbacks) {
+  init();
+  lb_.reset();
+  host_set_.runCallbacks({}, {});
+}
+
 TEST_P(SubsetLoadBalancerTest, NoFallbackAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));

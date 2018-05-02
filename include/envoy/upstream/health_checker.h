@@ -10,7 +10,21 @@ namespace Upstream {
 
 enum class HealthState { Unhealthy, Healthy };
 
-enum class HealthTransition { Unchanged, Changed };
+enum class HealthTransition {
+  /**
+   * Used when the health state of a host hasn't changed.
+   */
+  Unchanged,
+  /**
+   * Used when the health state of a host has changed.
+   */
+  Changed,
+  /**
+   * Used when the health check result differs from the health state of a host, but a change to the
+   * latter is delayed due to healthy/unhealthy threshold settings.
+   */
+  ChangePending
+};
 
 /**
  * Wraps active health checking of an upstream cluster.

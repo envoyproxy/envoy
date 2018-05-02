@@ -27,6 +27,14 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::config::filter::http::buffer::v2::Buffer()};
   }
 
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::buffer::v2::BufferPerRoute()};
+  }
+
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
+                                  Server::Configuration::FactoryContext&) override;
+
   std::string name() override { return HttpFilterNames::get().BUFFER; }
 
 private:
