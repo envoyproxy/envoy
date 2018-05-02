@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 SquashFilterConfigFactory::createFilterFactory(const Envoy::Json::Object& json_config,
                                                const std::string&,
                                                Server::Configuration::FactoryContext& context) {
@@ -26,7 +26,7 @@ SquashFilterConfigFactory::createFilterFactory(const Envoy::Json::Object& json_c
   return createFilter(proto_config, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProto(
+Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProto(
     const Envoy::Protobuf::Message& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   return createFilter(Envoy::MessageUtil::downcastAndValidate<
@@ -34,7 +34,7 @@ Server::Configuration::HttpFilterFactoryCb SquashFilterConfigFactory::createFilt
                       context);
 }
 
-Server::Configuration::HttpFilterFactoryCb SquashFilterConfigFactory::createFilter(
+Http::FilterFactoryCb SquashFilterConfigFactory::createFilter(
     const envoy::config::filter::http::squash::v2::Squash& proto_config,
     Server::Configuration::FactoryContext& context) {
 

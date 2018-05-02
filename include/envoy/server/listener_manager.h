@@ -35,9 +35,9 @@ public:
    * Creates a list of filter factories.
    * @param filters supplies the proto configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Configuration::NetworkFilterFactoryCb> the list of filter factories.
+   * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
+  virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context) PURE;
 
@@ -45,9 +45,9 @@ public:
    * Creates a list of listener filter factories.
    * @param filters supplies the JSON configuration.
    * @param context supplies the factory creation context.
-   * @return std::vector<Configuration::ListenerFilterFactoryCb> the list of filter factories.
+   * @return std::vector<Network::ListenerFilterFactoryCb> the list of filter factories.
    */
-  virtual std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
