@@ -16,9 +16,8 @@
 namespace Envoy {
 
 // Define fixture which allocates ValidationDispatcher.
-class ConfigValidation
-    : public ::testing::TestWithParam<Network::Address::IpVersion> {
- public:
+class ConfigValidation : public ::testing::TestWithParam<Network::Address::IpVersion> {
+public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
@@ -38,22 +37,17 @@ private:
 TEST_P(ConfigValidation, createConnection) {
   Network::Address::InstanceConstSharedPtr address;
   if (GetParam() == Network::Address::IpVersion::v4) {
-    address = Network::Address::InstanceConstSharedPtr(
-        new Network::Address::Ipv4Instance("127.0.0.1"));
+    address = Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4);
   } else {
-    address = Network::Address::InstanceConstSharedPtr(
-        new Network::Address::Ipv6Instance("::1"));
+    address = Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v6);
   }
-  dispatcher_->createClientConnection(
-      address, address, Network::Test::createRawBufferSocket(), nullptr);
+  dispatcher_->createClientConnection(address, address, Network::Test::createRawBufferSocket(),
+                                      nullptr);
   SUCCEED();
 }
 
-INSTANTIATE_TEST_CASE_P(
-    IpVersions, ConfigValidation,
-    testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-    TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_CASE_P(IpVersions, ConfigValidation,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 } // namespace Envoy
-
-
