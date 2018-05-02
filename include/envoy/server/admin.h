@@ -70,7 +70,7 @@ public:
 
   /**
    * Callback for admin URL handlers.
-   * @param path_and_query supplies the URL prefix to install the handler for.
+   * @param path_and_query supplies the the path and query of the request URL.
    * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
    * handler.
    * @param response supplies the buffer to fill in with the response body.

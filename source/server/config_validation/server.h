@@ -89,7 +89,7 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
-  const std::chrono::milliseconds& statsFlushInterval() override {
+  std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
   }
 
