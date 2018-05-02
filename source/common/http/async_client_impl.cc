@@ -34,7 +34,7 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::St
                                  Runtime::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer)
     : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true, false),
+                                 std::move(shadow_writer), true, false, EMPTY_STRING),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {

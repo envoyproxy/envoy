@@ -63,10 +63,10 @@ public:
 
 class RouterTestBase : public testing::Test {
 public:
-  RouterTestBase(bool start_child_span)
+  RouterTestBase(bool start_child_span, const std::string& start_timestamp_header = EMPTY_STRING)
       : shadow_writer_(new MockShadowWriter()),
         config_("test.", local_info_, stats_store_, cm_, runtime_, random_,
-                ShadowWriterPtr{shadow_writer_}, true, start_child_span),
+                ShadowWriterPtr{shadow_writer_}, true, start_child_span, start_timestamp_header),
         router_(config_) {
     router_.setDecoderFilterCallbacks(callbacks_);
     upstream_locality_.set_zone("to_az");
@@ -1628,6 +1628,28 @@ TEST_F(RouterTest, DirectResponseWithBody) {
   EXPECT_EQ(1UL, config_.stats_.rq_direct_response_.value());
 }
 
+TEST_F(RouterTest, NoStartTimestampHeader) {
+  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  const Http::LowerCaseString header("x-request-start");
+  EXPECT_EQ(nullptr, headers.get(header));
+
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST(RouterFilterUtilityTest, finalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
@@ -2115,6 +2137,37 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
 
   EXPECT_CALL(*child_span, finishSpan());
   encoder.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+}
+
+class RouterTestStartTimestampHeader : public RouterTestBase {
+public:
+  RouterTestStartTimestampHeader() : RouterTestBase(false, "X-Request-Start") {}
+};
+
+TEST_F(RouterTestStartTimestampHeader, WithStartTimestampHeader) {
+  absl::optional<Http::Protocol> downstream_protocol{Http::Protocol::Http2};
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features())
+      .WillOnce(Return(Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL));
+  EXPECT_CALL(callbacks_.request_info_, protocol()).WillOnce(ReturnPointee(&downstream_protocol));
+
+  EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, Http::Protocol::Http2, _));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  const Http::LowerCaseString header("x-request-start");
+  EXPECT_NE(nullptr, headers.get(header));
+
+  uint64_t timestamp;
+  StringUtil::atoul(headers.get(header)->value().c_str(), timestamp);
+  EXPECT_GT(timestamp, 0);
+
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 } // namespace Router

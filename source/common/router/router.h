@@ -89,11 +89,12 @@ public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats, bool start_child_span)
+               bool emit_dynamic_stats, bool start_child_span,
+               const std::string& start_timestamp_header)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        shadow_writer_(std::move(shadow_writer)) {}
+        start_timestamp_header_(start_timestamp_header), shadow_writer_(std::move(shadow_writer)) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -101,7 +102,7 @@ public:
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span()) {
+                     config.start_child_span(), config.start_timestamp_header()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -118,6 +119,7 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
+  const Http::LowerCaseString start_timestamp_header_;
 
 private:
   ShadowWriterPtr shadow_writer_;
