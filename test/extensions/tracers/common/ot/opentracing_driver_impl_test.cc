@@ -81,7 +81,7 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
 }
 
 TEST_F(OpenTracingDriverTest, TagSamplingFalse) {
-  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {}, true);
+  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, false});
