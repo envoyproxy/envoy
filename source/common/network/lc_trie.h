@@ -109,7 +109,7 @@ private:
 
     IpPrefix() {}
 
-    IpPrefix(const IpType& ip, int length, const std::string& tag) : ip_(ip), length_(length) {
+    IpPrefix(const IpType& ip, uint32_t length, const std::string& tag) : ip_(ip), length_(length) {
       tags_.insert(tag);
     }
 
@@ -161,13 +161,22 @@ private:
     // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
-    int length_;
+    uint32_t length_{0};
     // Tag(s) for this entry.
     TagSet tags_;
   };
 
   /**
-   * Binary trie used to simplify the construction of Level Compressed Tries
+   * Binary trie used to simplify the construction of Level Compressed Tries.
+   * This data type supports two operations:
+   *   1. Add a prefix to the trie.
+   *   2. Push the prefixes the leaves of the trie.
+   * That second operation produces a new set of prefixes that yield the same
+   * match results as the original set of prefixes from which the BinaryTrie
+   * was constructed, but with an important difference: the new prefixes are
+   * guaranteed not to be nested within each other. That allows the use of the
+   * classic LC Trie construction algorithm, which is fast and (relatively)
+   * simple but does not work properly with nested prefixes.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class BinaryTrie {
   public:
@@ -179,7 +188,7 @@ private:
      */
     void insert(const IpPrefix<IpType>& prefix) {
       Node* node = root_.get();
-      for (int i = 0; i < prefix.length_; i++) {
+      for (uint32_t i = 0; i < prefix.length_; i++) {
         auto bit = static_cast<uint32_t>(extractBits(i, 1, prefix.ip_));
         NodePtr& next_node = node->children[bit];
         if (next_node == nullptr) {
