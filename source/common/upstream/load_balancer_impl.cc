@@ -488,7 +488,7 @@ HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
     // We do not expire any hosts from the host list without rebuilding the scheduler.
     ASSERT(host != nullptr);
     scheduler.edf_.add(host->weight(), host);
-    // Track the nubmer of picks so we can pick up where we left of when
+    // Track the number of picks so we can pick up where we left off when
     // rebuilding.
     ++scheduler.rr_index_;
     return host;
