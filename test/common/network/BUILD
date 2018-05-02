@@ -155,12 +155,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "socket_option_test_harness",
-    srcs = ["socket_option_test_harness.h"],
+    name = "socket_option_test",
+    srcs = ["socket_option_test.h"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",
-        "//source/server:listener_socket_option_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:logging_lib",
@@ -172,7 +172,17 @@ envoy_cc_test(
     name = "socket_option_impl_test",
     srcs = ["socket_option_impl_test.cc"],
     deps = [
-        ":socket_option_test_harness",
+        ":socket_option_test",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "addr_family_aware_socket_option_impl_test",
+    srcs = ["addr_family_aware_socket_option_impl_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:addr_family_aware_socket_option_lib",
     ],
 )
 

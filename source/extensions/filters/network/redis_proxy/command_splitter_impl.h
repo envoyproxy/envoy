@@ -48,11 +48,11 @@ class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallba
 public:
   ~SingleServerRequest();
 
-  // Redis::ConnPool::PoolCallbacks
+  // RedisProxy::ConnPool::PoolCallbacks
   void onResponse(RespValuePtr&& response) override;
   void onFailure() override;
 
-  // Redis::CommandSplitter::SplitRequest
+  // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
 
 protected:
@@ -95,7 +95,7 @@ class FragmentedRequest : public SplitRequestBase {
 public:
   ~FragmentedRequest();
 
-  // Redis::CommandSplitter::SplitRequest
+  // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
 
 protected:
@@ -104,7 +104,7 @@ protected:
   struct PendingRequest : public ConnPool::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-    // Redis::ConnPool::PoolCallbacks
+    // RedisProxy::ConnPool::PoolCallbacks
     void onResponse(RespValuePtr&& value) override {
       parent_.onChildResponse(std::move(value), index_);
     }
@@ -137,7 +137,7 @@ public:
 private:
   MGETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
 
-  // Redis::CommandSplitter::FragmentedRequest
+  // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
 };
 
@@ -155,7 +155,7 @@ public:
 private:
   SplitKeysSumResultRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
 
-  // Redis::CommandSplitter::FragmentedRequest
+  // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
 
   int64_t total_{0};
@@ -174,7 +174,7 @@ public:
 private:
   MSETRequest(SplitCallbacks& callbacks) : FragmentedRequest(callbacks) {}
 
-  // Redis::CommandSplitter::FragmentedRequest
+  // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(RespValuePtr&& value, uint32_t index) override;
 };
 
@@ -212,7 +212,7 @@ public:
   InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
                const std::string& stat_prefix);
 
-  // Redis::CommandSplitter::Instance
+  // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(const RespValue& request, SplitCallbacks& callbacks) override;
 
 private:

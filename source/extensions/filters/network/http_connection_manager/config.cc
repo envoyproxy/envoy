@@ -50,9 +50,7 @@ HttpConnectionManagerFilterConfigFactory::createFilter(
   std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(
-                context.runtime(), context.dispatcher(), context.random(), context.localInfo(),
-                context.threadLocal(), context.admin());
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
 
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
@@ -133,9 +131,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()) {
 
-  route_config_provider_ = Router::RouteConfigProviderUtil::create(
-      config, context_.runtime(), context_.clusterManager(), context_.scope(), stats_prefix_,
-      context_.initManager(), route_config_provider_manager_);
+  route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
+                                                                   route_config_provider_manager_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:

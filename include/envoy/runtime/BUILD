@@ -11,4 +11,5 @@ envoy_package()
 envoy_cc_library(
     name = "runtime_interface",
     hdrs = ["runtime.h"],
+    external_deps = ["abseil_optional"],
 )

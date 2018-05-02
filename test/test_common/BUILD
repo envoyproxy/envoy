@@ -93,7 +93,7 @@ envoy_cc_test_library(
     hdrs = ["logging.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -102,5 +102,15 @@ envoy_cc_library(
     hdrs = ["threadsafe_singleton_injector.h"],
     deps = [
         "//source/common/singleton:threadsafe_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "tls_utility_lib",
+    srcs = ["tls_utility.cc"],
+    hdrs = ["tls_utility.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/common:assert_lib",
     ],
 )

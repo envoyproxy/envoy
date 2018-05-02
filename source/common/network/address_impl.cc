@@ -185,7 +185,8 @@ int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(ty
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
   static_assert(sizeof(absl::uint128) == 16, "The size of asbl::uint128 is not 16.");
-  memcpy(&result, &address_.sin6_addr.s6_addr, sizeof(absl::uint128));
+  memcpy(static_cast<void*>(&result), static_cast<const void*>(&address_.sin6_addr.s6_addr),
+         sizeof(absl::uint128));
   return result;
 }
 

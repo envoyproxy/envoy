@@ -21,6 +21,10 @@ ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
   return ::write(fd, buffer, num_bytes);
 }
 
+ssize_t OsSysCallsImpl::recv(int socket, void* buffer, size_t length, int flags) {
+  return ::recv(socket, buffer, length, flags);
+}
+
 int OsSysCallsImpl::shmOpen(const char* name, int oflag, mode_t mode) {
   return ::shm_open(name, oflag, mode);
 }
