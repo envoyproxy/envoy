@@ -4283,8 +4283,8 @@ public:
   };
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
-    Server::Configuration::HttpFilterFactoryCb
-    createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
+    Http::HttpFilterFactoryCb createFilter(const std::string&,
+                                           Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {

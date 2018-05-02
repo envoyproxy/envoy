@@ -222,16 +222,6 @@ public:
 };
 
 /**
- * This function is used to wrap the creation of an HTTP filter chain for new streams as they
- * come in. Filter factories create the function at configuration initialization time, and then
- * they are used at runtime.
- * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
- * function will install a single filter, but it's technically possibly to install more than one
- * if desired.
- */
-typedef std::function<void(Http::FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
-
-/**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
@@ -248,20 +238,20 @@ public:
    * @param config supplies the general json configuration for the filter
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return HttpFilterFactoryCb the factory creation function.
+   * @return Http::HttpFilterFactoryCb the factory creation function.
    */
-  virtual HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                  const std::string& stat_prefix,
-                                                  FactoryContext& context) PURE;
+  virtual Http::HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
+                                                        const std::string& stat_prefix,
+                                                        FactoryContext& context) PURE;
 
   /**
    * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                           const std::string& stat_prefix,
-                                                           FactoryContext& context) {
+  virtual Http::HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                 const std::string& stat_prefix,
+                                                                 FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);

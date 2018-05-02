@@ -113,7 +113,7 @@ private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
 
   Server::Configuration::FactoryContext& context_;
-  std::list<Server::Configuration::HttpFilterFactoryCb> filter_factories_;
+  std::list<Http::HttpFilterFactoryCb> filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;

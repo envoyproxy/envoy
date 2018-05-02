@@ -253,7 +253,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             string_name);
-    Server::Configuration::HttpFilterFactoryCb callback;
+    Http::HttpFilterFactoryCb callback;
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true),
                                              stats_prefix_, context);
@@ -292,7 +292,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  for (const Server::Configuration::HttpFilterFactoryCb& factory : filter_factories_) {
+  for (const Http::HttpFilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
 }

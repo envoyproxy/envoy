@@ -25,8 +25,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -114,7 +113,7 @@ void testHealthCheckHeaderMatch(
 
   *config = input_config;
 
-  Server::Configuration::HttpFilterFactoryCb cb =
+  Http::HttpFilterFactoryCb cb =
       healthCheckFilterConfig.createFilterFactoryFromProto(*config, "dummy_stats_prefix", context);
 
   Http::MockFilterChainFactoryCallbacks filter_callbacks;

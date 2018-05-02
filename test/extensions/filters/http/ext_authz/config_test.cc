@@ -32,7 +32,7 @@ TEST(HttpExtAuthzConfigTest, ExtAuthzCorrectProto) {
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
-  Server::Configuration::HttpFilterFactoryCb cb =
+  Http::HttpFilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::HttpFilterFactoryCb
 GrpcWebFilterConfig::createFilter(const std::string&,
                                   Server::Configuration::FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {

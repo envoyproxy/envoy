@@ -17,11 +17,11 @@ namespace IpTagging {
  */
 class IpTaggingFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override;

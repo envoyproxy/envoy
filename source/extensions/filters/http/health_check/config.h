@@ -12,10 +12,10 @@ namespace HealthCheck {
 
 class HealthCheckFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override;
@@ -28,7 +28,7 @@ public:
   std::string name() override { return HttpFilterNames::get().HEALTH_CHECK; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilter(const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
                const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
 };

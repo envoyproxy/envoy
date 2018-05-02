@@ -19,16 +19,16 @@ namespace Common {
  */
 class EmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  virtual Server::Configuration::HttpFilterFactoryCb
+  virtual Http::HttpFilterFactoryCb
   createFilter(const std::string& stat_prefix, Server::Configuration::FactoryContext& context) PURE;
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactory(const Json::Object&, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override {
     return createFilter(stat_prefix, context);
   }
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::HttpFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createFilter(stat_prefix, context);
