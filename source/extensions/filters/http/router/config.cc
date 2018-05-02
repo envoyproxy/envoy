@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RouterFilter {
 
-Http::HttpFilterFactoryCb RouterFilterConfig::createFilter(
+Http::FilterFactoryCb RouterFilterConfig::createFilter(
     const envoy::config::filter::http::router::v2::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   Router::FilterConfigSharedPtr filter_config(new Router::FilterConfig(
@@ -25,7 +25,7 @@ Http::HttpFilterFactoryCb RouterFilterConfig::createFilter(
   };
 }
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
                                         const std::string& stat_prefix,
                                         Server::Configuration::FactoryContext& context) {
@@ -34,7 +34,7 @@ RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, stat_prefix, context);
 }
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 RouterFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                  const std::string& stat_prefix,
                                                  Server::Configuration::FactoryContext& context) {

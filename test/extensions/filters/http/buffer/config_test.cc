@@ -32,7 +32,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterCorrectJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterConfigFactory factory;
-  Http::HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -59,7 +59,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterConfigFactory factory;
-  Http::HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -75,7 +75,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyProto) {
   config.mutable_max_request_time()->set_seconds(2);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  Http::HttpFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

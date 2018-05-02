@@ -238,20 +238,20 @@ public:
    * @param config supplies the general json configuration for the filter
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return Http::HttpFilterFactoryCb the factory creation function.
+   * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual Http::HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                        const std::string& stat_prefix,
-                                                        FactoryContext& context) PURE;
+  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object& config,
+                                                    const std::string& stat_prefix,
+                                                    FactoryContext& context) PURE;
 
   /**
    * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual Http::HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                 const std::string& stat_prefix,
-                                                                 FactoryContext& context) {
+  virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                             const std::string& stat_prefix,
+                                                             FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);

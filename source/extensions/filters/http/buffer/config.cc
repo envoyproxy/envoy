@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-Http::HttpFilterFactoryCb BufferFilterConfigFactory::createFilter(
+Http::FilterFactoryCb BufferFilterConfigFactory::createFilter(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
@@ -30,7 +30,7 @@ Http::HttpFilterFactoryCb BufferFilterConfigFactory::createFilter(
   };
 }
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 BufferFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                const std::string& stats_prefix,
                                                Server::Configuration::FactoryContext& context) {
@@ -39,7 +39,7 @@ BufferFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, stats_prefix, context);
 }
 
-Http::HttpFilterFactoryCb BufferFilterConfigFactory::createFilterFactoryFromProto(
+Http::FilterFactoryCb BufferFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   return createFilter(

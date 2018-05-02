@@ -32,7 +32,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RateLimitFilterConfig factory;
-  Http::HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -52,8 +52,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RateLimitFilterConfig factory;
-  Http::HttpFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -76,7 +75,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
           factory.createEmptyConfigProto().get());
   Envoy::Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
 
-  Http::HttpFilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

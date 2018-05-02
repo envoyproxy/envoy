@@ -15,8 +15,8 @@ namespace Dynamo {
  */
 class DynamoFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  Http::HttpFilterFactoryCb createFilter(const std::string& stat_prefix,
-                                         Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
+                                     Server::Configuration::FactoryContext& context) override;
 
   std::string name() override { return HttpFilterNames::get().DYNAMO; }
 };

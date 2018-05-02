@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 GrpcHttp1BridgeFilterConfig::createFilter(const std::string&,
                                           Server::Configuration::FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {

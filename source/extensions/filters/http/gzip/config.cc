@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 GzipFilterFactory::createFilter(const envoy::config::filter::http::gzip::v2::Gzip& proto_config) {
   GzipFilterConfigSharedPtr config = std::make_shared<GzipFilterConfig>(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -20,13 +20,13 @@ GzipFilterFactory::createFilter(const envoy::config::filter::http::gzip::v2::Gzi
   };
 }
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 GzipFilterFactory::createFilterFactory(const Json::Object&, const std::string&,
                                        Server::Configuration::FactoryContext&) {
   NOT_IMPLEMENTED;
 }
 
-Http::HttpFilterFactoryCb
+Http::FilterFactoryCb
 GzipFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                 const std::string&,
                                                 Server::Configuration::FactoryContext&) {

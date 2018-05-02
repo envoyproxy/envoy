@@ -504,7 +504,7 @@ public:
  * function will install a single filter, but it's technically possibly to install more than one
  * if desired.
  */
-typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
+typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
 
 /**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
