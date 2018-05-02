@@ -17,7 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-Server::Configuration::NetworkFilterFactoryCb RateLimitConfigFactory::createFilter(
+Network::FilterFactoryCb RateLimitConfigFactory::createFilter(
     const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -34,7 +34,7 @@ Server::Configuration::NetworkFilterFactoryCb RateLimitConfigFactory::createFilt
   };
 }
 
-Server::Configuration::NetworkFilterFactoryCb
+Network::FilterFactoryCb
 RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
                                             Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config;
@@ -42,7 +42,7 @@ RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, context);
 }
 
-Server::Configuration::NetworkFilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<

@@ -17,7 +17,7 @@ namespace OriginalDst {
 class OriginalDstConfigFactory : public Server::Configuration::NamedListenerFilterConfigFactory {
 public:
   // NamedListenerFilterConfigFactory
-  Server::Configuration::ListenerFilterFactoryCb
+  Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::ListenerFactoryContext&) override {
     return [](Network::ListenerFilterManager& filter_manager) -> void {

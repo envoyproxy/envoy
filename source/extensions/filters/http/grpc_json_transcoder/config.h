@@ -15,10 +15,10 @@ namespace GrpcJsonTranscoder {
  */
 class GrpcJsonTranscoderFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override;
@@ -31,7 +31,7 @@ public:
   std::string name() override { return HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilter(const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
                const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
 };

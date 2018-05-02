@@ -141,16 +141,6 @@ public:
 };
 
 /**
- * This function is used to wrap the creation of a listener filter chain for new sockets as they are
- * created. Filter factories create the lambda at configuration initialization time, and then they
- * are used at runtime.
- * @param filter_manager supplies the filter manager for the listener to install filters to.
- * Typically the function will install a single filter, but it's technically possibly to install
- * more than one if desired.
- */
-typedef std::function<void(Network::ListenerFilterManager& filter_manager)> ListenerFilterFactoryCb;
-
-/**
  * Implemented by each listener filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
@@ -165,9 +155,9 @@ public:
    * callback should always be initialized.
    * @param config supplies the general protobuf configuration for the filter
    * @param context supplies the filter's context.
-   * @return ListenerFilterFactoryCb the factory creation function.
+   * @return Network::ListenerFilterFactoryCb the factory creation function.
    */
-  virtual ListenerFilterFactoryCb
+  virtual Network::ListenerFilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
@@ -186,16 +176,6 @@ public:
 };
 
 /**
- * This function is used to wrap the creation of a network filter chain for new connections as
- * they come in. Filter factories create the lambda at configuration initialization time, and then
- * they are used at runtime.
- * @param filter_manager supplies the filter manager for the connection to install filters
- * to. Typically the function will install a single filter, but it's technically possibly to
- * install more than one if desired.
- */
-typedef std::function<void(Network::FilterManager& filter_manager)> NetworkFilterFactoryCb;
-
-/**
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
@@ -210,17 +190,17 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param context supplies the filter's context.
-   * @return NetworkFilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                     FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object& config,
+                                                       FactoryContext& context) PURE;
 
   /**
    * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
    * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
    */
-  virtual NetworkFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                              FactoryContext& context) {
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
     NOT_IMPLEMENTED;
@@ -242,16 +222,6 @@ public:
 };
 
 /**
- * This function is used to wrap the creation of an HTTP filter chain for new streams as they
- * come in. Filter factories create the function at configuration initialization time, and then
- * they are used at runtime.
- * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
- * function will install a single filter, but it's technically possibly to install more than one
- * if desired.
- */
-typedef std::function<void(Http::FilterChainFactoryCallbacks& callbacks)> HttpFilterFactoryCb;
-
-/**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
@@ -268,20 +238,20 @@ public:
    * @param config supplies the general json configuration for the filter
    * @param stat_prefix prefix for stat logging
    * @param context supplies the filter's context.
-   * @return HttpFilterFactoryCb the factory creation function.
+   * @return Http::FilterFactoryCb the factory creation function.
    */
-  virtual HttpFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                  const std::string& stat_prefix,
-                                                  FactoryContext& context) PURE;
+  virtual Http::FilterFactoryCb createFilterFactory(const Json::Object& config,
+                                                    const std::string& stat_prefix,
+                                                    FactoryContext& context) PURE;
 
   /**
    * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
    * may be optionally implemented today, but will in the future become compulsory once v1 is
    * deprecated.
    */
-  virtual HttpFilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                           const std::string& stat_prefix,
-                                                           FactoryContext& context) {
+  virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                             const std::string& stat_prefix,
+                                                             FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);
