@@ -190,17 +190,17 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param context supplies the filter's context.
-   * @return Network::NetworkFilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::NetworkFilterFactoryCb createFilterFactory(const Json::Object& config,
-                                                              FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb createFilterFactory(const Json::Object& config,
+                                                       FactoryContext& context) PURE;
 
   /**
    * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
    * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
    */
-  virtual Network::NetworkFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config, FactoryContext& context) {
+  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
+                                                                FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
     NOT_IMPLEMENTED;

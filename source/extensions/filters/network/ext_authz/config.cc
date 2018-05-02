@@ -18,7 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-Network::NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
+Network::FilterFactoryCb ExtAuthzConfigFactory::createFilter(
     const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context) {
   ConfigSharedPtr ext_authz_config(new Config(proto_config, context.scope()));
@@ -39,13 +39,13 @@ Network::NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilter(
   };
 }
 
-Network::NetworkFilterFactoryCb
+Network::FilterFactoryCb
 ExtAuthzConfigFactory::createFilterFactory(const Json::Object&,
                                            Server::Configuration::FactoryContext&) {
   NOT_IMPLEMENTED;
 }
 
-Network::NetworkFilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<

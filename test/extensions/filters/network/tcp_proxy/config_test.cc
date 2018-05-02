@@ -56,7 +56,7 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   TcpProxyConfigFactory factory;
-  Network::NetworkFilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -81,7 +81,7 @@ TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");
 
-  Network::NetworkFilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

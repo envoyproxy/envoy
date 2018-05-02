@@ -27,7 +27,7 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Network::NetworkFilterFactoryCb> createNetworkFilterFactoryList_(
+  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context);
   /**
@@ -38,7 +38,7 @@ public:
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  std::vector<Network::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
+  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context) override {
     return createNetworkFilterFactoryList_(filters, context);
@@ -293,7 +293,7 @@ private:
   const uint64_t hash_;
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
-  std::vector<Network::NetworkFilterFactoryCb> filter_factories_;
+  std::vector<Network::FilterFactoryCb> filter_factories_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};

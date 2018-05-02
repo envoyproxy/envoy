@@ -24,10 +24,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-bool FilterChainUtility::buildFilterChain(
-    Network::FilterManager& filter_manager,
-    const std::vector<Network::NetworkFilterFactoryCb>& factories) {
-  for (const Network::NetworkFilterFactoryCb& factory : factories) {
+bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
+                                          const std::vector<Network::FilterFactoryCb>& factories) {
+  for (const Network::FilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 

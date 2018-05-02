@@ -159,7 +159,7 @@ public:
  * to. Typically the function will install a single filter, but it's technically possibly to
  * install more than one if desired.
  */
-typedef std::function<void(FilterManager& filter_manager)> NetworkFilterFactoryCb;
+typedef std::function<void(FilterManager& filter_manager)> FilterFactoryCb;
 
 /**
  * Callbacks used by individual listener filter instances to communicate with the listener filter

@@ -22,11 +22,10 @@
 namespace Envoy {
 namespace Server {
 
-std::vector<Network::NetworkFilterFactoryCb>
-ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
-  std::vector<Network::NetworkFilterFactoryCb> ret;
+  std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_type = proto_config.deprecated_v1().type();
@@ -41,7 +40,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
-    Network::NetworkFilterFactoryCb callback;
+    Network::FilterFactoryCb callback;
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {

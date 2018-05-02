@@ -35,7 +35,7 @@ namespace HttpConnectionManager {
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-Network::NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
@@ -68,15 +68,14 @@ Network::NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::create
   };
 }
 
-Network::NetworkFilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
   Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
   return createFilter(proto_config, context);
 }
 
-Network::NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<const envoy::config::filter::network::

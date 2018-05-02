@@ -29,10 +29,10 @@ class HttpConnectionManagerFilterConfigFactory
       public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Network::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
-  Network::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -44,7 +44,7 @@ public:
   std::string name() override { return NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
-  Network::NetworkFilterFactoryCb createFilter(
+  Network::FilterFactoryCb createFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context);

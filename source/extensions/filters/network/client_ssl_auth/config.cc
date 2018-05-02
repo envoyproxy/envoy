@@ -13,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
 
-Network::NetworkFilterFactoryCb
+Network::FilterFactoryCb
 ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                 Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
@@ -21,7 +21,7 @@ ClientSslAuthConfigFactory::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, context);
 }
 
-Network::NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<
@@ -36,7 +36,7 @@ ProtobufTypes::MessagePtr ClientSslAuthConfigFactory::createEmptyConfigProto() {
 
 std::string ClientSslAuthConfigFactory::name() { return NetworkFilterNames::get().CLIENT_SSL_AUTH; }
 
-Network::NetworkFilterFactoryCb ClientSslAuthConfigFactory::createFilter(
+Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilter(
     const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());

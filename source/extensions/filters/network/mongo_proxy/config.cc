@@ -14,7 +14,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-Network::NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
+Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
     const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -41,7 +41,7 @@ Network::NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilter(
   };
 }
 
-Network::NetworkFilterFactoryCb
+Network::FilterFactoryCb
 MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
                                                    Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy proto_config;
@@ -49,7 +49,7 @@ MongoProxyFilterConfigFactory::createFilterFactory(const Json::Object& json_conf
   return createFilter(proto_config, context);
 }
 
-Network::NetworkFilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<

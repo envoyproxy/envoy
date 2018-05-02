@@ -67,17 +67,17 @@ public:
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke([raw_listener, need_init](
-                             const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
-                             Configuration::FactoryContext& context)
-                             -> std::vector<Network::NetworkFilterFactoryCb> {
-          std::shared_ptr<ListenerHandle> notifier(raw_listener);
-          raw_listener->context_ = &context;
-          if (need_init) {
-            context.initManager().registerTarget(notifier->target_);
-          }
-          return {[notifier](Network::FilterManager&) -> void {}};
-        }));
+        .WillOnce(Invoke(
+            [raw_listener, need_init](
+                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
+              std::shared_ptr<ListenerHandle> notifier(raw_listener);
+              raw_listener->context_ = &context;
+              if (need_init) {
+                context.initManager().registerTarget(notifier->target_);
+              }
+              return {[notifier](Network::FilterManager&) -> void {}};
+            }));
 
     return raw_listener;
   }
@@ -108,10 +108,9 @@ public:
   ListenerManagerImplWithRealFiltersTest() {
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                      Configuration::FactoryContext& context)
-                       -> std::vector<Network::NetworkFilterFactoryCb> {
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+               Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                    context);
             }));
@@ -241,8 +240,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::NetworkFilterFactoryCb
-  createFilterFactory(const Json::Object&, Configuration::FactoryContext& context) override {
+  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
+                                               Configuration::FactoryContext& context) override {
     context.scope().counter("bar").inc();
     return [](Network::FilterManager&) -> void {};
   }
