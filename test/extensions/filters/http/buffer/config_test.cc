@@ -96,6 +96,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyRouteProto) {
 
 TEST(BufferFilterConfigFactoryTest, BufferFilterRouteSpecificConfig) {
   BufferFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());
@@ -105,7 +106,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterRouteSpecificConfig) {
   cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(*proto_config);
+      factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
   EXPECT_TRUE(route_config.get());
 
   const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());
