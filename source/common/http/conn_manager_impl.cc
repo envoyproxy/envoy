@@ -569,10 +569,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (websocket_requested && websocket_allowed) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
-      connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-          *request_headers_, request_info_, *route_entry, *this,
-          connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
-      connection_manager_.ws_connection_->onNewConnection();
+      connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
+          *request_headers_, request_info_, *this, connection_manager_.cluster_manager_,
+          connection_manager_.read_callbacks_);
+      ASSERT(connection_manager_.ws_connection_ != nullptr);
       connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
       connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();

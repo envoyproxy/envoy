@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "metadatamatchcriteria_lib",
+    hdrs = ["metadatamatchcriteria_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -19,6 +27,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
+        ":metadatamatchcriteria_lib",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -34,6 +43,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )

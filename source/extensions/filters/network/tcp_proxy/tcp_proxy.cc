@@ -16,6 +16,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/well_known_names.h"
+#include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -124,19 +125,18 @@ TcpProxyUpstreamDrainManager& TcpProxyConfig::drainManager() {
   return upstream_drain_manager_slot_->getTyped<TcpProxyUpstreamDrainManager>();
 }
 
-// TODO(ggreenway): refactor this and websocket code so that config_ is always non-null.
 TcpProxyFilter::TcpProxyFilter(TcpProxyConfigSharedPtr config,
                                Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)) {}
+      upstream_callbacks_(new UpstreamCallbacks(this)) {
+  ASSERT(config != nullptr);
+}
 
 TcpProxyFilter::~TcpProxyFilter() {
   request_info_.onRequestComplete();
 
-  if (config_ != nullptr) {
-    for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, nullptr, request_info_);
-    }
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, request_info_);
   }
 
   if (upstream_connection_) {
@@ -164,6 +164,11 @@ void TcpProxyFilter::finalizeUpstreamConnectionStats() {
 }
 
 void TcpProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+  initialize(callbacks, true);
+}
+
+void TcpProxyFilter::initialize(Network::ReadFilterCallbacks& callbacks,
+                                bool set_connection_stats) {
   read_callbacks_ = &callbacks;
   ENVOY_CONN_LOG(debug, "new tcp proxy session", read_callbacks_->connection());
 
@@ -177,15 +182,14 @@ void TcpProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
   // established.
   read_callbacks_->connection().readDisable(true);
 
-  if (!config_) {
-    return;
-  }
   config_->stats().downstream_cx_total_.inc();
-  read_callbacks_->connection().setConnectionStats(
-      {config_->stats().downstream_cx_rx_bytes_total_,
-       config_->stats().downstream_cx_rx_bytes_buffered_,
-       config_->stats().downstream_cx_tx_bytes_total_,
-       config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
+  if (set_connection_stats) {
+    read_callbacks_->connection().setConnectionStats(
+        {config_->stats().downstream_cx_rx_bytes_total_,
+         config_->stats().downstream_cx_rx_bytes_buffered_,
+         config_->stats().downstream_cx_tx_bytes_total_,
+         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
+  }
 }
 
 void TcpProxyFilter::readDisableUpstream(bool disable) {
@@ -213,10 +217,6 @@ void TcpProxyFilter::readDisableUpstream(bool disable) {
 
 void TcpProxyFilter::readDisableDownstream(bool disable) {
   read_callbacks_->connection().readDisable(disable);
-  // The WsHandlerImpl class uses TCP Proxy code with a null config.
-  if (!config_) {
-    return;
-  }
 
   if (disable) {
     config_->stats().downstream_flow_control_paused_reading_total_.inc();
@@ -310,9 +310,7 @@ Network::FilterStatus TcpProxyFilter::initializeUpstreamConnection() {
     ENVOY_CONN_LOG(debug, "Creating connection to cluster {}", read_callbacks_->connection(),
                    cluster_name);
   } else {
-    if (config_) {
-      config_->stats().downstream_cx_no_route_.inc();
-    }
+    config_->stats().downstream_cx_no_route_.inc();
     request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
@@ -326,7 +324,7 @@ Network::FilterStatus TcpProxyFilter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  const uint32_t max_connect_attempts = (config_ != nullptr) ? config_->maxConnectAttempts() : 1;
+  const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
@@ -406,15 +404,10 @@ void TcpProxyFilter::onDownstreamEvent(Network::ConnectionEvent event) {
 
       if (upstream_connection_ != nullptr &&
           upstream_connection_->state() != Network::Connection::State::Closed) {
-        if (config_ != nullptr) {
-          config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
-                                      std::move(upstream_callbacks_), std::move(idle_timer_),
-                                      read_callbacks_->upstreamHost(),
-                                      std::move(connected_timespan_));
-        } else {
-          upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
-          disableIdleTimer();
-        }
+        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
+                                    std::move(upstream_callbacks_), std::move(idle_timer_),
+                                    read_callbacks_->upstreamHost(),
+                                    std::move(connected_timespan_));
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -482,7 +475,7 @@ void TcpProxyFilter::onUpstreamEvent(Network::ConnectionEvent event) {
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
 
-    if (config_ != nullptr && config_->idleTimeout()) {
+    if (config_->idleTimeout()) {
       // The idle_timer_ can be moved to a TcpProxyDrainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
       // the call to either TcpProxy or to TcpProxyDrainer, depending on the current state.
