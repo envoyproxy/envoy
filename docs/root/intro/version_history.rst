@@ -53,6 +53,9 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
+* router: added the optional
+  :ref:`start timestamp header<envoy_api_field_config.filter.http.router.v2.Router.start_timestamp_header>`
+  to send timestamp (in milliseconds) as the value of the specified header in upstream requests.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
   <envoy_api_field_Listener.freebind>` and upstream connections via
   :ref:`cluster manager wide
