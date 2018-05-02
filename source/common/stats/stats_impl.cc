@@ -276,7 +276,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   size_t key_removed = stats_.erase(&data);
   lock.unlock();
 
-  ASSERT(key_removed >= 1);
+  ASSERT(key_removed == 1);
   ::free(&data);
 }
 
