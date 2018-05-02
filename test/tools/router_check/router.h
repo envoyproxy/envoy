@@ -10,8 +10,7 @@
 #include "common/json/json_loader.h"
 #include "common/router/config_impl.h"
 
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 #include "test/tools/router_check/json/tool_config_schemas.h"
@@ -64,9 +63,9 @@ public:
   void setShowDetails() { details_ = true; }
 
 private:
-  RouterCheckTool(std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime,
-                  std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm,
-                  std::unique_ptr<Router::ConfigImpl> config);
+  RouterCheckTool(
+      std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
+      std::unique_ptr<Router::ConfigImpl> config);
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
@@ -90,8 +89,7 @@ private:
   bool details_{false};
 
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
-  std::unique_ptr<NiceMock<Runtime::MockLoader>> runtime_;
-  std::unique_ptr<NiceMock<Upstream::MockClusterManager>> cm_;
+  std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
 };
 } // namespace Envoy

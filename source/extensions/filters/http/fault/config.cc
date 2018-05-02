@@ -43,7 +43,8 @@ FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-FaultFilterFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) {
+FaultFilterFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
+                                                    Server::Configuration::FactoryContext&) {
   return std::make_shared<const Fault::FaultSettings>(
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
           proto_config));
