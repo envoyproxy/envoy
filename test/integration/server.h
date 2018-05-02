@@ -202,7 +202,8 @@ class IntegrationTestServer : Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
-                                         std::function<void()> pre_worker_start_test_steps);
+                                         std::function<void()> pre_worker_start_test_steps,
+                                         bool deterministic);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -217,7 +218,7 @@ public:
     on_worker_listener_removed_cb_ = on_worker_listener_removed;
   }
   void start(const Network::Address::IpVersion version,
-             std::function<void()> pre_worker_start_test_steps);
+             std::function<void()> pre_worker_start_test_steps, bool deterministic);
   void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
@@ -275,7 +276,7 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version);
+  void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;

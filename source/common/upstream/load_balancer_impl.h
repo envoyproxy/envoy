@@ -228,13 +228,16 @@ private:
   struct Scheduler {
     // EdfScheduler for weighted RR.
     EdfScheduler<const Host> edf_;
-    // Simple clock hand for when we do unweighted.
+    // Simple clock hand for when we do unweighted. Tracks the total number of
+    // picks when weighted.
     size_t rr_index_{};
     bool weighted_{};
   };
 
   // Scheduler for each valid HostsSource.
   std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  // Seed to allow us to desynchronize WRR balancers across a fleet.
+  const uint64_t seed_;
 };
 
 /**
