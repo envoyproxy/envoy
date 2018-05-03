@@ -111,15 +111,17 @@ public:
     ProtobufWkt::Struct request_struct, route_struct;
     ProtobufWkt::Value val;
 
-    // populate metadata like RequestInfo.setDynamicMetadata() would
-    val.set_string_value("v3.1");
+    // Populate metadata like RequestInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
     fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
     (*callbacks_.request_info_.metadata_
           .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
         request_struct;
 
-    // populate route entry's metadata which will be overridden
+    // Populate route entry's metadata which will be overridden.
     val.set_string_value("v3.0");
     fields_map = *request_struct.mutable_fields();
     fields_map["version"] = val;
@@ -138,10 +140,25 @@ public:
             Invoke([&](const std::string&, Upstream::ResourcePriority, Http::Protocol,
                        Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
               auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-              EXPECT_EQ(match.size(), 1);
+              EXPECT_EQ(match.size(), 2);
               auto it = match.begin();
+
+              // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+              // below matters.
+
+              // `stage` was only set by the request, not by the route entry.
+              EXPECT_EQ((*it)->name(), "stage");
+              EXPECT_EQ((*it)->value().value().string_value(), "devel");
+              it++;
+
+              // `version` should be what came from the request, overriding the route entry.
               EXPECT_EQ((*it)->name(), "version");
               EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+
+              // When metadataMatchCriteria() is computed from dynamic metadata, the result should
+              // be cached.
+              EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
+
               return &cm_.conn_pool_;
             }));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
