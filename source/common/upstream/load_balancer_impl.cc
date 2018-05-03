@@ -107,7 +107,11 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-      local_priority_set_(local_priority_set) {
+      local_priority_set_(local_priority_set),
+      routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+          common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
+      min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
+                                                        min_cluster_size, 6U)) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_set_.addMemberUpdateCb(
@@ -254,7 +258,8 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   }
 
   // Do not perform locality routing for small clusters.
-  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
+  const uint64_t min_cluster_size =
+      runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
   if (host_set.healthyHosts().size() < min_cluster_size) {
     stats_.lb_zone_cluster_too_small_.inc();
     return true;
@@ -370,7 +375,7 @@ ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUs
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
-  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
+  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
     hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
     return hosts_source;
   }
@@ -407,21 +412,16 @@ RoundRobinLoadBalancer::RoundRobinLoadBalancer(
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                common_config) {
+                                common_config),
+      seed_(random_.random()) {
   for (uint32_t priority = 0; priority < priority_set.hostSetsPerPriority().size(); ++priority) {
     refresh(priority);
   }
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
-  // TODO(htuch): By fully recomputing the host set schedulers on each membership update, we lose RR
-  // history, so on an EDS update, for example, we reset the schedule. This is likely a reasonable
-  // approximation when there are many more LB picks than host set updates. Otherwise, we will bias
-  // towards heavily weighted hosts further than weighted RR should allow. We could be a bit finer
-  // grained and only modify the schedulers for hosts that have changed health status, locality,
-  // been added/removed, etc. but this is quite a bit more complicated and will require some
-  // additional addMemberUpdateCb parameters to track efficiently. The other downside of a full
-  // recompute is that time complexity is O(n * log n), so we will need to do better at delta
-  // tracking to scale (see https://github.com/envoyproxy/envoy/issues/2874).
+  // The downside of a full recompute is that time complexity is O(n * log n),
+  // so we will need to do better at delta tracking to scale (see
+  // https://github.com/envoyproxy/envoy/issues/2874).
   priority_set.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
@@ -437,20 +437,40 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
       }
     }
 
+    // Compute schedule offset for unweighted before deleting the existing
+    // scheduler.
+    uint64_t unweighted_offset = 0;
+    if (hosts.size() > 0) {
+      // If we already have been balancing for this locality, continue where we
+      // left off; a rebuild with the same hosts will have the expected RR
+      // across the rebuild. Otherwise, start with the LB seed.
+      if (scheduler_.find(source) != scheduler_.end()) {
+        unweighted_offset = scheduler_[source].rr_index_;
+      } else {
+        unweighted_offset = seed_ % hosts.size();
+      }
+    }
     // Nuke existing scheduler if it exists.
-    scheduler_[source] = Scheduler{};
-    scheduler_[source].weighted_ = weighted;
+    auto& scheduler = scheduler_[source] = Scheduler{};
+    scheduler.weighted_ = weighted;
     if (weighted) {
       // Populate scheduler with host list.
-      // TODO(htuch): We should add the ability to randomly offset into the host list to
-      // desynchronize the schedule across Envoys in large fleets.
       for (const auto& host : hosts) {
         // We use a fixed weight here. While the weight may change without
         // notification, this will only be stale until this host is next picked,
         // at which point it is reinserted into the EdfScheduler with its new
         // weight in chooseHost().
-        scheduler_[source].edf_.add(host->weight(), host);
+        scheduler.edf_.add(host->weight(), host);
       }
+      // Cycle through hosts to achieve the intended offset behavior.
+      // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the
+      // schedule across refreshes for the weighted case.
+      for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
+        auto host = scheduler.edf_.pick();
+        scheduler.edf_.add(host->weight(), host);
+      }
+    } else {
+      scheduler.rr_index_ = unweighted_offset;
     }
   };
   // Populate EdfSchedulers for each valid HostsSource value for the host set

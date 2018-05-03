@@ -63,6 +63,7 @@ envoy_cc_test(
     deps = [
         "//source/common/event:libevent_lib",
         "//source/server/config_validation:api_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
 )

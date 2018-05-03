@@ -15,10 +15,10 @@ namespace BufferFilter {
  */
 class BufferFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override;
@@ -32,12 +32,13 @@ public:
   }
 
   Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config) override;
+  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
+                                  Server::Configuration::FactoryContext&) override;
 
   std::string name() override { return HttpFilterNames::get().BUFFER; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilter(const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
                const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
 };

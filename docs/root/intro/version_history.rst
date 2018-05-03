@@ -50,6 +50,8 @@ Version history
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
+* load balancer: ability to configure zone aware load balancer settings :ref:`through the API
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
@@ -64,6 +66,7 @@ Version history
   <envoy_api_field_Listener.transparent>`.
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
+* stats: added support for histograms.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
