@@ -574,6 +574,8 @@ message RouteAction {
     string stat_prefix = 1;
 
     // See :ref:`idle_timeout <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`.
+    // This timeout is only in effect after the WebSocket upgrade request is received by Envoy. It does
+    // not cover the initial part of the HTTP request.
     google.protobuf.Duration idle_timeout = 2
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
