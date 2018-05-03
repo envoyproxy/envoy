@@ -85,7 +85,6 @@ private:
     const envoy::api::v2::core::Locality& locality() const override {
       return envoy::api::v2::core::Locality().default_instance();
     }
-    // TODO(dio): To support different address port.
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }
