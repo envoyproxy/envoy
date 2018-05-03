@@ -301,12 +301,14 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   dns_lookup_family: V4_ONLY
 
   endpoints:
-  - address:
-      socket_address:
-        address: foo.bar.com
-        port_value: 443
-    health_check_config:
-      port_value: 8000
+    lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              address: foo.bar.com
+              port_value: 443
+          health_check_config:
+            port_value: 8000
   )EOF";
 
   testBasicSetup(json, ConfigType::V1_JSON);
