@@ -18,8 +18,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/common/thread_annotations.h"
 #include "common/common/non_copyable.h"
+#include "common/common/thread_annotations.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
