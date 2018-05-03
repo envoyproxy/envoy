@@ -136,11 +136,6 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config&,
                                               const std::string& operation_name,
                                               SystemTime start_time,
                                               const Tracing::Decision tracing_decision) {
-  // If tracing decision is no, and sampling decision is not communicated via tags, then
-  // return a null span to indicate that tracing is not being performed.
-  if (!tracing_decision.traced && !useTagForSamplingDecision()) {
-    return nullptr;
-  }
   const PropagationMode propagation_mode = this->propagationMode();
   const opentracing::Tracer& tracer = this->tracer();
   std::unique_ptr<opentracing::Span> active_span;

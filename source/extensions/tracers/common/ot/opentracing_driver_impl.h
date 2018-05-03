@@ -71,9 +71,6 @@ public:
 
   OpenTracingTracerStats& tracerStats() { return tracer_stats_; }
 
-protected:
-  virtual bool useTagForSamplingDecision() PURE;
-
 private:
   OpenTracingTracerStats tracer_stats_;
 };
