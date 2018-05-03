@@ -213,7 +213,9 @@ private:
  * simple index to acheive O(1) scheduling in that case.
  * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
  * support large ranges of weights or arbitrary precision floating weights, we could construct an
- * explicit schedule, since m will be a small constant factor in O(m * n).
+ * explicit schedule, since m will be a small constant factor in O(m * n). This
+ * could also be done on a thread aware LB, avoiding creating multiple EDF
+ * instances.
  */
 class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
 public:
@@ -238,6 +240,12 @@ private:
 
   // Scheduler for each valid HostsSource.
   std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+  // Seed to allow us to desynchronize WRR balancers across a fleet. If we don't
+  // do this, multiple Envoys that receive an update at the same time (or even
+  // multiple RoundRobinLoadBalancers on the same host) will send requests to
+  // backends in roughly lock step, causing significant imbalance and potential
+  // overload.
+  const uint64_t seed_;
 };
 
 /**
