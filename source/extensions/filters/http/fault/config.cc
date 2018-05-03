@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 FaultFilterFactory::createFilter(const envoy::config::filter::http::fault::v2::HTTPFault& config,
                                  const std::string& stats_prefix,
                                  Server::Configuration::FactoryContext& context) {
@@ -23,7 +23,7 @@ FaultFilterFactory::createFilter(const envoy::config::filter::http::fault::v2::H
   };
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
                                         const std::string& stats_prefix,
                                         Server::Configuration::FactoryContext& context) {
@@ -32,7 +32,7 @@ FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, stats_prefix, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                  const std::string& stats_prefix,
                                                  Server::Configuration::FactoryContext& context) {

@@ -18,7 +18,11 @@ namespace {
 class LoadStatsIntegrationTest : public HttpIntegrationTest,
                                  public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    // We rely on some fairly specific load balancing picks in this test, so
+    // determinizie the schedule.
+    setDeterministic();
+  }
 
   void addEndpoint(envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
                    uint32_t index, uint32_t& num_endpoints) {
@@ -346,7 +350,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   requestLoadStatsResponse({"cluster_0"});
 
   for (uint32_t i = 0; i < 6; ++i) {
-    sendAndReceiveUpstream(i % 3);
+    sendAndReceiveUpstream((4 + i) % 3);
   }
 
   // No locality for priority=1 since there's no "winter" endpoints.

@@ -13,7 +13,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
 
-Server::Configuration::NetworkFilterFactoryCb TcpProxyConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb TcpProxyConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<
@@ -21,7 +21,7 @@ Server::Configuration::NetworkFilterFactoryCb TcpProxyConfigFactory::createFilte
       context);
 }
 
-Server::Configuration::NetworkFilterFactoryCb
+Network::FilterFactoryCb
 TcpProxyConfigFactory::createFilterFactory(const Json::Object& json_config,
                                            Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
@@ -36,7 +36,7 @@ ProtobufTypes::MessagePtr TcpProxyConfigFactory::createEmptyConfigProto() {
 
 std::string TcpProxyConfigFactory::name() { return NetworkFilterNames::get().TCP_PROXY; }
 
-Server::Configuration::NetworkFilterFactoryCb TcpProxyConfigFactory::createFilter(
+Network::FilterFactoryCb TcpProxyConfigFactory::createFilter(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.stat_prefix().empty());

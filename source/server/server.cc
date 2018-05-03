@@ -43,13 +43,16 @@ namespace Server {
 InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                            TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory, ThreadLocal::Instance& tls)
+                           ComponentFactory& component_factory,
+                           Runtime::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
+      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
+      worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -99,8 +102,8 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                                 Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                       Stats::Store& store) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
@@ -122,6 +125,14 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
     }
   }
 
+  for (const Stats::ParentHistogramSharedPtr& histogram : store.histograms()) {
+    if (histogram->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushHistogram(*histogram);
+      }
+    }
+  }
+
   for (const auto& sink : sinks) {
     sink->endFlush();
   }
@@ -129,19 +140,23 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
 
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
-  HotRestart::GetParentStatsInfo info;
-  restarter_.getParentStats(info);
-  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
-  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                       info.memory_allocated_);
-  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-  server_stats_->parent_connections_.set(info.num_connections_);
-  server_stats_->total_connections_.set(numConnections() + info.num_connections_);
-  server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires());
-
-  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  // A shutdown initiated before this callback may prevent this from being called as per
+  // the semantics documented in ThreadLocal's runOnAllThreads method.
+  stats_store_.mergeHistograms([this]() -> void {
+    HotRestart::GetParentStatsInfo info;
+    restarter_.getParentStats(info);
+    server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+    server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                         info.memory_allocated_);
+    server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+    server_stats_->parent_connections_.set(info.num_connections_);
+    server_stats_->total_connections_.set(numConnections() + info.num_connections_);
+    server_stats_->days_until_first_cert_expiring_.set(
+        sslContextManager().daysUntilFirstCertExpires());
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
+    // TODO(ramaraochavali): consider adding different flush interval for histograms.
+    stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  });
 }
 
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
