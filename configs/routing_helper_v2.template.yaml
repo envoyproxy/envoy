@@ -12,7 +12,7 @@
 {%- macro internal_cluster_definition(service, options) -%}
   name: {{ service }}
   connect_timeout: 0.250s
-  type: sds
+  type: SDS
   lb_type: LEAST_REQUEST
   #need to mention http2
   eds_cluster_config:

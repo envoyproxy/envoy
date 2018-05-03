@@ -1,3 +1,6 @@
+---
+{% import 'routing_helper_v2.template.yaml' as helper -%}
+{% import 'access_log_format_helper_v2.template.yaml' as access_log_helper -%}
 {% macro ingress_listener(protocol, address, port_value) -%}
 - address:
     socket_address:
@@ -15,8 +18,8 @@
             access_log:
               - name: envoy.file_access_log
                 filter:
-                  not_health_check_filter: {}                
-                #add access_log format helper ingress call here
+                  not_health_check_filter: {}
+            #need to call access_log_helper
                 config:
                   path: /var/log/envoy/ingress_http.log
               - name: envoy.file_access_log
@@ -85,9 +88,9 @@ static_resources:
   {{ ingress_listener("TCP", "0.0.0.0", 9211)| indent(2)}}
   - address:
       socket_address:
-        protocol:
-        address:
-        port_value:  
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 9001
     filter_chains:
       - filters:
           - name: envoy.http_connection_manager
@@ -100,7 +103,7 @@ static_resources:
               access_log:
                 - name: envoy.file_access_log
                   filter:
-                    not_health_check_filter: {}                
+                    not_health_check_filter: {}
                   #add access_log format helper ingress call here
                   config:
                     path: /var/log/envoy/egress_http_error.log
@@ -121,7 +124,29 @@ static_resources:
           #call access_log_helper.egress_error_log() here
               stat_prefix: egress_http
               use_remote_address: true
-          #please check here    
+              route_config:
+                virtual_hosts:
+                {% for service, options in internal_virtual_hosts.iteritems() %}
+                - name: "{{ service }}"
+                  domains:
+                  - "{{ service }}"
+                  routes:
+                  - match:
+                      prefix: "/"
+                    #this is configs for route
+                    route:
+                      {{ helper.make_route_internal(service, options)|indent(10) }}
+                  {% if options.get('service_to_service_rate_limit', False) %}
+                  rate_limits:
+                    - actions:
+                        destination_cluster: rate_limit_on_this_destination
+                    - actions:
+                        source_cluster: rate_limit_on_this_source
+                  {% endif -%}  
+                {% if not loop.last %}{% endif %}
+                {% endfor %} 
+
+          #please check here
               rds:
                 config_source:
                   ads: {}
@@ -138,7 +163,204 @@ static_resources:
                 - name: envoy.router
                   config: {}
 
+  - address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 9002
+    filter_chains:
+      - filters:
+        - name: envoy.http_connection_manager
+          config:
+            codec_type: AUTO
+            tracing:
+              operation_name: EGRESS
+            add_user_agent: TRUE
+            idle_timeout: 0.84s
+            access_log:
+              - name: envoy.file_access_log
+                filter:
+                  not_health_check_filter: {}
+                #add access_log format helper ingress call here
+                config:
+                  path: /var/log/envoy/egress_http_error.log
+              - name: envoy.file_access_log
+                filter:
+                  or_filter:
+                    filters:
+                      - status_code_filter:
+                          comparision:
+                            op: GE
+                            value: 400
+                      - duration_filter:
+                          comparision:
+                            op: GE
+                            value: 2000
+                      - traceable_filter: {}
+                      - not_health_check_filter: {}
+        #call access_log_helper.egress_error_log() here
+            stat_prefix: EGRESS_HTTP
+            use_remote_address: TRUE
+            rds:
+              config_source:
+                api_config_source:
+                  cluster_names:
+                    - rds
+              route_config_name: 9002_http_conn_man
+            http_filters:
+              - name: envoy.ratelimit
+                config:
+                  domain: envoy_service_to_service
+
+              - name: envoy.grpc_http1_bridge
+                config: {}
+
+              - name: envoy.router
+                config: {}
+
+#why do we have this line?
+{% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
+{% for mapping in external_virtual_hosts %}
+  - address: 
+      socket_address:
+        address: "{{ mapping['address'] }}"
+        protocol: "{{ mapping['protocol'] }}"
+        port_value: "{{ mapping['port_value'] }}"
+    filter_chains:
+      - filters:
+        - name: envoy.http_connection_manager
+          config:
+            codec_type: AUTO
+            idle_timeout: 0.84s
+            access_log:
+              - name: envoy.file_access_log
+                filter:
+                  or_filter:
+                    filters:
+                      - status_code_filter:
+                          comparision:
+                            op: GE
+                            value: 400
+                      - status_code_filter:
+                          comparision:
+                            op: EQ
+                            value: 0
+                      {% if mapping.get('log_high_latency_requests', True) %}
+                      - duration_filter:
+                          comparision:
+                            op: GE
+                            value: 2000
+                      {% endif %}
+
+                config:
+                  path: "/var/log/envoy/egress_{{ mapping['name'] }}_http_error.log" 
+
+              #{% if mapping.get('is_amzn_service', False) -%}
+              #{{ access_log_helper.egress_error_amazon_service()|indent(6) }}
+              #{% else -%}
+              #{{ access_log_helper.egress_error_log()|indent(6) }}
+              #{% endif %}              
+            stat_prefix: EGRESS_{{ mapping['name'] }}
+            route_config:
+              virtual_hosts:
+              {% for host in mapping['hosts'] %}
+              - name: egress_{{ host['name'] }}
+                domains:
+                - "{{ host['domain'] }}"
+                routes:
+                - match:
+                    prefix: "/"
+                  route:
+                    cluster: egress_{{ host['name'] }}
+                    retry_policy:
+                      retry_on: connect-failure
+                    {% if host.get('host_rewrite', False) %}
+                    host_rewrite: "{{host['host_rewrite']}}"
+                    {% endif %}
+              {% if not loop.last %}{% endif %}
+              {% endfor %}
+
+            http_filters:
+            {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
+            - name: envoy.http_dynamo_filter
+              config: {}
+            {% endif -%}
+            - name: envoy.router
+              config: {}
+{% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
+{% endfor -%}
+
+{% for key, value in mongos_servers.iteritems() %}
+  - address: 
+      socket_address:
+        address: "{{ value['address'] }}"
+        protocol: "{{ value['protocol'] }}"
+        port_value: "{{ value['port_value'] }}"
+    filter_chains:
+      - filters:
+        {% if value.get('ratelimit', False) %}
+        - name: envoy.ratelimit
+          config:
+            stat_prefix: "{{ key }}"
+            domain: envoy_mongo_cps
+            descriptors:
+              - key: database
+                value: "{{ key }}"
+        {% endif %}
+        - name: mongo_proxy
+          config:
+            stat_prefix: "{{ key }}"
+            access_log: "/var/log/envoy/mongo_{{ key }}.log"
+        - name: tcp_proxy
+          config:
+            stat_prefix: mongo_{{ key }}
+            cluster: mongo_{{ key }}
+{% if not loop.last %}{% endif -%}
+{% endfor -%}
+
+
+
+
+
   clusters:
+    {% for service, options in internal_virtual_hosts.iteritems() -%}
+    - {{ helper.internal_cluster_definition(service, options)|indent(4)}}
+    {% endfor -%}
+  
+
+    {% for mapping in external_virtual_hosts -%}
+    {% for host in mapping['hosts'] -%}
+    - name: egress_{{ host['name'] }}
+      #need to update tls and timeout accordingly
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      lb_type: ROUND_ROBIN
+      hosts:
+        - socket_address:
+            address: {{ host['remote_address'] }}
+            port_value: {{ host['port_value'] }}
+            protocol: {{ host['protocol'] }}
+    {% endfor -%}
+    {% endfor -%}
+
+
+    {% for key, value in mongos_servers.iteritems() -%}
+    - name: mongo_{{ key }}
+      connect_timeout: 0.25s
+      type: STRICT_DNS
+      lb_type: RANDOM
+      hosts:
+      {% for server in value['hosts'] -%}
+        - socket_address:
+            protocol: {{ server['protocol'] }}
+            port_value: {{ server['port_value'] }}
+            address: {{ server['address'] }}
+      {% if not loop.last -%}{% endif -%}
+      {% endfor -%}
+    {% endfor %}
+
+
+
     - name: local_service
       connect_timeout: 0.25s
       type: STATIC
@@ -148,7 +370,7 @@ static_resources:
             protocol: TCP
             address: 127.0.0.1
             port_value: 8080
-#need to check here      
+#need to check here
       circuit_breakers:
         thresholds:
           max_pending_requests: 30
@@ -231,31 +453,3 @@ runtime:
 dynamic_resources:
 #need to add eds/sds_config here
   cds_config:
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
