@@ -47,6 +47,8 @@ message Event {
 }
 
 // Sequence of read/write events that constitute a captured trace on a socket.
+// Multiple Trace messages might be emitted for a given connection ID, with the
+// sink (e.g. file set, network) responsible for later reassembly.
 message Trace {
   // Connection properties.
   Connection connection = 1;

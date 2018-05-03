@@ -31,6 +31,10 @@ public:
 private:
   const std::string& path_prefix_;
   const envoy::config::transport_socket::capture::v2alpha::FileSink::Format format_;
+  // TODO(htuch): Buffering the entire trace until socket close won't scale to
+  // long lived connections or large transfers. We could emit multiple capture
+  // files with bounded size, with identical connection ID to allow later
+  // reassembly.
   envoy::extensions::common::tap::v2alpha::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketCallbacks* callbacks_{};
