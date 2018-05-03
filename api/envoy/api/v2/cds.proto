@@ -377,15 +377,12 @@ message Cluster {
     envoy.type.Percent healthy_panic_threshold = 1;
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
-    // [#not-implemented-hide:]
     message ZoneAwareLbConfig {
-      // [#not-implemented-hide:]
       // Configures percentage of requests that will be considered for zone aware routing
       // if zone aware routing is configured. If not specified, the default is 100%.
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
       // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
       envoy.type.Percent routing_enabled = 1;
-      // [#not-implemented-hide:]
       // Configures minimum upstream cluster size required for zone aware routing
       // If upstream cluster size is less than specified, zone aware routing is not performed
       // even if zone aware routing is configured. If not specified, the default is 6.
@@ -398,7 +395,6 @@ message Cluster {
     message LocalityWeightedLbConfig {
     }
     oneof locality_config_specifier {
-      // [#not-implemented-hide:]
       ZoneAwareLbConfig zone_aware_lb_config = 2;
       LocalityWeightedLbConfig locality_weighted_lb_config = 3;
     }
