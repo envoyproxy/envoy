@@ -62,6 +62,7 @@ Version history
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * upstream: added a new :ref:`endpoints field<envoy_api_field_Cluster.endpoints>` to allow specifying
   health check config for each cluster member.
+  Deprecates :ref:`endpoints field<envoy_api_field_Cluster.hosts>` field.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
