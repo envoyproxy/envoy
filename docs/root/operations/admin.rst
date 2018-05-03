@@ -202,34 +202,34 @@ The fields are:
   {
     "stats": [
         {
-            "name": "example.counter",
-            "value": 0
+          "name": "example.counter",
+          "value": 0
         },
         {
-            "name": "example.gauge",
-            "value": 0
+          "name": "example.gauge",
+          "value": 0
         },
         {
-            "histograms": {
-                "supported_quantiles": [...],
-                "computed_quantiles": [
+          "histograms": {
+            "supported_quantiles": [...],
+              "computed_quantiles": [
+                {
+                  "name": "example.histogram",
+                  "values": [
                     {
-                        "name": "example.histogram",
-                        "values": [
-                            {
-                                "interval": null,
-                                "cumulative": null
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": null
-                            },
-                            ...
-                        ]
-                    }
+                      "interval": null,
+                      "cumulative": null
+                    },
+                    {
+                      "interval": null,
+                      "cumulative": null
+                    },
+                    ...
                 ]
-            }
+              }
+          ]
         }
+       }
     ]
   }
 
