@@ -168,7 +168,7 @@ message Cluster {
   // .. attention::
   //
   //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
-  repeated endpoint.Endpoint endpoints = 31;
+  endpoint.LocalityLbEndpoints endpoints = 31;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no
