@@ -151,50 +151,23 @@ message Cluster {
   // when picking a host in the cluster.
   LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true];
 
-  // If the service discovery type is
+  // Setting this as a requirement for clusters with discovery type
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
-  // then hosts is required.
-  repeated core.Address hosts = 7;
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
+  // is deprecated. Set the :ref:`endpoints<envoy_api_field_Cluster.endpoints>` field
+  // instead.
+  repeated core.Address hosts = 7 [deprecated = true];
 
-  // Setting this instead of :ref:`hosts<envoy_api_field_Cluster.hosts>`, to allow specifying
-  // optional :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
-  // per cluster member of a cluster with discovery type
+  // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
+  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
   //
   // .. attention::
   //
   //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
-  //
-  //   As shown bellow, expressing a set of hosts as
-  //   a set of :ref:`endpoints<envoy_api_msg_endpoint.Endpoint>` is straightforward
-  //   (an :ref:`endpoint<envoy_api_msg_endpoint.Endpoint>` is composed of
-  //   an :ref:`address<envoy_api_msg_core.Address>` and an optional
-  //   :ref:`health_check_config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>` specifier).
-  //
-  //   .. code-block:: yaml
-  //
-  //     # Specifying cluster members as hosts.
-  //     hosts:
-  //       - socket_address:
-  //           address: 127.0.0.1
-  //           port_value: 443
-  //
-  //     # Expressing the above cluster member entries as endpoints.
-  //     endpoints:
-  //       - address:
-  //           socket_address:
-  //             address: 127.0.0.1
-  //             port_value: 443
-  //
-  //         # This is optional.
-  //         health_check_config:
-  //           # The port_value could have a different value from address's port_value.
-  //           port_value: 80
-  //
   repeated endpoint.Endpoint endpoints = 31;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
