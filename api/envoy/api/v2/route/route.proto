@@ -305,6 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
+// [#comment:next free field: 23]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -568,7 +569,7 @@ message RouteAction {
   google.protobuf.BoolValue use_websocket = 16;
 
   message WebSocketProxyConfig {
-    // See :ref:`idle_timeout <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`.
+    // See :ref:`stat_prefix <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`.
     // If the parameter is not specified, the default value of "websocket" is used.
     string stat_prefix = 1;
 
