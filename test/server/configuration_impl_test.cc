@@ -59,6 +59,35 @@ protected:
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
 
+TEST_F(ConfigurationImplTest, DefaultFlushIndividualStats) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_TRUE(config.flushIndividualStats());
+}
+
+TEST_F(ConfigurationImplTest, FlushIndividualStatsOn) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.mutable_stats_config()->mutable_flush_individual_stats()->set_value(true);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_TRUE(config.flushIndividualStats());
+}
+
+TEST_F(ConfigurationImplTest, FlushIndividualStatsOff) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.mutable_stats_config()->mutable_flush_individual_stats()->set_value(false);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  EXPECT_FALSE(config.flushIndividualStats());
+}
+
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
 

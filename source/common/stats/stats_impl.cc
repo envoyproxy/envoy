@@ -156,8 +156,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   return data;
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
-    : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
   std::unordered_set<std::string> names = addDefaultExtractors(config);

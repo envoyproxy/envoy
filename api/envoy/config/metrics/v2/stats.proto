@@ -53,8 +53,14 @@ message StatsConfig {
   // <https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.h>`_
   // for a list of the default tags in Envoy.
   //
-  // If not provided, the value is assumed to be true.
+  // If not provided, this value defaults to true.
   google.protobuf.BoolValue use_all_default_tags = 2;
+
+  // Flush each individual statistic to the configured sinks. If this is set to false, each sink
+  // will be responsible for querying the stats manually in startFlush() and endFlush().
+  //
+  // If not provided, this value defaults to true.
+  google.protobuf.BoolValue flush_individual_stats = 3;
 }
 
 // Designates a tag name and value pair. The value may be either a fixed value

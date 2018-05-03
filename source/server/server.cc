@@ -102,33 +102,35 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                       bool flush_individual_stats) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
 
-  for (const Stats::CounterSharedPtr& counter : store.counters()) {
-    uint64_t delta = counter->latch();
-    if (counter->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushCounter(*counter, delta);
+  if (flush_individual_stats) {
+    for (const Stats::CounterSharedPtr& counter : store.counters()) {
+      uint64_t delta = counter->latch();
+      if (counter->used()) {
+        for (const auto& sink : sinks) {
+          sink->flushCounter(*counter, delta);
+        }
       }
     }
-  }
 
-  for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
-    if (gauge->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushGauge(*gauge, gauge->value());
+    for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
+      if (gauge->used()) {
+        for (const auto& sink : sinks) {
+          sink->flushGauge(*gauge, gauge->value());
+        }
       }
     }
-  }
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : store.histograms()) {
-    if (histogram->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushHistogram(*histogram);
+    for (const Stats::ParentHistogramSharedPtr& histogram : store.histograms()) {
+      if (histogram->used()) {
+        for (const auto& sink : sinks) {
+          sink->flushHistogram(*histogram);
+        }
       }
     }
   }
@@ -153,7 +155,8 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_,
+                                      config_->flushIndividualStats());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
   });
