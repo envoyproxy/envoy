@@ -24,6 +24,14 @@ unhealthy, successes required before marking a host healthy, etc.):
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
   :ref:`redis_key <config_cluster_manager_cluster_hc_redis_key>`.
 
+Per cluster member health checking config
+-----------------------------------------
+
+If the active health checking is configured for an upstream cluster, a specific additional configuration
+for each registered member in that cluster's :ref:`endpoints<envoy_api_field_Cluster.endpoints>` can be
+specified by setting the :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
+of each of them.
+
 Passive health checking
 -----------------------
 
