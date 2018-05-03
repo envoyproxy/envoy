@@ -27,9 +27,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  const auto& hosts = cluster.hosts();
-  const auto& endpoints = cluster.endpoints();
-  if (hosts.size() != 1 && endpoints.size() != 1) {
+  if (endpoints_.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
@@ -47,15 +45,12 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& socket_address =
-      endpoints.empty() ? hosts[0].socket_address() : endpoints[0].address().socket_address();
+  const auto& socket_address = endpoints_[0].address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
-  health_check_config_ =
-      endpoints.empty() ? envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()
-                        : endpoints[0].health_check_config();
+  health_check_config_ = endpoints_[0].health_check_config();
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -93,9 +88,9 @@ void LogicalDnsCluster::startResolve() {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
             tls_->runOnAllThreads([this, new_address]() -> void {
-              tls_->getTyped<PerThreadCurrentHostData>().current_resolved_address_ = new_address;
-              tls_->getTyped<PerThreadCurrentHostData>().health_check_config_ =
-                  health_check_config_;
+              PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
+              data.current_resolved_address_ = new_address;
+              data.health_check_config_ = health_check_config_;
             });
           }
 

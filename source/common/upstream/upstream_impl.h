@@ -477,10 +477,13 @@ protected:
 
 protected:
   PrioritySetImpl priority_set_;
+  Protobuf::RepeatedPtrField<envoy::api::v2::endpoint::Endpoint> endpoints_;
 
 private:
   void finishInitialization();
   void reloadHealthyHosts();
+  void
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
 
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
