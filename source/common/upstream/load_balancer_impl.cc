@@ -107,7 +107,11 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-      local_priority_set_(local_priority_set) {
+      local_priority_set_(local_priority_set),
+      routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+          common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
+      min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
+                                                        min_cluster_size, 6U)) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_set_.addMemberUpdateCb(
@@ -254,7 +258,8 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   }
 
   // Do not perform locality routing for small clusters.
-  uint64_t min_cluster_size = runtime_.snapshot().getInteger(RuntimeMinClusterSize, 6U);
+  const uint64_t min_cluster_size =
+      runtime_.snapshot().getInteger(RuntimeMinClusterSize, min_cluster_size_);
   if (host_set.healthyHosts().size() < min_cluster_size) {
     stats_.lb_zone_cluster_too_small_.inc();
     return true;
@@ -370,7 +375,7 @@ ZoneAwareLoadBalancerBase::HostsSource ZoneAwareLoadBalancerBase::hostSourceToUs
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
-  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, 100)) {
+  if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
     hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
     return hosts_source;
   }

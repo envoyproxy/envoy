@@ -50,6 +50,8 @@ Version history
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
+* load balancer: ability to configure zone aware load balancer settings :ref:`through the API
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.

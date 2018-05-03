@@ -462,16 +462,18 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 0))
       .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 98))
       .WillRepeatedly(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
-      .WillRepeatedly(Return(6));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
+      .WillRepeatedly(Return(7));
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -484,7 +486,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
     EXPECT_EQ(0U, stats_.lb_zone_cluster_too_small_.value());
     return;
   }
-  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
       .WillRepeatedly(Return(1));
   // Trigger reload.
   local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
@@ -510,14 +512,18 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(100);
+  common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
+  common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
   local_host_set_->updateHosts(hosts, hosts, local_hosts_per_locality, local_hosts_per_locality, {},
                                empty_host_vector_, empty_host_vector_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
       .WillRepeatedly(Return(50));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 98))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
+      .WillRepeatedly(Return(7));
 
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_zone_number_differs_.value());
