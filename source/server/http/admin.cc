@@ -36,6 +36,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -388,8 +389,6 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response) {
-  // We currently don't support timers locally (only via statsd) so just group all the counters
-  // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
@@ -401,10 +400,31 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
+  // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
+  // multimap here. This makes sure that duplicate histograms get output. When shared storage is
+  // implemented this can be switched back to a normal map.
+  std::multimap<std::string, std::string> all_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
+    std::vector<std::string> summary;
+    const std::vector<double>& supported_quantiles_ref =
+        histogram->intervalStatistics().supportedQuantiles();
+    summary.reserve(supported_quantiles_ref.size());
+    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                    histogram->intervalStatistics().computedQuantiles()[i],
+                                    histogram->cumulativeStatistics().computedQuantiles()[i]));
+    }
+
+    all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+  }
+
   if (params.size() == 0) {
     // No Arguments so use the standard.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    }
+    for (auto histogram : all_histograms) {
+      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   } else {
     const std::string format_key = params.begin()->first;
@@ -412,7 +432,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_key == "format" && format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats));
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms()));
     } else if (format_key == "format" && format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response);
     } else {
@@ -453,6 +473,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
+// TODO(ramaraochavali): Add summary histogram output for Prometheus.
 uint64_t
 PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                             const std::list<Stats::GaugeSharedPtr>& gauges,
@@ -480,7 +501,9 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
+std::string
+AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                       const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -497,6 +520,7 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
     stats_array.PushBack(stat_obj, allocator);
   }
 
+<<<<<<< HEAD
   Value histograms_container_obj;
   histograms_container_obj.SetObject();
 
@@ -515,6 +539,8 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
+=======
+>>>>>>> ec7d1af2b... stats: unrevert and fix histograms (#3262)
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     Value histogram_obj;
     histogram_obj.SetObject();
@@ -522,20 +548,38 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
     histogram_name.SetString(histogram->name().c_str(), allocator);
     histogram_obj.AddMember("name", histogram_name, allocator);
 
+<<<<<<< HEAD
     rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
 
     for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
       Value quantile_obj;
       quantile_obj.SetObject();
+=======
+    rapidjson::Value quantile_array(rapidjson::kArrayType);
+
+    // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
+    // followed by two arrays interval and cumulative.
+    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      Value quantile_obj;
+      quantile_obj.SetObject();
+      Value quantile_type;
+      quantile_type.SetDouble(histogram->intervalStatistics().supportedQuantiles()[i] * 100);
+      quantile_obj.AddMember("quantile", quantile_type, allocator);
+>>>>>>> ec7d1af2b... stats: unrevert and fix histograms (#3262)
       Value interval_value;
       if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
         interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
       }
+<<<<<<< HEAD
       quantile_obj.AddMember("interval", interval_value, allocator);
+=======
+      quantile_obj.AddMember("interval_value", interval_value, allocator);
+>>>>>>> ec7d1af2b... stats: unrevert and fix histograms (#3262)
       Value cumulative_value;
       if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
         cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
       }
+<<<<<<< HEAD
       quantile_obj.AddMember("cumulative", cumulative_value, allocator);
       computed_quantile_array.PushBack(quantile_obj, allocator);
     }
@@ -545,6 +589,15 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
   histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
   histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
   stats_array.PushBack(histograms_container_obj, allocator);
+=======
+      quantile_obj.AddMember("cumulative_value", cumulative_value, allocator);
+      quantile_array.PushBack(quantile_obj, allocator);
+    }
+    histogram_obj.AddMember("quantiles", quantile_array, allocator);
+    stats_array.PushBack(histogram_obj, allocator);
+  }
+
+>>>>>>> ec7d1af2b... stats: unrevert and fix histograms (#3262)
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
   rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
