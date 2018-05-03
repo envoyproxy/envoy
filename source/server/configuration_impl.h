@@ -136,7 +136,7 @@ public:
   std::chrono::milliseconds wdMultiKillTimeout() const override {
     return watchdog_multikill_timeout_;
   }
-  bool flushIndividualStats() const override { return flush_individual_stats_; }
+  bool disableIndividualStatsFlush() const override { return disable_individual_stats_flush_; }
 
 private:
   /**
@@ -157,7 +157,7 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  bool flush_individual_stats_;
+  bool disable_individual_stats_flush_;
 };
 
 /**

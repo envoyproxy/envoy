@@ -65,27 +65,27 @@ TEST_F(ConfigurationImplTest, DefaultFlushIndividualStats) {
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_TRUE(config.flushIndividualStats());
+  EXPECT_FALSE(config.disableIndividualStatsFlush());
 }
 
-TEST_F(ConfigurationImplTest, FlushIndividualStatsOn) {
+TEST_F(ConfigurationImplTest, DisableFlushIndividualStats) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  bootstrap.mutable_stats_config()->mutable_flush_individual_stats()->set_value(true);
+  bootstrap.mutable_stats_config()->set_disable_individual_stats_flush(true);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_TRUE(config.flushIndividualStats());
+  EXPECT_TRUE(config.disableIndividualStatsFlush());
 }
 
-TEST_F(ConfigurationImplTest, FlushIndividualStatsOff) {
+TEST_F(ConfigurationImplTest, EnableFlushIndividualStats) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  bootstrap.mutable_stats_config()->mutable_flush_individual_stats()->set_value(false);
+  bootstrap.mutable_stats_config()->set_disable_individual_stats_flush(false);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
-  EXPECT_FALSE(config.flushIndividualStats());
+  EXPECT_FALSE(config.disableIndividualStatsFlush());
 }
 
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {

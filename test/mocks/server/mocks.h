@@ -327,13 +327,13 @@ public:
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdKillTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMultiKillTimeout, std::chrono::milliseconds());
-  MOCK_CONST_METHOD0(flushIndividualStats, bool());
+  MOCK_CONST_METHOD0(disableIndividualStatsFlush, bool());
 
   std::chrono::milliseconds wd_miss_;
   std::chrono::milliseconds wd_megamiss_;
   std::chrono::milliseconds wd_kill_;
   std::chrono::milliseconds wd_multikill_;
-  bool flush_individual_stats_{true};
+  bool disable_individual_stats_flush_{false};
 };
 
 class MockFactoryContext : public FactoryContext {

@@ -103,12 +103,12 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                       bool flush_individual_stats) {
+                                       bool disable_individual_stats_flush) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
 
-  if (flush_individual_stats) {
+  if (!disable_individual_stats_flush) {
     for (const Stats::CounterSharedPtr& counter : store.counters()) {
       uint64_t delta = counter->latch();
       if (counter->used()) {
@@ -156,7 +156,7 @@ void InstanceImpl::flushStats() {
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_,
-                                      config_->flushIndividualStats());
+                                      config_->disableIndividualStatsFlush());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
   });

@@ -37,11 +37,11 @@ TEST(ServerInstanceUtil, flushHelper) {
   EXPECT_CALL(*sink, flushCounter(Property(&Stats::Metric::name, "hello"), 1));
   EXPECT_CALL(*sink, flushGauge(Property(&Stats::Metric::name, "world"), 5));
   EXPECT_CALL(*sink, endFlush());
-  InstanceUtil::flushMetricsToSinks(sinks, store, true);
+  InstanceUtil::flushMetricsToSinks(sinks, store, false);
 
   EXPECT_CALL(*sink, beginFlush());
   EXPECT_CALL(*sink, endFlush());
-  InstanceUtil::flushMetricsToSinks(sinks, store, false);
+  InstanceUtil::flushMetricsToSinks(sinks, store, true);
 }
 
 class RunHelperTest : public testing::Test {

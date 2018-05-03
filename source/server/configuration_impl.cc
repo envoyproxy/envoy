@@ -64,8 +64,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
 
   stats_flush_interval_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
-  flush_individual_stats_ = !bootstrap.stats_config().has_flush_individual_stats() ||
-                            bootstrap.stats_config().flush_individual_stats().value();
+  disable_individual_stats_flush_ = bootstrap.stats_config().disable_individual_stats_flush();
 
   const auto& watchdog = bootstrap.watchdog();
   watchdog_miss_timeout_ =

@@ -100,9 +100,9 @@ public:
   virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
 
   /**
-   * @return bool whether the server should flush individual stats to sinks.
+   * @return bool whether the individual stats flush is disabled.
    */
-  virtual bool flushIndividualStats() const PURE;
+  virtual bool disableIndividualStatsFlush() const PURE;
 };
 
 /**
