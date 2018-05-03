@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-Server::Configuration::HttpFilterFactoryCb RateLimitFilterConfig::createFilter(
+Http::FilterFactoryCb RateLimitFilterConfig::createFilter(
     const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.domain().empty());
@@ -31,7 +31,7 @@ Server::Configuration::HttpFilterFactoryCb RateLimitFilterConfig::createFilter(
       };
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
                                            const std::string& stats_prefix,
                                            Server::Configuration::FactoryContext& context) {
@@ -40,7 +40,7 @@ RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, stats_prefix, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProto(
+Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   return createFilter(

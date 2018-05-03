@@ -16,11 +16,11 @@ namespace ExtAuthz {
 class ExtAuthzConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -31,7 +31,7 @@ public:
   std::string name() override { return NetworkFilterNames::get().EXT_AUTHORIZATION; }
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilter(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
                Server::Configuration::FactoryContext& context);
 };

@@ -35,8 +35,7 @@ namespace HttpConnectionManager {
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-Server::Configuration::NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilter(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
@@ -67,16 +66,14 @@ HttpConnectionManagerFilterConfigFactory::createFilter(
   };
 }
 
-Server::Configuration::NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactory(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
   Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
   return createFilter(proto_config, context);
 }
 
-Server::Configuration::NetworkFilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
+Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
   return createFilter(
       MessageUtil::downcastAndValidate<const envoy::config::filter::network::
@@ -252,7 +249,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             string_name);
-    Server::Configuration::HttpFilterFactoryCb callback;
+    Http::FilterFactoryCb callback;
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true),
                                              stats_prefix_, context);
@@ -291,7 +288,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  for (const Server::Configuration::HttpFilterFactoryCb& factory : filter_factories_) {
+  for (const Http::FilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
 }

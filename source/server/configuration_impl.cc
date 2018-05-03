@@ -25,17 +25,18 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::vector<NetworkFilterFactoryCb>& factories) {
-  for (const NetworkFilterFactoryCb& factory : factories) {
+                                          const std::vector<Network::FilterFactoryCb>& factories) {
+  for (const Network::FilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 
   return filter_manager.initializeReadFilters();
 }
 
-bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                                          const std::vector<ListenerFilterFactoryCb>& factories) {
-  for (const ListenerFilterFactoryCb& factory : factories) {
+bool FilterChainUtility::buildFilterChain(
+    Network::ListenerFilterManager& filter_manager,
+    const std::vector<Network::ListenerFilterFactoryCb>& factories) {
+  for (const Network::ListenerFilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 
