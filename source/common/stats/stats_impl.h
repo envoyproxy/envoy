@@ -18,6 +18,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/thread_annotations.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -370,8 +371,8 @@ public:
 };
 
 /**
- * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns
- * it.
+ * Implementation of RawStatDataAllocator that uses an unordered set to store
+ * RawStatData pointers.
  */
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
@@ -390,8 +391,11 @@ private:
     }
   };
   typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
-  StringRawDataSet stats_;
-  std::mutex mutex_;
+
+  // An unordered set of RawStatData pointers which keys off the key()
+  // field in each object. This necessitates a custom comparator and hasher.
+  StringRawDataSet stats_ GUARDED_BY(mutex_);
+  std::mutex mutex_; // Protects stats_.
 };
 
 /**
