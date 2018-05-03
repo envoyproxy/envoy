@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.oidc.v1alpha;
+
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/http_uri.proto";
+import "envoy/api/v2/route/route.proto";
+import "envoy/config/filter/http/common/v1alpha/config.proto";
+import "validate/validate.proto";
+
+// This message describes the client-side configuration for interfacing with
+// an OpenID Connect Provider (OP).
+message OidcProvider {
+  // Identifies the principal that issued the JWT. See `here
+  //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
+  //
+  // Example: https://securetoken.google.com
+  // Example: 1234567-compute@developer.gserviceaccount.com
+  //
+  envoy.config.filter.http.common.v1alpha.JwtVerificationRule issuer;
+
+  // `JSON Web Key Set <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed. to validate
+  // signature of the JWT. This field specifies where to fetch JWKS.
+  envoy.config.filter.http.common.v1alpha.JwksSource jwks_source_specifier = 2;
+
+  // Identifies the authorization endpoint for initiating an OpenID Connect authentication flow.
+  envoy.api.v2.core.HttpUri authorization_endpoint = 3;
+  
+  // Identifies the token endpoint for requesting authorization and id_tokens.
+  envoy.api.v2.core.HttpUri token_endpoint = 4;
+}
+
+// This message describes the client configuration required for an OpenID Connect client.
+// [#not-implemented-hide:]
+message OidcClient {
+  // Identity of the OpenID Connect client.
+  //
+  // Example: ABCDEF1267
+  string client_id = 1 [(validate.rules).string.min_bytes = 1];
+  
+  // The client's secret for authenticating with an OP.
+  //
+  // Example: ABCDEF1267
+  string client_secret = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+// This message describes the configuration options for the OpenID Connect
+// filter.
+message OidcFilter {
+  // The filter's provider configuration.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     issuer: https://securetoken.google.com
+  //     jwks_source_specifier:
+  //       remote_jwks:
+  //       - http_uri:
+  //         - uri: https://www.googleapis.com/oauth2/v1/certs
+  //           cluster: jwt.www.googleapis.com|443
+  //         cache_duration:
+  //           - seconds: 300
+  //      authorization_endpoint:
+  //      - uri: https://www.googleapis.com/oauth2/v1/authorization
+  //        cluster: jwt.www.googleapis.com|443
+  //      token_endpoint:
+  //      - uri: https://www.googleapis.com/oauth2/v1/tokens
+  //        cluster: jwt.www.googleapis.com|443
+  //
+  OidcProvider provider = 1;
+  // The filter's client configuration.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     client_id: ABCDEF
+  //     client_secret: 0123456789ABCDEF
+  //
+  OidcClient client = 2;
+  // The configuation to use to secure the acquired JWT for use as a session token.
+  //
+  // Example:
+  //
+  // .. code-tblock:: yaml
+  //
+  //      aesgcm256:
+  //        secret: "YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk="
+  //
+  envoy.config.filter.http.common.v1alpha.SessionSecret session = 3;
+  // This field indicates the landing page browsers will get redirected to upon successful authentication.
+  // Examples: bypass all CORS options requests
+  //
+  // .. code-block:: yaml
+  //
+  //   landing_page: /home
+  //
+  string landing_page = 4;
+  // This field lists the patterns allowed to bypass OIDC authentication.
+  //
+  // Examples: bypass all CORS options requests
+  //
+  // .. code-block:: yaml
+  //
+  //   bypass:
+  //   - headers:
+  //     - name: :method
+  //       value: OPTIONS
+  //   - headers:
+  //     - name: :path
+  //       regex_match: /.*
+  //
+  // Examples: bypass /healthz check
+  //
+  // .. code-block:: yaml
+  //
+  //   bypass:
+  //   - headers:
+  //     - name: :method
+  //       value: GET
+  //   - headers:
+  //     - name: :path
+  //       exact_match: /healthz
+  //
+  repeated envoy.api.v2.route.RouteMatch bypass = 5;
+}
