@@ -45,12 +45,13 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& socket_address = endpoints_[0].address().socket_address();
+  const envoy::api::v2::endpoint::Endpoint& endpoint = endpoints_[0].endpoint();
+  const envoy::api::v2::core::SocketAddress& socket_address = endpoint.address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
-  health_check_config_ = endpoints_[0].health_check_config();
+  health_check_config_ = endpoint.health_check_config();
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();

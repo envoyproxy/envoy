@@ -477,7 +477,7 @@ protected:
 
 protected:
   PrioritySetImpl priority_set_;
-  Protobuf::RepeatedPtrField<envoy::api::v2::endpoint::Endpoint> endpoints_;
+  Protobuf::RepeatedPtrField<envoy::api::v2::endpoint::LbEndpoint> endpoints_;
 
 private:
   void finishInitialization();

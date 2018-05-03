@@ -325,18 +325,22 @@ TEST(StrictDnsClusterImplTest, BasicEndpoints) {
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     endpoints:
-    - address:
-        socket_address:
-          address: localhost1
-          port_value: 11001
-      health_check_config:
-        port_value: 8000
-    - address:
-        socket_address:
-          address: localhost2
-          port_value: 11002
-      health_check_config:
-        port_value: 8000
+      lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              address: localhost1
+              port_value: 11001
+          health_check_config:
+            port_value: 8000
+
+      - endpoint:
+          address:
+            socket_address:
+              address: localhost2
+              port_value: 11002
+          health_check_config:
+            port_value: 8000
   )EOF";
 
   NiceMock<MockClusterManager> cm;
@@ -492,12 +496,14 @@ TEST(StaticClusterImplTest, StaticEndpoints) {
     type: STATIC
     lb_policy: ROUND_ROBIN
     endpoints:
-    - address:
-        socket_address:
-          address: 10.0.0.1
-          port_value: 443
-      health_check_config:
-        port_value: 8000
+      lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              address: 10.0.0.1
+              port_value: 443
+          health_check_config:
+            port_value: 8000
   )EOF";
 
   NiceMock<MockClusterManager> cm;
