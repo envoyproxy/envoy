@@ -333,6 +333,22 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
+// Validate that the RNG seed influences pick order.
+TEST_P(RoundRobinLoadBalancerTest, Seed) {
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"),
+  };
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
+  init(false);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
 TEST_P(RoundRobinLoadBalancerTest, Locality) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
                                             makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -421,6 +437,22 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+}
+
+// Validate that the RNG seed influences pick order when weighted RR.
+TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
+  init(false);
+  // Initial weights respected.
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
