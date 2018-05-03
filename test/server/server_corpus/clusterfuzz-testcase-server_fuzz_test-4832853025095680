@@ -25,7 +25,7 @@ static_resources {
     hosts {
       socket_address {
         address: "127.0.0.1"
-        port_value: 4294312379
+        port_value: 0
       }
     }
     dns_lookup_family: V4_ONLY
