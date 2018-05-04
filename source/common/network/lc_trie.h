@@ -206,7 +206,10 @@ private:
      * Update each node in the trie to inherit/override its ancestors' tags,
      * and then push the prefixes in the binary trie to the leaves so that:
      *  1) each leaf contains a prefix, and
-     *  2) no leaf's prefix is nested within another leaf's prefix.
+     *  2) given the set of prefixes now located at the leaves, a useful
+     *     new property applies: no prefix in that set is nested under any
+     *     other prefix in the set (since, by definition, no leaf of the
+     *     trie can be nested under another leaf)
      * @return the prefixes associated with the leaf nodes.
      */
     std::vector<IpPrefix<IpType>> push_leaves() {
