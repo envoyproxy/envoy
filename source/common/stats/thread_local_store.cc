@@ -291,7 +291,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
+  if (!parent_.shutting_down_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name];
   }
 
