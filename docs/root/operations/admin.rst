@@ -201,104 +201,109 @@ The fields are:
   .. code-block:: json
 
   {
-  "histograms":{
-    "supported_quantiles":[
-      0.0,
-      25.0,
-      50.0,
-      75.0,
-      90.0,
-      95.0,
-      99.0,
-      99.9,
-      100.0
-    ],
-    "computed_quantiles":[
-      {
-        "name":"cluster.external_auth_cluster.upstream_cx_length_ms",
-        "values":[
-          {
-            "interval":0.0,
-            "cumulative":0.0
-          },
-          {
-            "interval":0.0,
-            "cumulative":0.0
-          },
-          {
-            "interval":1.043578738857709,
-            "cumulative":1.043578738857709
-          },
-          {
-            "interval":1.0941564872895345,
-            "cumulative":1.0941564872895345
-          },
-          {
-            "interval":2.086002317497103,
-            "cumulative":2.086002317497103
-          },
-          {
-            "interval":3.066523297491039,
-            "cumulative":3.066523297491039
-          },
-          {
-            "interval":6.046608695652175,
-            "cumulative":6.046608695652175
-          },
-          {
-            "interval":229.57333333333436,
-            "cumulative":229.57333333333436
-          },
-          {
-            "interval":260.0,
-            "cumulative":260.0
-          }
-        ]
-      },
-      {
-        "name":"http.admin.downstream_rq_time",
-        "values":[
-          {
-            "interval":null,
-            "cumulative":0.0
-          },
-          {
-            "interval":null,
-            "cumulative":0.0
-          },
-          {
-            "interval":null,
-            "cumulative":1.043578738857709
-          },
-          {
-            "interval":null,
-            "cumulative":1.0941564872895345
-          },
-          {
-            "interval":null,
-            "cumulative":2.086002317497103
-          },
-          {
-            "interval":null,
-            "cumulative":3.066523297491039
-          },
-          {
-            "interval":null,
-            "cumulative":6.046608695652175
-          },
-          {
-            "interval":null,
-            "cumulative":229.57333333333436
-          },
-          {
-            "interval":null,
-            "cumulative":260.0
-          }
-        ]
-      }
-    ]
+    "histograms": 
+    {
+      "supported_quantiles": 
+      [
+        0,
+        25,
+        50,
+        75,
+        90,
+        95,
+        99,
+        99.9,
+        100
+      ],
+      "computed_quantiles": 
+      [      
+        {
+          "name": "cluster.external_auth_cluster.upstream_cx_length_ms",
+          "values": 
+          [          
+            {
+              "interval": 0,
+              "cumulative": 0
+            },          
+            {
+              "interval": 0,
+              "cumulative": 0
+            },          
+            {
+              "interval": 1.0435787,
+              "cumulative": 1.0435787
+            },          
+            {
+              "interval": 1.0941565,
+              "cumulative": 1.0941565
+            },          
+            {
+              "interval": 2.0860023,
+              "cumulative": 2.0860023
+            },          
+            {
+              "interval": 3.0665233,
+              "cumulative": 3.0665233
+            },          
+            {
+              "interval": 6.046609,
+              "cumulative": 6.046609
+            },          
+            {
+              "interval": 229.57333,
+              "cumulative": 229.57333
+            },          
+            {
+              "interval": 260,
+              "cumulative": 260
+            }
+          ]
+        },      
+        {
+          "name": "http.admin.downstream_rq_time",
+          "values": 
+          [          
+            {
+              "interval": null,
+              "cumulative": 0
+            },          
+            {
+              "interval": null,
+              "cumulative": 0
+            },          
+            {
+              "interval": null,
+              "cumulative": 1.0435787
+            },          
+            {
+              "interval": null,
+              "cumulative": 1.0941565
+            },          
+            {
+              "interval": null,
+              "cumulative": 2.0860023
+            },          
+            {
+              "interval": null,
+              "cumulative": 3.0665233
+            },          
+            {
+              "interval": null,
+              "cumulative": 6.046609
+            },          
+            {
+              "interval": null,
+              "cumulative": 229.57333
+            },          
+            {
+              "interval": null,
+              "cumulative": 260
+            }
+          ]
+        }
+      ]
+    }
   }
-}
 
   .. http:get:: /stats?format=prometheus
 
