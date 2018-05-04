@@ -60,7 +60,7 @@ public:
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
     // Sometimes stats do not come in the first flush cycle, this loop ensures that we wait till
-    // required stats are flushed or 10 requests whichever is earlier.
+    // required stats are flushed.
     while (known_counter_exists && known_gauge_exists && known_histogram_exists) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
       metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg);
