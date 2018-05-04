@@ -170,7 +170,7 @@ private:
    * Binary trie used to simplify the construction of Level Compressed Tries.
    * This data type supports two operations:
    *   1. Add a prefix to the trie.
-   *   2. Push the prefixes the leaves of the trie.
+   *   2. Push the prefixes to the leaves of the trie.
    * That second operation produces a new set of prefixes that yield the same
    * match results as the original set of prefixes from which the BinaryTrie
    * was constructed, but with an important difference: the new prefixes are
