@@ -5,10 +5,8 @@ Envoy documentation
 
   .. attention::
 
-    This is pre-release documentation generated directly from
-    `data-plane-api <https://github.com/envoyproxy/data-plane-api>`_. There is risk of it not
-    being consistent with what is currently implemented in Envoy, though we try to make things
-    consistent as quickly as possible.
+    This is pre-release documentation. There is risk of it not being consistent with what is
+    currently implemented in Envoy, though we try to make things consistent as quickly as possible.
 
 .. toctree::
   :maxdepth: 2

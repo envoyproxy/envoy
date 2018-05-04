@@ -21,7 +21,7 @@ then
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
-  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-data-plane-api-"${BUILD_SHA:0:6}"
+  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
 fi
 
