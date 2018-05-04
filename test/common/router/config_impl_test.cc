@@ -3575,7 +3575,7 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
   mutable_fields->insert({"b++", v2});
   mutable_fields->insert({"c", v3});
 
-  MetadataMatchCriteriaImplConstPtr matches = parent_matches.mergeMatchCriteria(metadata_struct);
+  MetadataMatchCriteriaConstPtr matches = parent_matches.mergeMatchCriteria(metadata_struct);
 
   EXPECT_EQ(matches->metadataMatchCriteria().size(), 4);
   auto it = matches->metadataMatchCriteria().begin();

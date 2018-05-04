@@ -153,7 +153,7 @@ public:
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return config_->metadataMatchCriteria();
   }
 

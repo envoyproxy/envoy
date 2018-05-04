@@ -189,6 +189,7 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
+  MOCK_CONST_METHOD1(mergeMatchCriteria, MetadataMatchCriteriaConstPtr(const ProtobufWkt::Struct&));
 };
 
 class MockPathMatchCriterion : public PathMatchCriterion {

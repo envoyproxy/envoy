@@ -462,7 +462,7 @@ private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
-    MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
+    MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
@@ -506,7 +506,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
-  MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
+  MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;

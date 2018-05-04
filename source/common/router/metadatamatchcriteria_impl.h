@@ -13,14 +13,8 @@ public:
   MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
 
-  /**
-   * Creates a new MetadataMatchCriteriaImpl, merging existing
-   * metadata criteria this criteria. The result criteria is the
-   * combination of both sets of criteria, with those from the
-   * ProtobufWkt::Struct taking precedence.
-   */
-  MetadataMatchCriteriaImplConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const {
+  MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
     return MetadataMatchCriteriaImplConstPtr(
         new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
   }

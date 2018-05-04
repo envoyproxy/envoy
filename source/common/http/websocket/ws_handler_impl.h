@@ -45,7 +45,7 @@ public:
                 Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config);
 
   // Upstream::LoadBalancerContext
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return route_entry_.metadataMatchCriteria();
   }
 
