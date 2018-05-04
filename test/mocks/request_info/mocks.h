@@ -73,6 +73,7 @@ public:
   absl::optional<uint32_t> response_code_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
+  envoy::api::v2::core::Metadata metadata_;
 };
 
 } // namespace RequestInfo
