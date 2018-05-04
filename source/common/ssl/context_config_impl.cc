@@ -105,10 +105,10 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
-  // We need to check the length of the C string in case there are embedded \000
-  // that BoringSSL will treat as end-of-string. PGV can't do this.
-  if (!server_name_indication_.empty() && strlen(server_name_indication_.c_str()) == 0) {
-    throw EnvoyException("Empty SNI names are not allowed");
+  // BoringSSL treats this as a C string, so embedded NULL characters will not
+  // be handled correctly.
+  if (server_name_indication_.find('\0') != std::string::npos) {
+    throw EnvoyException("SNI names containing NULL-byte are not allowed");
   }
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if (config.common_tls_context().tls_certificates().size() > 1) {
