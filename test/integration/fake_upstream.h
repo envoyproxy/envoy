@@ -150,12 +150,14 @@ public:
   void set_parented() {
     std::unique_lock<std::mutex> lock(lock_);
     parented_ = true;
+    ENVOY_LOG_MISC(debug, "HTD parented! {}", static_cast<void*>(this));
   }
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     std::unique_lock<std::mutex> lock(lock_);
+    ENVOY_LOG_MISC(debug, "HTD parented {} {}", parented_, static_cast<void*>(this));
     RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_ ||
                    (event != Network::ConnectionEvent::RemoteClose &&
                     event != Network::ConnectionEvent::LocalClose));
@@ -296,7 +298,8 @@ public:
 
   FakeHttpConnection::Type httpType() { return http_type_; }
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
-  FakeRawConnectionPtr waitForRawConnection();
+  FakeRawConnectionPtr
+  waitForRawConnection(std::chrono::milliseconds wait_for_ms = std::chrono::milliseconds{10000});
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Wait for one of the upstreams to receive a connection

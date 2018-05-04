@@ -55,11 +55,18 @@ char** argv_;
 
 } // namespace
 
-std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
-  // Bazel style temp dirs. Should be set by test runner or Bazel.
+absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
   const char* path = ::getenv(var.c_str());
-  RELEASE_ASSERT(path != nullptr);
+  if (path == nullptr) {
+    return {};
+  }
   return std::string(path);
+}
+
+std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
+  auto optional = getOptionalEnvVar(var);
+  RELEASE_ASSERT(optional.has_value());
+  return optional.value();
 }
 
 void TestEnvironment::initializeOptions(int argc, char** argv) {
