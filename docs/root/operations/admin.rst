@@ -204,7 +204,7 @@ The fields are:
   {
     "histograms": {
       "supported_quantiles": [
-        0,25,50,75,90,95,99,99.9,100
+        0, 25, 50, 75, 90, 95, 99, 99.9, 100
       ],
       "computed_quantiles": [
        {
