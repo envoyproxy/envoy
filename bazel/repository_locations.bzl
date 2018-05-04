@@ -5,8 +5,12 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "787891a3882795cee0364e8a0f0dda315578d155",
+        commit = "9613678332c976568272c8f4a78631a29159271d",
         remote = "https://github.com/abseil/abseil-cpp",
+    ),
+    com_googlesource_code_cctz = dict(
+        commit = "3f8873a5c451090b0951db824c191780d5a7f832",
+        remote = "https://github.com/google/cctz",
     ),
     com_github_bombela_backward = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06

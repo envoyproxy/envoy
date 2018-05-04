@@ -193,8 +193,10 @@ envoy_cc_library(
     hdrs = ["perf_annotation.h"],
     deps = [
         ":assert_lib",
+        ":thread_annotations",
         ":utility_lib",
     ],
+    external_deps = ["abseil_synchronization"],
 )
 
 envoy_cc_library(

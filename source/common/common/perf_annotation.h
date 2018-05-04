@@ -10,6 +10,7 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 
 // Performance Annotation system, enabled with
 //   bazel --define=perf_annotation=enabled ...
@@ -62,9 +63,9 @@
  * Controls whether performacne collection and reporting is thread safe. For now,
  * leaving this enabled for predictability across multiiple applications, on the assumption
  * that an uncontended mutex lock has vanishingly small cost. In the future we may try
- * to make this system thread-unsafe if mutext contention disturbs the metrics.
+ * to make this system thread-unsafe if mutex contention disturbs the metrics.
  */
-#define PERF_THREAD_SAFE true
+#define PERF_THREAD_SAFE false
 
 namespace Envoy {
 
@@ -131,9 +132,12 @@ private:
 
   using DurationStatsMap = std::unordered_map<CategoryDescription, DurationStats, Hash>;
 
-  DurationStatsMap duration_stats_map_; // Maps {category, description} to DurationStats.
+  // Maps {category, description} to DurationStats.
 #if PERF_THREAD_SAFE
-  std::mutex mutex_;
+  DurationStatsMap duration_stats_map_ GUARDED_BY(mutex_);
+  absl::Mutex mutex_;
+#else
+  DurationStatsMap duration_stats_map_;
 #endif
 };
 

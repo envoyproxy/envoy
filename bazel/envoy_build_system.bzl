@@ -13,13 +13,14 @@ def envoy_copts(repository, test = False):
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-std=c++14",
+        "-Wthread-safety",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
         repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
-        repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
         repository + "//bazel:disable_signal_trace": [],

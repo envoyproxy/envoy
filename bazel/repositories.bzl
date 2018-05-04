@@ -225,6 +225,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # dependencies and name conflicts.
     _boringssl()
     _com_google_absl()
+    _com_googlesourcecode_cctz()
     _com_github_bombela_backward()
     _com_github_cyan4973_xxhash()
     _com_github_eile_tclap()
@@ -387,6 +388,25 @@ def _com_google_absl():
     native.bind(
         name = "abseil_optional",
         actual = "@com_google_absl//absl/types:optional",
+    )
+    native.bind(
+        name = "abseil_synchronization",
+        actual = "@com_google_absl//absl/synchronization:synchronization",
+    )
+    native.bind(
+        name = "abseil_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
+def _com_googlesourcecode_cctz():
+    _repository_impl("com_googlesource_code_cctz")
+    native.bind(
+        name = "abseil_time_zone",
+        actual = "@com_googlesource_absl//civil_time",
+    )
+    native.bind(
+        name = "abseil_time_zone",
+        actual = "@com_googlesource_absl//time_zone",
     )
 
 def _com_google_protobuf():
