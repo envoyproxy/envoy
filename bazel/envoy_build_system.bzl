@@ -13,7 +13,6 @@ def envoy_copts(repository, test = False):
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-std=c++14",
-        "-Wthread-safety",
     ] + select({
         # Bazel adds an implicit -DNDEBUG for opt.
         repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
