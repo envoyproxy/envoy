@@ -221,7 +221,8 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
-  EXPECT_EQ(1580011435426663819U, factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
+  EXPECT_EQ(1580011435426663819U,
+            factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
   expectRequest();
   interval_timer_->callback_();
@@ -571,7 +572,8 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   provider_impl.onConfigUpdate({}, "");
-  EXPECT_EQ(1UL, factory_context_.scope_.counter("foo_prefix.rds.foo_route_config.update_empty").value());
+  EXPECT_EQ(
+      1UL, factory_context_.scope_.counter("foo_prefix.rds.foo_route_config.update_empty").value());
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
