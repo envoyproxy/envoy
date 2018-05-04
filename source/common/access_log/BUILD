@@ -48,6 +48,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/runtime:uuid_util_lib",

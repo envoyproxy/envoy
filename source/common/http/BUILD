@@ -264,3 +264,18 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "header_utility_lib",
+    srcs = ["header_utility.cc"],
+    hdrs = ["header_utility.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/config:rds_json_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/type:range_cc",
+    ],
+)

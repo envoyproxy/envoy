@@ -599,6 +599,131 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
+TEST_F(AccessLogImplTest, HeaderPresence) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  header_filter:
+    header:
+      name: test-header
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.addCopy("test-header", "present");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, HeaderExactMatch) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  header_filter:
+    header:
+      name: test-header
+      exact_match: exact-match-value
+
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.addCopy("test-header", "exact-match-value");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "not-exact-match-value");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, HeaderRegexMatch) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  header_filter:
+    header:
+      name: test-header
+      regex_match: \d{3}
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.addCopy("test-header", "123");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "1234");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "123.456");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+}
+
+TEST_F(AccessLogImplTest, HeaderRangeMatch) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  header_filter:
+    header:
+      name: test-header
+      range_match:
+        start: -10
+        end: 0
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.addCopy("test-header", "-1");
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "0");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "somestring");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "10.9");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_headers_.remove("test-header");
+  request_headers_.addCopy("test-header", "-1somestring");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy
