@@ -193,45 +193,112 @@ The fields are:
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
   will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
-  that has the computed quantile for each histogram.
+  that has the computed quantile for each histogram. Only histograms with recorded values will be exported.
 
-  The JSON structure would as shown below.
+  The JSON structure for histograms is shown below. If a histogram is not updated during an interval, it will show
+  null for all the quantiles.
 
   .. code-block:: json
 
   {
-    "stats": [
-        {
-          "name": "example.counter",
-          "value": 0
-        },
-        {
-          "name": "example.gauge",
-          "value": 0
-        },
-        {
-          "histograms": {
-            "supported_quantiles": [...],
-              "computed_quantiles": [
-                {
-                  "name": "example.histogram",
-                  "values": [
-                    {
-                      "interval": null,
-                      "cumulative": null
-                    },
-                    {
-                      "interval": null,
-                      "cumulative": null
-                    },
-                    ...
-                ]
-              }
-          ]
-        }
-       }
+  "histograms":{
+    "supported_quantiles":[
+      0.0,
+      25.0,
+      50.0,
+      75.0,
+      90.0,
+      95.0,
+      99.0,
+      99.9,
+      100.0
+    ],
+    "computed_quantiles":[
+      {
+        "name":"cluster.external_auth_cluster.upstream_cx_length_ms",
+        "values":[
+          {
+            "interval":0.0,
+            "cumulative":0.0
+          },
+          {
+            "interval":0.0,
+            "cumulative":0.0
+          },
+          {
+            "interval":1.043578738857709,
+            "cumulative":1.043578738857709
+          },
+          {
+            "interval":1.0941564872895345,
+            "cumulative":1.0941564872895345
+          },
+          {
+            "interval":2.086002317497103,
+            "cumulative":2.086002317497103
+          },
+          {
+            "interval":3.066523297491039,
+            "cumulative":3.066523297491039
+          },
+          {
+            "interval":6.046608695652175,
+            "cumulative":6.046608695652175
+          },
+          {
+            "interval":229.57333333333436,
+            "cumulative":229.57333333333436
+          },
+          {
+            "interval":260.0,
+            "cumulative":260.0
+          }
+        ]
+      },
+      {
+        "name":"http.admin.downstream_rq_time",
+        "values":[
+          {
+            "interval":null,
+            "cumulative":0.0
+          },
+          {
+            "interval":null,
+            "cumulative":0.0
+          },
+          {
+            "interval":null,
+            "cumulative":1.043578738857709
+          },
+          {
+            "interval":null,
+            "cumulative":1.0941564872895345
+          },
+          {
+            "interval":null,
+            "cumulative":2.086002317497103
+          },
+          {
+            "interval":null,
+            "cumulative":3.066523297491039
+          },
+          {
+            "interval":null,
+            "cumulative":6.046608695652175
+          },
+          {
+            "interval":null,
+            "cumulative":229.57333333333436
+          },
+          {
+            "interval":null,
+            "cumulative":260.0
+          }
+        ]
+      }
     ]
   }
+}
 
   .. http:get:: /stats?format=prometheus
 

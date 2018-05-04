@@ -405,17 +405,19 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   // implemented this can be switched back to a normal map.
   std::multimap<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-    std::vector<std::string> summary;
-    const std::vector<double>& supported_quantiles_ref =
-        histogram->intervalStatistics().supportedQuantiles();
-    summary.reserve(supported_quantiles_ref.size());
-    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                                    histogram->intervalStatistics().computedQuantiles()[i],
-                                    histogram->cumulativeStatistics().computedQuantiles()[i]));
-    }
+    if (histogram->used()) {
+      std::vector<std::string> summary;
+      const std::vector<double>& supported_quantiles_ref =
+          histogram->intervalStatistics().supportedQuantiles();
+      summary.reserve(supported_quantiles_ref.size());
+      for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+        summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                      histogram->intervalStatistics().computedQuantiles()[i],
+                                      histogram->cumulativeStatistics().computedQuantiles()[i]));
+      }
 
-    all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+      all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+    }
   }
 
   if (params.size() == 0) {
@@ -539,31 +541,33 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    Value histogram_obj;
-    histogram_obj.SetObject();
-    Value histogram_name;
-    histogram_name.SetString(histogram->name().c_str(), allocator);
-    histogram_obj.AddMember("name", histogram_name, allocator);
+    if (histogram->used()) {
+      Value histogram_obj;
+      histogram_obj.SetObject();
+      Value histogram_name;
+      histogram_name.SetString(histogram->name().c_str(), allocator);
+      histogram_obj.AddMember("name", histogram_name, allocator);
 
-    rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
+      rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
 
-    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
-      Value quantile_obj;
-      quantile_obj.SetObject();
-      Value interval_value;
-      if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
-        interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
+      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+        Value quantile_obj;
+        quantile_obj.SetObject();
+        Value interval_value;
+        if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
+          interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("interval", interval_value, allocator);
+        Value cumulative_value;
+        if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
+          cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("cumulative", cumulative_value, allocator);
+        computed_quantile_array.PushBack(quantile_obj, allocator);
       }
-      quantile_obj.AddMember("interval", interval_value, allocator);
-      Value cumulative_value;
-      if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
-        cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
-      }
-      quantile_obj.AddMember("cumulative", cumulative_value, allocator);
-      computed_quantile_array.PushBack(quantile_obj, allocator);
+      histogram_obj.AddMember("values", computed_quantile_array, allocator);
+      histogram_array.PushBack(histogram_obj, allocator);
     }
-    histogram_obj.AddMember("values", computed_quantile_array, allocator);
-    histogram_array.PushBack(histogram_obj, allocator);
   }
   histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
   histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
