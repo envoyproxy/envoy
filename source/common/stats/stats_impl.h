@@ -431,7 +431,10 @@ private:
   // An unordered set of RawStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.
   StringRawDataSet stats_ GUARDED_BY(mutex_);
-  std::mutex mutex_; // Protects stats_.
+  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
+  // Although alloc() operations are called under existing locking, free() operations are made from
+  // the destructors of the individual stat objects, which are not protected by locks.
+  std::mutex mutex_;
 };
 
 /**

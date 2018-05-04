@@ -153,6 +153,12 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
 
+  // Because the RawStatData object is initialized with and contains a truncated
+  // version of the std::string name, storing the stats in a map would require
+  // storing the name twice. Performing a lookup on the set is similarly
+  // expensive to performing a map lookup, since both require allocating a
+  // RawStatData object and a writing a string.
+
   std::unique_lock<std::mutex> lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
