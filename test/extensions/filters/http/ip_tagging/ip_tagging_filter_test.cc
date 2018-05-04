@@ -258,6 +258,26 @@ TEST_F(IpTaggingFilterTest, RuntimeDisabled) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers));
 }
 
+TEST_F(IpTaggingFilterTest, ClearRouteCache) {
+  initializeFilter(internal_request_yaml);
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddress("1.2.3.5");
+  EXPECT_CALL(filter_callbacks_.request_info_, downstreamRemoteAddress())
+      .WillOnce(ReturnRef(remote_address));
+
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  // no tags, no call
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
+  request_headers = {};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions

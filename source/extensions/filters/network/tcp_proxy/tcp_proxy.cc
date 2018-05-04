@@ -135,7 +135,7 @@ TcpProxyFilter::~TcpProxyFilter() {
 
   if (config_ != nullptr) {
     for (const auto& access_log : config_->accessLogs()) {
-      access_log->log(nullptr, nullptr, request_info_);
+      access_log->log(nullptr, nullptr, nullptr, request_info_);
     }
   }
 

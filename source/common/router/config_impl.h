@@ -14,6 +14,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/router/config_utility.h"
@@ -46,7 +47,8 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs);
+  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+                   Server::Configuration::FactoryContext& factory_context);
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
 
@@ -117,8 +119,8 @@ class ConfigImpl;
 class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
-                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
-                  Upstream::ClusterManager& cm, bool validate_clusters);
+                  const ConfigImpl& global_route_config,
+                  Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
@@ -315,7 +317,7 @@ public:
    * @throw EnvoyException with reason if the route configuration contains any errors
    */
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                     Runtime::Loader& loader);
+                     Server::Configuration::FactoryContext& factory_context);
 
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
@@ -464,7 +466,7 @@ private:
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string rutime_key,
-                         Runtime::Loader& loader,
+                         Server::Configuration::FactoryContext& factory_context,
                          const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
@@ -559,7 +561,7 @@ private:
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                       Runtime::Loader& loader);
+                       Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -585,7 +587,7 @@ private:
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                     Runtime::Loader& loader);
+                     Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -611,7 +613,7 @@ private:
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                      Runtime::Loader& loader);
+                      Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -639,8 +641,8 @@ private:
 class RouteMatcher {
 public:
   RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
-               const ConfigImpl& global_http_config, Runtime::Loader& runtime,
-               Upstream::ClusterManager& cm, bool validate_clusters);
+               const ConfigImpl& global_http_config,
+               Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -668,8 +670,9 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-             Upstream::ClusterManager& cm, bool validate_clusters_default);
+  ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+             Server::Configuration::FactoryContext& factory_context,
+             bool validate_clusters_default);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };

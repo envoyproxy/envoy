@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 DynamoFilterConfig::createFilter(const std::string& stat_prefix,
                                  Server::Configuration::FactoryContext& context) {
   return [&context, stat_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {

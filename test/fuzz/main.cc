@@ -31,7 +31,7 @@ std::vector<std::string> test_corpus_;
 class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {};
 
 TEST_P(FuzzerCorpusTest, RunOneCorpusFile) {
-  ENVOY_LOG_MISC(debug, "Corpus file: {}", GetParam());
+  ENVOY_LOG_MISC(info, "Corpus file: {}", GetParam());
   const std::string buf = Filesystem::fileReadToEnd(GetParam());
   // Everything from here on is the same as under the fuzzer lib.
   LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size());

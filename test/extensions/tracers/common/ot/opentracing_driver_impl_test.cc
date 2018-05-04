@@ -21,9 +21,8 @@ class TestDriver : public OpenTracingDriver {
 public:
   TestDriver(OpenTracingDriver::PropagationMode propagation_mode,
              const opentracing::mocktracer::PropagationOptions& propagation_options,
-             Stats::Store& stats, bool useTagForSamplingDecision)
-      : OpenTracingDriver{stats}, propagation_mode_{propagation_mode},
-        useTagForSamplingDecision_(useTagForSamplingDecision) {
+             Stats::Store& stats)
+      : OpenTracingDriver{stats}, propagation_mode_{propagation_mode} {
     opentracing::mocktracer::MockTracerOptions options;
     auto recorder = new opentracing::mocktracer::InMemoryRecorder{};
     recorder_ = recorder;
@@ -39,24 +38,19 @@ public:
 
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
-protected:
-  bool useTagForSamplingDecision() override { return useTagForSamplingDecision_; }
-
 private:
   const OpenTracingDriver::PropagationMode propagation_mode_;
   const opentracing::mocktracer::InMemoryRecorder* recorder_;
   std::shared_ptr<opentracing::mocktracer::MockTracer> tracer_;
-  bool useTagForSamplingDecision_;
 };
 
 class OpenTracingDriverTest : public Test {
 public:
-  void setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
-                            OpenTracingDriver::PropagationMode::SingleHeader,
-                        const opentracing::mocktracer::PropagationOptions& propagation_options = {},
-                        const bool useTagForSamplingDecision = false) {
-    driver_.reset(
-        new TestDriver{propagation_mode, propagation_options, stats_, useTagForSamplingDecision});
+  void
+  setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
+                       OpenTracingDriver::PropagationMode::SingleHeader,
+                   const opentracing::mocktracer::PropagationOptions& propagation_options = {}) {
+    driver_.reset(new TestDriver{propagation_mode, propagation_options, stats_});
   }
 
   const std::string operation_name_{"test"};
@@ -86,15 +80,8 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
 }
 
-TEST_F(OpenTracingDriverTest, NoSpanSamplingFalse) {
-  setupValidDriver(OpenTracingDriver::PropagationMode::SingleHeader, {}, false);
-
-  EXPECT_EQ(nullptr, driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
-                                        {Tracing::Reason::Sampling, false}));
-}
-
 TEST_F(OpenTracingDriverTest, TagSamplingFalse) {
-  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {}, true);
+  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, false});

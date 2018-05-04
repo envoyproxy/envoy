@@ -5,7 +5,6 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/api/v2/auth/auth.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/duration.proto";
@@ -97,9 +96,7 @@ message VirtualHost {
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
 
-  // [#not-implemented-hide:]
-  // Return a 401/403 when auth checks fail.
-  auth.AuthAction auth = 9;
+  reserved 9;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -143,9 +140,7 @@ message Route {
   // Decorator for the matched route.
   Decorator decorator = 5;
 
-  // [#not-implemented-hide:]
-  // Return a 401/403 when auth checks fail.
-  auth.AuthAction auth = 6;
+  reserved 6;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -358,6 +353,28 @@ message RouteAction {
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
   // at a different path from those exposed at the reverse proxy layer.
+  //
+  // .. attention::
+  //
+  //   Pay careful attention to the use of trailing slashes in the
+  //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
+  //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
+  //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
+  //   :ref:`Route <envoy_api_msg_route.Route>`, as shown by the below config entries:
+  //
+  //   .. code-block:: yaml
+  //
+  //     - match:
+  //         prefix: "/prefix/"
+  //       route:
+  //         prefix_rewrite: "/"
+  //     - match:
+  //         prefix: "/prefix"
+  //       route:
+  //         prefix_rewrite: "/"
+  //
+  //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
+  //   requests to */prefix/etc* will be stripped to */etc*.
   string prefix_rewrite = 5;
 
   oneof host_rewrite_specifier {
@@ -571,6 +588,11 @@ message RedirectAction {
     // Indicates that during redirection, the matched prefix (or path)
     // should be swapped with this value. This option allows redirect URLs be dynamically created
     // based on the request.
+    //
+    // .. attention::
+    //
+    //   Pay attention to the use of trailing slashes as mentioned in
+    //   :ref:`RouteAction's prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>`.
     string prefix_rewrite = 5;
   }
 

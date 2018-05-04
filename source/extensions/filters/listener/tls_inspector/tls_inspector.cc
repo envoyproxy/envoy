@@ -176,8 +176,6 @@ void Filter::parseClientHello(const void* data, size_t len) {
       cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().SSL);
     } else {
       config_->stats().tls_not_found_.inc();
-      cb_->socket().setDetectedTransportProtocol(
-          TransportSockets::TransportSocketNames::get().RAW_BUFFER);
     }
     done(true);
     break;
