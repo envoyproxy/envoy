@@ -7,6 +7,11 @@ Envoy currently provides an experimental :ref:`transport socket extension
 <envoy_api_msg_core.TransportSocket>` that can intercept traffic and write to a :ref:`protobuf
 capture file <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
 
+.. warning::
+  This feature is experimental and has a known limitation that it will OOM for large traces on a
+  given socket. It can also be disabled in the build if there are security concerns, see
+  https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#disabling-extensions.
+
 Configuration
 -------------
 
