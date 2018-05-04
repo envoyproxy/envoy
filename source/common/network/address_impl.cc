@@ -19,6 +19,30 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
+namespace {
+
+// Validate that IPv4 is supported on this platform, raise an exception for the
+// given address if not.
+void validateIpv4Supported(const std::string& address) {
+  static bool supported = [] { return ::socket(AF_INET, SOCK_STREAM, 0) != -1; }();
+  if (!supported) {
+    throw EnvoyException(
+        fmt::format("IPv4 addresses are not supported on this machine: {}", address));
+  }
+}
+
+// Validate that IPv6 is supported on this platform, raise an exception for the
+// given address if not.
+void validateIpv6Supported(const std::string& address) {
+  static bool supported = [] { return ::socket(AF_INET6, SOCK_STREAM, 0) != -1; }();
+  if (!supported) {
+    throw EnvoyException(
+        fmt::format("IPv6 addresses are not supported on this machine: {}", address));
+  }
+}
+
+} // namespace
+
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
   RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t));
@@ -144,6 +168,7 @@ Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) 
   inet_ntop(AF_INET, &address->sin_addr, str, INET_ADDRSTRLEN);
   friendly_name_ = fmt::format("{}:{}", str, ntohs(address->sin_port));
   ip_.friendly_address_ = str;
+  validateIpv4Supported(friendly_name_);
 }
 
 Ipv4Instance::Ipv4Instance(const std::string& address) : Ipv4Instance(address, 0) {}
@@ -158,6 +183,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port) : Instance
   }
 
   friendly_name_ = fmt::format("{}:{}", address, port);
+  validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = address;
 }
 
@@ -167,6 +193,7 @@ Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
   friendly_name_ = fmt::format("0.0.0.0:{}", port);
+  validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = "0.0.0.0";
 }
 
@@ -204,6 +231,7 @@ Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only) : InstanceB
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   ip_.v6only_ = v6only;
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+  validateIpv6Supported(friendly_name_);
 }
 
 Ipv6Instance::Ipv6Instance(const std::string& address) : Ipv6Instance(address, 0) {}
@@ -221,6 +249,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
   // Just in case address is in a non-canonical format, format from network address.
   ip_.friendly_address_ = ip_.ipv6_.makeFriendlyAddress();
   friendly_name_ = fmt::format("[{}]:{}", ip_.friendly_address_, ip_.port());
+  validateIpv6Supported(friendly_name_);
 }
 
 Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {}
