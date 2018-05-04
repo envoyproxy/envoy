@@ -17,11 +17,6 @@ public:
   virtual ~OsSysCalls() {}
 
   /**
-   * @see socket (man 2 socket)
-   */
-  virtual int socket(int domain, int type, int protocol) PURE;
-
-  /**
    * @see bind (man 2 bind)
    */
   virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
