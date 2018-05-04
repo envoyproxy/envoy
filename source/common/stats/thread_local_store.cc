@@ -96,8 +96,8 @@ void ThreadLocalStoreImpl::shutdownThreading() {
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
-  ASSERT(!merge_in_progress_);
   if (!shutting_down_) {
+    ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
@@ -109,6 +109,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
           }
         },
         [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
+  } else {
+    // If server is shutting down, just call the callback to allow flush to continue.
+    merge_complete_cb();
   }
 }
 

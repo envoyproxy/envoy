@@ -459,6 +459,29 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
+TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ("h1", h1.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  store_->shutdownThreading();
+
+  // Validate that merge callback is called during shutdown and there is no ASSERT.
+  bool merge_called = false;
+  store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
+
+  EXPECT_TRUE(merge_called);
+
+  tls_.shutdownThread();
+
+  EXPECT_CALL(*this, free(_));
+}
+
 // Histogram tests
 TEST_F(HistogramTest, BasicSingleHistogramMerge) {
   Histogram& h1 = store_->histogram("h1");
