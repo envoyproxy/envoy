@@ -7,6 +7,10 @@
 namespace Envoy {
 namespace Api {
 
+int OsSysCallsImpl::socket(int domain, int type, int protocol) {
+  return ::socket(domain, type, protocol);
+}
+
 int OsSysCallsImpl::bind(int sockfd, const sockaddr* addr, socklen_t addrlen) {
   return ::bind(sockfd, addr, addrlen);
 }
