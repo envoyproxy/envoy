@@ -22,7 +22,7 @@ public:
   SocketOptionTest() { socket_.local_address_.reset(); }
 
   NiceMock<MockListenSocket> socket_;
-  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 
   void testSetSocketOptionSuccess(Socket::Option& socket_option,
