@@ -291,7 +291,7 @@ envoy_cc_test(
     srcs = ["subset_lb_test.cc"],
     deps = [
         ":utility_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:subset_lb_lib",

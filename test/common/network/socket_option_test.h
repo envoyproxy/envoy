@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class SocketOptionTest : public testing::TestWithParam<Address::IpVersion> {
+class SocketOptionTest : public testing::Test {
 public:
   SocketOptionTest() { socket_.local_address_.reset(); }
 
@@ -25,23 +25,13 @@ public:
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 
-  void testSetSocketOptionSuccess(SocketOptionImpl& socket_option, int socket_level,
+  void testSetSocketOptionSuccess(Socket::Option& socket_option,
                                   Network::SocketOptionName option_name, int option_val,
                                   const std::set<Socket::SocketState>& when) {
-    int fd;
-    if (GetParam() == Network::Address::IpVersion::v4) {
-      Address::Ipv4Instance address("1.2.3.4", 5678);
-      fd = address.socket(Address::SocketType::Stream);
-    } else {
-      Address::Ipv6Instance address("::1", 5678);
-      fd = address.socket(Address::SocketType::Stream);
-    }
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
-
     for (Socket::SocketState state : when) {
       if (option_name.has_value()) {
-        EXPECT_CALL(os_sys_calls_,
-                    setsockopt_(_, socket_level, option_name.value(), _, sizeof(int)))
+        EXPECT_CALL(os_sys_calls_, setsockopt_(_, option_name.value().first,
+                                               option_name.value().second, _, sizeof(int)))
             .WillOnce(Invoke([option_val](int, int, int, const void* optval, socklen_t) -> int {
               EXPECT_EQ(option_val, *static_cast<const int*>(optval));
               return 0;

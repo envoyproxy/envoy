@@ -9,6 +9,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -40,8 +41,7 @@ public:
    */
   virtual RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
-      Init::Manager& init_manager) PURE;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) PURE;
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for
@@ -53,7 +53,7 @@ public:
    */
   virtual RouteConfigProviderSharedPtr
   getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
-                               Runtime::Loader& runtime, Upstream::ClusterManager& cm) PURE;
+                               Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * @return std::vector<Router::RouteConfigProviderSharedPtr> a list of all the

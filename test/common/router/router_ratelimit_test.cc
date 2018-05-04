@@ -12,7 +12,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -103,12 +103,11 @@ public:
     envoy::api::v2::RouteConfiguration route_config;
     auto json_object_ptr = Json::Factory::loadFromString(json);
     Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
-    config_.reset(new ConfigImpl(route_config, runtime_, cm_, true));
+    config_.reset(new ConfigImpl(route_config, factory_context_, true));
   }
 
   std::unique_ptr<ConfigImpl> config_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};

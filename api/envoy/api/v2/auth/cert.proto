@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2.auth;
+option go_package = "auth";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";

@@ -96,14 +96,14 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::vector<NetworkFilterFactoryCb>& factories);
+                               const std::vector<Network::FilterFactoryCb>& factories);
 
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const std::vector<ListenerFilterFactoryCb>& factories);
+                               const std::vector<Network::ListenerFilterFactoryCb>& factories);
 };
 
 /**

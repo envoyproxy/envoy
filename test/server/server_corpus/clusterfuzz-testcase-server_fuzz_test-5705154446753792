@@ -9,13 +9,13 @@ static_resources {
     hosts {
       socket_address {
         address: "127.0.0.1"
-        port_value: 9901
+        port_value: 0
       }
     }
     hosts {
       socket_address {
         address: "127.0.0.1"
-        port_value: 9901
+        port_value: 0
       }
     }
     circuit_breakers {
