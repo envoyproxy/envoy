@@ -102,6 +102,7 @@ public:
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
+  void closeListeners() override;
   void stopWorkers() override;
 
   Instance& server_;
@@ -202,6 +203,8 @@ public:
     saw_listener_create_failure_ = true;
     return ret;
   }
+
+  void close() { socket_->close(); }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }

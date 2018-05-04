@@ -469,7 +469,13 @@ void HotRestartImpl::terminateParent() {
   parent_terminated_ = true;
 }
 
-void HotRestartImpl::shutdown() { socket_event_.reset(); }
+void HotRestartImpl::shutdown() {
+  socket_event_.reset();
+  if (my_domain_socket_ >= 0) {
+    ::close(my_domain_socket_);
+    my_domain_socket_ = -1;
+  }
+}
 
 std::string HotRestartImpl::version() {
   return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);

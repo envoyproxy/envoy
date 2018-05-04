@@ -320,6 +320,28 @@ Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerGracefulShutdown(absl::string_view, Http::HeaderMap&,
+                                              Buffer::Instance& response) {
+  if (graceful_shutdown_timer_ != nullptr) {
+    response.add("Graceful shutdown already in progress.\n");
+    return Http::Code::BadRequest;
+  }
+
+  const std::chrono::seconds shutdown_time(server_.options().parentShutdownTime());
+  ENVOY_LOG(info, "Starting graceful shutdown. Server will exit in {} seconds.",
+            shutdown_time.count());
+  graceful_shutdown_timer_ = server_.dispatcher().createTimer([this]() { server_.shutdown(); });
+  graceful_shutdown_timer_->enableTimer(shutdown_time);
+
+  server_.drainListeners();
+  server_.listenerManager().closeListeners();
+  server_.shutdownAdmin();
+  server_.hotRestart().shutdown();
+
+  response.add("OK\n");
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerHealthcheckFail(absl::string_view, Http::HeaderMap&,
                                              Buffer::Instance& response) {
   server_.failHealthcheck(true);
@@ -753,6 +775,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            false, false},
           {"/cpuprofiler", "enable/disable the CPU profiler",
            MAKE_ADMIN_HANDLER(handlerCpuProfiler), false, true},
+          {"/graceful_shutdown", "close all listeners and drain connections",
+           MAKE_ADMIN_HANDLER(handlerGracefulShutdown), false, true},
           {"/healthcheck/fail", "cause the server to fail health checks",
            MAKE_ADMIN_HANDLER(handlerHealthcheckFail), false, true},
           {"/healthcheck/ok", "cause the server to pass health checks",

@@ -120,6 +120,8 @@ public:
    */
   virtual void stopListeners() PURE;
 
+  virtual void closeListeners() PURE;
+
   /**
    * Stop all threaded workers from running. When this routine returns all worker threads will
    * have exited.
