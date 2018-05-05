@@ -65,7 +65,7 @@
  * that an uncontended mutex lock has vanishingly small cost. In the future we may try
  * to make this system thread-unsafe if mutex contention disturbs the metrics.
  */
-#define PERF_THREAD_SAFE false
+#define PERF_THREAD_SAFE true
 
 namespace Envoy {
 
