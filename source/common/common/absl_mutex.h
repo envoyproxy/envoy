@@ -21,9 +21,8 @@ namespace Locking {
 // errors; we need a MutexLock with the functionality needed in the
 // Envoy codebase (slightly beyond absl's) *and* the lock annotations.
 class SCOPED_LOCKABLE MutexLock {
- public:
-  explicit MutexLock(absl::Mutex& mutex) EXCLUSIVE_LOCK_FUNCTION(mutex)
-      : mutex_(&mutex) {
+public:
+  explicit MutexLock(absl::Mutex& mutex) EXCLUSIVE_LOCK_FUNCTION(mutex) : mutex_(&mutex) {
     mutex_->Lock();
   }
   ~MutexLock() UNLOCK_FUNCTION() { unlock(); }
@@ -35,12 +34,12 @@ class SCOPED_LOCKABLE MutexLock {
     }
   }
 
- private:
+private:
   MutexLock(const MutexLock&) = delete;
   void operator=(const MutexLock&) = delete;
 
   absl::Mutex* mutex_;
 };
 
-}  // namespace Locking
-}  // namespace Envoy
+} // namespace Locking
+} // namespace Envoy
