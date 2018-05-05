@@ -21,20 +21,20 @@ public:
   virtual ~AdminStream() {}
 
   /**
-   * @param end_stream set to false for streaming response. Default is true, which will close
-   * connection on socket.
+   * @param end_stream set to false for streaming response. Default is true, which will
+   * end the response when the initial handler completes.
    */
   virtual void setEndStreamOnComplete(bool end_stream) PURE;
 
   /**
    * @param cb callback to be added to the list of callbacks invoked by onDestroy() when connection
-   * is dropped.
+   * is closed.
    */
   virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
 
   /**
-   * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get socket for data
-   * streaming.
+   * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get HTTP request data
+   * for streaming.
    */
   virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 

@@ -151,7 +151,7 @@ Http::FilterTrailersStatus AdminFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 void AdminFilter::onDestroy() {
-  for (const auto& callback : *on_destroy_callbacks_) {
+  for (const auto& callback : on_destroy_callbacks_) {
     callback();
   }
 }
@@ -664,7 +664,7 @@ void AdminFilter::onComplete() {
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
 
-  AdminStreamImpl admin_stream(*callbacks_, *request_headers_, *on_destroy_callbacks_);
+  AdminStreamImpl admin_stream(*callbacks_, *request_headers_, on_destroy_callbacks_);
   Http::Code code = parent_.runCallback(path, *header_map, response, admin_stream);
 
   header_map->insertStatus().value(std::to_string(enumToInt(code)));

@@ -283,8 +283,7 @@ private:
   AdminImpl& parent_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
-  std::unique_ptr<std::list<std::function<void()>>> on_destroy_callbacks_ =
-      std::make_unique<std::list<std::function<void()>>>();
+  std::list<std::function<void()>> on_destroy_callbacks_;
 };
 
 /**
