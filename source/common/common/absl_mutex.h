@@ -22,11 +22,24 @@ namespace Locking {
 // Envoy codebase (slightly beyond absl's) *and* the lock annotations.
 class SCOPED_LOCKABLE MutexLock {
 public:
+  /**
+   * Establishes a scoped mutex-lock; the mutex is locked upon construction.
+   *
+   * @param mutex the mutex.
+   */
   explicit MutexLock(absl::Mutex& mutex) EXCLUSIVE_LOCK_FUNCTION(mutex) : mutex_(&mutex) {
     mutex_->Lock();
   }
+
+  /**
+   * Destruction of the MutexLock unlocks the mutex, if it has not already been explicitly unlocked.
+   */
   ~MutexLock() UNLOCK_FUNCTION() { unlock(); }
 
+  /**
+   * Unlocks the mutex. This enables call-sites to release the mutex prior to the Lock going out of
+   * scope.
+   */
   void unlock() UNLOCK_FUNCTION() {
     if (mutex_ != nullptr) {
       mutex_->Unlock();
@@ -38,7 +51,7 @@ private:
   MutexLock(const MutexLock&) = delete;
   void operator=(const MutexLock&) = delete;
 
-  absl::Mutex* mutex_;
+  absl::Mutex* mutex_;  // Set to nullptr on unlock, to prevent double-unlocking.
 };
 
 } // namespace Locking
