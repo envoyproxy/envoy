@@ -63,7 +63,7 @@ public:
     // required stats are flushed.
     // TODO(ramaraochavali): Figure out a more robust way to find out all required stats have been
     // flushed.
-    while (known_counter_exists && known_gauge_exists && known_histogram_exists) {
+    while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
       metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg);
       EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
@@ -99,6 +99,9 @@ public:
         }
       }
     }
+    EXPECT_TRUE(known_counter_exists);
+    EXPECT_TRUE(known_gauge_exists);
+    EXPECT_TRUE(known_histogram_exists);
   }
 
   void cleanup() {
