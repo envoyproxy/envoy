@@ -6,6 +6,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -66,13 +68,35 @@ public:
   typedef std::vector<OptionConstSharedPtr> Options;
   typedef std::shared_ptr<Options> OptionsSharedPtr;
 
+  static OptionsSharedPtr& appendOptions(OptionsSharedPtr& to, const OptionsSharedPtr& from) {
+    to->insert(to->end(), from->begin(), from->end());
+    return to;
+  }
+
+  static bool applyOptions(const OptionsSharedPtr& options, Socket& socket, SocketState state) {
+    if (options == nullptr) {
+      return true;
+    }
+    for (const auto& option : *options) {
+      if (!option->setOption(socket, state)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * Add a socket option visitor for later retrieval with options().
    */
   virtual void addOption(const OptionConstSharedPtr&) PURE;
 
   /**
-   * @return the socket options stored earlier with addOption() calls, if any.
+   * Add socket option visitors for later retrieval with options().
+   */
+  virtual void addOptions(const OptionsSharedPtr&) PURE;
+
+  /**
+   * @return the socket options stored earlier with addOption() and addOptions() calls, if any.
    */
   virtual const OptionsSharedPtr& options() const PURE;
 };
@@ -121,6 +145,26 @@ public:
    *         address the socket was initially accepted at.
    */
   virtual bool localAddressRestored() const PURE;
+
+  /**
+   * Set detected transport protocol (e.g. RAW_BUFFER, TLS).
+   */
+  virtual void setDetectedTransportProtocol(absl::string_view protocol) PURE;
+
+  /**
+   * @return detected transport protocol (e.g. RAW_BUFFER, TLS), if any.
+   */
+  virtual absl::string_view detectedTransportProtocol() const PURE;
+
+  /**
+   * Set requested server name (e.g. SNI in TLS).
+   */
+  virtual void setRequestedServerName(absl::string_view server_name) PURE;
+
+  /**
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  virtual absl::string_view requestedServerName() const PURE;
 };
 
 typedef std::unique_ptr<ConnectionSocket> ConnectionSocketPtr;

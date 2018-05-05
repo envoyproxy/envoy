@@ -26,9 +26,9 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/router:config_lib",
         "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
     ],
 )

@@ -123,6 +123,7 @@ public:
 
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+           const Http::HeaderMap* response_trailers,
            const RequestInfo::RequestInfo& request_info) override;
 
 private:
@@ -131,6 +132,7 @@ private:
   GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;
   std::vector<Http::LowerCaseString> response_headers_to_log_;
+  std::vector<Http::LowerCaseString> response_trailers_to_log_;
 };
 
 } // namespace HttpGrpc

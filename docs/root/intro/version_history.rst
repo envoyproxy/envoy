@@ -4,8 +4,11 @@ Version history
 1.7.0 (Pending)
 ===============
 
+* access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
+* access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
+  to filter logs based on request headers
 * admin: added :http:get:`/config_dump` for dumping current configs
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
@@ -14,8 +17,14 @@ Version history
   :http:post:`/logging`, :http:post:`/quitquitquit`, :http:post:`/reset_counters`,
   :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`,
 * admin: removed `/routes` endpoint; route configs can now be found at the :ref:`/config_dump endpoint <operations_admin_interface_config_dump>`.
+* buffer filter: the buffer filter can be optionally
+  :ref:`disabled <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.disabled>` or
+  :ref:`overridden <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.buffer>` with
+  route-local configuration.
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
+* cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
+  to close tcp_proxy upstream connections when health checks fail.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -24,16 +33,27 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
-* listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
+* health check http filter: added
+  :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
+  to trigger health check response. Deprecated the
+  :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* http: filters can now optionally support
+  :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
+  :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
+  :ref:`weighted cluster <envoy_api_field_route.WeightedCluster.ClusterWeight.per_filter_config>`
+  local configuration.
 * http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+* listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
+* load balancer: ability to configure zone aware load balancer settings :ref:`through the API
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
@@ -44,6 +64,9 @@ Version history
   :ref:`cluster specific <envoy_api_field_Cluster.upstream_bind_config>` options.
 * sockets: added `IP_TRANSPARENT` socket option support for :ref:`listeners
   <envoy_api_field_Listener.transparent>`.
+* sockets: added `SO_KEEPALIVE` socket option for upstream connections
+  :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
+* stats: added support for histograms.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.

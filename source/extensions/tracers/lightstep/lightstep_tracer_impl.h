@@ -64,9 +64,6 @@ public:
   opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }
 
-protected:
-  bool useTagForSamplingDecision() override { return false; }
-
 private:
   class LightStepTransporter : public lightstep::AsyncTransporter, Http::AsyncClient::Callbacks {
   public:

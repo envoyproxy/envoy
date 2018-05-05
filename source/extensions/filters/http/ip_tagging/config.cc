@@ -13,13 +13,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 IpTaggingFilterFactory::createFilterFactory(const Json::Object&, const std::string&,
                                             Server::Configuration::FactoryContext&) {
   NOT_IMPLEMENTED;
 }
 
-Server::Configuration::HttpFilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProto(
+Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProto(
     const Protobuf::Message& proto_config, const std::string& stat_prefix,
     Server::Configuration::FactoryContext& context) {
 

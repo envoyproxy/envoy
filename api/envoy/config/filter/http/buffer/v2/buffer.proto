@@ -22,3 +22,15 @@ message Buffer {
   google.protobuf.Duration max_request_time = 2
       [(validate.rules).duration = {required: true, gt: {}}, (gogoproto.stdduration) = true];
 }
+
+message BufferPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the buffer filter for this particular vhost or route.
+    bool disabled = 1 [(validate.rules).bool.const = true];
+
+    // Override the global configuration of the filter with this new config.
+    Buffer buffer = 2 [(validate.rules).message.required = true];
+  }
+}

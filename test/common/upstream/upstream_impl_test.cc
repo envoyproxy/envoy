@@ -704,6 +704,31 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
+// Test that the correct feature() is set when close_connections_on_host_health_failure is
+// configured.
+TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+  ReadyWatcher initialized;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    close_connections_on_host_health_failure: true
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+  )EOF";
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  EXPECT_TRUE(cluster.info()->features() &
+              ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
+}
+
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;

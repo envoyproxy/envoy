@@ -49,7 +49,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
     ],
 )

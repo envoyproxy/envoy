@@ -9,13 +9,12 @@
 #include "common/config/utility.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/resolver_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
-#include "server/listener_socket_option_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
@@ -23,11 +22,10 @@
 namespace Envoy {
 namespace Server {
 
-std::vector<Configuration::NetworkFilterFactoryCb>
-ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
-  std::vector<Configuration::NetworkFilterFactoryCb> ret;
+  std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_type = proto_config.deprecated_v1().type();
@@ -42,7 +40,7 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
             string_name);
-    Configuration::NetworkFilterFactoryCb callback;
+    Network::FilterFactoryCb callback;
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {
@@ -54,11 +52,11 @@ ProdListenerComponentFactory::createNetworkFilterFactoryList_(
   return ret;
 }
 
-std::vector<Configuration::ListenerFilterFactoryCb>
+std::vector<Network::ListenerFilterFactoryCb>
 ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
-  std::vector<Configuration::ListenerFilterFactoryCb> ret;
+  std::vector<Network::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
     const ProtobufTypes::String string_name = proto_config.name();
@@ -132,8 +130,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
 
-  // Add listen socket options from the config.
-  addListenSocketOption(std::make_shared<ListenerSocketOptionImpl>(config));
+  if (config.has_transparent()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
+  }
+  if (config.has_freebind()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
+  }
+  if (config.has_tcp_fast_open_queue_length()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
+        config.tcp_fast_open_queue_length().value()));
+  }
 
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
@@ -287,21 +293,20 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
-    for (const auto& option : *listen_socket_options_) {
-      bool ok = option->setOption(*socket_, Network::Socket::SocketState::PostBind);
-      const std::string message =
-          fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-      if (!ok) {
-        ENVOY_LOG(warn, "{}", message);
-        throw EnvoyException(message);
-      } else {
-        ENVOY_LOG(debug, "{}", message);
-      }
-
-      // Add the options to the socket_ so that SocketState::Listening options can be
-      // set in the worker after listen()/evconnlistener_new() is called.
-      socket_->addOption(option);
+    bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
+                                            Network::Socket::SocketState::PostBind);
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
     }
+
+    // Add the options to the socket_ so that SocketState::Listening options can be
+    // set in the worker after listen()/evconnlistener_new() is called.
+    socket_->addOptions(listen_socket_options_);
   }
 }
 

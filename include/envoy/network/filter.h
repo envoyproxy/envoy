@@ -152,6 +152,16 @@ public:
 };
 
 /**
+ * This function is used to wrap the creation of a network filter chain for new connections as
+ * they come in. Filter factories create the lambda at configuration initialization time, and then
+ * they are used at runtime.
+ * @param filter_manager supplies the filter manager for the connection to install filters
+ * to. Typically the function will install a single filter, but it's technically possibly to
+ * install more than one if desired.
+ */
+typedef std::function<void(FilterManager& filter_manager)> FilterFactoryCb;
+
+/**
  * Callbacks used by individual listener filter instances to communicate with the listener filter
  * manager.
  */
@@ -211,6 +221,16 @@ public:
    */
   virtual void addAcceptFilter(ListenerFilterPtr&& filter) PURE;
 };
+
+/**
+ * This function is used to wrap the creation of a listener filter chain for new sockets as they are
+ * created. Filter factories create the lambda at configuration initialization time, and then they
+ * are used at runtime.
+ * @param filter_manager supplies the filter manager for the listener to install filters to.
+ * Typically the function will install a single filter, but it's technically possibly to install
+ * more than one if desired.
+ */
+typedef std::function<void(ListenerFilterManager& filter_manager)> ListenerFilterFactoryCb;
 
 /**
  * Creates a chain of network filters for a new connection.

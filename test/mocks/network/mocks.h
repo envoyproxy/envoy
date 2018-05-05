@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <vector>
 
 #include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/connection.h"
@@ -271,11 +272,13 @@ public:
   ~MockListenSocket();
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
+  void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
+  MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
   MOCK_CONST_METHOD0(options, const OptionsSharedPtr&());
 
   Address::InstanceConstSharedPtr local_address_;
@@ -297,13 +300,19 @@ public:
   ~MockConnectionSocket();
 
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
+  void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setDetectedTransportProtocol, void(absl::string_view));
+  MOCK_CONST_METHOD0(detectedTransportProtocol, absl::string_view());
   MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(setRequestedServerName, void(absl::string_view));
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
+  MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(fd, int());
   MOCK_METHOD0(close, void());
