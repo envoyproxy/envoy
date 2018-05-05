@@ -51,7 +51,7 @@ private:
   MutexLock(const MutexLock&) = delete;
   void operator=(const MutexLock&) = delete;
 
-  absl::Mutex* mutex_;  // Set to nullptr on unlock, to prevent double-unlocking.
+  absl::Mutex* mutex_; // Set to nullptr on unlock, to prevent double-unlocking.
 };
 
 } // namespace Locking
