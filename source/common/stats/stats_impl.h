@@ -16,6 +16,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/absl_mutex.h"
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/non_copyable.h"
@@ -25,7 +26,6 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-#include "common/common/absl_mutex.h"
 #include "circllhist.h"
 
 namespace Envoy {

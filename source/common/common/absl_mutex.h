@@ -9,9 +9,9 @@ namespace Locking {
 
 // Substitute for absl::MutexLock for use in Envoy, with non-const ref
 // style, and more importantly, making it easier to release locks in
-// the middle of scopes.  absl::Mutex on its own is risky to use in
+// the middle of scopes. absl::Mutex on its own is risky to use in
 // the context of code that throws exceptions, as you don't want a
-// thrown exception to leave something locked.  However
+// thrown exception to leave something locked. However
 // absl::MutexLock is hard to use when you need to interleave
 // variable-scopes and lock-scopes, because it has no Unlock().
 //
