@@ -10,7 +10,7 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/synchronization/mutex.h"
+#include "common/common/absl_mutex.h"
 
 // Performance Annotation system, enabled with
 //   bazel --define=perf_annotation=enabled ...

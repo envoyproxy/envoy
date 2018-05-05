@@ -206,6 +206,7 @@ envoy_cc_library(
     hdrs = ["perf_annotation.h"],
     external_deps = ["abseil_synchronization"],
     deps = [
+        ":absl_mutex_lib",
         ":assert_lib",
         ":thread_annotations",
         ":utility_lib",
@@ -221,4 +222,11 @@ envoy_cc_library(
         "//include/envoy/common:token_bucket_interface",
         "//source/common/common:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "absl_mutex_lib",
+    hdrs = ["absl_mutex.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [":thread_annotations"],
 )

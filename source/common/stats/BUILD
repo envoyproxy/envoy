@@ -14,13 +14,13 @@ envoy_cc_library(
     hdrs = ["stats_impl.h"],
     external_deps = [
         "abseil_optional",
-        "abseil_synchronization",
         "libcircllhist",
     ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:absl_mutex_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:non_copyable",

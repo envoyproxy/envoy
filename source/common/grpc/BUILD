@@ -84,6 +84,7 @@ envoy_cc_library(
         ":google_async_site_lib",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:absl_mutex_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",

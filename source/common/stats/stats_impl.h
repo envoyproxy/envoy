@@ -25,7 +25,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
-#include "absl/synchronization/mutex.h"
+#include "common/common/absl_mutex.h"
 #include "circllhist.h"
 
 namespace Envoy {

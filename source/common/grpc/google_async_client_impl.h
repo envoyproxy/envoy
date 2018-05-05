@@ -11,7 +11,7 @@
 #include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "absl/synchronization/mutex.h"
+#include "common/common/absl_mutex.h"
 #include "grpc++/generic/generic_stub.h"
 #include "grpc++/grpc++.h"
 
