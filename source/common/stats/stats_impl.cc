@@ -150,7 +150,7 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
+  RawStatData *existing_data, *data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
 
   // Because the RawStatData object is initialized with and contains a truncated
@@ -158,18 +158,19 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // storing the name twice. Performing a lookup on the set is similarly
   // expensive to performing a map lookup, since both require copying a truncated version of the
   // string before doing the hash lookup.
-  absl::MutexLock lock(&mutex_);
-  auto ret = stats_.insert(data);
-  RawStatData* existing_data = *ret.first;
-  lock.unlock();
+  bool inserted;
+  {
+    absl::MutexLock lock(&mutex_);
+    auto insertion = stats_.insert(data);
+    existing_data = *insertion.first;
+    inserted = insertion.second;
+  }
 
-  if (!ret.second) {
+  if (!inserted) {
     ::free(data);
     ++existing_data->ref_count_;
-    return existing_data;
-  } else {
-    return data;
   }
+  return existing_data;
 }
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
@@ -277,9 +278,11 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
     return;
   }
 
-  absl::MutexLock lock(&mutex_);
-  size_t key_removed = stats_.erase(&data);
-  lock.unlock();
+  size_t key_removed;
+  {
+    absl::MutexLock lock(&mutex_);
+    key_removed = stats_.erase(&data);
+  }
 
   ASSERT(key_removed == 1);
   ::free(&data);
