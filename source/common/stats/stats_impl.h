@@ -25,6 +25,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -434,7 +435,7 @@ private:
   // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
-  std::mutex mutex_;
+  absl::Mutex mutex_;
 };
 
 /**

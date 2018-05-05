@@ -204,12 +204,12 @@ envoy_cc_library(
     name = "perf_annotation_lib",
     srcs = ["perf_annotation.cc"],
     hdrs = ["perf_annotation.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":assert_lib",
         ":thread_annotations",
         ":utility_lib",
     ],
-    external_deps = ["abseil_synchronization"],
 )
 
 envoy_cc_library(

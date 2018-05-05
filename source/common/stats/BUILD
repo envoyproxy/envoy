@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["stats_impl.h"],
     external_deps = [
         "abseil_optional",
+        "abseil_synchronization",
         "libcircllhist",
     ],
     deps = [
