@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -299,6 +300,70 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     EXPECT_TRUE(hosts[0]->healthy());
+  }
+}
+
+// Validate that onConfigUpdate() removes endpoints that are marked as healthy
+// when configured to do so.
+TEST_F(EdsTest, EndpointRemoval) {
+  resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      drain_connections_on_eds_removal: true
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+  )EOF");
+
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+
+  auto add_endpoint = [cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+      ->mutable_endpoint()
+      ->mutable_address()
+      ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80);
+  add_endpoint(81);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_TRUE(hosts.size() == 2);
+
+    // Mark the hosts as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  // Remove endpoints and add back the port 80 one
+  cluster_load_assignment->clear_endpoints();
+  add_endpoint(80);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
   }
 }
 

@@ -528,6 +528,12 @@ public:
    *         connections for this cluster.
    */
   virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
+
+  /**
+   * @return whether to skip waiting for health checking before draining connections
+   *         after an endpoint is removed from EDS.
+   */
+  virtual bool drainConnectionsOnEdsRemoval() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
