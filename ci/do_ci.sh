@@ -117,7 +117,8 @@ elif [[ "$1" == "bazel.api" ]]; then
   echo "Building API..."
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/...
+  bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
+    @envoy_api//tools:capture2pcap_test
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain

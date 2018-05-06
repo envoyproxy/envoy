@@ -33,6 +33,7 @@ public:
   Http::StreamEncoder& startRequest(const Http::HeaderMap& headers,
                                     IntegrationStreamDecoder& response);
   void waitForDisconnect();
+  Network::ClientConnection* connection() const { return connection_.get(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
