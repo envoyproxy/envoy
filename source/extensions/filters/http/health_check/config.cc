@@ -3,8 +3,8 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
-#include "common/router/config_utility.h"
 
 #include "extensions/filters/http/health_check/health_check.h"
 
@@ -22,7 +22,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilter(
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
   const std::string hc_endpoint = proto_config.endpoint();
 
-  auto header_match_data = std::make_shared<std::vector<Router::ConfigUtility::HeaderData>>();
+  auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
 
   // TODO(mrice32): remove endpoint field at the end of the 1.7.0 deprecation cycle.
   const bool endpoint_set = !proto_config.endpoint().empty();
@@ -34,7 +34,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilter(
   }
 
   for (const envoy::api::v2::route::HeaderMatcher& matcher : proto_config.headers()) {
-    Router::ConfigUtility::HeaderData single_header_match(matcher);
+    Http::HeaderUtility::HeaderData single_header_match(matcher);
     // Ignore any path header matchers if the endpoint field has been set.
     if (!(endpoint_set && single_header_match.name_ == Http::Headers::get().Path)) {
       header_match_data->push_back(std::move(single_header_match));

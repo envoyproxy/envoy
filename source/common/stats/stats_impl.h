@@ -19,6 +19,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/non_copyable.h"
+#include "common/common/thread_annotations.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -406,14 +407,34 @@ private:
 };
 
 /**
- * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns
- * it.
+ * Implementation of RawStatDataAllocator that uses an unordered set to store
+ * RawStatData pointers.
  */
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
+  ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+
+private:
+  struct RawStatDataHash_ {
+    size_t operator()(const RawStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  };
+  struct RawStatDataCompare_ {
+    bool operator()(const RawStatData* a, const RawStatData* b) const {
+      return (a->key() == b->key());
+    }
+  };
+  typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
+
+  // An unordered set of RawStatData pointers which keys off the key()
+  // field in each object. This necessitates a custom comparator and hasher.
+  StringRawDataSet stats_ GUARDED_BY(mutex_);
+  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
+  // Although alloc() operations are called under existing locking, free() operations are made from
+  // the destructors of the individual stat objects, which are not protected by locks.
+  std::mutex mutex_;
 };
 
 /**

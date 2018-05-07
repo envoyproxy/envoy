@@ -105,6 +105,11 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
+  // BoringSSL treats this as a C string, so embedded NULL characters will not
+  // be handled correctly.
+  if (server_name_indication_.find('\0') != std::string::npos) {
+    throw EnvoyException("SNI names containing NULL-byte are not allowed");
+  }
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if (config.common_tls_context().tls_certificates().size() > 1) {
     throw EnvoyException("Multiple TLS certificates are not supported for client contexts");

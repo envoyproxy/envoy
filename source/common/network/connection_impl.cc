@@ -49,8 +49,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
                                       [this]() -> void { this->onLowWatermark(); },
                                       [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), id_(++next_global_id_) {
-
+      dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd() != -1);
