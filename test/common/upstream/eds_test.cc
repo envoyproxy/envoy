@@ -1,5 +1,7 @@
 #include "envoy/api/v2/eds.pb.h"
 
+#include <memory>
+
 #include "common/config/utility.h"
 #include "common/upstream/eds.h"
 
@@ -321,7 +323,7 @@ TEST_F(EdsTest, EndpointRemoval) {
             refresh_delay: 1s
   )EOF");
 
-  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
   cluster_->setHealthChecker(health_checker);
@@ -348,7 +350,7 @@ TEST_F(EdsTest, EndpointRemoval) {
 
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_TRUE(hosts.size() == 2);
+    EXPECT_EQ(hosts.size(), 2);
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
