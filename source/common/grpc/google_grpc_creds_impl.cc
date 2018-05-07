@@ -68,6 +68,10 @@ public:
         const grpc::SslCredentialsOptions ssl_creds = {
             .pem_root_certs = Config::DataSource::read(
                 credential.google_channel_credentials().ssl_credentials().root_certs(), true),
+            .pem_private_key = Config::DataSource::read(
+                credential.google_channel_credentials().ssl_credentials().private_key(), true),
+            .pem_cert_chain = Config::DataSource::read(
+                credential.google_channel_credentials().ssl_credentials().cert_chain(), true),
         };
         creds = grpc::SslCredentials(ssl_creds);
       }
