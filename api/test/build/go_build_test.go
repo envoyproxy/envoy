@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	_ "github.com/envoyproxy/data-plane-api/api/ads"
-	_ "github.com/envoyproxy/data-plane-api/api/auth"
 	_ "github.com/envoyproxy/data-plane-api/api/bootstrap"
 	_ "github.com/envoyproxy/data-plane-api/api/cds"
 	_ "github.com/envoyproxy/data-plane-api/api/cert"

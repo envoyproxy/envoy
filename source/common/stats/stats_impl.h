@@ -18,10 +18,14 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/non_copyable.h"
+#include "common/common/thread_annotations.h"
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "circllhist.h"
 
 namespace Envoy {
 namespace Stats {
@@ -167,9 +171,6 @@ public:
  * RawStatData::size() instead.
  */
 struct RawStatData {
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
 
   /**
    * Due to the flexible-array-length of name_, c-style allocation
@@ -217,19 +218,19 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. This is required by SharedMemoryHashSet.
+   * and padding for alignment. This is required by BlockMemoryHashSet.
    */
   static size_t size();
 
   /**
    * Initializes this object to have the specified key,
    * a refcount of 1, and all other values zero. This is required by
-   * SharedMemoryHashSet.
+   * BlockMemoryHashSet.
    */
   void initialize(absl::string_view key);
 
   /**
-   * Returns a hash of the key. This is required by SharedMemoryHashSet.
+   * Returns a hash of the key. This is required by BlockMemoryHashSet.
    */
   static uint64_t hash(absl::string_view key) { return HashUtil::xxHash64(key); }
 
@@ -239,7 +240,7 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns the name as a string_view. This is required by SharedMemoryHashSet.
+   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
    */
   absl::string_view key() const {
     return absl::string_view(name_, strnlen(name_, maxNameLength()));
@@ -284,6 +285,14 @@ public:
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
+protected:
+  /**
+   * Flags used by all stats types to figure out whether they have been used.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x1;
+  };
+
 private:
   const std::string name_;
   const std::string tag_extracted_name_;
@@ -305,13 +314,13 @@ public:
   void add(uint64_t amount) override {
     data_.value_ += amount;
     data_.pending_increment_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
 
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
   void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
 private:
@@ -333,13 +342,13 @@ public:
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
     data_.value_ += amount;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void dec() override { sub(1); }
   virtual void inc() override { add(1); }
   virtual void set(uint64_t value) override {
     data_.value_ = value;
-    data_.flags_ |= RawStatData::Flags::Used;
+    data_.flags_ |= Flags::Used;
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
@@ -347,11 +356,35 @@ public:
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & RawStatData::Flags::Used; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
 private:
   RawStatData& data_;
   RawStatDataAllocator& alloc_;
+};
+
+/**
+ * Implementation of HistogramStatistics for circllhist.
+ */
+class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
+public:
+  HistogramStatisticsImpl() : computed_quantiles_(supportedQuantiles().size(), 0.0) {}
+  /**
+   * HistogramStatisticsImpl object is constructed using the passed in histogram.
+   * @param histogram_ptr pointer to the histogram for which stats will be calculated. This pointer
+   * will not be retained.
+   */
+  HistogramStatisticsImpl(const histogram_t* histogram_ptr);
+
+  void refresh(const histogram_t* new_histogram_ptr);
+
+  // HistogramStatistics
+  std::string summary() const override;
+  const std::vector<double>& supportedQuantiles() const override;
+  const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+
+private:
+  std::vector<double> computed_quantiles_;
 };
 
 /**
@@ -366,18 +399,42 @@ public:
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
+  bool used() const override { return true; }
+
+private:
+  // This is used for delivering the histogram data to sinks.
   Store& parent_;
 };
 
 /**
- * Implementation of RawStatDataAllocator that just allocates a new structure in memory and returns
- * it.
+ * Implementation of RawStatDataAllocator that uses an unordered set to store
+ * RawStatData pointers.
  */
 class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
+  ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+
+private:
+  struct RawStatDataHash_ {
+    size_t operator()(const RawStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  };
+  struct RawStatDataCompare_ {
+    bool operator()(const RawStatData* a, const RawStatData* b) const {
+      return (a->key() == b->key());
+    }
+  };
+  typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
+
+  // An unordered set of RawStatData pointers which keys off the key()
+  // field in each object. This necessitates a custom comparator and hasher.
+  StringRawDataSet stats_ GUARDED_BY(mutex_);
+  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
+  // Although alloc() operations are called under existing locking, free() operations are made from
+  // the destructors of the individual stat objects, which are not protected by locks.
+  std::mutex mutex_;
 };
 
 /**
@@ -446,6 +503,9 @@ public:
   // Stats::Store
   std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
   std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
+  std::list<ParentHistogramSharedPtr> histograms() const override {
+    return std::list<ParentHistogramSharedPtr>{};
+  }
 
 private:
   struct ScopeImpl : public Scope {

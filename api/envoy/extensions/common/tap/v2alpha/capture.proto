@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+// [#protodoc-title: Common TAP]
+// Trace capture format for the capture transport socket extension. This dumps plain text read/write
+// sequences on a socket.
+
+package envoy.extensions.common.tap.v2alpha;
+option go_package = "v2";
+
+import "envoy/api/v2/core/address.proto";
+
+import "google/protobuf/timestamp.proto";
+
+// Connection properties.
+message Connection {
+  // Global unique connection ID for Envoy session. Matches connection IDs used
+  // in Envoy logs.
+  uint64 id = 1;
+  // Local address.
+  envoy.api.v2.core.Address local_address = 2;
+  // Remote address.
+  envoy.api.v2.core.Address remote_address = 3;
+}
+
+// Event in a capture trace.
+message Event {
+  // Timestamp for event.
+  google.protobuf.Timestamp timestamp = 1;
+  // Data read by Envoy from the transport socket.
+  message Read {
+    // Binary data read.
+    bytes data = 1;
+    // TODO(htuch): Half-close for reads.
+  }
+  // Data written by Envoy to the transport socket.
+  message Write {
+    // Binary data written.
+    bytes data = 1;
+    // Stream was half closed after this write.
+    bool end_stream = 2;
+  }
+  // Read or write with content as bytes string.
+  oneof event_selector {
+    Read read = 2;
+    Write write = 3;
+  }
+}
+
+// Sequence of read/write events that constitute a captured trace on a socket.
+// Multiple Trace messages might be emitted for a given connection ID, with the
+// sink (e.g. file set, network) responsible for later reassembly.
+message Trace {
+  // Connection properties.
+  Connection connection = 1;
+  // Sequence of observed events.
+  repeated Event events = 2;
+}

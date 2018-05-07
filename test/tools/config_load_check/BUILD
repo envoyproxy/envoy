@@ -20,7 +20,7 @@ envoy_cc_binary(
     testonly = 1,
     deps = [
         ":config_load_check_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],

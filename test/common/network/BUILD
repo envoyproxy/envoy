@@ -2,7 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_binary",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -152,16 +154,35 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "socket_option_impl_test",
-    srcs = ["socket_option_impl_test.cc"],
+envoy_cc_test_library(
+    name = "socket_option_test",
+    srcs = ["socket_option_test.h"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "socket_option_impl_test",
+    srcs = ["socket_option_impl_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "addr_family_aware_socket_option_impl_test",
+    srcs = ["addr_family_aware_socket_option_impl_test.cc"],
+    deps = [
+        ":socket_option_test",
+        "//source/common/network:addr_family_aware_socket_option_lib",
     ],
 )
 
@@ -172,5 +193,18 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_binary(
+    name = "lc_trie_speed_test",
+    testonly = 1,
+    srcs = ["lc_trie_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/network:lc_trie_lib",
+        "//source/common/network:utility_lib",
     ],
 )

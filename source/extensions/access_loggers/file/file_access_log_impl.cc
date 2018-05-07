@@ -16,6 +16,7 @@ FileAccessLog::FileAccessLog(const std::string& access_log_path, AccessLog::Filt
 
 void FileAccessLog::log(const Http::HeaderMap* request_headers,
                         const Http::HeaderMap* response_headers,
+                        const Http::HeaderMap* response_trailers,
                         const RequestInfo::RequestInfo& request_info) {
   static Http::HeaderMapImpl empty_headers;
   if (!request_headers) {
@@ -24,6 +25,9 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
   if (!response_headers) {
     response_headers = &empty_headers;
   }
+  if (!response_trailers) {
+    response_trailers = &empty_headers;
+  }
 
   if (filter_) {
     if (!filter_->evaluate(request_info, *request_headers)) {
@@ -31,7 +35,8 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
     }
   }
 
-  log_file_->write(formatter_->format(*request_headers, *response_headers, request_info));
+  log_file_->write(
+      formatter_->format(*request_headers, *response_headers, *response_trailers, request_info));
 }
 
 } // namespace File

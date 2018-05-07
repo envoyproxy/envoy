@@ -112,6 +112,10 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
+  testUpstreamDisconnectWithTwoRequests();
+}
+
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }

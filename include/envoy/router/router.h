@@ -233,6 +233,17 @@ class RateLimitPolicy;
 class Config;
 
 /**
+ * All route specific config returned by the method at
+ *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
+ * should be derived from this class.
+ */
+class RouteSpecificFilterConfig {
+public:
+  virtual ~RouteSpecificFilterConfig() {}
+};
+typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
+
+/**
  * Virtual host defintion.
  */
 class VirtualHost {
@@ -260,11 +271,19 @@ public:
   virtual const Config& routeConfig() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
-   * filter name configured for this virtual host. If none is present,
-   * nullptr is returned.
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 /**
@@ -315,6 +334,9 @@ public:
 
 typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
 
+class MetadataMatchCriteria;
+typedef std::unique_ptr<const MetadataMatchCriteria> MetadataMatchCriteriaConstPtr;
+
 class MetadataMatchCriteria {
 public:
   virtual ~MetadataMatchCriteria() {}
@@ -326,6 +348,17 @@ public:
    */
   virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
   metadataMatchCriteria() const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria, merging existing
+   * metadata criteria with the provided criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the metadata_matches
+   * ProtobufWkt::Struct taking precedence.
+   * @param metadata_matches supplies the new criteria.
+   * @return MetadataMatchCriteriaConstPtr the result criteria.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
 /**
@@ -472,12 +505,19 @@ public:
   virtual const PathMatchCriterion& pathMatchCriterion() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
-   * filter name configured for this route entry. Only weighted cluster entries
-   * will potentially have these values available. If none is present,
-   * nullptr is returned.
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 /**
@@ -525,11 +565,19 @@ public:
   virtual const Decorator* decorator() const PURE;
 
   /**
-   * @return const Protobuf::Message* the per-filter config for the given
-   * filter name configured for this route. If none is present, nullptr is
-   * returned.
+   * @return const RouteSpecificFilterConfig* the per-filter config pre-processed object for
+   *  the given filter name. If there is not per-filter config, or the filter factory returns
+   *  nullptr, nullptr is returned.
    */
-  virtual const Protobuf::Message* perFilterConfig(const std::string& name) const PURE;
+  virtual const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * This is a helper on top of perFilterConfig() that casts the return object to the specified
+   * type.
+   */
+  template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
+    return dynamic_cast<const Derived*>(perFilterConfig(name));
+  }
 };
 
 typedef std::shared_ptr<const Route> RouteConstSharedPtr;

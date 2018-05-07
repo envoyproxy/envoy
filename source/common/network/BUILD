@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -53,7 +54,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/ssl:ssl_socket_lib",
@@ -183,6 +184,35 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "addr_family_aware_socket_option_lib",
+    srcs = ["addr_family_aware_socket_option_impl.cc"],
+    hdrs = ["addr_family_aware_socket_option_impl.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":address_lib",
+        ":socket_option_lib",
+        "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "socket_option_factory_lib",
+    srcs = ["socket_option_factory.cc"],
+    hdrs = ["socket_option_factory.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":addr_family_aware_socket_option_lib",
+        ":address_lib",
+        ":socket_option_lib",
+        "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
     ],
 )

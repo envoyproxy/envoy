@@ -175,11 +175,11 @@ public:
   }
 
   MOCK_METHOD2(createNetworkFilterFactoryList,
-               std::vector<Configuration::NetworkFilterFactoryCb>(
+               std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenerFilterFactoryList,
-               std::vector<Configuration::ListenerFilterFactoryCb>(
+               std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
   MOCK_METHOD3(createListenSocket,
@@ -318,7 +318,7 @@ public:
   MockMain() : MockMain(0, 0, 0, 0) {}
   MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
 
-  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
@@ -396,6 +396,10 @@ public:
     addListenSocketOption_(option);
   }
   MOCK_METHOD1(addListenSocketOption_, void(const Network::Socket::OptionConstSharedPtr&));
+  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+    addListenSocketOptions_(options);
+  }
+  MOCK_METHOD1(addListenSocketOptions_, void(const Network::Socket::OptionsSharedPtr&));
 };
 
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {

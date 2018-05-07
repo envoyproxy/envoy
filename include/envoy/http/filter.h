@@ -261,7 +261,7 @@ public:
   /**
    * This routine may be called to change the buffer limit for decoder filters.
    *
-   * @param boolean supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit.
    */
   virtual void setDecoderBufferLimit(uint32_t limit) PURE;
 
@@ -393,7 +393,7 @@ public:
   /**
    * This routine may be called to change the buffer limit for encoder filters.
    *
-   * @limit settings supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit.
    */
   virtual void setEncoderBufferLimit(uint32_t limit) PURE;
 
@@ -495,6 +495,16 @@ public:
    */
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
 };
+
+/**
+ * This function is used to wrap the creation of an HTTP filter chain for new streams as they
+ * come in. Filter factories create the function at configuration initialization time, and then
+ * they are used at runtime.
+ * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
+ * function will install a single filter, but it's technically possibly to install more than one
+ * if desired.
+ */
+typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
 
 /**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a

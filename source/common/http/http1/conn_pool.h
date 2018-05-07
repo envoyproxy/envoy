@@ -31,8 +31,7 @@ class ConnPoolImpl : Logger::Loggable<Logger::Id::pool>, public ConnectionPool::
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
-               const Network::ConnectionSocket::OptionsSharedPtr& options)
-      : dispatcher_(dispatcher), host_(host), priority_(priority), socket_options_(options) {}
+               const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   ~ConnPoolImpl();
 
@@ -123,7 +122,8 @@ protected:
   void onDownstreamReset(ActiveClient& client);
   void onPendingRequestCancel(PendingRequest& request);
   void onResponseComplete(ActiveClient& client);
-  void processIdleClient(ActiveClient& client);
+  void onUpstreamReady();
+  void processIdleClient(ActiveClient& client, bool delay);
 
   Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
@@ -134,6 +134,8 @@ protected:
   std::list<DrainedCb> drained_callbacks_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  Event::TimerPtr upstream_ready_timer_;
+  bool upstream_ready_enabled_{false};
 };
 
 /**

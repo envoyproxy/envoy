@@ -49,8 +49,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
                                       [this]() -> void { this->onLowWatermark(); },
                                       [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), id_(++next_global_id_) {
-
+      dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(fd() != -1);
@@ -536,18 +535,15 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
-  if (options) {
-    for (const auto& option : *options) {
-      if (!option->setOption(*socket_, Socket::SocketState::PreBind)) {
-        // Set a special error state to ensure asynchronous close to give the owner of the
-        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-        immediate_error_event_ = ConnectionEvent::LocalClose;
-        // Trigger a write event to close this connection out-of-band.
-        file_event_->activate(Event::FileReadyType::Write);
-        return;
-      }
-    }
+  if (!Network::Socket::applyOptions(options, *socket_, Socket::SocketState::PreBind)) {
+    // Set a special error state to ensure asynchronous close to give the owner of the
+    // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+    immediate_error_event_ = ConnectionEvent::LocalClose;
+    // Trigger a write event to close this connection out-of-band.
+    file_event_->activate(Event::FileReadyType::Write);
+    return;
   }
+
   if (source_address != nullptr) {
     const int rc = source_address->bind(fd());
     if (rc < 0) {

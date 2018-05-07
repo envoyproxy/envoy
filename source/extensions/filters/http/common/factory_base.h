@@ -15,14 +15,14 @@ template <class ConfigProto>
 class FactoryBase : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
   // Server::Configuration::NamedHttpFilterConfigFactory
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object&, const std::string&,
                       Server::Configuration::FactoryContext&) override {
     // Only used in v1 filters.
     NOT_IMPLEMENTED;
   }
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
@@ -40,7 +40,7 @@ protected:
   FactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  virtual Server::Configuration::HttpFilterFactoryCb
+  virtual Http::FilterFactoryCb
   createTypedFilterFactoryFromProto(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;

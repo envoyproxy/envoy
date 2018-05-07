@@ -16,11 +16,11 @@ namespace RateLimitFilter {
 class RateLimitConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -32,7 +32,7 @@ public:
   std::string name() override { return NetworkFilterNames::get().RATE_LIMIT; }
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilter(const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
                Server::Configuration::FactoryContext& context);
 };

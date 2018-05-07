@@ -15,7 +15,8 @@ void Runner::setupEnvironment(int argc, char** argv) {
   TestEnvironment::initializeOptions(argc, argv);
 
   static auto* lock = new Thread::MutexBasicLockable();
-  Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
+  const auto environment_log_level = TestEnvironment::getOptions().logLevel();
+  Logger::Registry::initialize(std::min(environment_log_level, spdlog::level::info),
                                TestEnvironment::getOptions().logFormat(), *lock);
 }
 
@@ -24,10 +25,5 @@ void Runner::setupEnvironment(int argc, char** argv) {
 
 extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv);
-  return 0;
-}
-
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* buf, size_t len) {
-  Envoy::Fuzz::Runner::execute(buf, len);
   return 0;
 }

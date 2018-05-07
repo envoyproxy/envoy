@@ -18,7 +18,8 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,15 +31,7 @@ const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_perce
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
 
-FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
-                                     Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope)
-    : runtime_(runtime), stats_(generateStats(stats_prefix, scope)), stats_prefix_(stats_prefix),
-      scope_(scope) {
-
-  if (!fault.has_abort() && !fault.has_delay()) {
-    throw EnvoyException("fault filter must have at least abort or delay specified in the config.");
-  }
+FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
     abort_percent_ = fault.abort().percent();
@@ -51,7 +44,7 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
-  for (const Router::ConfigUtility::HeaderData& header_map : fault.headers()) {
+  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
     fault_filter_headers_.push_back(header_map);
   }
 
@@ -62,6 +55,12 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
   }
 }
 
+FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
+                                     Runtime::Loader& runtime, const std::string& stats_prefix,
+                                     Stats::Scope& scope)
+    : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
+      stats_prefix_(stats_prefix), scope_(scope) {}
+
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
 FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
@@ -71,6 +70,21 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
+  // Route-level configuration overrides filter-level configuration
+  // NOTE: We should not use runtime when reading from route-level
+  // faults. In other words, runtime is supported only when faults are
+  // configured at the filter level.
+  fault_settings_ = config_->settings();
+  if (callbacks_->route() && callbacks_->route()->routeEntry()) {
+    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
+    const auto* route_entry = callbacks_->route()->routeEntry();
+
+    const FaultSettings* per_route_settings_ =
+        route_entry->perFilterConfigTyped<FaultSettings>(name)
+            ?: route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
+    fault_settings_ = per_route_settings_ ?: fault_settings_;
+  }
+
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -80,7 +94,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
 
   // Check for header matches
-  if (!Router::ConfigUtility::matchHeaders(headers, config_->filterHeaders())) {
+  if (!Http::HeaderUtility::matchHeaders(headers, fault_settings_->filterHeaders())) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -115,24 +129,24 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 }
 
 bool FaultFilter::isDelayEnabled() {
-  bool enabled =
-      config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY, config_->delayPercent());
+  bool enabled = config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY,
+                                                              fault_settings_->delayPercent());
 
   if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
-                                                            config_->delayPercent());
+                                                            fault_settings_->delayPercent());
   }
 
   return enabled;
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled =
-      config_->runtime().snapshot().featureEnabled(ABORT_PERCENT_KEY, config_->abortPercent());
+  bool enabled = config_->runtime().snapshot().featureEnabled(ABORT_PERCENT_KEY,
+                                                              fault_settings_->abortPercent());
 
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            config_->abortPercent());
+                                                            fault_settings_->abortPercent());
   }
 
   return enabled;
@@ -145,8 +159,8 @@ absl::optional<uint64_t> FaultFilter::delayDuration() {
     return ret;
   }
 
-  uint64_t duration =
-      config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY, config_->delayDuration());
+  uint64_t duration = config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY,
+                                                               fault_settings_->delayDuration());
   if (!downstream_cluster_delay_duration_key_.empty()) {
     duration =
         config_->runtime().snapshot().getInteger(downstream_cluster_delay_duration_key_, duration);
@@ -163,7 +177,7 @@ absl::optional<uint64_t> FaultFilter::delayDuration() {
 uint64_t FaultFilter::abortHttpStatus() {
   // TODO(mattklein123): check http status codes obtained from runtime.
   uint64_t http_status =
-      config_->runtime().snapshot().getInteger(ABORT_HTTP_STATUS_KEY, config_->abortCode());
+      config_->runtime().snapshot().getInteger(ABORT_HTTP_STATUS_KEY, fault_settings_->abortCode());
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
@@ -244,17 +258,17 @@ void FaultFilter::abortWithHTTPStatus() {
 bool FaultFilter::matchesTargetUpstreamCluster() {
   bool matches = true;
 
-  if (!config_->upstreamCluster().empty()) {
+  if (!fault_settings_->upstreamCluster().empty()) {
     Router::RouteConstSharedPtr route = callbacks_->route();
     matches = route && route->routeEntry() &&
-              (route->routeEntry()->clusterName() == config_->upstreamCluster());
+              (route->routeEntry()->clusterName() == fault_settings_->upstreamCluster());
   }
 
   return matches;
 }
 
 bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
-  if (config_->downstreamNodes().empty()) {
+  if (fault_settings_->downstreamNodes().empty()) {
     return true;
   }
 
@@ -263,7 +277,8 @@ bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
   }
 
   const std::string downstream_node = headers.EnvoyDownstreamServiceNode()->value().c_str();
-  return config_->downstreamNodes().find(downstream_node) != config_->downstreamNodes().end();
+  return fault_settings_->downstreamNodes().find(downstream_node) !=
+         fault_settings_->downstreamNodes().end();
 }
 
 void FaultFilter::resetTimerState() {

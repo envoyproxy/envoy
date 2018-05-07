@@ -12,3 +12,4 @@ Operations and administration
   stats_overview
   runtime
   fs_flags
+  traffic_capture

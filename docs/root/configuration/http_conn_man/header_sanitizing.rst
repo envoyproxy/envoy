@@ -20,6 +20,7 @@ Envoy will potentially sanitize the following headers:
 * :ref:`x-envoy-external-address <config_http_conn_man_headers_x-envoy-external-address>`
 * :ref:`x-envoy-force-trace <config_http_conn_man_headers_x-envoy-force-trace>`
 * :ref:`x-envoy-internal <config_http_conn_man_headers_x-envoy-internal>`
+* :ref:`x-envoy-ip-tags <config_http_filters_ip_tagging>`
 * :ref:`x-envoy-max-retries <config_http_filters_router_x-envoy-max-retries>`
 * :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
 * :ref:`x-envoy-retry-on <config_http_filters_router_x-envoy-retry-on>`

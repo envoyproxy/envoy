@@ -33,6 +33,7 @@ public:
   Http::StreamEncoder& startRequest(const Http::HeaderMap& headers,
                                     IntegrationStreamDecoder& response);
   void waitForDisconnect();
+  Network::ClientConnection* connection() const { return connection_.get(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -128,6 +129,7 @@ protected:
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
   void testIdleTimerDisabled();
+  void testUpstreamDisconnectWithTwoRequests();
   // HTTP/1 tests
   void testBadFirstline();
   void testMissingDelimiter();

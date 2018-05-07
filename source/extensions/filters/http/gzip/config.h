@@ -18,7 +18,7 @@ public:
   GzipFilterFactory() : FactoryBase(HttpFilterNames::get().ENVOY_GZIP) {}
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createTypedFilterFactoryFromProto(const envoy::config::filter::http::gzip::v2::Gzip& config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;

@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["backtrace.h"],
     external_deps = ["backward"],
     tags = ["backtrace"],
-    deps = ["//source/common/common:logger_lib"],
+    deps = ["//source/common/common:minimal_logger_lib"],
 )
 
 envoy_cc_library(
@@ -32,7 +32,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:lds_json_lib",
         "//source/common/config:utility_lib",
@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
         "//source/common/network:connection_lib",
+        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
@@ -80,7 +81,7 @@ envoy_cc_library(
         "//include/envoy/server:drain_manager_interface",
         "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
@@ -97,7 +98,7 @@ envoy_cc_library(
         "//include/envoy/server:watchdog_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
@@ -116,7 +117,7 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:shared_memory_hash_set_lib",
+        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -205,7 +206,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
-        "//source/common/network:socket_option_lib",
+        "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
@@ -260,6 +261,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_lib",
         "//source/common/config:bootstrap_json_lib",

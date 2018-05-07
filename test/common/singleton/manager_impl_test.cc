@@ -2,6 +2,8 @@
 
 #include "common/singleton/manager_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -14,7 +16,8 @@ static void deathTestWorker() {
 }
 
 TEST(SingletonManagerImplDeathTest, NotRegistered) {
-  EXPECT_DEATH(deathTestWorker(), "invalid singleton name 'foo'. Make sure it is registered.");
+  EXPECT_DEATH_LOG_TO_STDERR(deathTestWorker(),
+                             "invalid singleton name 'foo'. Make sure it is registered.");
 }
 
 static constexpr char test_singleton_name[] = "test_singleton";

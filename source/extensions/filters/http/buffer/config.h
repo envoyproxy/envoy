@@ -11,19 +11,27 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 /**
- * Config registration for the buffer filter. @see NamedHttpFilterConfigFactory.
+ * Config registration for the buffer filter.
  */
 class BufferFilterFactory
     : public Common::FactoryBase<envoy::config::filter::http::buffer::v2::Buffer> {
 public:
   BufferFilterFactory() : FactoryBase(HttpFilterNames::get().BUFFER) {}
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
+  /*ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::buffer::v2::BufferPerRoute()};
+  }
+
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
+                                  Server::Configuration::FactoryContext&) override;*/
+
 private:
-  Server::Configuration::HttpFilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
       const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

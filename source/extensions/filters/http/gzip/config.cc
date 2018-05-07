@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-Server::Configuration::HttpFilterFactoryCb GzipFilterFactory::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb GzipFilterFactory::createTypedFilterFactoryFromProto(
     const envoy::config::filter::http::gzip::v2::Gzip& proto_config, const std::string&,
     Server::Configuration::FactoryContext&) {
   GzipFilterConfigSharedPtr config = std::make_shared<GzipFilterConfig>(proto_config);
@@ -20,7 +20,7 @@ Server::Configuration::HttpFilterFactoryCb GzipFilterFactory::createTypedFilterF
 }
 
 /**
- * Static registration for the gzip filter. @see RegisterFactory.
+ * Static registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
 static Registry::RegisterFactory<GzipFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>

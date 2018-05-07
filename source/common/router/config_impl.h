@@ -14,8 +14,10 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
@@ -46,12 +48,13 @@ public:
 
 class PerFilterConfigs {
 public:
-  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs);
+  PerFilterConfigs(const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
+                   Server::Configuration::FactoryContext& factory_context);
 
-  const Protobuf::Message* get(const std::string& name) const;
+  const RouteSpecificFilterConfig* get(const std::string& name) const;
 
 private:
-  std::unordered_map<std::string, ProtobufTypes::MessagePtr> configs_;
+  std::unordered_map<std::string, RouteSpecificFilterConfigConstSharedPtr> configs_;
 };
 
 class RouteEntryImplBase;
@@ -76,7 +79,9 @@ public:
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
-  const Protobuf::Message* perFilterConfig(const std::string&) const override { return nullptr; }
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
+    return nullptr;
+  }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -115,8 +120,8 @@ class ConfigImpl;
 class VirtualHostImpl : public VirtualHost {
 public:
   VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
-                  const ConfigImpl& global_route_config, Runtime::Loader& runtime,
-                  Upstream::ClusterManager& cm, bool validate_clusters);
+                  const ConfigImpl& global_route_config,
+                  Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
   RouteConstSharedPtr getRouteFromEntries(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;
@@ -130,7 +135,7 @@ public:
   const std::string& name() const override { return name_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const Config& routeConfig() const override;
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 private:
   enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
@@ -254,14 +259,8 @@ public:
   MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
       : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
 
-  /**
-   * Creates a new MetadataMatchCriteriaImpl, merging existing
-   * metadata criteria this criteria. The result criteria is the
-   * combination of both sets of criteria, with those from the
-   * ProtobufWkt::Struct taking precedence.
-   */
-  MetadataMatchCriteriaImplConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const {
+  MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
     return MetadataMatchCriteriaImplConstPtr(
         new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
   }
@@ -313,7 +312,7 @@ public:
    * @throw EnvoyException with reason if the route configuration contains any errors
    */
   RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                     Runtime::Loader& loader);
+                     Server::Configuration::FactoryContext& factory_context);
 
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
 
@@ -370,7 +369,7 @@ public:
   const DirectResponseEntry* directResponseEntry() const override;
   const RouteEntry* routeEntry() const override;
   const Decorator* decorator() const override { return decorator_.get(); }
-  const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+  const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
 protected:
   const bool case_sensitive_;
@@ -444,7 +443,7 @@ private:
     const RouteEntry* routeEntry() const override { return this; }
     const Decorator* decorator() const override { return parent_->decorator(); }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override {
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
     };
 
@@ -462,7 +461,7 @@ private:
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
     WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string rutime_key,
-                         Runtime::Loader& loader,
+                         Server::Configuration::FactoryContext& factory_context,
                          const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
@@ -487,13 +486,13 @@ private:
       DynamicRouteEntry::finalizeResponseHeaders(headers, request_info);
     }
 
-    const Protobuf::Message* perFilterConfig(const std::string& name) const override;
+    const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
   private:
     const std::string runtime_key_;
     Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
-    MetadataMatchCriteriaImplConstPtr cluster_metadata_match_criteria_;
+    MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
@@ -532,12 +531,12 @@ private:
   const RateLimitPolicyImpl rate_limit_policy_;
   const ShadowPolicyImpl shadow_policy_;
   const Upstream::ResourcePriority priority_;
-  std::vector<ConfigUtility::HeaderData> config_headers_;
+  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcher> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
-  MetadataMatchCriteriaImplConstPtr metadata_match_criteria_;
+  MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
@@ -557,7 +556,7 @@ private:
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                       Runtime::Loader& loader);
+                       Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -583,7 +582,7 @@ private:
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                     Runtime::Loader& loader);
+                     Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -609,7 +608,7 @@ private:
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
-                      Runtime::Loader& loader);
+                      Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteEntry
   void finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -637,8 +636,8 @@ private:
 class RouteMatcher {
 public:
   RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
-               const ConfigImpl& global_http_config, Runtime::Loader& runtime,
-               Upstream::ClusterManager& cm, bool validate_clusters);
+               const ConfigImpl& global_http_config,
+               Server::Configuration::FactoryContext& factory_context, bool validate_clusters);
 
   RouteConstSharedPtr route(const Http::HeaderMap& headers, uint64_t random_value) const;
 
@@ -666,8 +665,9 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-             Upstream::ClusterManager& cm, bool validate_clusters_default);
+  ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+             Server::Configuration::FactoryContext& factory_context,
+             bool validate_clusters_default);
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };

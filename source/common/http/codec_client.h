@@ -9,6 +9,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/linked_object.h"

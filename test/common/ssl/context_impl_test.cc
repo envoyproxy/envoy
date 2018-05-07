@@ -285,6 +285,12 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
+TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys_sds_secret_config();
+  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg), EnvoyException, "SDS not supported yet");
+}
+
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   std::string json = R"EOF(
   {
@@ -323,6 +329,72 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
                           "^Failed to load CRL from .* without trusted CA certificates$");
+}
+
+// Validate that empty SNI (according to C string rules) fails config validation.
+TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.set_sni(std::string("\000", 1));
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException, "SNI names containing NULL-byte are not allowed");
+  tls_context.set_sni(std::string("a\000b", 3));
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException, "SNI names containing NULL-byte are not allowed");
+}
+
+// Multiple certificate hashes are not yet supported.
+// TODO(htuch): Support multiple hashes.
+TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash();
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->add_verify_certificate_hash();
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException,
+                            "Multiple TLS certificate verification hashes are not supported");
+}
+
+// Multiple TLS certificates are not yet supported.
+// TODO(PiotrSikora): Support multiple TLS certificates.
+TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException,
+                            "Multiple TLS certificates are not supported for client contexts");
+}
+
+// Multiple TLS certificates are not yet supported, but one is expected for
+// server.
+// TODO(PiotrSikora): Support multiple TLS certificates.
+TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
+                            EnvoyException,
+                            "A single TLS certificate is required for server contexts");
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
+                            EnvoyException,
+                            "A single TLS certificate is required for server contexts");
+}
+
+// TlsCertificate messages must have a cert for servers.
+TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificates();
+  ServerContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_MESSAGE(ServerContextPtr server_ctx(manager.createSslServerContext(
+                                "", {}, store, client_context_config, true)),
+                            EnvoyException,
+                            "Server TlsCertificates must have a certificate specified");
 }
 
 } // namespace Ssl
