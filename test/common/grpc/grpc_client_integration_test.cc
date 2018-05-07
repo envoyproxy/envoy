@@ -28,12 +28,12 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Grpc {
@@ -315,6 +315,8 @@ public:
     }
   }
 
+  virtual void expectExtraHeaders(FakeStream&) {}
+
   std::unique_ptr<HelloworldRequest> createRequest(const TestMetadata& initial_metadata) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
@@ -348,6 +350,7 @@ public:
     request->fake_stream_ = &fake_stream;
 
     expectInitialHeaders(fake_stream, initial_metadata);
+    expectExtraHeaders(fake_stream);
 
     helloworld::HelloRequest received_msg;
     fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
@@ -376,6 +379,7 @@ public:
     stream->fake_stream_ = &fake_stream;
 
     expectInitialHeaders(fake_stream, initial_metadata);
+    expectExtraHeaders(fake_stream);
 
     return stream;
   }
@@ -747,8 +751,8 @@ public:
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
-    auto* google_grpc = config.mutable_google_grpc();
-    auto* ssl_creds = google_grpc->mutable_ssl_credentials();
+    auto* ssl_creds =
+        config.add_credentials()->mutable_google_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (use_client_cert_) {
@@ -832,6 +836,58 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// AccessToken credential validation tests.
+class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
+public:
+  void expectExtraHeaders(FakeStream& fake_stream) override {
+    fake_stream.waitForHeadersComplete();
+    Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
+    EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
+  }
+
+  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+    auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
+    auto* google_grpc = config.mutable_google_grpc();
+    google_grpc->set_credentials_factory_name("access_token");
+    auto* ssl_creds =
+        config.add_credentials()->mutable_google_channel_credentials()->mutable_ssl_credentials();
+    ssl_creds->mutable_root_certs()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    config.add_credentials()->mutable_google_call_credentials()->set_access_token(
+        access_token_value_);
+    return config;
+  }
+
+  std::string access_token_value_{};
+};
+
+// Parameterize the loopback test server socket address and gRPC client type.
+INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate that a simple request-reply unary RPC works with AccessToken auth.
+TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  access_token_value_ = "accesstokenvalue";
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a simple request-reply stream RPC works with AccessToken auth..
+TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  access_token_value_ = "accesstokenvalue";
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendRequest();
+  stream->sendReply();
+  stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
 
