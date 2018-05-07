@@ -38,13 +38,12 @@ BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
   return createTypedFilterFactoryFromProto(proto_config, stats_prefix, context);
 }
 
-/*Router::RouteSpecificFilterConfigConstSharedPtr
-BufferFilterConfigFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
-                                                           Server::Configuration::FactoryContext&) {
-  return std::make_shared<const BufferFilterSettings>(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::buffer::v2::BufferPerRoute&>(proto_config));
-}*/
+Router::RouteSpecificFilterConfigConstSharedPtr
+BufferFilterFactory::createTypedRouteSpecificFilterConfig(
+    const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<const BufferFilterSettings>(proto_config);
+}
 
 /**
  * Static registration for the buffer filter. @see RegisterFactory.

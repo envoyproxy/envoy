@@ -34,8 +34,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -62,8 +61,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -85,7 +83,7 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   cb(filter_callback);
 }
 
-TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyRouteProto) {
+TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
     envoy::config::filter::http::buffer::v2::BufferPerRoute* config =
@@ -95,7 +93,7 @@ TEST(BufferFilterConfigFactoryTest, BufferFilterEmptyRouteProto) {
   });
 }
 
-TEST(BufferFilterConfigFactoryTest, BufferFilterRouteSpecificConfig) {
+TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   BufferFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
