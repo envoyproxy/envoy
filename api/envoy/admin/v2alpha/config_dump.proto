@@ -30,7 +30,8 @@ message ConfigDump {
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes
 // any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
-// an Envoy configuration by reusing the output as the bootstrap configuration for another Envoy.
+// the static portions of an Envoy configuration by reusing the output as the bootstrap
+// configuration for another Envoy.
 message BootstrapConfigDump {
   envoy.config.bootstrap.v2.Bootstrap bootstrap = 1 [(gogoproto.nullable) = false];
 }
@@ -57,17 +58,17 @@ message ListenersConfigDump {
   // The statically loaded listener configs.
   repeated envoy.api.v2.Listener static_listeners = 2 [(gogoproto.nullable) = false];
 
-  // The dynamically loaded active listeners These are listeners that are available to service
+  // The dynamically loaded active listeners. These are listeners that are available to service
   // data plane traffic.
   repeated DynamicListener dynamic_active_listeners = 3 [(gogoproto.nullable) = false];
 
-  // The dynamically loaded warming listeners These are listeners that are currently undergoing
+  // The dynamically loaded warming listeners. These are listeners that are currently undergoing
   // warming in preparation to service data plane traffic. Note that if attempting to recreate an
   // Envoy configuration from a configuration dump, the warming listeners should generally be
   // discarded.
   repeated DynamicListener dynamic_warming_listeners = 4 [(gogoproto.nullable) = false];
 
-  // The dynamically loaded draining listeners These are listeners that are currently undergoing
+  // The dynamically loaded draining listeners. These are listeners that are currently undergoing
   // draining in preparation to stop servicing data plane traffic. Note that if attempting to
   // recreate an Envoy configuration from a configuration dump, the draining listeners should
   // generally be discarded.
