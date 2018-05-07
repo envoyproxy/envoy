@@ -208,8 +208,8 @@ envoy_cc_library(
     hdrs = ["perf_annotation.h"],
     deps = [
         ":assert_lib",
-        ":thread_lib",
         ":thread_annotations",
+        ":thread_lib",
         ":utility_lib",
     ],
 )
