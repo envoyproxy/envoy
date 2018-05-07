@@ -136,7 +136,6 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":macros",
-        ":non_copyable",
         "//include/envoy/thread:thread_interface",
     ],
 )

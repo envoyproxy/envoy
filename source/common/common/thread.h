@@ -6,8 +6,6 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/non_copyable.h"
-
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
