@@ -93,6 +93,19 @@ api_go_proto_library(
 )
 
 api_proto_library(
+    name = "http_status",
+    srcs = ["http_status.proto"],
+    visibility = [
+        ":friends",
+    ],
+)
+
+api_go_proto_library(
+    name = "http_status",
+    proto = ":http_status",
+)
+
+api_proto_library(
     name = "grpc_service",
     srcs = ["grpc_service.proto"],
     visibility = [

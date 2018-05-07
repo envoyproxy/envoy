@@ -82,6 +82,7 @@ public:
 private:
   enum class State { NotStarted, Calling, Complete };
   void initiateCall(const Http::HeaderMap& headers);
+  Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse);
 
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;

@@ -69,12 +69,15 @@ protected:
         std::make_unique<Filters::Common::ExtAuthz::Response>();
     response->status = status;
     response->status_code = status_code;
+
     if (!headers.empty()) {
       response->headers = std::move(headers);
     }
+
     if (!body.empty()) {
       response->body = std::make_unique<Buffer::OwnedImpl>(body);
     }
+
     return response;
   }
 };
@@ -223,13 +226,17 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
+
   Http::TestHeaderMapImpl response_headers{{":status", "403"}};
+
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
 
-  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+  request_callbacks_->onComplete(
+      makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied, {}, std::string{}, 403));
 
   EXPECT_EQ(
       1U,

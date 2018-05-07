@@ -6,6 +6,7 @@ package envoy.service.auth.v2alpha;
 option go_package = "v2alpha";
 option java_generic_services = true;
 
+import "envoy/api/v2/core/http_status.proto";
 import "envoy/service/auth/v2alpha/attribute_context.proto";
 
 import "google/rpc/status.proto";
@@ -24,12 +25,10 @@ message CheckRequest {
   AttributeContext attributes = 1;
 }
 
-// An message that contains HTTP response attributes. This message is
-// used when the authorization service needs to send custom responses to the
-// downstream client or, to modify/add request headers being dispatched to the upstream.
-message HttpResponse {
+// Http attributes for denied responses.
+message DeniedHttpResponse {
   // Http status code.
-  uint32 status_code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+  envoy.api.v2.core.HttpStatus status = 1;
 
   // Http entity headers.
   map<string, string> headers = 2;
@@ -38,10 +37,25 @@ message HttpResponse {
   string body = 3;
 }
 
+// Http attributes for ok responses.
+message OkHttpResponse {
+  // Http entity headers.
+  map<string, string> headers = 2;
+}
+
 message CheckResponse {
   // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;
 
-  // A field that supplies the attributes for an HTTP response.
-  HttpResponse http_response = 2;
+  // An message that contains HTTP response attributes. This message is
+  // used when the authorization service needs to send custom responses to the
+  // downstream client or, to modify/add request headers being dispatched to the upstream.
+  oneof http_response {
+    
+    // Supplies http attributes for denied responses.
+    DeniedHttpResponse denied_response = 2;
+    
+    // Supplies http attributes for ok responses.
+    OkHttpResponse ok_response = 3;
+  }
 }

@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/codes.h"
-
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
@@ -20,11 +18,13 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 namespace {
+
 const Http::HeaderMap* getDeniedHeader() {
   static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
       {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Forbidden))}};
   return header_map;
 }
+
 } // namespace
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
@@ -83,9 +83,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   using Filters::Common::ExtAuthz::CheckStatus;
 
-  const bool update_status_code = response->status_code >= enumToInt(Http::Code::Continue) &&
-                                  response->status_code != enumToInt(Http::Code::Forbidden);
-
   switch (response->status) {
   case CheckStatus::OK:
     cluster_->statsScope().counter("ext_authz.ok").inc();
@@ -96,16 +93,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Denied:
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeUtility::ResponseStatInfo info{
-        config_->scope(),
-        cluster_->statsScope(),
-        EMPTY_STRING,
-        (update_status_code ? response->status_code : enumToInt(Http::Code::Forbidden)),
-        true,
-        EMPTY_STRING,
-        EMPTY_STRING,
-        EMPTY_STRING,
-        EMPTY_STRING,
-        false};
+        config_->scope(), cluster_->statsScope(), EMPTY_STRING, response->status_code, true,
+        EMPTY_STRING,     EMPTY_STRING,           EMPTY_STRING, EMPTY_STRING,          false};
     Http::CodeUtility::chargeResponseStat(info);
     break;
   }
@@ -114,23 +103,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   // if there is an error contacting the service.
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
-    Http::HeaderMapPtr response_headers;
-    if (update_status_code) {
-      response_headers = std::make_unique<Http::HeaderMapImpl>(Http::HeaderMapImpl{
-          {Http::Headers::get().Status, std::to_string(response->status_code)}});
-    } else {
-      response_headers = std::make_unique<Http::HeaderMapImpl>(*getDeniedHeader());
-    }
 
-    for (const auto& header : response->headers) {
-      response_headers->setReferenceKey(header.first, header.second);
-    }
-
-    if (response->body) {
-      callbacks_->encodeHeaders(std::move(response_headers), false);
+    if (response->body && response->body->length()) {
+      callbacks_->encodeHeaders(getHeaderMap(response), false);
       callbacks_->encodeData(*response->body.get(), true);
     } else {
-      callbacks_->encodeHeaders(std::move(response_headers), true);
+      callbacks_->encodeHeaders(getHeaderMap(response), true);
     }
 
     callbacks_->requestInfo().setResponseFlag(
@@ -151,6 +129,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       callbacks_->continueDecoding();
     }
   }
+}
+
+Http::HeaderMapPtr Filter::getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse) {
+  Http::HeaderMapPtr header_map;
+  if (reponse->status_code != enumToInt(Http::Code::Forbidden)) {
+    header_map = std::make_unique<Http::HeaderMapImpl>(
+        Http::HeaderMapImpl{{Http::Headers::get().Status, std::to_string(reponse->status_code)}});
+  } else {
+    header_map = std::make_unique<Http::HeaderMapImpl>(*getDeniedHeader());
+  }
+  for (const auto& header : reponse->headers) {
+    header_map->addReferenceKey(header.first, header.second);
+  }
+  return header_map;
 }
 
 } // namespace ExtAuthz

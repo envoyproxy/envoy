@@ -35,12 +35,12 @@ typedef std::vector<std::pair<Http::LowerCaseString, std::string>> KeyValueHeade
 struct Response {
   // Call status.
   CheckStatus status;
-  // Optional http headers attribute.
+  // Optional http headers attribute to be dispached to the upstream.
   KeyValueHeaders headers;
-  // Optional http body attribute.
+  // Optional http headers attribute to be dispached to the downstream.
   Buffer::InstancePtr body;
-  // Extra http status code attribute.
-  uint32_t status_code;
+  // Optional http status code to be dispatched to the downstream.
+  uint32_t status_code{};
 };
 
 typedef std::unique_ptr<Response> ResponsePtr;
