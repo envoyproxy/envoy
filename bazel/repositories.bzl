@@ -225,7 +225,6 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     # dependencies and name conflicts.
     _boringssl()
     _com_google_absl()
-    _com_googlesourcecode_cctz()
     _com_github_bombela_backward()
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
