@@ -350,6 +350,8 @@ TEST_F(EdsTest, EndpointRemoval) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_TRUE(hosts.size() == 2);
 
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     // Mark the hosts as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
