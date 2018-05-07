@@ -9,7 +9,8 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
-* admin: added :http:get:`/config_dump` for dumping current configs
+* admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
+  version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:

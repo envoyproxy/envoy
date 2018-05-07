@@ -49,6 +49,7 @@ bazel --batch build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
 PROTO_RST="
+  /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
   /envoy/api/v2/core/config_source/envoy/api/v2/core/config_source.proto.rst

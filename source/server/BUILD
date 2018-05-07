@@ -22,7 +22,6 @@ envoy_cc_library(
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
     deps = [
-        ":lds_api_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -198,6 +197,7 @@ envoy_cc_library(
         ":configuration_lib",
         ":drain_manager_lib",
         ":init_manager_lib",
+        ":lds_api_lib",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -212,6 +212,7 @@ envoy_cc_library(
         "//source/common/ssl:context_config_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )

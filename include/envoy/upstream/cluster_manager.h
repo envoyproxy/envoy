@@ -15,6 +15,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/admin.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
@@ -70,9 +71,12 @@ public:
    *    Nothing is done if the hash matches the previously running configuration.
    * 2) Statically defined clusters (those present when Envoy starts) can not be updated via API.
    *
+   * @param cluster supplies the cluster configuration.
+   * @param version_info supplies the xDS version of the cluster.
    * @return true if the action results in an add/update of a cluster.
    */
-  virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster) PURE;
+  virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+                                  const std::string& version_info) PURE;
 
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
@@ -228,7 +232,7 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager) PURE;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) PURE;
 
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',

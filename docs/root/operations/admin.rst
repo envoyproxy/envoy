@@ -115,9 +115,8 @@ modify different aspects of the server:
 .. http:get:: /config_dump
 
   Dump currently loaded configuration from various Envoy components as JSON-serialized proto
-  messages. Currently, only route configs are available but more are on the way. See
-  :api:`envoy/admin/v2/config_dump.proto` for more information. That proto is in draft state and is
-  subject to change.
+  messages. See the :ref:`response definition <envoy_api_msg_admin.v2alpha.ConfigDump>` for more
+  information.
 
 .. http:post:: /cpuprofiler
 
@@ -182,9 +181,9 @@ The fields are:
 .. http:get:: /stats
 
   Outputs all statistics on demand. This command is very useful for local debugging.
-  Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100. 
-  The output for each quantile will be in the form of (interval,cumulative) where interval value 
-  represents the summary since last flush interval and cumulative value represents the 
+  Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
+  The output for each quantile will be in the form of (interval,cumulative) where interval value
+  represents the summary since last flush interval and cumulative value represents the
   summary since the start of envoy instance.
   See :ref:`here <operations_stats>` for more information.
 

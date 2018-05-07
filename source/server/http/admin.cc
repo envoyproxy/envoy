@@ -278,7 +278,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 }
 
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
-Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response) const {
   envoy::admin::v2alpha::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
@@ -290,6 +290,8 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
     config_dump_map[key_callback_pair.first] = any_message;
   }
 
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }

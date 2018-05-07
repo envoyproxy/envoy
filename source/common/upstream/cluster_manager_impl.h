@@ -45,7 +45,7 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager) override;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
@@ -150,10 +150,11 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster) override;
+  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+                          const std::string& version_info) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -289,8 +290,11 @@ private:
   };
 
   struct ClusterData {
-    ClusterData(uint64_t config_hash, bool added_via_api, ClusterSharedPtr&& cluster)
-        : config_hash_(config_hash), added_via_api_(added_via_api), cluster_(std::move(cluster)) {}
+    ClusterData(const envoy::api::v2::Cluster& cluster_config, const std::string& version_info,
+                bool added_via_api, ClusterSharedPtr&& cluster)
+        : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
+          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)) {
+    }
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -302,7 +306,9 @@ private:
       }
     }
 
+    const envoy::api::v2::Cluster cluster_config_;
     const uint64_t config_hash_;
+    const std::string version_info_;
     const bool added_via_api_;
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
@@ -320,12 +326,14 @@ private:
   };
 
   typedef std::unique_ptr<ClusterData> ClusterDataPtr;
-  typedef std::unordered_map<std::string, ClusterDataPtr> ClusterMap;
+  // This map is ordered so that config dumping is consistent.
+  typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
+  ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api,
-                   ClusterMap& cluster_map);
+  void loadCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
+                   bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const HostVector& hosts_added, const HostVector& hosts_removed);
@@ -351,6 +359,7 @@ private:
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };
 
 } // namespace Upstream
