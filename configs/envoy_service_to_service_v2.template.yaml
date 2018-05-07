@@ -422,6 +422,14 @@ static_resources:
             address: collector-grpc.lightstep.com
             port_value: 443
 
+    - name: cds_cluster
+      connect_timeout: 0.25s
+      type: STRICT_DNS
+      lb_type: ROUND_ROBIN
+      hosts:
+        - url: tcp://cds.yourcompany.net:80
+
+
 admin:
   access_log_path: /var/log/envoy/admin_access.log
   address:
@@ -453,3 +461,6 @@ runtime:
 dynamic_resources:
 #need to add eds/sds_config here
   cds_config:
+    api_config_source:
+      cluster_names:
+        - cds_cluster

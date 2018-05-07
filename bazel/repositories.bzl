@@ -146,8 +146,8 @@ def _python_deps():
         build_file = "@envoy//bazel/external:pyyaml.BUILD",
     )
     native.bind(
-        name = "pyyaml",
-        actual = "@com_github_yaml_pyyaml//:pyyaml",
+        name = "yaml",
+        actual = "@com_github_yaml_pyyaml//:yaml",
     )
 
 
