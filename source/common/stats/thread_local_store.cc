@@ -101,8 +101,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (const auto& scopes : tls_->getTyped<TlsCache>().scope_cache_) {
-            for (const auto& name_histogram_pair : scopes.second.histograms_) {
+          for (const auto& scope : tls_->getTyped<TlsCache>().scope_cache_) {
+            const TlsCacheEntry& tls_cache_entry = scope.second;
+            for (const auto& name_histogram_pair : tls_cache_entry.histograms_) {
               const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
               tls_hist->beginMerge();
             }
@@ -138,7 +139,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
-std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag>& tags) {
+std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
+                                                 std::vector<Tag>& tags) const {
   return tag_producer_->produceTags(name, tags);
 }
 
@@ -300,7 +302,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
     return **tls_ref;
   }
 
-  std::unique_lock<std::mutex> lock(parent_.lock_);
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(name, tags);
   TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(
