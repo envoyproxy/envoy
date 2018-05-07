@@ -660,8 +660,7 @@ void StaticClusterImpl::startPreInit() {
 bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& current_hosts,
                                                    HostVector& hosts_added,
-                                                   HostVector& hosts_removed,
-                                                   bool has_health_checker, bool ignore_active_hc) {
+                                                   HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
@@ -731,14 +730,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       hosts_added.push_back(host);
 
       // If we are depending on a health checker, we initialize to unhealthy.
-      if (has_health_checker) {
+      if (health_checker_ != nullptr) {
         hosts_added.back()->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       }
     }
   }
 
+  const bool skip_healthy_hosts =
+      health_checker_ != nullptr && !info()->drainConnectionsOnEdsRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
-  if (!current_hosts.empty() && !ignore_active_hc) {
+  if (!current_hosts.empty() && skip_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
@@ -867,8 +868,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector hosts_added;
         HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false,
-                                          true)) {
+        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);
         }

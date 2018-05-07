@@ -121,8 +121,6 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
 
   HostVector hosts_added;
   HostVector hosts_removed;
-  const bool has_health_checker = health_checker_ != nullptr;
-  const bool ignore_active_hc = !has_health_checker || info()->drainConnectionsOnEdsRemoval();
   // We need to trigger updateHosts with the new host vectors if they have changed. We also do this
   // when the locality weight map changes.
   // TODO(htuch): We eagerly update all the host sets here on weight changes, which isn't great,
@@ -131,8 +129,7 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            has_health_checker, ignore_active_hc) ||
+  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;
