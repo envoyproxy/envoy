@@ -559,7 +559,7 @@ message RouteAction {
   //
   // .. attention::
   //
-  //   If a connection is upgraded to a WebSocket connection, Envoy will setup plain TCP
+  //   If a connection is upgraded to a WebSocket connection, Envoy will set up plain TCP
   //   proxying between the client and the upstream server. Hence, an upstream
   //   server that rejects the WebSocket upgrade request is also responsible for
   //   closing the associated connection. Until then, Envoy will continue to
