@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+import "validate/validate.proto";
+
+// HTTP status code.
+message HttpStatus {
+
+  // Supplies HTTP response code.
+  uint32 code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
+}
