@@ -7,7 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "common/common/absl_mutex.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
