@@ -473,8 +473,8 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
 
 // TODO(ramaraochavali): Add summary histogram output for Prometheus.
 uint64_t
-PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                            const std::list<Stats::GaugeSharedPtr>& gauges,
+PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
+                                            const std::vector<Stats::GaugeSharedPtr>& gauges,
                                             Buffer::Instance& response) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
@@ -501,7 +501,7 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
 
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                       const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+                       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);

@@ -89,7 +89,8 @@ public:
    * @param sinks supplies the list of sinks.
    * @param store supplies the store to flush.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                  Stats::FlushDelegate& flush_delegate);
 
   /**
    * Load a bootstrap config from either v1 or v2 and perform validation.

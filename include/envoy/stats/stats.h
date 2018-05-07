@@ -225,6 +225,41 @@ public:
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
 
 /**
+ * Provides sinks with access to stats during periodic stat flushes.
+ */
+class FlushDelegate {
+public:
+  virtual ~FlushDelegate() {}
+
+  /**
+   * Returns all known counters. Will use a values cached during the flush if already accessed.
+   * @return std::vector<CounterSharedPtr>& all known counters. Note: reference may not be valid
+   * after clearFlushCache() is called.
+   */
+  virtual const std::vector<CounterSharedPtr>& cachedCounters() PURE;
+
+  /**
+   * Returns all known gauges. Will use a values cached during the flush if already accessed.
+   * @return std::vector<GaugeSharedPtr>& all known counters. Note: reference may not be valid after
+   * clearFlushCache() is called.
+   */
+  virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
+
+  /**
+   * Returns all known parent histograms. Will use a values cached during the flush if already
+   * accessed.
+   * @return std::vector<ParentHistogramSharedPtr>& all known counters. Note: reference may not be
+   * valid after clearFlushCache() is called.
+   */
+  virtual const std::vector<ParentHistogramSharedPtr>& cachedHistograms() PURE;
+
+  /**
+   * Clears the cache so that any future calls to get cached metrics will refresh the set.
+   */
+  virtual void clearFlushCache() PURE;
+};
+
+/**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
  */
 class Sink {
@@ -232,34 +267,16 @@ public:
   virtual ~Sink() {}
 
   /**
-   * This will be called before a sequence of flushCounter() and flushGauge() calls. Sinks can
-   * choose to optimize writing if desired with a paired endFlush() call.
+   * Periodic metric flush to the sink.
+   * @param flush_delegate interface through which the sink can access all metrics being flushed.
    */
-  virtual void beginFlush() PURE;
+  virtual void flush(FlushDelegate& flush_delegate) PURE;
 
   /**
-   * Flush a counter delta.
-   */
-  virtual void flushCounter(const Counter& counter, uint64_t delta) PURE;
-
-  /**
-   * Flush a gauge value.
-   */
-  virtual void flushGauge(const Gauge& gauge, uint64_t value) PURE;
-
-  /**
-   * Flush a histogram.
-   */
-  virtual void flushHistogram(const ParentHistogram& histogram) PURE;
-
-  /**
-   * This will be called after beginFlush(), some number of flushCounter(), and some number of
-   * flushGauge(). Sinks can use this to optimize writing if desired.
-   */
-  virtual void endFlush() PURE;
-
-  /**
-   * Flush a histogram value.
+   * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
+   * the metric, so implementations must be thread-safe.
+   * @param histogram the histogram metric that this sample applies to.
+   * @param value the value of the sample.
    */
   virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
 };
@@ -315,17 +332,17 @@ public:
   /**
    * @return a list of all known counters.
    */
-  virtual std::list<CounterSharedPtr> counters() const PURE;
+  virtual std::vector<CounterSharedPtr> counters() const PURE;
 
   /**
    * @return a list of all known gauges.
    */
-  virtual std::list<GaugeSharedPtr> gauges() const PURE;
+  virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
    * @return a list of all known histograms.
    */
-  virtual std::list<ParentHistogramSharedPtr> histograms() const PURE;
+  virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;
@@ -371,6 +388,8 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
+
+  virtual FlushDelegate& flushDelegate() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

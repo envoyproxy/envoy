@@ -14,7 +14,9 @@
 
 using testing::HasSubstr;
 using testing::InSequence;
+using testing::Invoke;
 using testing::Property;
+using testing::Ref;
 using testing::SaveArg;
 using testing::StrictMock;
 using testing::_;
@@ -26,17 +28,24 @@ TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::IsolatedStoreImpl store;
+  Stats::FlushDelegateImpl flush_delegate(store);
   store.counter("hello").inc();
   store.gauge("world").set(5);
   std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
-  EXPECT_CALL(*sink, beginFlush());
-  EXPECT_CALL(*sink, flushCounter(Property(&Stats::Metric::name, "hello"), 1));
-  EXPECT_CALL(*sink, flushGauge(Property(&Stats::Metric::name, "world"), 5));
-  EXPECT_CALL(*sink, endFlush());
+  EXPECT_CALL(*sink, flush(Ref(flush_delegate)))
+      .WillOnce(Invoke([](Stats::FlushDelegate& flush_delegate) {
+        ASSERT_EQ(flush_delegate.cachedCounters().size(), 1);
+        EXPECT_EQ(flush_delegate.cachedCounters().front()->name(), "hello");
+        EXPECT_EQ(flush_delegate.cachedCounters().front()->latch(), 1);
+
+        ASSERT_EQ(flush_delegate.cachedGauges().size(), 1);
+        EXPECT_EQ(flush_delegate.cachedGauges().front()->name(), "world");
+        EXPECT_EQ(flush_delegate.cachedGauges().front()->value(), 5);
+      }));
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, flush_delegate);
 }
 
 class RunHelperTest : public testing::Test {

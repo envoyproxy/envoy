@@ -402,8 +402,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
   //`statsAsPrometheus()` should return two implying it found two unique stat names
 
   Stats::HeapRawStatDataAllocator alloc;
-  std::list<Stats::CounterSharedPtr> counters;
-  std::list<Stats::GaugeSharedPtr> gauges;
+  std::vector<Stats::CounterSharedPtr> counters;
+  std::vector<Stats::GaugeSharedPtr> gauges;
 
   {
     std::string name = "cluster.test_cluster_1.upstream_cx_total";
@@ -460,8 +460,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
   // four unique stat names.
 
   Stats::HeapRawStatDataAllocator alloc;
-  std::list<Stats::CounterSharedPtr> counters;
-  std::list<Stats::GaugeSharedPtr> gauges;
+  std::vector<Stats::CounterSharedPtr> counters;
+  std::vector<Stats::GaugeSharedPtr> gauges;
 
   {
     std::string name = "cluster.test_cluster_1.upstream_cx_total";

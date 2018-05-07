@@ -131,8 +131,9 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::list<Stats::ParentHistogramSharedPtr>& all_histograms);
+  static std::string
+  statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+              const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -268,8 +269,8 @@ public:
    * the response buffer after sanitizing the metric / label names.
    * @return uint64_t total number of metric types inserted in response.
    */
-  static uint64_t statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                    const std::list<Stats::GaugeSharedPtr>& gauges,
+  static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
+                                    const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     Buffer::Instance& response);
   /**
    * Format the given tags, returning a string as a comma-separated list
