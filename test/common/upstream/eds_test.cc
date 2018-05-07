@@ -1,6 +1,6 @@
-#include "envoy/api/v2/eds.pb.h"
-
 #include <memory>
+
+#include "envoy/api/v2/eds.pb.h"
 
 #include "common/config/utility.h"
 #include "common/upstream/eds.h"
