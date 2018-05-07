@@ -26,6 +26,9 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
 }
 
 void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
+  ASSERT(state_ == ConnectState::PreConnect);
+  state_ = ConnectState::Failed;
+
   Code http_code = Code::InternalServerError;
   switch (failure_reason) {
   case UpstreamFailureReason::CONNECT_FAILED:
@@ -43,22 +46,29 @@ void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
 }
 
 Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
+  ENVOY_LOG(trace, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
             end_stream);
 
-  // If we are connected to upstream, then data should have been drained already.
-  // And if we're not connected yet, it is expected that TcpProxy will readDisable(true)
-  // the downstream connection until it is ready to send data to the upstream connection,
-  // so onData() should be called zero or one times before is_connected_ is true.
-  ASSERT(queued_data_.length() == 0);
+  switch (state_) {
+  case ConnectState::PreConnect:
+    // It is expected that TcpProxy will readDisable(true) the downstream connection until it is
+    // ready to send data to the upstream connection, so onData() should be called zero or one times
+    // before state_ becomes Connected.
+    ASSERT(queued_data_.length() == 0);
 
-  if (is_connected_) {
-    ENVOY_LOG(debug, "WsHandlerImpl::onData is connected");
-    return Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(data, end_stream);
-  } else {
-    ENVOY_LOG(debug, "WsHandlerImpl::onData is NOT connected");
+    ENVOY_LOG(trace, "WsHandlerImpl::onData is NOT connected");
     queued_data_.move(data);
     queued_end_stream_ = end_stream;
+    break;
+  case ConnectState::Connected:
+    // Data should have been drained already when we transitioned to Connected.
+    ASSERT(queued_data_.length() == 0);
+
+    ENVOY_LOG(trace, "WsHandlerImpl::onData is connected");
+    return Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(data, end_stream);
+  case ConnectState::Failed:
+    ENVOY_LOG(trace, "WsHandlerImpl::onData state_ == Failed; discarding");
+    break;
   }
 
   return Network::FilterStatus::StopIteration;
@@ -92,9 +102,10 @@ void WsHandlerImpl::onConnectionSuccess() {
   Http1::ClientConnectionImpl upstream_http(*upstream_connection_, http_conn_callbacks_);
   Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
   upstream_request.encodeHeaders(request_headers_, false);
-  is_connected_ = true;
+  ASSERT(state_ == ConnectState::PreConnect);
+  state_ = ConnectState::Connected;
   if (queued_data_.length() > 0 || queued_end_stream_) {
-    ENVOY_LOG(debug, "WsHandlerImpl::onConnectionSuccess calling TcpProxy::onData");
+    ENVOY_LOG(trace, "WsHandlerImpl::onConnectionSuccess calling TcpProxy::onData");
     Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(queued_data_, queued_end_stream_);
     ASSERT(queued_data_.length() == 0);
   }

@@ -128,7 +128,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
   }
   response_timer_->enableTimer(std::chrono::milliseconds(
-      Protobuf::util::TimeUtil::DurationToMilliseconds(message_->load_reporting_interval())));
+      DurationUtil::durationToMilliseconds(message_->load_reporting_interval())));
 }
 
 void LoadStatsReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {

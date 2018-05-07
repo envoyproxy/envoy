@@ -23,10 +23,11 @@ message GrpcJsonTranscoder {
     bytes proto_descriptor_bin = 4;
   }
 
-  // A list of strings that supplies the service names that the
-  // transcoder will translate. If the service name doesn't exist in ``proto_descriptor``, Envoy
-  // will fail at startup. The ``proto_descriptor`` may contain more services than the service names
-  // specified here, but they won't be translated.
+  // A list of strings that
+  // supplies the fully qualified service names (i.e. "package_name.service_name") that
+  // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
+  // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than 
+  // the service names specified here, but they won't be translated.
   repeated string services = 2 [(validate.rules).repeated .min_items = 1];
 
   message PrintOptions {

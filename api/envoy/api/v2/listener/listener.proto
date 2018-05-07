@@ -125,6 +125,7 @@ message ListenerFilter {
   //
   // [#comment:TODO(mattklein123): Auto generate the following list]
   // * :ref:`envoy.listener.original_dst <config_listener_filters_original_dst>`
+  // * :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being

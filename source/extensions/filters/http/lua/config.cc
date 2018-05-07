@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 LuaFilterConfig::createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config,
                               const std::string&, Server::Configuration::FactoryContext& context) {
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
@@ -22,7 +22,7 @@ LuaFilterConfig::createFilter(const envoy::config::filter::http::lua::v2::Lua& p
   };
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
                                      const std::string& stat_prefix,
                                      Server::Configuration::FactoryContext& context) {
@@ -31,7 +31,7 @@ LuaFilterConfig::createFilterFactory(const Json::Object& json_config,
   return createFilter(proto_config, stat_prefix, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 LuaFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                               const std::string& stat_prefix,
                                               Server::Configuration::FactoryContext& context) {

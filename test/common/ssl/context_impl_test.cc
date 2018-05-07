@@ -285,6 +285,12 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyInlineStringFailTooSmall) {
   EXPECT_THROW(loadConfigV2(cfg), EnvoyException);
 }
 
+TEST_F(SslServerContextImplTicketTest, TicketKeySdsFail) {
+  envoy::api::v2::auth::DownstreamTlsContext cfg;
+  cfg.mutable_session_ticket_keys_sds_secret_config();
+  EXPECT_THROW_WITH_MESSAGE(loadConfigV2(cfg), EnvoyException, "SDS not supported yet");
+}
+
 TEST_F(SslServerContextImplTicketTest, CRLSuccess) {
   std::string json = R"EOF(
   {
@@ -323,6 +329,17 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
                           "^Failed to load CRL from .* without trusted CA certificates$");
+}
+
+// Validate that empty SNI (according to C string rules) fails config validation.
+TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.set_sni(std::string("\000", 1));
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException, "SNI names containing NULL-byte are not allowed");
+  tls_context.set_sni(std::string("a\000b", 3));
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+                            EnvoyException, "SNI names containing NULL-byte are not allowed");
 }
 
 // Multiple certificate hashes are not yet supported.

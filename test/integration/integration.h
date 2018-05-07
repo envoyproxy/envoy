@@ -134,6 +134,8 @@ public:
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
   // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
+  // Make test more deterministic by using a fixed RNG value.
+  void setDeterministic() { deterministic_ = true; }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
@@ -205,6 +207,8 @@ private:
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   // True if initialized() has been called.
   bool initialized_{};
+  // True if test will use a fixed RNG value.
+  bool deterministic_{};
 };
 
 } // namespace Envoy

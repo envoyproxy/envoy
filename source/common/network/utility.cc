@@ -77,6 +77,8 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
     return std::stoi(url.substr(colon_index + 1));
   } catch (const std::invalid_argument& e) {
     throw EnvoyException(e.what());
+  } catch (const std::out_of_range& e) {
+    throw EnvoyException(e.what());
   }
 }
 

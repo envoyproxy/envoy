@@ -61,6 +61,7 @@ private:
   // the indexes of where the parameters for each directive is expected to begin
   static const size_t ReqParamStart{std::strlen("REQ(")};
   static const size_t RespParamStart{std::strlen("RESP(")};
+  static const size_t TrailParamStart{std::strlen("TRAILER(")};
   static const size_t StartTimeParamStart{std::strlen("START_TIME(")};
 };
 
@@ -89,6 +90,7 @@ public:
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers,
                      const Http::HeaderMap& response_headers,
+                     const Http::HeaderMap& response_trailers,
                      const RequestInfo::RequestInfo& request_info) const override;
 
 private:
@@ -104,7 +106,7 @@ public:
   PlainStringFormatter(const std::string& str);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo::RequestInfo&) const override;
 
 private:
@@ -134,7 +136,7 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap& request_headers, const Http::HeaderMap&,
-                     const RequestInfo::RequestInfo&) const override;
+                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
 };
 
 /**
@@ -147,6 +149,20 @@ public:
 
   // Formatter::format
   std::string format(const Http::HeaderMap&, const Http::HeaderMap& response_headers,
+                     const Http::HeaderMap&, const RequestInfo::RequestInfo&) const override;
+};
+
+/**
+ * Formatter based on the response trailer.
+ */
+class ResponseTrailerFormatter : public Formatter, HeaderFormatter {
+public:
+  ResponseTrailerFormatter(const std::string& main_header, const std::string& alternative_header,
+                           absl::optional<size_t> max_length);
+
+  // Formatter::format
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+                     const Http::HeaderMap& response_trailers,
                      const RequestInfo::RequestInfo&) const override;
 };
 
@@ -158,7 +174,7 @@ public:
   RequestInfoFormatter(const std::string& field_name);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo::RequestInfo& request_info) const override;
 
 private:
@@ -190,7 +206,7 @@ public:
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
 
   // Formatter::format
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo::RequestInfo& request_info) const override;
 };
 
@@ -200,7 +216,7 @@ public:
 class StartTimeFormatter : public Formatter {
 public:
   StartTimeFormatter(const std::string& format);
-  std::string format(const Http::HeaderMap&, const Http::HeaderMap&,
+  std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const RequestInfo::RequestInfo&) const override;
 
 private:

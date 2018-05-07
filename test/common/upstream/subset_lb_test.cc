@@ -78,6 +78,11 @@ public:
     return matches_;
   }
 
+  Router::MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct&) const override {
+    return nullptr;
+  }
+
 private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
@@ -92,9 +97,7 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
-    return matches_.get();
-  }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
@@ -345,6 +348,14 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
 
+// Validate that SubsetLoadBalancer unregisters its priority set member update
+// callback. Regression for heap-use-after-free.
+TEST_F(SubsetLoadBalancerTest, DeregisterCallbacks) {
+  init();
+  lb_.reset();
+  host_set_.runCallbacks({}, {});
+}
+
 TEST_P(SubsetLoadBalancerTest, NoFallbackAfterUpdate) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
@@ -380,8 +391,8 @@ TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
   HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
   modifyHosts({added_host}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
@@ -890,7 +901,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
@@ -1011,7 +1022,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
@@ -1130,7 +1141,7 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
 }
 
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {

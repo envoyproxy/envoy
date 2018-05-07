@@ -206,6 +206,33 @@ private:
       uint64_t drains_remaining_{};
     };
 
+    // Holds an unowned reference to a connection, and watches for Closed events. If the connection
+    // is closed, this container removes itself from the container that owns it.
+    struct TcpConnContainer : public Network::ConnectionCallbacks, public Event::DeferredDeletable {
+    public:
+      TcpConnContainer(ThreadLocalClusterManagerImpl& parent, const HostConstSharedPtr& host,
+                       Network::ClientConnection& connection)
+          : parent_(parent), host_(host), connection_(connection) {
+        connection_.addConnectionCallbacks(*this);
+      }
+
+      // Network::ConnectionCallbacks
+      void onEvent(Network::ConnectionEvent event) override {
+        if (event == Network::ConnectionEvent::LocalClose ||
+            event == Network::ConnectionEvent::RemoteClose) {
+          parent_.removeTcpConn(host_, connection_);
+        }
+      }
+      void onAboveWriteBufferHighWatermark() override {}
+      void onBelowWriteBufferLowWatermark() override {}
+
+      ThreadLocalClusterManagerImpl& parent_;
+      HostConstSharedPtr host_;
+      Network::ClientConnection& connection_;
+    };
+    typedef std::unordered_map<Network::ClientConnection*, std::unique_ptr<TcpConnContainer>>
+        TcpConnectionsMap;
+
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
                    const LoadBalancerFactorySharedPtr& lb_factory);
@@ -238,6 +265,7 @@ private:
     ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
+    void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
                                         HostVectorConstSharedPtr healthy_hosts,
@@ -251,7 +279,12 @@ private:
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     std::unordered_map<std::string, ClusterEntryPtr> thread_local_clusters_;
+
+    // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
+    // to prevent lifetime/ownership issues when a cluster is dynamically removed.
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
+
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
   };

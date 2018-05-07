@@ -53,7 +53,7 @@ public:
         .WillByDefault(
             Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                        Server::Configuration::FactoryContext& context)
-                       -> std::vector<Server::Configuration::NetworkFilterFactoryCb> {
+                       -> std::vector<Network::FilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                            context);
             }));
@@ -61,7 +61,7 @@ public:
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
                 Server::Configuration::ListenerFactoryContext& context)
-                -> std::vector<Server::Configuration::ListenerFilterFactoryCb> {
+                -> std::vector<Network::ListenerFilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
                   filters, context);
             }));

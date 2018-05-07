@@ -15,6 +15,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -36,8 +37,7 @@ public:
   static RouteConfigProviderSharedPtr
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
-         Runtime::Loader& runtime, Upstream::ClusterManager& cm, Stats::Scope& scope,
-         const std::string& stat_prefix, Init::Manager& init_manager,
+         Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
          RouteConfigProviderManager& route_config_provider_manager);
 };
 
@@ -47,7 +47,7 @@ public:
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
-                                Runtime::Loader& runtime, Upstream::ClusterManager& cm);
+                                Server::Configuration::FactoryContext& factory_context);
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
@@ -121,17 +121,14 @@ private:
 
   RdsRouteConfigProviderImpl(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      const std::string& manager_identifier, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-      Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-      const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-      ThreadLocal::SlotAllocator& tls,
+      const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+      const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
 
-  Runtime::Loader& runtime_;
-  Upstream::ClusterManager& cm_;
+  Server::Configuration::FactoryContext& factory_context_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   ThreadLocal::SlotPtr tls_;
   std::string config_source_;
@@ -151,10 +148,7 @@ private:
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
-  RouteConfigProviderManagerImpl(Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-                                 Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 ThreadLocal::SlotAllocator& tls, Server::Admin& admin);
+  RouteConfigProviderManagerImpl(Server::Admin& admin);
 
   // RouteConfigProviderManager
   std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
@@ -162,12 +156,12 @@ public:
 
   RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
-      Init::Manager& init_manager) override;
+      Server::Configuration::FactoryContext& factory_context,
+      const std::string& stat_prefix) override;
 
   RouteConfigProviderSharedPtr
   getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
-                               Runtime::Loader& runtime, Upstream::ClusterManager& cm) override;
+                               Server::Configuration::FactoryContext& factory_context) override;
 
 private:
   ProtobufTypes::MessagePtr dumpRouteConfigs();
@@ -179,12 +173,6 @@ private:
   std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
       route_config_providers_;
   std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
-  Runtime::Loader& runtime_;
-  Event::Dispatcher& dispatcher_;
-  Runtime::RandomGenerator& random_;
-  const LocalInfo::LocalInfo& local_info_;
-  ThreadLocal::SlotAllocator& tls_;
-  Server::Admin& admin_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
   friend class RdsRouteConfigProviderImpl;

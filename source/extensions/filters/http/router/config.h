@@ -17,11 +17,11 @@ namespace RouterFilter {
  */
 class RouterFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override;
@@ -33,7 +33,7 @@ public:
   std::string name() override { return HttpFilterNames::get().ROUTER; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilter(const envoy::config::filter::http::router::v2::Router& proto_config,
                const std::string& stat_prefix, Server::Configuration::FactoryContext& context);
 };

@@ -8,6 +8,8 @@
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 
+#include "extensions/transport_sockets/well_known_names.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -148,6 +150,11 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       // prevent further redirection.
       new_listener->onAccept(std::move(socket_), false);
     } else {
+      // Set default transport protocol if none of the listener filters did it.
+      if (socket_->detectedTransportProtocol().empty()) {
+        socket_->setDetectedTransportProtocol(
+            Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
+      }
       // Create a new connection on this listener.
       listener_.newConnection(std::move(socket_));
     }
