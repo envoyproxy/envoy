@@ -28,12 +28,12 @@
 
 #include "gmock/gmock.h"
 
-using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace Grpc {
