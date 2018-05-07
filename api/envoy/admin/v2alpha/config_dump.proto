@@ -39,15 +39,15 @@ message BootstrapConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
 message ListenersConfigDump {
-  // This is the top level, "transactional," version information in the last processed LDS
-  // discovery response. If there are only static bootstrap listeners, this field will be "".
+  // This is the *version_info* in the last processed LDS discovery response. If there
+  // are only static bootstrap listeners, this field will be "".
   string version_info = 1;
 
   // Describes a dynamically loaded cluster via the LDS API.
   message DynamicListener {
     // This is the per-resource version information. This version is currently taken from the
-    // transactional version_info field at the time that the listener was loaded. In the future,
-    // discrete per-listener versions may be supported by the API.
+    // *version_info* field at the time that the listener was loaded. In the future, discrete
+    // per-listener versions may be supported by the API.
     string version_info = 1;
 
     // The listener config.
@@ -78,15 +78,15 @@ message ListenersConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // clusters as static clusters or by returning them in a CDS response.
 message ClustersConfigDump {
-  // This is the top level, "transactional," version information in the last processed CDS
-  // discovery response. If there are only static bootstrap clusters, this field will be "".
+  // This is the *version_info* in the last processed CDS discovery response. If there
+  // are only static bootstrap clusters, this field will be "".
   string version_info = 1;
 
   // Describes a dynamically loaded cluster via the CDS API.
   message DynamicCluster {
     // This is the per-resource version information. This version is currently taken from the
-    // transactional version_info field at the time that the cluster was loaded. In the future,
-    // discrete per-cluster versions may be supported by the API.
+    // *version_info* field at the time that the cluster was loaded. In the future, discrete
+    // per-cluster versions may be supported by the API.
     string version_info = 1;
 
     // The cluster config.
@@ -115,9 +115,7 @@ message ClustersConfigDump {
 message RoutesConfigDump {
   message DynamicRouteConfig {
     // This is the per-resource version information. This version is currently taken from the
-    // transactional version_info field in the RDS response at the time that the route was loaded.
-    // Note that *RoutesConfigDump* does not contain a top-level transactional *version_info*
-    // field as every RDS subscription is discrete.
+    // *version_info* field at the time that the route configuration was loaded.
     string version_info = 1;
 
     // The route config.

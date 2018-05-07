@@ -21,8 +21,7 @@ public:
   /**
    * Called when a configuration update is received.
    * @param resources vector of fetched resources corresponding to the configuration update.
-   * @param version_info supplies the transactional/top-level version information as supplied by
-   *        the xDS discovery response.
+   * @param version_info supplies the version information as supplied by the xDS discovery response.
    * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
