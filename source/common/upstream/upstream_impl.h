@@ -360,9 +360,7 @@ public:
     return cluster_socket_options_;
   };
 
-  bool drainConnectionsOnEdsRemoval() const override {
-    return drain_connections_on_eds_removal_;
-  }
+  bool drainConnectionsOnEdsRemoval() const override { return drain_connections_on_eds_removal_; }
 
 private:
   struct ResourceManagers {

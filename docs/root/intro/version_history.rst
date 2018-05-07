@@ -24,7 +24,7 @@ Version history
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
 * cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
-* cluster: Add :ref:`option <envoy_api_field_Clister.drain_connections_on_eds_removal>` to drain
+* cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_eds_removal>` to drain
   endpoints after they are removed through EDS, despite health status.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.

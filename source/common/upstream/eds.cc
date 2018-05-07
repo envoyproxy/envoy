@@ -131,7 +131,7 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-        depend_on_hc) ||
+                            depend_on_hc) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;

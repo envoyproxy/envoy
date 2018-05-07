@@ -334,9 +334,9 @@ TEST_F(EdsTest, EndpointRemoval) {
     auto* endpoints = cluster_load_assignment->add_endpoints();
 
     auto* socket_address = endpoints->add_lb_endpoints()
-      ->mutable_endpoint()
-      ->mutable_address()
-      ->mutable_socket_address();
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
     socket_address->set_address("1.2.3.4");
     socket_address->set_port_value(port);
   };
