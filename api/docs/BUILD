@@ -48,6 +48,8 @@ proto_library(
         "//envoy/config/metrics/v2:stats",
         "//envoy/config/ratelimit/v2:rls",
         "//envoy/config/trace/v2:trace",
+        "//envoy/config/transport_socket/capture/v2alpha:capture",
+        "//envoy/extensions/common/tap/v2alpha:capture",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/load_stats/v2:lrs",
         "//envoy/service/metrics/v2:metrics_service",

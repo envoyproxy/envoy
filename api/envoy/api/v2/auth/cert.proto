@@ -215,7 +215,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2;
+  string sni = 2 [(validate.rules).string.max_bytes = 255];
 }
 
 message DownstreamTlsContext {

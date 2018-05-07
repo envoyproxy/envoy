@@ -316,7 +316,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
                                                  random_value);
   }
 
-  matches &= ConfigUtility::matchHeaders(headers, config_headers_);
+  matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
         Http::Utility::parseQueryString(headers.Path()->value().c_str());

@@ -78,6 +78,11 @@ public:
     return matches_;
   }
 
+  Router::MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct&) const override {
+    return nullptr;
+  }
+
 private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
@@ -92,9 +97,7 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
-    return matches_.get();
-  }
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;

@@ -7,6 +7,8 @@ Version history
 * access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
+* access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
+  to filter logs based on request headers
 * admin: added :http:get:`/config_dump` for dumping current configs
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
@@ -55,6 +57,8 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
+* sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
+  recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
   <envoy_api_field_Listener.freebind>` and upstream connections via
   :ref:`cluster manager wide
