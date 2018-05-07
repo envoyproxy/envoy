@@ -531,9 +531,9 @@ public:
 
   /**
    * @return whether to skip waiting for health checking before draining connections
-   *         after an endpoint is removed from EDS.
+   *         after a host is removed from service discovery.
    */
-  virtual bool drainConnectionsOnEdsRemoval() const PURE;
+  virtual bool drainConnectionsOnHostRemoval() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

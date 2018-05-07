@@ -270,7 +270,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
-      drain_connections_on_eds_removal_(config.drain_connections_on_eds_removal()) {
+      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
@@ -737,7 +737,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   }
 
   const bool skip_healthy_hosts =
-      health_checker_ != nullptr && !info()->drainConnectionsOnEdsRemoval();
+      health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && skip_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {

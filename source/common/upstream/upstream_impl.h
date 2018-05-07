@@ -360,7 +360,7 @@ public:
     return cluster_socket_options_;
   };
 
-  bool drainConnectionsOnEdsRemoval() const override { return drain_connections_on_eds_removal_; }
+  bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
 private:
   struct ResourceManagers {
@@ -400,7 +400,7 @@ private:
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
-  const bool drain_connections_on_eds_removal_;
+  const bool drain_connections_on_host_removal_;
 };
 
 /**

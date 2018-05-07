@@ -311,7 +311,7 @@ TEST_F(EdsTest, EndpointRemoval) {
       connect_timeout: 0.25s
       type: EDS
       lb_policy: ROUND_ROBIN
-      drain_connections_on_eds_removal: true
+      drain_connections_on_host_removal: true
       eds_cluster_config:
         service_name: fare
         eds_config:
