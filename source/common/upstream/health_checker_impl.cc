@@ -449,7 +449,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   request_encoder_->getStream().addCallbacks(*this);
 
   auto headers_message = Grpc::Common::prepareHeaders(
-      parent_.cluster_.info()->name(), parent_.service_method_.service()->full_name(),
+      parent_.service_method_.service()->full_name(),
       parent_.service_method_.name());
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);

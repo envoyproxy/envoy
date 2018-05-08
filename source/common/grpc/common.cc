@@ -228,8 +228,7 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   return body;
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
+Http::MessagePtr Common::prepareHeaders(const std::string& service_full_name,
                                         const std::string& method_name) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
