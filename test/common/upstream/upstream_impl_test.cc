@@ -307,7 +307,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
-TEST(StrictDnsClusterImplTest, BasicEndpoints) {
+TEST(StrictDnsClusterImplTest, DISABLED_BasicEndpoints) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
@@ -485,7 +485,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-TEST(StaticClusterImplTest, StaticEndpoints) {
+TEST(StaticClusterImplTest, DISABLED_StaticEndpoints) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;

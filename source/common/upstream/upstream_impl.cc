@@ -414,8 +414,7 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Runtime::Loader& runtime, Stats::Store& stats,
                                  Ssl::ContextManager& ssl_context_manager, bool added_via_api)
     : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
-                                                   ssl_context_manager, added_via_api)),
-      endpoints_(cluster.endpoints().lb_endpoints()) {
+                                                   ssl_context_manager, added_via_api)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -434,22 +433,6 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
         info_->stats().membership_total_.set(hosts);
         info_->stats().membership_healthy_.set(healthy_hosts);
       });
-
-  // The cluster's hosts field is deprecated, this translates cluster hosts to endpoints.
-  translateClusterHosts(cluster.hosts());
-}
-
-void ClusterImplBase::translateClusterHosts(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
-  if (!endpoints_.empty()) {
-    return;
-  }
-
-  endpoints_.Reserve(hosts.size());
-  for (const envoy::api::v2::core::Address& host : hosts) {
-    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = endpoints_.Add();
-    lb_endpoint->mutable_endpoint()->mutable_address()->CopyFrom(host);
-  }
 }
 
 HostVectorConstSharedPtr ClusterImplBase::createHealthyHostList(const HostVector& hosts) {
@@ -641,12 +624,11 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       initial_hosts_(new HostVector()) {
-  for (const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint : endpoints_) {
-    const envoy::api::v2::endpoint::Endpoint& endpoint = lb_endpoint.endpoint();
+  for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-        info_, EMPTY_STRING, resolveProtoAddress(endpoint.address()),
-        envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(), endpoint.health_check_config())});
+        info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
+        envoy::api::v2::core::Locality().default_instance(),
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
   }
 }
 
@@ -808,13 +790,12 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     NOT_REACHED;
   }
 
-  for (const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint : endpoints_) {
-    const envoy::api::v2::core::SocketAddress& socket_address =
-        lb_endpoint.endpoint().address().socket_address();
+  for (const auto& host : cluster.hosts()) {
     resolve_targets_.emplace_back(new ResolveTarget(
         *this, dispatcher,
-        fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value()),
-        lb_endpoint.endpoint().health_check_config()));
+        fmt::format("tcp://{}:{}", host.socket_address().address(),
+                    host.socket_address().port_value()),
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
   }
 }
 

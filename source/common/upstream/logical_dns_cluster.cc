@@ -27,7 +27,8 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  if (endpoints_.size() != 1) {
+  const auto& hosts = cluster.hosts();
+  if (hosts.size() != 1) {
     throw EnvoyException("logical_dns clusters must have a single host");
   }
 
@@ -45,13 +46,12 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const envoy::api::v2::endpoint::Endpoint& endpoint = endpoints_[0].endpoint();
-  const envoy::api::v2::core::SocketAddress& socket_address = endpoint.address().socket_address();
+  const auto& socket_address = hosts[0].socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
-  health_check_config_ = endpoint.health_check_config();
+  health_check_config_ = envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance();
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
