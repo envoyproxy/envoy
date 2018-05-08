@@ -87,7 +87,7 @@ public:
     }
   }
 
-  bool try_lock() override {
+  bool tryLock() override {
     int rc = pthread_mutex_trylock(&mutex_);
     if (rc == EBUSY) {
       return false;
@@ -209,7 +209,7 @@ private:
   Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  std::unique_ptr<RawStatDataSet> stats_set_;
+  std::unique_ptr<RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;
