@@ -346,7 +346,7 @@ TEST_F(EdsTest, EndpointRemoval) {
   add_endpoint(80);
   add_endpoint(81);
 
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -363,7 +363,7 @@ TEST_F(EdsTest, EndpointRemoval) {
   cluster_load_assignment->clear_endpoints();
   add_endpoint(80);
 
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -628,7 +628,7 @@ TEST_F(EdsTest, EndpointHostPerPriority) {
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
   EXPECT_TRUE(initialized);
 
   {
@@ -645,7 +645,7 @@ TEST_F(EdsTest, EndpointHostPerPriority) {
 
   add_hosts_to_locality("oceania", "koala", "ingsoc", 4, 0);
 
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
