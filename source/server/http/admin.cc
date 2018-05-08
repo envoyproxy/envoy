@@ -664,8 +664,9 @@ void AdminFilter::onComplete() {
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
 
-  AdminStreamImpl admin_stream(*callbacks_, *request_headers_, on_destroy_callbacks_);
-  Http::Code code = parent_.runCallback(path, *header_map, response, admin_stream);
+  std::unique_ptr<AdminStreamImpl> admin_stream =
+      std::make_unique<AdminStreamImpl>(*callbacks_, *request_headers_, on_destroy_callbacks_);
+  Http::Code code = parent_.runCallback(path, *header_map, response, *admin_stream);
 
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
@@ -682,10 +683,10 @@ void AdminFilter::onComplete() {
   // Under no circumstance should browsers sniff content-type.
   header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
   callbacks_->encodeHeaders(std::move(header_map),
-                            admin_stream.endStreamOnComplete() && response.length() == 0);
+                            admin_stream->endStreamOnComplete() && response.length() == 0);
 
   if (response.length() > 0) {
-    callbacks_->encodeData(response, admin_stream.endStreamOnComplete());
+    callbacks_->encodeData(response, admin_stream->endStreamOnComplete());
   }
 }
 
