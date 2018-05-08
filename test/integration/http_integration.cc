@@ -89,7 +89,7 @@ void IntegrationCodecClient::flushWrite() {
 
 void IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& headers,
                                                    IntegrationStreamDecoder& response) {
-  RELEASE_ASSERT(!response.complete());  // Make sure this is cleared between uses.
+  RELEASE_ASSERT(!response.complete()); // Make sure this is cleared between uses.
   Http::StreamEncoder& encoder = newStream(response);
   encoder.getStream().addCallbacks(response);
   encoder.encodeHeaders(headers, true);
@@ -98,7 +98,7 @@ void IntegrationCodecClient::makeHeaderOnlyRequest(const Http::HeaderMap& header
 
 void IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size,
                                                  IntegrationStreamDecoder& response) {
-  RELEASE_ASSERT(!response.complete());  // Make sure this is cleared between uses.
+  RELEASE_ASSERT(!response.complete()); // Make sure this is cleared between uses.
   Http::StreamEncoder& encoder = newStream(response);
   encoder.getStream().addCallbacks(response);
   encoder.encodeHeaders(headers, false);
