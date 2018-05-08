@@ -123,6 +123,8 @@ private:
     Router::ConfigConstSharedPtr config_;
   };
 
+  friend class AdminStatsTest;
+
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
