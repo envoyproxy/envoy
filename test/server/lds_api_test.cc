@@ -120,7 +120,7 @@ TEST_F(LdsApiTest, ValidateFail) {
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
   listeners.Add();
 
-  EXPECT_THROW(lds_->onConfigUpdate(listeners), ProtoValidationException);
+  EXPECT_THROW(lds_->onConfigUpdate(listeners, ""), ProtoValidationException);
   EXPECT_CALL(request_, cancel());
 }
 
@@ -167,7 +167,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, true))
       .WillOnce(Throw(EnvoyException("something is wrong")));
 
-  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener invalid-listener: something is wrong");
   EXPECT_CALL(request_, cancel());
 }

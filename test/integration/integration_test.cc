@@ -39,16 +39,16 @@ TEST_P(IntegrationTest, ConnectionClose) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                               {":path", "/healthcheck"},
-                                                               {":authority", "host"},
-                                                               {"connection", "close"}},
-                                       *response_);
-  response_->waitForEndStream();
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/healthcheck"},
+                                                                   {":authority", "host"},
+                                                                   {"connection", "close"}});
+  response->waitForEndStream();
   codec_client_->waitForDisconnect();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -137,14 +137,13 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeHeaderOnlyRequest(
+  auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/test/long/url"},
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"content-type", "application/grpc"},
-                              {"x-envoy-retry-grpc-on", "cancelled"}},
-      *response_);
+                              {"x-envoy-retry-grpc-on", "cancelled"}});
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
@@ -152,9 +151,9 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024 * 65, false);
 
-  response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -341,11 +340,12 @@ TEST_P(IntegrationTest, TestBind) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Request 1.
 
-  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"}},
-                                     1024, *response_);
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         1024);
 
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   std::string address =
@@ -369,17 +369,16 @@ TEST_P(IntegrationTest, TestFailedBind) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // With no ability to successfully bind on an upstream connection Envoy should
   // send a 500.
-  codec_client_->makeHeaderOnlyRequest(
+  auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestHeaderMapImpl{{":method", "GET"},
                               {":path", "/test/long/url"},
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "1000"}},
-      *response_);
-  response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+                              {"x-envoy-upstream-rq-timeout-ms", "1000"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 

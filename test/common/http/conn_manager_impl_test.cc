@@ -61,10 +61,7 @@ public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
-    const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
-    const envoy::api::v2::RouteConfiguration& configAsProto() const override {
-      return envoy::api::v2::RouteConfiguration::default_instance();
-    }
+    absl::optional<ConfigInfo> configInfo() const override { return {}; }
 
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };

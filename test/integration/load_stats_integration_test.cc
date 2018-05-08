@@ -143,8 +143,7 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
-    codec_client_->makeRequestWithBody(headers, request_size_, *response_);
+    response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
   void waitForLoadStatsStream() {
@@ -301,6 +300,7 @@ public:
 
   static constexpr uint32_t upstream_endpoints_ = 5;
 
+  IntegrationStreamDecoderPtr response_;
   std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;

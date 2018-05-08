@@ -22,16 +22,16 @@ public:
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecClient::Type type);
 
-  void makeHeaderOnlyRequest(const Http::HeaderMap& headers, IntegrationStreamDecoder& response);
-  void makeRequestWithBody(const Http::HeaderMap& headers, uint64_t body_size,
-                           IntegrationStreamDecoder& response);
+  IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::HeaderMap& headers);
+  IntegrationStreamDecoderPtr makeRequestWithBody(const Http::HeaderMap& headers,
+                                                  uint64_t body_size);
   bool sawGoAway() { return saw_goaway_; }
   void sendData(Http::StreamEncoder& encoder, Buffer::Instance& data, bool end_stream);
   void sendData(Http::StreamEncoder& encoder, uint64_t size, bool end_stream);
   void sendTrailers(Http::StreamEncoder& encoder, const Http::HeaderMap& trailers);
   void sendReset(Http::StreamEncoder& encoder);
-  Http::StreamEncoder& startRequest(const Http::HeaderMap& headers,
-                                    IntegrationStreamDecoder& response);
+  std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
+  startRequest(const Http::HeaderMap& headers);
   void waitForDisconnect();
   Network::ClientConnection* connection() const { return connection_.get(); }
 
@@ -58,6 +58,7 @@ private:
 
   void flushWrite();
 
+  Event::Dispatcher& dispatcher_;
   ConnectionCallbacks callbacks_;
   CodecCallbacks codec_callbacks_;
   bool connected_{};
@@ -91,10 +92,9 @@ protected:
   //
   // Waits for the complete downstream response before returning.
   // Requires |codec_client_| to be initialized.
-  void sendRequestAndWaitForResponse(Http::TestHeaderMapImpl& request_headers,
-                                     uint32_t request_body_size,
-                                     Http::TestHeaderMapImpl& response_headers,
-                                     uint32_t response_body_size);
+  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+      Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
+      Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
 
   // Wait for the end of stream on the next upstream stream on fake_upstreams_
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
@@ -175,8 +175,6 @@ protected:
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
   FakeHttpConnectionPtr fake_upstream_connection_;
-  // A placeholder for the first response received by the client.
-  IntegrationStreamDecoderPtr response_{new IntegrationStreamDecoder(*dispatcher_)};
   // A placeholder for the first request received at upstream.
   FakeStreamPtr upstream_request_;
   // A pointer to the request encoder, if used.
