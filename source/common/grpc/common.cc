@@ -238,7 +238,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                                  service_full_name.size());
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().insertHost().value(upstream_cluster);
+  message->headers().insertHost().value(service_full_name);
   message->headers().insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Grpc);
   message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
