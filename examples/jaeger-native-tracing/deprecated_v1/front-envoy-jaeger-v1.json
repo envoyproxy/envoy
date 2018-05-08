@@ -1,0 +1,84 @@
+{
+  "listeners": [
+    {
+      "address": "tcp://0.0.0.0:80",
+      "filters": [
+        {
+          "name": "http_connection_manager",
+          "config": {
+            "tracing": {
+              "operation_name": "egress"
+            }, 
+            "codec_type": "auto",
+            "stat_prefix": "ingress_http",
+            "route_config": {
+              "virtual_hosts": [
+                {
+                  "name": "backend",
+                  "domains": ["*"],
+                  "routes": [
+                    {
+                      "prefix": "/",
+                      "cluster": "service1",
+                      "decorator": {
+                        "operation": "checkAvailability"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "filters": [
+              {
+                "name": "router",
+                "config": {}
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tracing": {
+    "http": {
+      "driver": {
+        "type": "zipkin", 
+        "config": {
+          "collector_cluster": "jaeger",
+          "collector_endpoint": "/api/v1/spans"
+        }
+      }
+    }
+  }, 
+  "admin": {
+    "access_log_path": "/dev/null",
+    "address": "tcp://0.0.0.0:8001"
+  },
+  "cluster_manager": {
+    "clusters": [
+      {
+        "name": "service1",
+        "connect_timeout_ms": 250,
+        "type": "strict_dns",
+        "lb_type": "round_robin",
+        "features": "http2",
+        "hosts": [
+          {
+            "url": "tcp://service1:80"
+          }
+        ]
+      },
+      {
+        "name": "jaeger",
+        "connect_timeout_ms": 1000, 
+        "type": "strict_dns", 
+        "lb_type": "round_robin", 
+        "hosts": [
+          {
+            "url": "tcp://jaeger:9411"
+          }
+        ]
+      } 
+    ]
+  }
+}
