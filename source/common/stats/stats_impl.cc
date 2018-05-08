@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/perf_annotation.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
@@ -158,10 +159,10 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // storing the name twice. Performing a lookup on the set is similarly
   // expensive to performing a map lookup, since both require copying a truncated version of the
   // string before doing the hash lookup.
-  std::unique_lock<std::mutex> lock(mutex_);
+  absl::ReleasableMutexLock lock(&mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
-  lock.unlock();
+  lock.Release();
 
   if (!ret.second) {
     ::free(data);
@@ -277,9 +278,11 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
     return;
   }
 
-  std::unique_lock<std::mutex> lock(mutex_);
-  size_t key_removed = stats_.erase(&data);
-  lock.unlock();
+  size_t key_removed;
+  {
+    absl::MutexLock lock(&mutex_);
+    key_removed = stats_.erase(&data);
+  }
 
   ASSERT(key_removed == 1);
   ::free(&data);
