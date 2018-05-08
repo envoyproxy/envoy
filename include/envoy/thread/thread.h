@@ -82,6 +82,11 @@ private:
   bool is_locked_;
 };
 
+/**
+ * Implements a LockGuard that is identical to absl::ReleasableMutexLock, but takes a
+ * BasicLockable& to allow usages to be agnostic to cross-process mutexes vs. single-process
+ * mutexes.
+ */
 class SCOPED_LOCKABLE LockGuard {
 public:
   /**
