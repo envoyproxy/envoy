@@ -442,6 +442,14 @@ message Cluster {
   //   to an upstream host that becomes unhealthy, Envoy may spend a substantial amount of
   //   time exclusively closing these connections, and not processing any other traffic.
   bool close_connections_on_host_health_failure = 31;
+
+  // If this cluster uses EDS or STRICT_DNS to configure its hosts, immediately drain
+  // connections from any hosts that are removed from service discovery.
+  //
+  // This only affects behavior for hosts that are being actively health checked.
+  // If this flag is not set to true, Envoy will wait until the hosts fail active health
+  // checking before removing it from the cluster.
+  bool drain_connections_on_host_removal = 32;
 }
 
 // An extensible structure containing the address Envoy should bind to when

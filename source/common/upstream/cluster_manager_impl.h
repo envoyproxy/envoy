@@ -186,7 +186,6 @@ public:
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
-  const std::string versionInfo() const override;
   const std::string& localClusterName() const override { return local_cluster_name_; }
 
   ClusterUpdateCallbacksHandlePtr

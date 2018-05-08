@@ -42,7 +42,8 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
     ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
-    std::unique_lock<std::mutex> lock(stream.completed_ops_lock_);
+    absl::MutexLock lock(&stream.completed_ops_lock_);
+
     // It's an invariant that there must only be one pending post for arbitrary
     // length completed_ops_, otherwise we can race in stream destruction, where
     // we process multiple events in onCompletedOps() but have only partially
@@ -239,7 +240,7 @@ void GoogleAsyncStreamImpl::writeQueued() {
 }
 
 void GoogleAsyncStreamImpl::onCompletedOps() {
-  std::unique_lock<std::mutex> lock(completed_ops_lock_);
+  absl::MutexLock lock(&completed_ops_lock_);
   while (!completed_ops_.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;
