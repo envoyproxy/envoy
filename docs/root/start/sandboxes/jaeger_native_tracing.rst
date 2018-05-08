@@ -17,7 +17,8 @@ native client instead of with Envoy's builtin Zipkin client has the following ad
 
 This sandbox is very similar to the front proxy architecture described above, with one difference:
 service1 makes an API call to service2 before returning a response.
-The three containers will be deployed inside a virtual network called ``envoymesh``.
+The three containers will be deployed inside a virtual network called ``envoymesh``. (Note: the sandbox
+only works on x86-64).
 
 All incoming requests are routed via the front envoy, which is acting as a reverse proxy
 sitting on the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000``
