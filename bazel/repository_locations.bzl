@@ -13,7 +13,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "0c44450723e34c9d8768e69b11bf919be83fd2ed",  # 2018-04-30
+        commit = "476687ac9cc636fc92ac3070246d757ae6854547",  # 2018-05-08
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
