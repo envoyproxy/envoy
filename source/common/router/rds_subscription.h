@@ -45,8 +45,6 @@ private:
     NOT_IMPLEMENTED;
   }
 
-  const std::string versionInfo() const override { return version_info_; }
-
   // Http::RestApiFetcher
   void createRequest(Http::Message& request) override;
   void parseResponse(const Http::Message& response) override;
@@ -54,7 +52,6 @@ private:
   void onFetchFailure(const EnvoyException* e) override;
 
   std::string route_config_name_;
-  std::string version_info_;
   const LocalInfo::LocalInfo& local_info_;
   Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_ = nullptr;
   Envoy::Config::SubscriptionStats stats_;

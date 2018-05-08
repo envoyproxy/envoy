@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
 
@@ -92,7 +92,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources) {
+void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
+                                                const std::string& version_info) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
     stats_.update_empty_.inc();
@@ -110,10 +111,9 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
                                      route_config_name_, route_config.name()));
   }
   const uint64_t new_hash = MessageUtil::hash(route_config);
-  if (new_hash != last_config_hash_ || !initialized_) {
+  if (!config_info_ || new_hash != config_info_.value().last_config_hash_) {
     ConfigConstSharedPtr new_config(new ConfigImpl(route_config, factory_context_, false));
-    initialized_ = true;
-    last_config_hash_ = new_hash;
+    config_info_ = {new_hash, version_info};
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               new_hash);
@@ -168,11 +168,15 @@ std::vector<RouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
   std::vector<RouteConfigProviderSharedPtr> providers_strong;
   // Collect non-expired providers.
-  std::transform(static_route_config_providers_.begin(), static_route_config_providers_.end(),
-                 providers_strong.begin(), [](auto&& weak) { return weak.lock(); });
+  for (const auto& weak_provider : static_route_config_providers_) {
+    const auto strong_provider = weak_provider.lock();
+    if (strong_provider != nullptr) {
+      providers_strong.push_back(strong_provider);
+    }
+  }
 
   // Replace our stored list of weak_ptrs with the filtered list.
-  static_route_config_providers_.assign(providers_strong.begin(), providers_strong.begin());
+  static_route_config_providers_.assign(providers_strong.begin(), providers_strong.end());
 
   return providers_strong;
 };
@@ -219,15 +223,23 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 }
 
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::v2::RouteConfigDump>();
-  auto* const dynamic_configs = config_dump->mutable_dynamic_route_configs();
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
+
   for (const auto& provider : getRdsRouteConfigProviders()) {
-    dynamic_configs->Add()->MergeFrom(provider->configAsProto());
+    auto config_info = provider->configInfo();
+    if (config_info) {
+      auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
+      dynamic_config->set_version_info(config_info.value().version_);
+      dynamic_config->mutable_route_config()->MergeFrom(config_info.value().config_);
+    }
   }
-  auto* const static_configs = config_dump->mutable_static_route_configs();
+
   for (const auto& provider : getStaticRouteConfigProviders()) {
-    static_configs->Add()->MergeFrom(provider->configAsProto());
+    ASSERT(provider->configInfo());
+    config_dump->mutable_static_route_configs()->Add()->MergeFrom(
+        provider->configInfo().value().config_);
   }
+
   return ProtobufTypes::MessagePtr{std::move(config_dump)};
 }
 
