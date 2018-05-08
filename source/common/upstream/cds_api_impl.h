@@ -31,6 +31,7 @@ public:
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }
+  const std::string versionInfo() const override { return version_info_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
@@ -48,6 +49,7 @@ private:
 
   ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
+  std::string version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
 };

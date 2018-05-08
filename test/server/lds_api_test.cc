@@ -231,6 +231,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
   EXPECT_EQ(15400115654359694268U, store_.gauge("listener_manager.lds.version").value());
   expectRequest();
   interval_timer_->callback_();
@@ -262,6 +263,7 @@ TEST_F(LdsApiTest, Basic) {
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
@@ -291,6 +293,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
   expectRequest();
   interval_timer_->callback_();
 
@@ -339,6 +342,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
   expectAdd("listener-8080", true);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_NO_THROW(callbacks_->onSuccess(std::move(message)));
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
 }
 
 TEST_F(LdsApiTest, Failure) {
@@ -365,6 +369,7 @@ TEST_F(LdsApiTest, Failure) {
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+  EXPECT_EQ("", lds_->versionInfo());
 
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_failure").value());

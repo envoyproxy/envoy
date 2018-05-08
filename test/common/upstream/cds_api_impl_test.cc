@@ -161,8 +161,10 @@ TEST_F(CdsApiImplTest, Basic) {
   expectAdd("cluster2");
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
+  EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
   callbacks_->onSuccess(std::move(message));
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, cds_->versionInfo());
   EXPECT_EQ(4054905652974790809U, store_.gauge("cluster_manager.cds.version").value());
 
   expectRequest();
@@ -185,6 +187,7 @@ TEST_F(CdsApiImplTest, Basic) {
 
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_success").value());
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, cds_->versionInfo());
   EXPECT_EQ(1872764556139482420U, store_.gauge("cluster_manager.cds.version").value());
 }
 
@@ -214,6 +217,7 @@ TEST_F(CdsApiImplTest, Failure) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
+  EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(2UL, store_.counter("cluster_manager.cds.update_failure").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
@@ -237,6 +241,7 @@ TEST_F(CdsApiImplTest, FailureArray) {
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
+  EXPECT_EQ("", cds_->versionInfo());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_attempt").value());
   EXPECT_EQ(1UL, store_.counter("cluster_manager.cds.update_failure").value());
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());

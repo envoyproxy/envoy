@@ -24,6 +24,8 @@ public:
          Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
          ListenerManager& lm);
 
+  const std::string versionInfo() const { return version_info_; }
+
   // Init::Target
   void initialize(std::function<void()> callback) override;
 
@@ -38,6 +40,7 @@ private:
   void runInitializeCallbackIfAny();
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
+  std::string version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
