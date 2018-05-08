@@ -239,6 +239,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   EXPECT_EQ(256, response_->body().size());
+  resetResponse();
   checkStats();
   envoy::api::v2::core::Address expected_local_address;
   Network::Utility::addressToProtobufAddress(*codec_client_->connection()->remoteAddress(),
@@ -254,6 +255,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
   EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
+  ASSERT_GE(trace.events().size(), 2);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 
@@ -275,6 +277,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.connection().id());
+  ASSERT_GE(trace.events().size(), 2);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }

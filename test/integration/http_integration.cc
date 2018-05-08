@@ -189,6 +189,8 @@ void HttpIntegrationTest::sendRequestAndWaitForResponse(Http::TestHeaderMapImpl&
                                                         uint32_t request_body_size,
                                                         Http::TestHeaderMapImpl& response_headers,
                                                         uint32_t response_size) {
+  // If this fails, there was a lack of resetResponse() since last request.
+  ASSERT(!response_->complete());
   // Send the request to Envoy.
   if (request_body_size) {
     codec_client_->makeRequestWithBody(request_headers, request_body_size, *response_);
@@ -915,7 +917,7 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
   // Request 2.
-  response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+  resetResponse();
   codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                              {":path", "/test/long/url"},
                                                              {":scheme", "http"},
@@ -1011,7 +1013,7 @@ void HttpIntegrationTest::testTwoRequests() {
   EXPECT_EQ(512U, response_->body().size());
 
   // Request 2.
-  response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+  resetResponse();
   codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
                                                              {":path", "/test/long/url"},
                                                              {":scheme", "http"},

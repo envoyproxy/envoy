@@ -96,6 +96,9 @@ protected:
                                      Http::TestHeaderMapImpl& response_headers,
                                      uint32_t response_body_size);
 
+  // Invoke between requests to reset the response_ object.
+  void resetResponse() { response_.reset(new IntegrationStreamDecoder(*dispatcher_)); }
+
   // Wait for the end of stream on the next upstream stream on fake_upstreams_
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
