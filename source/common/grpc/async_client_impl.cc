@@ -79,8 +79,8 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
-  headers_message_ = Common::prepareHeaders(
-      service_method_.service()->full_name(), service_method_.name());
+  headers_message_ =
+      Common::prepareHeaders(service_method_.service()->full_name(), service_method_.name());
   // Fill service-wide initial metadata.
   for (const auto& header_value : parent_.initial_metadata_) {
     headers_message_->headers().addCopy(Http::LowerCaseString(header_value.key()),
