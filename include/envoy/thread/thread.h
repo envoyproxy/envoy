@@ -1,4 +1,4 @@
-u#pragma once
+#pragma once
 
 #include "envoy/common/pure.h"
 
