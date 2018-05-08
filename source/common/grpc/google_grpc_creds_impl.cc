@@ -87,9 +87,9 @@ public:
       }
       case envoy::api::v2::core::GrpcService::GoogleGrpc::Credentials::kCallCredentials: {
         if (!credential.call_credentials().access_token().empty()) {
-          call_creds = grpc::MetadataCredentialsFromPlugin(
-              std::unique_ptr<grpc::MetadataCredentialsPlugin>(new StaticHeaderAuthenticator(
-                  credential.call_credentials().access_token())));
+          call_creds =
+              grpc::MetadataCredentialsFromPlugin(std::unique_ptr<grpc::MetadataCredentialsPlugin>(
+                  new StaticHeaderAuthenticator(credential.call_credentials().access_token())));
         }
         break;
       }
