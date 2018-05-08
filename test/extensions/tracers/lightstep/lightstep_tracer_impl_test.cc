@@ -175,7 +175,7 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("lightstep.collector.CollectorService", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
@@ -235,7 +235,7 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("lightstep.collector.CollectorService", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
@@ -277,7 +277,7 @@ TEST_F(LightStepDriverTest, FlushOneInvalidResponse) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("lightstep.collector.CollectorService", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
@@ -351,7 +351,7 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
             EXPECT_STREQ("/lightstep.collector.CollectorService/Report",
                          message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
+            EXPECT_STREQ("lightstep.collector.CollectorService", message->headers().Host()->value().c_str());
             EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 
             return &request;
