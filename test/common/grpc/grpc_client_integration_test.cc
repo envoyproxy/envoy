@@ -751,8 +751,9 @@ public:
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
-    auto* ssl_creds =
-        config.add_credentials()->mutable_google_channel_credentials()->mutable_ssl_credentials();
+    auto* google_grpc = config.mutable_google_grpc();
+    auto* ssl_creds = google_grpc->add_credentials()->mutable_channel_credentials(
+            )->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (use_client_cert_) {
@@ -851,12 +852,12 @@ public:
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
-    google_grpc->set_credentials_factory_name("access_token");
-    auto* ssl_creds =
-        config.add_credentials()->mutable_google_channel_credentials()->mutable_ssl_credentials();
+    google_grpc->set_credentials_factory_name("envoy.grpc_credentials.access_token");
+    auto* ssl_creds = google_grpc->add_credentials()->mutable_channel_credentials(
+            )->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    config.add_credentials()->mutable_google_call_credentials()->set_access_token(
+    google_grpc->add_credentials()->mutable_call_credentials()->set_access_token(
         access_token_value_);
     return config;
   }
