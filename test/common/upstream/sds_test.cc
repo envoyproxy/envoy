@@ -154,7 +154,6 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_CALL(membership_updated_, ready()).Times(2);
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_5f3725fa79001155", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
@@ -193,7 +192,6 @@ TEST_F(SdsTest, NoHealthChecker) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_2d1af371bb73a287", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(canary_host, findHost("10.0.16.43"));
   EXPECT_TRUE(canary_host->canary());
@@ -244,7 +242,6 @@ TEST_F(SdsTest, NoHealthChecker) {
   message.reset(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_2d1af371bb73a287", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(50U, canary_host->weight());
   EXPECT_EQ(50UL, cluster_->info()->stats().max_host_weight_.value());
@@ -283,7 +280,6 @@ TEST_F(SdsTest, HealthChecker) {
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_5f3725fa79001155", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster_->info()->stats().membership_healthy_.value());
@@ -334,7 +330,6 @@ TEST_F(SdsTest, HealthChecker) {
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
-  EXPECT_EQ("hash_5f3725fa79001155", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
   EXPECT_EQ(
@@ -361,7 +356,6 @@ TEST_F(SdsTest, HealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_2.json"))));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_398882981ada7c10", cluster_->versionInfo());
   EXPECT_EQ(14UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(13UL, cluster_->info()->stats().membership_healthy_.value());
@@ -391,7 +385,6 @@ TEST_F(SdsTest, HealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_2.json"))));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_398882981ada7c10", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(12UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
@@ -420,7 +413,6 @@ TEST_F(SdsTest, HealthChecker) {
   message->body().reset(new Buffer::OwnedImpl(Filesystem::fileReadToEnd(
       TestEnvironment::runfilesPath("test/common/upstream/test_data/sds_response_3.json"))));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("hash_b9f8f43f828a3b25", cluster_->versionInfo());
   EXPECT_EQ(13UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(12UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(12UL, cluster_->info()->stats().membership_healthy_.value());
@@ -456,7 +448,6 @@ TEST_F(SdsTest, Failure) {
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("", cluster_->versionInfo());
 
   EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }
@@ -475,7 +466,6 @@ TEST_F(SdsTest, FailureArray) {
 
   EXPECT_CALL(*timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("", cluster_->versionInfo());
 
   EXPECT_EQ(1UL, cluster_->info()->stats().update_failure_.value());
 }

@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.config.transport_socket.capture.v2alpha;
+option go_package = "v2";
+
+// [#protodoc-title: Capture]
+
+import "envoy/api/v2/core/base.proto";
+
+// File sink.
+//
+// .. warning::
+//
+//   The current file sink implementation buffers the entire trace in memory
+//   prior to writing. This will OOM for long lived sockets and/or where there
+//   is a large amount of traffic on the socket.
+message FileSink {
+  // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
+  // identifier distinguishing the recorded trace for individual socket instances (the Envoy
+  // connection ID).
+  string path_prefix = 1;
+
+  // File format.
+  enum Format {
+    // Binary proto format as per :ref:`Trace
+    // <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
+    PROTO_BINARY = 0;
+    // Text proto format as per :ref:`Trace
+    // <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
+    PROTO_TEXT = 1;
+  }
+  Format format = 2;
+}
+
+// Configuration for capture transport socket. This wraps another transport socket, providing the
+// ability to interpose and record in plain text any traffic that is surfaced to Envoy.
+message Capture {
+  oneof sink_selector {
+    // Trace is to be written to a file sink.
+    FileSink file_sink = 1;
+  }
+
+  // The underlying transport socket being wrapped.
+  api.v2.core.TransportSocket transport_socket = 2;
+}

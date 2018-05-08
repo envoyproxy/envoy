@@ -44,7 +44,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   typedef std::unique_ptr<HostVector> HostListPtr;
   std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state(1);
   if (resources.empty()) {
@@ -129,8 +129,7 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            health_checker_ != nullptr) ||
+  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;
