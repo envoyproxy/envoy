@@ -2156,9 +2156,9 @@ TEST_F(RouterTestStartTimestampHeader, WithStartTimestampHeader) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-
   const Http::LowerCaseString header("x-request-start");
+  EXPECT_EQ(nullptr, headers.get(header));
+  router_.decodeHeaders(headers, true);
   EXPECT_NE(nullptr, headers.get(header));
 
   uint64_t timestamp;
