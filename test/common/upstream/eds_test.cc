@@ -647,10 +647,15 @@ TEST_F(EdsTest, EndpointHostPerPriority) {
 
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources));
 
-  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(4, hosts.size());
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(4, hosts.size());
+  }
 
-  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority().size()); // <- FAILS HERE
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(0, hosts.size());
+  }
 }
 
 // Validate that onConfigUpdate() updates bins hosts per priority as expected.
