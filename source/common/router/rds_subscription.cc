@@ -47,10 +47,9 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> resources;
   Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
   resources[0].set_name(route_config_name_);
-  callbacks_->onConfigUpdate(resources);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
-  version_info_ = hash.first;
+  callbacks_->onConfigUpdate(resources, hash.first);
   stats_.version_.set(hash.second);
   stats_.update_success_.inc();
 }

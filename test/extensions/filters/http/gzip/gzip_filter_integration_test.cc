@@ -26,20 +26,21 @@ public:
     uint64_t content_length;
     ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
     const Buffer::OwnedImpl expected_response{std::string(content_length, 'a')};
-    sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
+    auto response =
+        sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
-    EXPECT_TRUE(response_->complete());
-    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-    ASSERT_TRUE(response_->headers().ContentEncoding() != nullptr);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    ASSERT_TRUE(response->headers().ContentEncoding() != nullptr);
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
-              response_->headers().ContentEncoding()->value().c_str());
-    ASSERT_TRUE(response_->headers().TransferEncoding() != nullptr);
+              response->headers().ContentEncoding()->value().c_str());
+    ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-              response_->headers().TransferEncoding()->value().c_str());
+              response->headers().TransferEncoding()->value().c_str());
 
     Buffer::OwnedImpl decompressed_response{};
-    const Buffer::OwnedImpl compressed_response{response_->body()};
+    const Buffer::OwnedImpl compressed_response{response->body()};
     decompressor_.decompress(compressed_response, decompressed_response);
     ASSERT_EQ(content_length, decompressed_response.length());
     EXPECT_TRUE(TestUtility::buffersEqual(expected_response, decompressed_response));
@@ -49,14 +50,15 @@ public:
                                  Http::TestHeaderMapImpl&& response_headers) {
     uint64_t content_length;
     ASSERT_TRUE(StringUtil::atoul(response_headers.get_("content-length").c_str(), content_length));
-    sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
+    auto response =
+        sendRequestAndWaitForResponse(request_headers, 0, response_headers, content_length);
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
-    EXPECT_TRUE(response_->complete());
-    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-    ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
-    ASSERT_EQ(content_length, response_->body().size());
-    EXPECT_EQ(response_->body(), std::string(content_length, 'a'));
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+    ASSERT_EQ(content_length, response->body().size());
+    EXPECT_EQ(response->body(), std::string(content_length, 'a'));
   }
 
   const std::string full_config{R"EOF(
@@ -145,14 +147,14 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
                                            {"content-length", "128"},
                                            {"content-type", "application/json"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  ASSERT_STREQ("br", response_->headers().ContentEncoding()->value().c_str());
-  EXPECT_EQ(128U, response_->body().size());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_STREQ("br", response->headers().ContentEncoding()->value().c_str());
+  EXPECT_EQ(128U, response->body().size());
 }
 
 /**
@@ -169,14 +171,14 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"}, {"content-length", "10"}, {"content-type", "application/json"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 10);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 10);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
-  EXPECT_EQ(10U, response_->body().size());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+  EXPECT_EQ(10U, response->body().size());
 }
 
 /**
@@ -192,14 +194,14 @@ TEST_P(GzipIntegrationTest, EmptyResponse) {
 
   Http::TestHeaderMapImpl response_headers{{":status", "204"}, {"content-length", "0"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("204", response_->headers().Status()->value().c_str());
-  ASSERT_TRUE(response_->headers().ContentEncoding() == nullptr);
-  EXPECT_EQ(0U, response_->body().size());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("204", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
+  EXPECT_EQ(0U, response->body().size());
 }
 
 /**
@@ -247,14 +249,14 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   Http::TestHeaderMapImpl response_headers{{":status", "200"},
                                            {"content-type", "application/json"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
-  ASSERT_STREQ("chunked", response_->headers().TransferEncoding()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_STREQ("gzip", response->headers().ContentEncoding()->value().c_str());
+  ASSERT_STREQ("chunked", response->headers().TransferEncoding()->value().c_str());
 }
 
 /**
@@ -271,13 +273,13 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   Http::TestHeaderMapImpl response_headers{
       {":status", "200"}, {"content-type", "application/json"}, {"vary", "Cookie"}};
 
-  sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 1024);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  ASSERT_STREQ("gzip", response_->headers().ContentEncoding()->value().c_str());
-  ASSERT_STREQ("Cookie, Accept-Encoding", response_->headers().Vary()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_STREQ("gzip", response->headers().ContentEncoding()->value().c_str());
+  ASSERT_STREQ("Cookie, Accept-Encoding", response->headers().Vary()->value().c_str());
 }
 } // namespace Envoy

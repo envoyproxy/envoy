@@ -174,37 +174,6 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
-TEST_F(ClusterManagerImplTest, VersionInfoStatic) {
-  const std::string json =
-      fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_0")}));
-
-  create(parseBootstrapFromJson(json));
-  EXPECT_EQ("static", cluster_manager_->versionInfo());
-}
-
-TEST_F(ClusterManagerImplTest, VersionInfoDynamic) {
-  const std::string json = fmt::sprintf(
-      R"EOF(
-  {
-    "cds": {"cluster": %s},
-    %s
-  }
-  )EOF",
-      defaultStaticClusterJson("cds_cluster"),
-      clustersJson({defaultStaticClusterJson("cluster_0")}));
-
-  // Setup cds api in order to control returned version info string.
-  MockCdsApi* cds = new MockCdsApi();
-  EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
-  EXPECT_CALL(*cds, setInitializedCb(_));
-  EXPECT_CALL(*cds, initialize());
-
-  create(parseBootstrapFromJson(json));
-
-  EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version"));
-  EXPECT_EQ("version", cluster_manager_->versionInfo());
-}
-
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   const std::string json = R"EOF(
   {

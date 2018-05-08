@@ -24,13 +24,13 @@ public:
          Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
          ListenerManager& lm);
 
-  const std::string versionInfo() const { return subscription_->versionInfo(); }
+  const std::string versionInfo() const { return version_info_; }
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
@@ -40,6 +40,7 @@ private:
   void runInitializeCallbackIfAny();
 
   std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
+  std::string version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
