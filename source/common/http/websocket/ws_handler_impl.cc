@@ -22,7 +22,7 @@ tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
   tcp_config.set_stat_prefix("websocket");
 
   if (route_config.has_websocket_config()) {
-    // WebSocket has it's own TcpProxy config type because some of the fields
+    // WebSocket has its own TcpProxy config type because some of the fields
     // in envoy::config::filter::network::tcp_proxy::v2::TcpProxy don't apply, and some
     // are duplicated in the route config (such as the upstream cluster).
     const envoy::api::v2::route::RouteAction::WebSocketProxyConfig& ws_config =
