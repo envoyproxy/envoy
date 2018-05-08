@@ -14,11 +14,11 @@ namespace TcpProxy {
 class TcpProxyConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
 
@@ -27,7 +27,7 @@ public:
   std::string name() override;
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilter(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
                Server::Configuration::FactoryContext& context);
 };

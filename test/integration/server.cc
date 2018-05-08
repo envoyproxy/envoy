@@ -14,26 +14,28 @@
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-IntegrationTestServerPtr
-IntegrationTestServer::create(const std::string& config_path,
-                              const Network::Address::IpVersion version,
-                              std::function<void()> pre_worker_start_test_steps) {
+IntegrationTestServerPtr IntegrationTestServer::create(
+    const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void()> pre_worker_start_test_steps, bool deterministic) {
   IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
-  server->start(version, pre_worker_start_test_steps);
+  server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
 
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> pre_worker_start_test_steps) {
+                                  std::function<void()> pre_worker_start_test_steps,
+                                  bool deterministic) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_.reset(new Thread::Thread([version, this]() -> void { threadRoutine(version); }));
+  thread_.reset(new Thread::Thread(
+      [version, deterministic, this]() -> void { threadRoutine(version, deterministic); }));
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   if (pre_worker_start_test_steps != nullptr) {
@@ -82,7 +84,8 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
   }
 }
 
-void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version) {
+void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
+                                          bool deterministic) {
   Server::TestOptionsImpl options(config_path_, version);
   Server::HotRestartNopImpl restarter;
   Thread::MutexBasicLockable lock;
@@ -91,8 +94,15 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Stats::HeapRawStatDataAllocator stats_allocator;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
   stat_store_ = &stats_store;
+  Runtime::RandomGeneratorPtr random_generator;
+  if (deterministic) {
+    random_generator = std::make_unique<testing::NiceMock<Runtime::MockRandomGenerator>>();
+  } else {
+    random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
+  }
   server_.reset(new Server::InstanceImpl(options, Network::Utility::getLocalAddress(version), *this,
-                                         restarter, stats_store, lock, *this, tls));
+                                         restarter, stats_store, lock, *this,
+                                         std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   server_set_.setReady();

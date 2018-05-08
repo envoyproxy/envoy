@@ -3,7 +3,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
+#include "envoy/extensions/common/tap/v2alpha/capture.pb.h"
+
 #include "common/event/dispatcher_impl.h"
+#include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_manager_impl.h"
@@ -12,6 +16,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
@@ -177,6 +182,119 @@ TEST_P(SslIntegrationTest, AltAlpn) {
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
   checkStats();
+}
+
+class SslCaptureIntegrationTest : public SslIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      // Configure inner SSL transport socket based on existing config.
+      envoy::api::v2::core::TransportSocket ssl_transport_socket;
+      ssl_transport_socket.set_name("ssl");
+      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
+      // Configure outer capture transport socket.
+      auto* transport_socket = filter_chain->mutable_transport_socket();
+      transport_socket->set_name("envoy.transport_sockets.capture");
+      envoy::config::transport_socket::capture::v2alpha::Capture capture_config;
+      auto* file_sink = capture_config.mutable_file_sink();
+      file_sink->set_path_prefix(path_prefix_);
+      file_sink->set_format(
+          text_format_ ? envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT
+                       : envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_BINARY);
+      capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
+      MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config());
+      // Nuke TLS context from legacy location.
+      filter_chain->clear_tls_context();
+      // Rest of TLS initialization.
+    });
+    SslIntegrationTest::initialize();
+  }
+
+  std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
+  bool text_format_{};
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, SslCaptureIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+// Validate two back-to-back requests with binary proto output.
+TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
+  initialize();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+
+  // First request (ID will be +1 since the client will also bump).
+  const uint64_t first_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  codec_client_ = makeHttpConnection(creator());
+  Http::TestHeaderMapImpl post_request_headers{
+      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  sendRequestAndWaitForResponse(post_request_headers, 128, default_response_headers_, 256);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(128, upstream_request_->bodyLength());
+  ASSERT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(256, response_->body().size());
+  checkStats();
+  envoy::api::v2::core::Address expected_local_address;
+  Network::Utility::addressToProtobufAddress(*codec_client_->connection()->remoteAddress(),
+                                             expected_local_address);
+  envoy::api::v2::core::Address expected_remote_address;
+  Network::Utility::addressToProtobufAddress(*codec_client_->connection()->localAddress(),
+                                             expected_remote_address);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  envoy::extensions::common::tap::v2alpha::Trace trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  // Validate general expected properties in the trace.
+  EXPECT_EQ(first_id, trace.connection().id());
+  EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
+  EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
+  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+
+  // Verify a second request hits a different file.
+  const uint64_t second_id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  codec_client_ = makeHttpConnection(creator());
+  Http::TestHeaderMapImpl get_request_headers{
+      {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
+      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
+  sendRequestAndWaitForResponse(get_request_headers, 128, default_response_headers_, 256);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(128, upstream_request_->bodyLength());
+  ASSERT_TRUE(response_->complete());
+  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_EQ(256, response_->body().size());
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  // Validate second connection ID.
+  EXPECT_EQ(second_id, trace.connection().id());
+  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
+}
+
+// Validate a single request with text proto output.
+TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
+  text_format_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(false, false);
+  };
+  const uint64_t id = Network::ConnectionImpl::nextGlobalIdForTest() + 1;
+  testRouterRequestAndResponseWithBody(1024, 512, false, &creator);
+  checkStats();
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+  envoy::extensions::common::tap::v2alpha::Trace trace;
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
+  // Test some obvious properties.
+  EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
+  EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }
 
 } // namespace Ssl

@@ -15,11 +15,11 @@ namespace Squash {
  */
 class SquashFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -30,7 +30,7 @@ public:
   std::string name() override { return HttpFilterNames::get().SQUASH; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilter(const envoy::config::filter::http::squash::v2::Squash& proto_config,
                Server::Configuration::FactoryContext& context);
 };

@@ -132,6 +132,7 @@ envoy_cc_library(
     name = "thread_lib",
     srcs = ["thread.cc"],
     hdrs = ["thread.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":assert_lib",
         ":macros",
@@ -206,6 +207,8 @@ envoy_cc_library(
     hdrs = ["perf_annotation.h"],
     deps = [
         ":assert_lib",
+        ":thread_annotations",
+        ":thread_lib",
         ":utility_lib",
     ],
 )

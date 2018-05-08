@@ -9,8 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 
-Server::Configuration::HttpFilterFactoryCb
-CorsFilterConfig::createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+Http::FilterFactoryCb CorsFilterConfig::createFilter(const std::string&,
+                                                     Server::Configuration::FactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CorsFilter>());

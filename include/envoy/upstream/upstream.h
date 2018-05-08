@@ -397,6 +397,8 @@ public:
     // Use the downstream protocol (HTTP1.1, HTTP2) for upstream connections as well, if available.
     // This is used when creating connection pools.
     static const uint64_t USE_DOWNSTREAM_PROTOCOL = 0x2;
+    // Whether connections should be immediately closed upon health failure.
+    static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
   };
 
   virtual ~ClusterInfo() {}
@@ -526,6 +528,12 @@ public:
    *         connections for this cluster.
    */
   virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
+
+  /**
+   * @return whether to skip waiting for health checking before draining connections
+   *         after a host is removed from service discovery.
+   */
+  virtual bool drainConnectionsOnHostRemoval() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

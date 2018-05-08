@@ -167,6 +167,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_utility_test",
+    srcs = ["header_utility_test.cc"],
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     deps = [

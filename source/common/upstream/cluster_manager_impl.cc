@@ -583,7 +583,17 @@ Host::CreateConnectionData ClusterManagerImpl::tcpConnForCluster(const std::stri
 
   HostConstSharedPtr logical_host = entry->second->lb_->chooseHost(context);
   if (logical_host) {
-    return logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
+    auto conn_info =
+        logical_host->createConnection(cluster_manager.thread_local_dispatcher_, nullptr);
+    if ((entry->second->cluster_info_->features() &
+         ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) &&
+        conn_info.connection_ != nullptr) {
+      auto& conn_map = cluster_manager.host_tcp_conn_map_[logical_host];
+      conn_map.emplace(conn_info.connection_.get(),
+                       std::make_unique<ThreadLocalClusterManagerImpl::TcpConnContainer>(
+                           cluster_manager, logical_host, *conn_info.connection_));
+    }
+    return conn_info;
   } else {
     entry->second->cluster_info_->stats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
@@ -662,6 +672,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   //                     redis/conn_pool_impl.cc. Will fix at the same time.
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
   host_http_conn_pool_map_.clear();
+  ASSERT(host_tcp_conn_map_.empty());
   for (auto& cluster : thread_local_clusters_) {
     if (&cluster.second->priority_set_ != local_priority_set_) {
       cluster.second.reset();
@@ -705,6 +716,20 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   }
 }
 
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeTcpConn(
+    const HostConstSharedPtr& host, Network::ClientConnection& connection) {
+  auto host_tcp_conn_map_it = host_tcp_conn_map_.find(host);
+  ASSERT(host_tcp_conn_map_it != host_tcp_conn_map_.end());
+  TcpConnectionsMap& connections_map = host_tcp_conn_map_it->second;
+  auto it = connections_map.find(&connection);
+  ASSERT(it != connections_map.end());
+  connection.dispatcher().deferredDelete(std::move(it->second));
+  connections_map.erase(it);
+  if (connections_map.empty()) {
+    host_tcp_conn_map_.erase(host_tcp_conn_map_it);
+  }
+}
+
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, HostVectorConstSharedPtr hosts,
     HostVectorConstSharedPtr healthy_hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
@@ -739,11 +764,34 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   // more granular host set changes, we should be able to capture single host changes and make them
   // more targeted.
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
-  const auto& container = config.host_http_conn_pool_map_.find(host);
-  if (container != config.host_http_conn_pool_map_.end()) {
-    for (const auto& pair : container->second.pools_) {
-      const Http::ConnectionPool::InstancePtr& pool = pair.second;
-      pool->drainConnections();
+  {
+    const auto& container = config.host_http_conn_pool_map_.find(host);
+    if (container != config.host_http_conn_pool_map_.end()) {
+      for (const auto& pair : container->second.pools_) {
+        const Http::ConnectionPool::InstancePtr& pool = pair.second;
+        pool->drainConnections();
+      }
+    }
+  }
+
+  if (host->cluster().features() &
+      ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
+
+    // Each connection will remove itself from the TcpConnectionsMap when it closes, via its
+    // Network::ConnectionCallbacks. The last removed tcp conn will remove the TcpConnectionsMap
+    // from host_tcp_conn_map_, so do not cache it between iterations.
+    //
+    // TODO(ggreenway) PERF: If there are a large number of connections, this could take a long time
+    // and halt other useful work. Consider breaking up this work. Note that this behavior is noted
+    // in the configuration documentation in cluster setting
+    // "close_connections_on_host_health_failure". Update the docs if this if this changes.
+    while (true) {
+      const auto& it = config.host_tcp_conn_map_.find(host);
+      if (it == config.host_tcp_conn_map_.end()) {
+        break;
+      }
+      TcpConnectionsMap& container = it->second;
+      container.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
   }
 }

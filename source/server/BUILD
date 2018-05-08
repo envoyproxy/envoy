@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
         "//source/common/network:connection_lib",
+        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 

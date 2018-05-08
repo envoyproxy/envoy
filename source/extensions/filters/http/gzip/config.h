@@ -15,10 +15,10 @@ namespace Gzip {
  */
 class GzipFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -29,8 +29,7 @@ public:
   std::string name() override { return HttpFilterNames::get().ENVOY_GZIP; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
+  Http::FilterFactoryCb createFilter(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
 };
 
 } // namespace Gzip

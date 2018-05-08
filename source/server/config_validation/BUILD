@@ -53,9 +53,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "dispatcher_lib",
     srcs = ["dispatcher.cc"],
-    hdrs = ["dispatcher.h"],
+    hdrs = [
+        "connection.h",
+        "dispatcher.h",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/event:dispatcher_lib",
     ],

@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2.auth;
+option go_package = "auth";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
@@ -214,7 +215,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2;
+  string sni = 2 [(validate.rules).string.max_bytes = 255];
 }
 
 message DownstreamTlsContext {
