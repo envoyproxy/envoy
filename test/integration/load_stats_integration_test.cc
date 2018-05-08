@@ -143,7 +143,7 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+    resetResponse();
     codec_client_->makeRequestWithBody(headers, request_size_, *response_);
   }
 

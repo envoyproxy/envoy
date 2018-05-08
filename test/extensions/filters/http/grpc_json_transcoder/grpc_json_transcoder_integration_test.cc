@@ -57,7 +57,7 @@ protected:
                        const std::vector<std::string>& grpc_response_messages,
                        const Status& grpc_status, Http::HeaderMap&& response_headers,
                        const std::string& response_body, bool full_response = true) {
-    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
+    resetResponse();
 
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
