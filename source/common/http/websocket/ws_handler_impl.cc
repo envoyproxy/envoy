@@ -13,16 +13,52 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
+Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr
+tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
+               Server::Configuration::FactoryContext& factory_context) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_config;
+
+  // Set the default value. This may be overwritten below.
+  tcp_config.set_stat_prefix("websocket");
+
+  if (route_config.has_websocket_config()) {
+    // WebSocket has its own TcpProxy config type because some of the fields
+    // in envoy::config::filter::network::tcp_proxy::v2::TcpProxy don't apply, and some
+    // are duplicated in the route config (such as the upstream cluster).
+    const envoy::api::v2::route::RouteAction::WebSocketProxyConfig& ws_config =
+        route_config.websocket_config();
+
+    if (!ws_config.stat_prefix().empty()) {
+      tcp_config.set_stat_prefix(ws_config.stat_prefix());
+    }
+
+    if (ws_config.has_idle_timeout()) {
+      *tcp_config.mutable_idle_timeout() = ws_config.idle_timeout();
+    }
+
+    if (ws_config.has_max_connect_attempts()) {
+      *tcp_config.mutable_max_connect_attempts() = ws_config.max_connect_attempts();
+    }
+  }
+  return std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyConfig>(tcp_config,
+                                                                                factory_context);
+}
+
 WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
                              const RequestInfo::RequestInfo& request_info,
-                             const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
+                             const Router::RouteEntry& route_entry,
+                             WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
-                             Network::ReadFilterCallbacks* read_callbacks)
-    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(nullptr, cluster_manager),
+                             Network::ReadFilterCallbacks* read_callbacks,
+                             Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config)
+    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(config, cluster_manager),
       request_headers_(request_headers), request_info_(request_info), route_entry_(route_entry),
       ws_callbacks_(callbacks) {
 
-  initializeReadFilterCallbacks(*read_callbacks);
+  // set_connection_stats == false because the http connection manager has already set them
+  // and they will be inaccurate if we change them now.
+  initialize(*read_callbacks, false);
+  onNewConnection();
 }
 
 void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {

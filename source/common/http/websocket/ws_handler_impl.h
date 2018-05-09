@@ -20,6 +20,14 @@ namespace Http {
 namespace WebSocket {
 
 /**
+ * @return Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr to use in creating
+ * instances of WsHandlerImpl.
+ */
+Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr
+tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
+               Server::Configuration::FactoryContext& factory_context);
+
+/**
  * An implementation of a WebSocket proxy based on TCP proxy. This will be used for
  * handling client connection only after a WebSocket upgrade request succeeds
  * (i.e, it is requested by client and allowed by config). This implementation will
@@ -27,12 +35,14 @@ namespace WebSocket {
  * All data will be proxied back and forth between the two connections, without any
  * knowledge of the underlying WebSocket protocol.
  */
-class WsHandlerImpl : public Extensions::NetworkFilters::TcpProxy::TcpProxyFilter {
+class WsHandlerImpl : public Extensions::NetworkFilters::TcpProxy::TcpProxyFilter,
+                      public Http::WebSocketProxy {
 public:
   WsHandlerImpl(HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-                const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
+                const Router::RouteEntry& route_entry, WebSocketProxyCallbacks& callbacks,
                 Upstream::ClusterManager& cluster_manager,
-                Network::ReadFilterCallbacks* read_callbacks);
+                Network::ReadFilterCallbacks* read_callbacks,
+                Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -59,7 +69,7 @@ private:
   HeaderMap& request_headers_;
   const RequestInfo::RequestInfo& request_info_;
   const Router::RouteEntry& route_entry_;
-  WsHandlerCallbacks& ws_callbacks_;
+  WebSocketProxyCallbacks& ws_callbacks_;
   NullHttpConnectionCallbacks http_conn_callbacks_;
   Buffer::OwnedImpl queued_data_;
   bool queued_end_stream_{false};
