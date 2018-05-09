@@ -21,7 +21,10 @@
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
+#include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
+
+#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include "absl/types/optional.h"
 
@@ -238,49 +241,6 @@ private:
   std::vector<HashMethodPtr> hash_impls_;
 };
 
-class MetadataMatchCriterionImpl : public MetadataMatchCriterion {
-public:
-  MetadataMatchCriterionImpl(const std::string& name, const HashedValue& value)
-      : name_(name), value_(value) {}
-
-  const std::string& name() const override { return name_; }
-  const HashedValue& value() const override { return value_; }
-
-private:
-  const std::string name_;
-  const HashedValue value_;
-};
-
-class MetadataMatchCriteriaImpl;
-typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
-
-class MetadataMatchCriteriaImpl : public MetadataMatchCriteria {
-public:
-  MetadataMatchCriteriaImpl(const ProtobufWkt::Struct& metadata_matches)
-      : metadata_match_criteria_(extractMetadataMatchCriteria(nullptr, metadata_matches)){};
-
-  MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const override {
-    return MetadataMatchCriteriaImplConstPtr(
-        new MetadataMatchCriteriaImpl(extractMetadataMatchCriteria(this, metadata_matches)));
-  }
-
-  // MetadataMatchCriteria
-  const std::vector<MetadataMatchCriterionConstSharedPtr>& metadataMatchCriteria() const override {
-    return metadata_match_criteria_;
-  }
-
-private:
-  MetadataMatchCriteriaImpl(const std::vector<MetadataMatchCriterionConstSharedPtr>& criteria)
-      : metadata_match_criteria_(criteria){};
-
-  static std::vector<MetadataMatchCriterionConstSharedPtr>
-  extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
-                               const ProtobufWkt::Struct& metadata_matches);
-
-  const std::vector<MetadataMatchCriterionConstSharedPtr> metadata_match_criteria_;
-};
-
 /**
  * Implementation of Decorator that reads from the proto route decorator.
  */
@@ -351,7 +311,11 @@ public:
   std::chrono::milliseconds timeout() const override { return timeout_; }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-  bool useWebSocket() const override { return use_websocket_; }
+  bool useWebSocket() const override { return websocket_config_ != nullptr; }
+  Http::WebSocketProxyPtr createWebSocketProxy(
+      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+      Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -430,6 +394,13 @@ private:
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool useWebSocket() const override { return parent_->useWebSocket(); }
+    Http::WebSocketProxyPtr createWebSocketProxy(
+        Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+        Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+        Network::ReadFilterCallbacks* read_callbacks) const override {
+      return parent_->createWebSocketProxy(request_headers, request_info, callbacks,
+                                           cluster_manager, read_callbacks);
+    }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -515,7 +486,7 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
-  const bool use_websocket_;
+  const Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr websocket_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;

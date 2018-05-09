@@ -58,7 +58,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "wshandler_callback_interface",
+    name = "websocket_interface",
     hdrs = ["websocket.h"],
     deps = [
         ":header_map_interface",

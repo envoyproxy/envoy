@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -22,6 +23,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Router {
 
 /**
@@ -475,6 +481,19 @@ public:
    * @return bool true if this route should use WebSockets.
    */
   virtual bool useWebSocket() const PURE;
+
+  /**
+   * Create an instance of a WebSocketProxy, using the configuration in this route.
+   *
+   * This may only be called if useWebSocket() returns true on this RouteEntry.
+   *
+   * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
+   *         in this route.
+   */
+  virtual Http::WebSocketProxyPtr createWebSocketProxy(
+      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+      Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
