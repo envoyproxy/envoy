@@ -663,7 +663,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->decodeHeaders(
+    FilterHeadersStatus status = (*entry)->decodeHeaders(
         headers, end_stream && continue_data_entry == decoder_filters_.end());
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
@@ -1353,9 +1353,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
     parent_.connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
-    Http::Utility::sendLocalReply(*parent_.request_headers_, *this, parent_.state_.destroyed_,
-                                  Http::Code::PayloadTooLarge,
-                                  CodeUtility::toString(Http::Code::PayloadTooLarge));
+    sendLocalReply(Http::Code::PayloadTooLarge, CodeUtility::toString(Http::Code::PayloadTooLarge),
+                   nullptr);
   }
 }
 
@@ -1427,7 +1426,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
 
-      Http::Utility::sendLocalReply(*parent_.request_headers_,
+      Http::Utility::sendLocalReply(Http::Utility::hasGrpcContentType(*parent_.request_headers_),
                                     [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
                                       parent_.response_headers_ = std::move(response_headers);
                                       parent_.response_encoder_->encodeHeaders(

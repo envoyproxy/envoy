@@ -70,7 +70,6 @@ FaultFilter::~FaultFilter() { ASSERT(!delay_timer_); }
 // if we inject a delay, then we will inject the abort in the delay timer
 // callback.
 Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  downstream_headers_ = &headers;
   // Route-level configuration overrides filter-level configuration
   // NOTE: We should not use runtime when reading from route-level
   // faults. In other words, runtime is supported only when faults are
@@ -251,9 +250,8 @@ void FaultFilter::postDelayInjection() {
 
 void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FaultInjected);
-  ASSERT(downstream_headers_);
-  Http::Utility::sendLocalReply(*downstream_headers_, *callbacks_, stream_destroyed_,
-                                static_cast<Http::Code>(abortHttpStatus()), "fault filter abort");
+  callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()), "fault filter abort",
+                             nullptr);
   recordAbortsInjectedStats();
 }
 

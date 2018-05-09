@@ -191,6 +191,17 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Create a locally generated response using the provided lambdas.
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
+   */
+  virtual void sendLocalReply(Code response_code, const std::string& body_text,
+                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+
+  /**
    * Called with 100-Continue headers to be encoded.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters

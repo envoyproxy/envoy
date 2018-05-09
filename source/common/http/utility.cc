@@ -329,13 +329,6 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
-void Utility::sendLocalReply(const HeaderMap& request_headers,
-                             StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                             Code response_code, const std::string& body_text) {
-  sendLocalReply(hasGrpcContentType(request_headers), callbacks, is_reset, response_code,
-                 body_text);
-}
-
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
                              const bool& is_reset, Code response_code,
                              const std::string& body_text) {
@@ -347,16 +340,6 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                    callbacks.encodeData(data, end_stream);
                  },
                  is_reset, response_code, body_text);
-}
-
-void Utility::sendLocalReply(
-    const HeaderMap& request_headers,
-    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
-    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text) {
-  // Respond with a gRPC trailers-only response if the request is gRPC
-  sendLocalReply(hasGrpcContentType(request_headers), encode_headers, encode_data, is_reset,
-                 response_code, body_text);
 }
 
 void Utility::sendLocalReply(

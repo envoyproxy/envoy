@@ -164,6 +164,19 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
+    void sendLocalReply(Code code, const std::string& body,
+                        std::function<void(HeaderMap& headers)> modify_headers) override {
+      Utility::sendLocalReply(
+          is_grpc_request_,
+          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+            if (headers != nullptr && modify_headers != nullptr) {
+              modify_headers(*headers);
+            }
+            encodeHeaders(std::move(headers), end_stream);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
+          parent_.state_.destroyed_, code, body);
+    }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -177,10 +190,16 @@ private:
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
 
+    FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
+      is_grpc_request_ = Http::Utility::hasGrpcContentType(headers);
+      return handle_->decodeHeaders(headers, end_stream);
+    }
+
     void requestDataTooLarge();
     void requestDataDrained();
 
     StreamDecoderFilterSharedPtr handle_;
+    bool is_grpc_request_{};
   };
 
   typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;

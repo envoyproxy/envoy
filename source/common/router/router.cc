@@ -172,24 +172,6 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
-void Filter::sendLocalReply(Http::Code code, const std::string& body,
-                            std::function<void(Http::HeaderMap& headers)> modify_headers) {
-  // This is a customized version of send local reply that allows us to set the overloaded
-  // header.
-  Http::Utility::sendLocalReply(
-      grpc_request_,
-      [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (headers != nullptr && modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        callbacks_->encodeHeaders(std::move(headers), end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        callbacks_->encodeData(data, end_stream);
-      },
-      stream_destroyed_, code, body);
-}
-
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
@@ -207,7 +189,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().c_str());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    sendLocalReply(Http::Code::NotFound, "");
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -216,7 +198,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers);
-    sendLocalReply(
+    callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
             ->void {
@@ -237,7 +219,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "");
+    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -257,7 +239,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    sendLocalReply(
+    callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode", [](Http::HeaderMap& headers) {
           headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
         });
@@ -334,7 +316,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream");
+  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -521,7 +503,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
+    callbacks_->sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
       if (dropped) {
         headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
       }
