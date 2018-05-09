@@ -1,7 +1,7 @@
 .. _install_sandboxes_jaeger_native_tracing:
 
 Jaeger Native Tracing
-==============
+=====================
 
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Jaeger <http://jaegertracing.io/>`_ as the tracing provider and Jaeger's native
