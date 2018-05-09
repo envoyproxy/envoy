@@ -81,12 +81,14 @@ public:
 
 private:
   enum class State { NotStarted, Calling, Complete };
+  enum class FilterReturn { ContinueDecoding, StopDecoding };
   void initiateCall(const Http::HeaderMap& headers);
 
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
+  FilterReturn filter_return_{FilterReturn::ContinueDecoding};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   envoy::service::auth::v2alpha::CheckRequest check_request_{};

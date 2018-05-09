@@ -94,12 +94,14 @@ public:
 
 private:
   enum class Status { NotStarted, Calling, Complete };
+  enum class FilterReturn { Stop, Continue };
   void callCheck();
 
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
+  FilterReturn filter_return_{FilterReturn::Stop};
   bool calling_check_{};
   envoy::service::auth::v2alpha::CheckRequest check_request_{};
 };
