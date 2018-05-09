@@ -96,8 +96,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   // Track whether we rebuilt any LB structures.
   bool cluster_rebuilt = false;
 
-  // Loop over all priorities present in the config. This will either update an existing
-  // HostSet or create a new one.
+  // Loop over existing priorities not present in the config. This will empty out any priorities
+  // the config update did not refer to
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
       if (locality_weights_map_.size() <= i) {
