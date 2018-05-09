@@ -10,7 +10,7 @@ native client instead of with Envoy's builtin Zipkin client has the following ad
 
 - Trace propagation will work with other other services using Jaeger without needing to make
   configuration `changes <https://github.com/jaegertracing/jaeger-client-go#zipkin-http-b3-compatible-header-propagation>`_.
-- A variety of different `sampling strategies <https://www.jaegertracing.io/docs/sampling/#client-sampling-configuration>`_.
+- A variety of different `sampling strategies <https://www.jaegertracing.io/docs/sampling/#client-sampling-configuration>`_
   can be used, including probabilistic or remote where sampling can be centrally controlled from Jaeger's backend.
 - Spans are sent to the collector in a more efficient binary encoding.
 
