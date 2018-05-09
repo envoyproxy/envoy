@@ -34,6 +34,11 @@ public:
     return request->request_;
   }
 
+protected:
+  envoy::api::v2::core::HealthCheckerType healthCheckerType() const override {
+    return envoy::api::v2::core::HealthCheckerType::REDIS;
+  }
+
 private:
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,

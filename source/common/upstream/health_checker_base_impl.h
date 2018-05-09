@@ -79,6 +79,7 @@ protected:
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
+  virtual envoy::api::v2::core::HealthCheckerType healthCheckerType() const PURE;
 
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
@@ -134,10 +135,12 @@ public:
 
   virtual ~HealthCheckEventLoggerImpl() {}
 
-  void logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+  void logEjectUnhealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
+                         const HostDescriptionConstSharedPtr& host,
                          envoy::api::v2::core::HealthCheckFailureType failure_type,
                          std::chrono::milliseconds timeout, uint32_t unhealthy_threshold) override;
-  void logAddHealthy(const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
+  void logAddHealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
+                     const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
                      bool first_check) override;
 
 private:

@@ -16,17 +16,18 @@ option (gogoproto.equal_all) = true;
 // [#proto-status: draft]
 
 message HealthCheckEvent {
-  string host_address = 1 [(validate.rules).string.min_bytes = 1];
-  string cluster_name = 2 [(validate.rules).string.min_bytes = 1];
+  HealthCheckerType health_checker_type = 1;
+  string host_address = 2 [(validate.rules).string.min_bytes = 1];
+  string cluster_name = 3 [(validate.rules).string.min_bytes = 1];
 
   oneof event {
     option (validate.required) = true;
 
     // Host ejection.
-    HealthCheckEjectUnhealthy eject_unhealthy_event = 3;
+    HealthCheckEjectUnhealthy eject_unhealthy_event = 4;
 
     // Host addition.
-    HealthCheckAddHealthy add_healthy_event = 4;
+    HealthCheckAddHealthy add_healthy_event = 5;
   }
 }
 
@@ -34,6 +35,13 @@ enum HealthCheckFailureType {
   ACTIVE = 0;
   PASSIVE = 1;
   NETWORK = 2;
+}
+
+enum HealthCheckerType {
+  HTTP = 0;
+  TCP = 1;
+  GRPC = 2;
+  REDIS = 3;
 }
 
 message HealthCheckEjectUnhealthy {

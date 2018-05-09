@@ -204,7 +204,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
-        parent_.event_logger_->logAddHealthy(host_, parent_.healthy_threshold_, first_check_);
+        parent_.event_logger_->logAddHealthy(parent_.healthCheckerType(), host_,
+                                             parent_.healthy_threshold_, first_check_);
       }
     } else {
       changed_state = HealthTransition::ChangePending;
@@ -232,8 +233,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
-        parent_.event_logger_->logEjectUnhealthy(host_, type, parent_.timeout_,
-                                                 parent_.unhealthy_threshold_);
+        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type,
+                                                 parent_.timeout_, parent_.unhealthy_threshold_);
       }
     } else {
       changed_state = HealthTransition::ChangePending;
@@ -271,10 +272,12 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
 }
 
 void HealthCheckEventLoggerImpl::logEjectUnhealthy(
+    envoy::api::v2::core::HealthCheckerType health_checker_type,
     const HostDescriptionConstSharedPtr& host,
     envoy::api::v2::core::HealthCheckFailureType failure_type, std::chrono::milliseconds timeout,
     uint32_t unhealthy_threshold) {
   envoy::api::v2::core::HealthCheckEvent event;
+  event.set_health_checker_type(health_checker_type);
   event.set_host_address(host->address()->asString());
   event.set_cluster_name(host->cluster().name());
   event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
@@ -282,20 +285,24 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
       std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
   event.mutable_eject_unhealthy_event()->mutable_unhealthy_threshold()->set_value(
       unhealthy_threshold);
-  // Make sure the failure type enum makes it into the JSON
+  // Make sure the type enums make it into the JSON
   const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
                                                           /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
-void HealthCheckEventLoggerImpl::logAddHealthy(const HostDescriptionConstSharedPtr& host,
-                                               uint32_t healthy_threshold, bool first_check) {
+void HealthCheckEventLoggerImpl::logAddHealthy(
+    envoy::api::v2::core::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold, bool first_check) {
   envoy::api::v2::core::HealthCheckEvent event;
+  event.set_health_checker_type(health_checker_type);
   event.set_host_address(host->address()->asString());
   event.set_cluster_name(host->cluster().name());
   event.mutable_add_healthy_event()->mutable_healthy_threshold()->set_value(healthy_threshold);
   event.mutable_add_healthy_event()->set_first_check(first_check);
-  const auto json = MessageUtil::getJsonStringFromMessage(event);
+  // Make sure the type enums make it into the JSON
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 

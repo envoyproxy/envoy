@@ -69,23 +69,27 @@ public:
 
   /**
    * Log an unhealthy host ejection event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure
    * @param timeout supplies the configured health check timeout for this health check
    * @param unhealthy_threshold supplied the configured unhealthy threshold for this health check
    */
-  virtual void logEjectUnhealthy(const HostDescriptionConstSharedPtr& host,
+  virtual void logEjectUnhealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
+                                 const HostDescriptionConstSharedPtr& host,
                                  envoy::api::v2::core::HealthCheckFailureType failure_type,
                                  std::chrono::milliseconds timeout,
                                  uint32_t unhealthy_threshold) PURE;
 
   /**
    * Log a healthy host addition event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    * @param healthy_threshold supplied the configured healthy threshold for this health check
    * @param first_check whether this is a fast path success on the first health check for this host
    */
-  virtual void logAddHealthy(const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
+  virtual void logAddHealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
+                             const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
                              bool first_check) PURE;
 };
 

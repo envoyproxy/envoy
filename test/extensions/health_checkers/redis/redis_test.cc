@@ -188,7 +188,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   interval_timer_->callback_();
 
   // Failure
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -256,7 +256,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   interval_timer_->callback_();
 
   // Failure, exists
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -308,7 +308,7 @@ TEST_F(RedisHealthCheckerTest, ExistsDeprecated) {
   interval_timer_->callback_();
 
   // Failure, exists
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -360,7 +360,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   interval_timer_->callback_();
 
   // The connection will close on failure.
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
