@@ -94,6 +94,8 @@ envoy_cc_test(
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:ssl_socket_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/grpc_credentials:well_known_names",
+        "//source/extensions/grpc_credentials/example:config",
         "//test/integration:integration_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",

@@ -4,6 +4,7 @@
 
 #ifdef ENVOY_GOOGLE_GRPC
 #include "common/grpc/google_async_client_impl.h"
+#include "extensions/grpc_credentials/well_known_names.h"
 #endif
 #include "common/http/async_client_impl.h"
 #include "common/http/http2/conn_pool.h"
@@ -752,8 +753,7 @@ public:
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
-    auto* ssl_creds =
-        google_grpc->add_credentials()->mutable_channel_credentials()->mutable_ssl_credentials();
+    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (use_client_cert_) {
@@ -840,6 +840,7 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
   dispatcher_helper_.runDispatcher();
 }
 
+#ifdef ENVOY_GOOGLE_GRPC
 // AccessToken credential validation tests.
 class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
@@ -852,13 +853,12 @@ public:
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
-    google_grpc->set_credentials_factory_name("envoy.grpc_credentials.access_token");
-    auto* ssl_creds =
-        google_grpc->add_credentials()->mutable_channel_credentials()->mutable_ssl_credentials();
+    google_grpc->set_credentials_factory_name(
+        Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE);
+    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    google_grpc->add_credentials()->mutable_call_credentials()->set_access_token(
-        access_token_value_);
+    google_grpc->add_call_credentials()->set_access_token(access_token_value_);
     return config;
   }
 
@@ -891,6 +891,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
 }
+#endif
 
 } // namespace
 } // namespace Grpc

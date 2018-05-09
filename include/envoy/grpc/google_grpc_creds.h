@@ -3,6 +3,8 @@
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/pure.h"
 
+#include "grpc++/grpc++.h"
+
 namespace Envoy {
 namespace Grpc {
 
