@@ -131,6 +131,8 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMegaMissTimeout()).WillByDefault(Return(wd_megamiss_));
   ON_CALL(*this, wdKillTimeout()).WillByDefault(Return(wd_kill_));
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
+  ON_CALL(*this, disableIndividualStatsFlush())
+      .WillByDefault(Return(disable_individual_stats_flush_));
 }
 
 MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {

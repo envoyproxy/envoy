@@ -98,6 +98,11 @@ public:
    *         multiple nonresponsive threads.
    */
   virtual std::chrono::milliseconds wdMultiKillTimeout() const PURE;
+
+  /**
+   * @return bool whether the individual stats flush is disabled.
+   */
+  virtual bool disableIndividualStatsFlush() const PURE;
 };
 
 /**

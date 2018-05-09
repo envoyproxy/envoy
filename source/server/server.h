@@ -83,13 +83,15 @@ public:
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
 
   /**
-   * Helper for flushing counters, gauges and hisograms to sinks. This takes care of calling
-   * beginFlush(), latching of counters and flushing, flushing of gauges, and calling endFlush(), on
-   * each sink.
+   * Helper for flushing counters and gauges to sinks. This takes care of calling beginFlush(),
+   * optional latching of counters and flushing, optional flushing of gauges, merging of histograms
+   * and optional flushing, and calling endFlush(), on each sink.
    * @param sinks supplies the list of sinks.
    * @param store supplies the store to flush.
+   * @param flush_individual_stats whether to flush individual stats to the sinks.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
+                                  bool flush_individual_stats);
 
   /**
    * Load a bootstrap config from either v1 or v2 and perform validation.

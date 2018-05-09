@@ -28,15 +28,20 @@ TEST(ServerInstanceUtil, flushHelper) {
   Stats::IsolatedStoreImpl store;
   store.counter("hello").inc();
   store.gauge("world").set(5);
-  std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
+  std::unique_ptr<Stats::MockSink> tmp(new StrictMock<Stats::MockSink>());
+  Stats::MockSink* sink = tmp.get();
+  std::list<Stats::SinkPtr> sinks;
+  sinks.emplace_back(std::move(tmp));
+
   EXPECT_CALL(*sink, beginFlush());
   EXPECT_CALL(*sink, flushCounter(Property(&Stats::Metric::name, "hello"), 1));
   EXPECT_CALL(*sink, flushGauge(Property(&Stats::Metric::name, "world"), 5));
   EXPECT_CALL(*sink, endFlush());
+  InstanceUtil::flushMetricsToSinks(sinks, store, false);
 
-  std::list<Stats::SinkPtr> sinks;
-  sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushMetricsToSinks(sinks, store);
+  EXPECT_CALL(*sink, beginFlush());
+  EXPECT_CALL(*sink, endFlush());
+  InstanceUtil::flushMetricsToSinks(sinks, store, true);
 }
 
 class RunHelperTest : public testing::Test {
