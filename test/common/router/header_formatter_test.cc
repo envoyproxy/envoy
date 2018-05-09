@@ -252,6 +252,12 @@ TEST(HeaderParserTest, TestParseInternal) {
     absl::optional<std::string> expected_exception_;
   };
 
+  time_t start_time_epoch = 1522280158;
+  SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
+  const std::string timestamp = fmt::format(
+      "{}",
+      std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count());
+
   static const TestCase test_cases[] = {
       // Valid inputs
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
@@ -271,6 +277,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%START_TIMESTAMP%", {timestamp}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -404,6 +411,8 @@ TEST(HeaderParserTest, TestParseInternal) {
             key: value
       )EOF");
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+
+  ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
