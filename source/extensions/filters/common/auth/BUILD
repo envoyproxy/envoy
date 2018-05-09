@@ -10,8 +10,8 @@ envoy_package()
 
 envoy_cc_library(
     name = "attribute_context_lib",
-    hdrs = ["attribute_context.h"],
     srcs = ["attribute_context.cc"],
+    hdrs = ["attribute_context.h"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",

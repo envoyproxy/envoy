@@ -12,6 +12,7 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
+
 #include "extensions/filters/common/auth/attribute_context.h"
 
 namespace Envoy {
