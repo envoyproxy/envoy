@@ -190,6 +190,10 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  // Do a check for the HTTP Path header value,
+  // This is a required http header.
+  ASSERT(headers.Path());
+
   downstream_headers_ = &headers;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
@@ -297,7 +301,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Scheme());
   ASSERT(headers.Method());
   ASSERT(headers.Host());
-  ASSERT(headers.Path());
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
