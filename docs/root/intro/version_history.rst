@@ -59,7 +59,7 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
-* router: added `START_TIMESTAMP` as one of supported variables in :ref:`header
+* router: added `START_TIME_SINCE_EPOCH` as one of supported variables in :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`. The timestamp unit is in milliseconds.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.

@@ -481,5 +481,5 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
-%START_TIMESTAMP%
-    The timestamp when the first byte of a request is received. The timestamp unit is in milliseconds.
+%START_TIME_SINCE_EPOCH%
+    The timestamp since epoch when the first byte of a request is received. The timestamp unit is in milliseconds.

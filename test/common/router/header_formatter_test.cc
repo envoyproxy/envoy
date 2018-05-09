@@ -3,6 +3,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/protocol.h"
 
+#include "common/access_log/access_log_formatter.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/router/header_formatter.h"
@@ -254,9 +255,8 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   time_t start_time_epoch = 1522280158;
   SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
-  const std::string timestamp = fmt::format(
-      "{}",
-      std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count());
+  const std::string timestamp =
+      AccessLog::AccessLogFormatUtils::durationToString(start_time.time_since_epoch());
 
   static const TestCase test_cases[] = {
       // Valid inputs
@@ -277,7 +277,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
-      {"%START_TIMESTAMP%", {timestamp}, {}},
+      {"%START_TIME_SINCE_EPOCH%", {timestamp}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -608,7 +608,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-request-start",
-        "value": "%START_TIMESTAMP%"
+        "value": "%START_TIME_SINCE_EPOCH%"
       }
     ]
   }
@@ -635,12 +635,8 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_EQ("127.0.0.1", headerMap.get_("x-client-ip"));
-
-  uint64_t timestamp;
-  StringUtil::atoul(headerMap.get_("x-request-start").c_str(), timestamp);
-  EXPECT_EQ(
-      timestamp,
-      std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count());
+  EXPECT_EQ(headerMap.get_("x-request-start").c_str(),
+            AccessLog::AccessLogFormatUtils::durationToString(start_time.time_since_epoch()));
 
   typedef std::map<std::string, int> CountMap;
   CountMap counts;
@@ -675,7 +671,7 @@ route:
       append: true
     - header:
         key: "x-request-start"
-        value: "%START_TIMESTAMP%"
+        value: "%START_TIME_SINCE_EPOCH%"
       append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
