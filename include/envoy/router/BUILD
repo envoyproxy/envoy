@@ -41,10 +41,12 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:websocket_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 

@@ -44,7 +44,7 @@ Network::FilterFactoryCb TcpProxyConfigFactory::createFilter(
     ASSERT(proto_config.deprecated_v1().routes_size() > 0);
   }
 
-  TcpProxyConfigSharedPtr filter_config(new TcpProxyConfig(proto_config, context));
+  TcpProxyConfigSharedPtr filter_config(std::make_shared<TcpProxyConfig>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
         std::make_shared<TcpProxyFilter>(filter_config, context.clusterManager()));
