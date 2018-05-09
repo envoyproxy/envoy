@@ -22,4 +22,3 @@ envoy_cc_library(
         "//source/extensions/grpc_credentials:well_known_names",
     ],
 )
-
