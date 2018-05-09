@@ -63,6 +63,7 @@ public:
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};

@@ -7,6 +7,8 @@ Version history
 * access log: ability to log response trailers
 * access log: ability to format START_TIME
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
+* access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
+  to filter logs based on request headers
 * admin: added :http:get:`/config_dump` for dumping current configs
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
@@ -23,6 +25,8 @@ Version history
   representation of the bootstrap config and overrides --config-path.
 * cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
   to close tcp_proxy upstream connections when health checks fail.
+* cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
+  connections from hosts after they are removed from service discovery, regardless of health status.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -50,11 +54,15 @@ Version history
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
+* load balancer: ability to configure zone aware load balancer settings :ref:`through the API
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
 * router: added `START_TIMESTAMP` as one of supported variables in :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`. The timestamp unit is in milliseconds.
+* sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
+  recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
   <envoy_api_field_Listener.freebind>` and upstream connections via
   :ref:`cluster manager wide
@@ -64,9 +72,12 @@ Version history
   <envoy_api_field_Listener.transparent>`.
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
+* stats: added support for histograms.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
+* websocket: support configuring
+  :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 
 1.6.0 (March 20, 2018)
 ======================

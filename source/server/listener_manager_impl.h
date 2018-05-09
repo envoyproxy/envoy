@@ -27,23 +27,23 @@ public:
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList_(
+  static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
-  static std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
+  static std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  std::vector<Configuration::NetworkFilterFactoryCb> createNetworkFilterFactoryList(
+  std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context) override {
     return createNetworkFilterFactoryList_(filters, context);
   }
-  std::vector<Configuration::ListenerFilterFactoryCb> createListenerFilterFactoryList(
+  std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
@@ -293,8 +293,8 @@ private:
   const uint64_t hash_;
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
-  std::vector<Configuration::NetworkFilterFactoryCb> filter_factories_;
-  std::vector<Configuration::ListenerFilterFactoryCb> listener_filter_factories_;
+  std::vector<Network::FilterFactoryCb> filter_factories_;
+  std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::api::v2::core::Metadata metadata_;

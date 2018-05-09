@@ -118,7 +118,7 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
   clusters.Add();
 
-  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters),
+  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
                ProtoValidationException);
   EXPECT_CALL(request_, cancel());
 }

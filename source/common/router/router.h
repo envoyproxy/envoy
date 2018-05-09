@@ -21,8 +21,10 @@
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/logger.h"
+#include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
+#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -161,8 +163,27 @@ public:
     }
     return {};
   }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     if (route_entry_) {
+      // Have we been called before? If so, there's no need to recompute because
+      // by the time this method is called for the first time, route_entry_ should
+      // not change anymore.
+      if (metadata_match_ != nullptr) {
+        return metadata_match_.get();
+      }
+
+      // The request's metadata, if present, takes precedence over the route's.
+      const auto& request_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+      const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+      if (filter_it != request_metadata.end()) {
+        if (route_entry_->metadataMatchCriteria() != nullptr) {
+          metadata_match_ =
+              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+        } else {
+          metadata_match_ = std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+        }
+        return metadata_match_.get();
+      }
       return route_entry_->metadataMatchCriteria();
     }
     return nullptr;
@@ -343,6 +364,7 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   bool stream_destroyed_{};
+  MetadataMatchCriteriaConstPtr metadata_match_;
 
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;

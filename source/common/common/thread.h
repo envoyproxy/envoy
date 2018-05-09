@@ -6,6 +6,8 @@
 
 #include "envoy/thread/thread.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Thread {
 
@@ -46,6 +48,7 @@ public:
   void unlock() override { mutex_.unlock(); }
 
 private:
+  // TODO(jmarantz): change to absl::Mutex and add thread annotations.
   std::mutex mutex_;
 };
 

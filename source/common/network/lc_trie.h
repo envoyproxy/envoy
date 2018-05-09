@@ -99,10 +99,22 @@ private:
   typedef uint32_t Ipv4;
   typedef absl::uint128 Ipv6;
 
+  typedef std::unordered_set<std::string> TagSet;
+  typedef std::shared_ptr<std::unordered_set<std::string>> TagSetSharedPtr;
+
   /**
    * Structure to hold a CIDR range and the tag associated with it.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> struct IpPrefix {
+
+    IpPrefix() {}
+
+    IpPrefix(const IpType& ip, uint32_t length, const std::string& tag) : ip_(ip), length_(length) {
+      tags_.insert(tag);
+    }
+
+    IpPrefix(const IpType& ip, int length, const TagSet& tags)
+        : ip_(ip), length_(length), tags_(tags) {}
 
     /**
      * @return -1 if the current object is less than other. 0 if they are the same. 1
@@ -146,27 +158,111 @@ private:
 
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
-    void addNestedPrefix(const IpPrefix& other) {
-      if (nested_prefixes_ == nullptr) {
-        nested_prefixes_ = std::make_shared<std::vector<IpPrefix>>();
-      }
-      nested_prefixes_->push_back(other);
-    }
-
     // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
-    int length_;
-    // TODO(ccaraman): Support more than one tag per entry.
-    // Tag for this entry.
-    std::string tag_;
-    // Other prefixes nested under this one. If an LC trie lookup matches on this
-    // prefix, the lookup will scan the nested prefixes to see if any of them match,
-    // too. This situation is rare, so to save memory in the common case the
-    // nested_prefixes field is a pointer to a vector rather than an inline vector.
-    // TODO(brian-pane) switch to a trie of nested prefixes, to ensure sublinear-time
-    // searching even in situations where there are a lot of nested prefixes.
-    std::shared_ptr<std::vector<IpPrefix>> nested_prefixes_;
+    uint32_t length_{0};
+    // Tag(s) for this entry.
+    TagSet tags_;
+  };
+
+  /**
+   * Binary trie used to simplify the construction of Level Compressed Tries.
+   * This data type supports two operations:
+   *   1. Add a prefix to the trie.
+   *   2. Push the prefixes to the leaves of the trie.
+   * That second operation produces a new set of prefixes that yield the same
+   * match results as the original set of prefixes from which the BinaryTrie
+   * was constructed, but with an important difference: the new prefixes are
+   * guaranteed not to be nested within each other. That allows the use of the
+   * classic LC Trie construction algorithm, which is fast and (relatively)
+   * simple but does not work properly with nested prefixes.
+   */
+  template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class BinaryTrie {
+  public:
+    BinaryTrie() : root_(std::make_unique<Node>()) {}
+
+    /**
+     * Add a CIDR prefix and associated tag to the binary trie. If an entry already
+     * exists for the prefix, merge the tag into the existing entry.
+     */
+    void insert(const IpPrefix<IpType>& prefix) {
+      Node* node = root_.get();
+      for (uint32_t i = 0; i < prefix.length_; i++) {
+        auto bit = static_cast<uint32_t>(extractBits(i, 1, prefix.ip_));
+        NodePtr& next_node = node->children[bit];
+        if (next_node == nullptr) {
+          next_node = std::make_unique<Node>();
+        }
+        node = next_node.get();
+      }
+      if (node->tags == nullptr) {
+        node->tags = std::make_shared<TagSet>();
+      }
+      node->tags->insert(prefix.tags_.begin(), prefix.tags_.end());
+    }
+
+    /**
+     * Update each node in the trie to inherit/override its ancestors' tags,
+     * and then push the prefixes in the binary trie to the leaves so that:
+     *  1) each leaf contains a prefix, and
+     *  2) given the set of prefixes now located at the leaves, a useful
+     *     new property applies: no prefix in that set is nested under any
+     *     other prefix in the set (since, by definition, no leaf of the
+     *     trie can be nested under another leaf)
+     * @return the prefixes associated with the leaf nodes.
+     */
+    std::vector<IpPrefix<IpType>> push_leaves() {
+      std::vector<IpPrefix<IpType>> prefixes;
+      std::function<void(Node*, TagSetSharedPtr, unsigned, IpType)> visit =
+          [&](Node* node, TagSetSharedPtr tags, unsigned depth, IpType prefix) {
+            // Inherit any tags set by ancestor nodes.
+            if (tags != nullptr) {
+              if (node->tags == nullptr) {
+                node->tags = tags;
+              } else {
+                node->tags->insert(tags->begin(), tags->end());
+              }
+            }
+            // If a node has exactly one child, create a second child node
+            // that inherits the union of all tags set by any ancestor nodes.
+            // This gives the trie an important new property: all the configured
+            // prefixes end up at the leaves of the trie. As no leaf is nested
+            // under another leaf (or one of them would not be a leaf!), the
+            // leaves of the trie upon completion of this leaf-push operation
+            // will form a set of disjoint prefixes (no nesting) that can be
+            // used to build an LC trie.
+            if (node->children[0] != nullptr && node->children[1] == nullptr) {
+              node->children[1] = std::make_unique<Node>();
+            } else if (node->children[0] == nullptr && node->children[1] != nullptr) {
+              node->children[0] = std::make_unique<Node>();
+            }
+            if (node->children[0] != nullptr) {
+              visit(node->children[0].get(), node->tags, depth + 1, (prefix << 1) + IpType(0));
+              visit(node->children[1].get(), node->tags, depth + 1, (prefix << 1) + IpType(1));
+            } else {
+              if (node->tags != nullptr) {
+                // Compute the CIDR prefix from the path we've taken to get to this point in the
+                // tree.
+                IpType ip = prefix;
+                if (depth != 0) {
+                  ip <<= (address_size - depth);
+                }
+                prefixes.emplace_back(IpPrefix<IpType>(ip, depth, *node->tags));
+              }
+            }
+          };
+      visit(root_.get(), nullptr, 0, IpType(0));
+      return prefixes;
+    }
+
+  private:
+    struct Node {
+      std::unique_ptr<Node> children[2];
+      TagSetSharedPtr tags;
+    };
+    typedef std::unique_ptr<Node> NodePtr;
+    NodePtr root_;
   };
 
   /**
@@ -223,20 +319,8 @@ private:
                                          tag_data.size(), MAXIMUM_CIDR_RANGE_ENTRIES));
       }
 
-      // TODO(ccaraman): Consider adding an optimization to short circuit building the trie, if
-      // tag_data[0].length_==0.
-      std::sort(tag_data.begin(), tag_data.end());
-      ip_prefixes_.push_back(tag_data[0]);
-
-      // Set up ip_prefixes_, which should contain the supplied prefixes in sorted order,
-      // but with any nested prefixes encapsulated under their parent prefixes.
-      for (size_t i = 1; i < tag_data.size(); ++i) {
-        if (ip_prefixes_[ip_prefixes_.size() - 1].isPrefix(tag_data[i])) {
-          ip_prefixes_[ip_prefixes_.size() - 1].addNestedPrefix(tag_data[i]);
-        } else {
-          ip_prefixes_.push_back(tag_data[i]);
-        }
-      }
+      ip_prefixes_ = tag_data;
+      std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
       // In theory, the trie_ vector can have at most twice the number of ip_prefixes entries - 1.
       // However, due to the fill factor a buffer is added to the size of the
@@ -530,24 +614,14 @@ LcTrie::LcTrieInternal<IpType, address_size>::getTags(const IpType& ip_address) 
     address = node.address_;
   }
 
-  // The prefix table entry ip_prefixes_[address] contains either a single prefix or
-  // a parent prefix with a set of additional prefixes nested under it. In the latter
-  // case, we compare the supplied ip_address against all the prefixes in the entry
-  // and return the union of all the matches' tags.
-  // TODO(ccaraman): determine whether there's a more optimal way to handle "/0" prefixes.
-  std::unordered_set<std::string> unique_tags;
+  // The path taken through the trie to match the ip_address may have contained skips,
+  // so it is necessary to check whether the the matched prefix really contains the
+  // ip_address.
   const auto& prefix = ip_prefixes_[address];
   if (prefix.contains(ip_address)) {
-    unique_tags.insert(prefix.tag_);
-    if (prefix.nested_prefixes_ != nullptr) {
-      for (const auto& nested_prefix : *prefix.nested_prefixes_) {
-        if (nested_prefix.contains(ip_address)) {
-          unique_tags.insert(nested_prefix.tag_);
-        }
-      }
-    }
+    return std::vector<std::string>(prefix.tags_.begin(), prefix.tags_.end());
   }
-  return std::vector<std::string>(unique_tags.begin(), unique_tags.end());
+  return std::vector<std::string>();
 }
 
 } // namespace LcTrie

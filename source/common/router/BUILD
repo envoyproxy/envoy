@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "metadatamatchcriteria_lib",
+    hdrs = ["metadatamatchcriteria_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
@@ -17,6 +25,7 @@ envoy_cc_library(
         ":config_utility_lib",
         ":header_formatter_lib",
         ":header_parser_lib",
+        ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         "//include/envoy/http:header_map_interface",
@@ -32,8 +41,10 @@ envoy_cc_library(
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -77,7 +88,7 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/admin/v2:config_dump_cc",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
@@ -176,6 +187,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:rds_json_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )

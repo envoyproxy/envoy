@@ -21,7 +21,7 @@ then
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
-  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-data-plane-api-"${BUILD_SHA:0:6}"
+  export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
 fi
 
@@ -91,6 +91,8 @@ PROTO_RST="
   /envoy/config/filter/network/redis_proxy/v2/redis_proxy/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto.rst
   /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
+  /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
+  /envoy/extensions/common/tap/v2alpha/capture/envoy/extensions/common/tap/v2alpha/capture.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
 "

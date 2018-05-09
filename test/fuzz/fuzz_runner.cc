@@ -15,7 +15,8 @@ void Runner::setupEnvironment(int argc, char** argv) {
   TestEnvironment::initializeOptions(argc, argv);
 
   static auto* lock = new Thread::MutexBasicLockable();
-  Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
+  const auto environment_log_level = TestEnvironment::getOptions().logLevel();
+  Logger::Registry::initialize(std::min(environment_log_level, spdlog::level::info),
                                TestEnvironment::getOptions().logFormat(), *lock);
 }
 

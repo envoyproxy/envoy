@@ -13,6 +13,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -22,6 +23,11 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Router {
 
 /**
@@ -334,6 +340,9 @@ public:
 
 typedef std::shared_ptr<const MetadataMatchCriterion> MetadataMatchCriterionConstSharedPtr;
 
+class MetadataMatchCriteria;
+typedef std::unique_ptr<const MetadataMatchCriteria> MetadataMatchCriteriaConstPtr;
+
 class MetadataMatchCriteria {
 public:
   virtual ~MetadataMatchCriteria() {}
@@ -345,6 +354,17 @@ public:
    */
   virtual const std::vector<MetadataMatchCriterionConstSharedPtr>&
   metadataMatchCriteria() const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria, merging existing
+   * metadata criteria with the provided criteria. The result criteria is the
+   * combination of both sets of criteria, with those from the metadata_matches
+   * ProtobufWkt::Struct taking precedence.
+   * @param metadata_matches supplies the new criteria.
+   * @return MetadataMatchCriteriaConstPtr the result criteria.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
 };
 
 /**
@@ -461,6 +481,19 @@ public:
    * @return bool true if this route should use WebSockets.
    */
   virtual bool useWebSocket() const PURE;
+
+  /**
+   * Create an instance of a WebSocketProxy, using the configuration in this route.
+   *
+   * This may only be called if useWebSocket() returns true on this RouteEntry.
+   *
+   * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
+   *         in this route.
+   */
+  virtual Http::WebSocketProxyPtr createWebSocketProxy(
+      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
+      Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when

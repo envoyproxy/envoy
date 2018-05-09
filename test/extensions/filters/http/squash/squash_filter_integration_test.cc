@@ -52,12 +52,12 @@ public:
 
   FakeStreamPtr sendSquashOk(const std::string& body) { return sendSquash("200", body); }
 
-  void sendDebugRequest(IntegrationCodecClientPtr& codec_client) {
+  IntegrationStreamDecoderPtr sendDebugRequest(IntegrationCodecClientPtr& codec_client) {
     Http::TestHeaderMapImpl headers{{":method", "GET"},
                                     {":authority", "www.solo.io"},
                                     {"x-squash-debug", "true"},
                                     {":path", "/getsomething"}};
-    codec_client->makeHeaderOnlyRequest(headers, *response_);
+    return codec_client->makeHeaderOnlyRequest(headers);
   }
 
   void createUpstreams() override {
@@ -113,7 +113,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, SquashFilterIntegrationTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate();
@@ -121,7 +121,7 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   // Respond to read attachment request
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attached"));
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
   EXPECT_STREQ("POST", create_stream->headers().Method()->value().c_str());
   EXPECT_STREQ("/api/v2/debugattachment/", create_stream->headers().Path()->value().c_str());
@@ -138,26 +138,26 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   // The second request should be for the created object
   EXPECT_STREQ("GET", get_stream->headers().Method()->value().c_str());
   EXPECT_STREQ("/api/v2/debugattachment/oF8iVdiJs5", get_stream->headers().Path()->value().c_str());
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SquashFilterIntegrationTest, ErrorAttaching) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate();
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("error"));
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate();
@@ -166,47 +166,47 @@ TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
   // before issuing another get attachment request.
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attaching"));
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SquashFilterIntegrationTest, ErrorNoSquashServer) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Don't respond to anything. squash filter should timeout within
   // squash_request_timeout and continue the request.
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SquashFilterIntegrationTest, BadCreateResponse) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate("not json...");
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(SquashFilterIntegrationTest, BadGetResponse) {
-  sendDebugRequest(codec_client_);
+  auto response = sendDebugRequest(codec_client_);
 
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate();
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk("not json...");
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 } // namespace Envoy

@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Server::Configuration::HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
     const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   auto filter_config =
@@ -36,13 +36,13 @@ Server::Configuration::HttpFilterFactoryCb ExtAuthzFilterConfig::createFilter(
   };
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 ExtAuthzFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
                                           Server::Configuration::FactoryContext&) {
   NOT_IMPLEMENTED;
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 ExtAuthzFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                    const std::string& stats_prefix,
                                                    Server::Configuration::FactoryContext& context) {

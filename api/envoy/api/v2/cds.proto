@@ -377,15 +377,12 @@ message Cluster {
     envoy.type.Percent healthy_panic_threshold = 1;
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
-    // [#not-implemented-hide:]
     message ZoneAwareLbConfig {
-      // [#not-implemented-hide:]
       // Configures percentage of requests that will be considered for zone aware routing
       // if zone aware routing is configured. If not specified, the default is 100%.
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
       // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
       envoy.type.Percent routing_enabled = 1;
-      // [#not-implemented-hide:]
       // Configures minimum upstream cluster size required for zone aware routing
       // If upstream cluster size is less than specified, zone aware routing is not performed
       // even if zone aware routing is configured. If not specified, the default is 6.
@@ -398,7 +395,6 @@ message Cluster {
     message LocalityWeightedLbConfig {
     }
     oneof locality_config_specifier {
-      // [#not-implemented-hide:]
       ZoneAwareLbConfig zone_aware_lb_config = 2;
       LocalityWeightedLbConfig locality_weighted_lb_config = 3;
     }
@@ -446,6 +442,14 @@ message Cluster {
   //   to an upstream host that becomes unhealthy, Envoy may spend a substantial amount of
   //   time exclusively closing these connections, and not processing any other traffic.
   bool close_connections_on_host_health_failure = 31;
+
+  // If this cluster uses EDS or STRICT_DNS to configure its hosts, immediately drain
+  // connections from any hosts that are removed from service discovery.
+  //
+  // This only affects behavior for hosts that are being actively health checked.
+  // If this flag is not set to true, Envoy will wait until the hosts fail active health
+  // checking before removing it from the cluster.
+  bool drain_connections_on_host_removal = 32;
 }
 
 // An extensible structure containing the address Envoy should bind to when

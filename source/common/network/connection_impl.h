@@ -111,6 +111,9 @@ public:
   // Reconsider how to make fairness happen.
   void setReadBufferReady() override { file_event_->activate(Event::FileReadyType::Read); }
 
+  // Obtain global next connection ID. This should only be used in tests.
+  static uint64_t nextGlobalIdForTest() { return next_global_id_; }
+
 protected:
   void closeSocket(ConnectionEvent close_type);
 

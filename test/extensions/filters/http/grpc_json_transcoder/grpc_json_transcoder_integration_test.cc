@@ -57,16 +57,17 @@ protected:
                        const std::vector<std::string>& grpc_response_messages,
                        const Status& grpc_status, Http::HeaderMap&& response_headers,
                        const std::string& response_body, bool full_response = true) {
-    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
-
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
+    IntegrationStreamDecoderPtr response;
     if (!request_body.empty()) {
-      request_encoder_ = &codec_client_->startRequest(request_headers, *response_);
+      auto encoder_decoder = codec_client_->startRequest(request_headers);
+      request_encoder_ = &encoder_decoder.first;
+      response = std::move(encoder_decoder.second);
       Buffer::OwnedImpl body(request_body);
       codec_client_->sendData(*request_encoder_, body, true);
     } else {
-      codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+      response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
@@ -116,8 +117,8 @@ protected:
       upstream_request_->waitForReset();
     }
 
-    response_->waitForEndStream();
-    EXPECT_TRUE(response_->complete());
+    response->waitForEndStream();
+    EXPECT_TRUE(response->complete());
     response_headers.iterate(
         [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
@@ -125,12 +126,12 @@ protected:
           EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
           return Http::HeaderMap::Iterate::Continue;
         },
-        response_.get());
+        response.get());
     if (!response_body.empty()) {
       if (full_response) {
-        EXPECT_EQ(response_body, response_->body());
+        EXPECT_EQ(response_body, response->body());
       } else {
-        EXPECT_TRUE(StringUtil::startsWith(response_->body().c_str(), response_body));
+        EXPECT_TRUE(StringUtil::startsWith(response->body().c_str(), response_body));
       }
     }
 
