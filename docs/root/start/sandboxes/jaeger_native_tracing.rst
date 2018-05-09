@@ -1,16 +1,16 @@
 .. _install_sandboxes_jaeger_native_tracing:
 
-Jaeger Tracing
+Jaeger Native Tracing
 ==============
 
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Jaeger <http://jaegertracing.io/>`_ as the tracing provider and Jaeger's native
-`C++ client <https://github.com/jaegertracing/jaeger-client-cpp>` as a plugin. Using Jaeger with its
+`C++ client <https://github.com/jaegertracing/jaeger-client-cpp>`_ as a plugin. Using Jaeger with its
 native client instead of with Envoy's builtin Zipkin client has the following advantages:
 
 - Trace propagation will work with other other services using Jaeger without needing to make
-  configuration `changes <https://github.com/jaegertracing/jaeger-client-go#zipkin-http-b3-compatible-header-propagation>`.
-- A variety of different `sampling strategies <https://www.jaegertracing.io/docs/sampling/#client-sampling-configuration>`
+  configuration `changes <https://github.com/jaegertracing/jaeger-client-go#zipkin-http-b3-compatible-header-propagation>`_.
+- A variety of different `sampling strategies <https://www.jaegertracing.io/docs/sampling/#client-sampling-configuration>`_.
   can be used, including probabilistic or remote where sampling can be centrally controlled from Jaeger's backend.
 - Spans are sent to the collector in a more efficient binary encoding.
 
