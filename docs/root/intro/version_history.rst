@@ -27,6 +27,7 @@ Version history
   to close tcp_proxy upstream connections when health checks fail.
 * cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status

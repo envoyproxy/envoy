@@ -597,6 +597,67 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
   }
 }
 
+// Validate that onConfigUpdate() updates all priorities in the prioritySet
+TEST_F(EdsTest, EndpointHostPerPriority) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+  uint32_t port = 1000;
+  auto add_hosts_to_locality = [cluster_load_assignment,
+                                &port](const std::string& region, const std::string& zone,
+                                       const std::string& sub_zone, uint32_t n, uint32_t priority) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+    endpoints->set_priority(priority);
+    auto* locality = endpoints->mutable_locality();
+    locality->set_region(region);
+    locality->set_zone(zone);
+    locality->set_sub_zone(sub_zone);
+
+    for (uint32_t i = 0; i < n; ++i) {
+      auto* socket_address = endpoints->add_lb_endpoints()
+                                 ->mutable_endpoint()
+                                 ->mutable_address()
+                                 ->mutable_socket_address();
+      socket_address->set_address("1.2.3.4");
+      socket_address->set_port_value(port++);
+    }
+  };
+
+  add_hosts_to_locality("oceania", "koala", "ingsoc", 2, 0);
+  add_hosts_to_locality("", "us-east-1a", "", 1, 1);
+
+  bool initialized = false;
+  cluster_->initialize([&initialized] { initialized = true; });
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  EXPECT_TRUE(initialized);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2, hosts.size());
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(1, hosts.size());
+  }
+
+  cluster_load_assignment->clear_endpoints();
+
+  add_hosts_to_locality("oceania", "koala", "ingsoc", 4, 0);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(4, hosts.size());
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(0, hosts.size());
+  }
+}
+
 // Validate that onConfigUpdate() updates bins hosts per priority as expected.
 TEST_F(EdsTest, EndpointHostsPerPriority) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
