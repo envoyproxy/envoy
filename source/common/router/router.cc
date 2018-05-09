@@ -192,12 +192,6 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
-  // If defined, set the specified start timestamp header with timestamp in milliseconds.
-  if (!config_.start_timestamp_header_.get().empty()) {
-    headers.addReferenceKey(config_.start_timestamp_header_,
-                            std::chrono::system_clock::now().time_since_epoch().count());
-  }
-
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();

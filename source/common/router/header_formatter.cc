@@ -135,6 +135,13 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
       return RequestInfo::Utility::formatDownstreamAddressNoPort(
           *request_info.downstreamLocalAddress());
     };
+  } else if (field_name == "START_TIMESTAMP") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      // Returns the start timestamp in milliseconds.
+      return fmt::format("{}", std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   request_info.startTime().time_since_epoch())
+                                   .count());
+    };
   } else if (field_name.find_first_of("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));

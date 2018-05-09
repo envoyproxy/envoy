@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -595,6 +596,10 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {
         "key": "x-client-ip",
         "value": "%CLIENT_IP%"
+      },
+      {
+        "key": "x-request-start",
+        "value": "%START_TIMESTAMP%"
       }
     ]
   }
@@ -604,6 +609,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
+  route_action.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route_action.request_headers_to_add());
@@ -611,11 +617,21 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  time_t start_time_epoch = 1522280158;
+  SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
+  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
+
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_EQ("127.0.0.1", headerMap.get_("x-client-ip"));
+
+  uint64_t timestamp;
+  StringUtil::atoul(headerMap.get_("x-request-start").c_str(), timestamp);
+  EXPECT_EQ(
+      timestamp,
+      std::chrono::duration_cast<std::chrono::milliseconds>(start_time.time_since_epoch()).count());
 
   typedef std::map<std::string, int> CountMap;
   CountMap counts;
@@ -635,6 +651,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
+  EXPECT_EQ(1, counts["x-request-start"]);
 }
 
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
@@ -647,6 +664,10 @@ route:
         key: "x-client-ip"
         value: "%CLIENT_IP%"
       append: true
+    - header:
+        key: "x-request-start"
+        value: "%START_TIMESTAMP%"
+      append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
 
@@ -657,6 +678,7 @@ route:
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
+  EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
 }

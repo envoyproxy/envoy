@@ -480,3 +480,6 @@ Supported variable names are:
     found, or if the selected value is not a supported type, then no header is emitted. The
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
+
+%START_TIMESTAMP%
+    The timestamp when the first byte of a request is received. The timestamp unit is in milliseconds.

@@ -26,15 +26,4 @@ message Router {
   // an upstream request. Presuming retries are configured, multiple upstream
   // requests may be made for each downstream (inbound) request.
   repeated envoy.config.filter.accesslog.v2.AccessLog upstream_log = 3;
-
-  // If set, the specified header will be added to upstream requests with a timestamp
-  // (in milliseconds) when Envoy starts decoding downstream's request headers.
-  //
-  // Example:
-  //
-  // .. code-block:: yaml
-  //
-  //   start_timestamp_header: x-request-start
-  //
-  string start_timestamp_header = 4;
 }
