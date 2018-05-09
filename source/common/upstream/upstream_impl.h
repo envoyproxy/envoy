@@ -472,9 +472,8 @@ protected:
   void onPreInitComplete();
 
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr
-      info_; // This cluster info stores the stats scope so it must be initialized first
-             // and destroyed last.
+  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
+                                   // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
@@ -490,6 +489,11 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+
 /**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
  * hosts with resolved IP addresses).
@@ -498,7 +502,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -507,7 +511,16 @@ private:
   // ClusterImplBase
   void startPreInit() override;
 
-  HostVectorSharedPtr initial_hosts_;
+  void preparePriorityState(const envoy::api::v2::ClusterLoadAssignment& load_assignment);
+  void updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                              LocalityWeightsMap& locality_weights_map,
+                              LocalityWeightsMap& new_locality_weights_map);
+  const envoy::api::v2::ClusterLoadAssignment
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+
+  PriorityState priority_state_{1};
+  const LocalInfo::LocalInfo& local_info_;
+  std::vector<LocalityWeightsMap> locality_weights_map_;
 };
 
 /**

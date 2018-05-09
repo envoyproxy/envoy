@@ -363,8 +363,8 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(
-        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, cm, added_via_api));
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager,
+                                            local_info, cm, added_via_api));
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
@@ -624,36 +624,138 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
+                                     Ssl::ContextManager& ssl_context_manager,
+                                     const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
-      initial_hosts_(new HostVector()) {
-  for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-        info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
-  }
+      local_info_(local_info) {
+  preparePriorityState(cluster.has_load_assignment() ? cluster.load_assignment()
+                                                     : translateClusterHosts(cluster.hosts()));
 }
 
 void StaticClusterImpl::startPreInit() {
-  // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
-  // fire update callbacks to start the health checking process.
-  if (health_checker_) {
-    for (const auto& host : *initial_hosts_) {
-      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  for (size_t i = 0; i < priority_state_.size(); ++i) {
+    if (priority_state_[i].first != nullptr) {
+      // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
+      // fire update callbacks to start the health checking process.
+      if (health_checker_) {
+        for (const auto& host : *priority_state_[i].first) {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        }
+      }
+
+      if (locality_weights_map_.size() <= i) {
+        locality_weights_map_.resize(i + 1);
+      }
+      updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), *priority_state_[i].first,
+                             locality_weights_map_[i], priority_state_[i].second);
     }
   }
 
-  // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  first_host_set.updateHosts(initial_hosts_, createHealthyHostList(*initial_hosts_),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             *initial_hosts_, {});
-  initial_hosts_ = nullptr;
-
   onPreInitComplete();
+}
+
+void StaticClusterImpl::preparePriorityState(
+    const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment) {
+  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    const uint32_t priority = locality_lb_endpoint.priority();
+    if (priority_state_.size() <= priority) {
+      priority_state_.resize(priority + 1);
+    }
+    if (priority_state_[priority].first == nullptr) {
+      priority_state_[priority].first.reset(new HostVector());
+    }
+    if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+      priority_state_[priority].second[locality_lb_endpoint.locality()] =
+          locality_lb_endpoint.load_balancing_weight().value();
+    }
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      priority_state_[priority].first->emplace_back(new HostImpl(
+          info_, EMPTY_STRING, resolveProtoAddress(lb_endpoint.endpoint().address()),
+          lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
+          locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config()));
+    }
+  }
+}
+
+void StaticClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector& new_hosts,
+                                               LocalityWeightsMap& locality_weights_map,
+                                               LocalityWeightsMap& new_locality_weights_map) {
+  HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
+  std::vector<HostVector> per_locality;
+  LocalityWeightsSharedPtr locality_weights;
+  locality_weights_map = new_locality_weights_map;
+
+  HostVector hosts_added;
+  for (const HostSharedPtr& host : new_hosts) {
+    hosts_added.push_back(host);
+  }
+
+  *current_hosts_copy = std::move(hosts_added);
+
+  // If we are configured for locality weighted LB we populate the locality
+  // weights.
+  const bool locality_weighted_lb = info()->lbConfig().has_locality_weighted_lb_config();
+  if (locality_weighted_lb) {
+    locality_weights = std::make_shared<LocalityWeights>();
+  }
+  // If local locality is not defined then skip populating per locality hosts.
+  const auto& local_locality = local_info_.node().locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_info_.node().locality().DebugString());
+
+  // We use std::map to guarantee a stable ordering for zone aware routing.
+  std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
+
+  for (const HostSharedPtr& host : *current_hosts_copy) {
+    hosts_per_locality[host->locality()].push_back(host);
+  }
+
+  // Do we have hosts for the local locality?
+  const bool non_empty_local_locality =
+      local_info_.node().has_locality() &&
+      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+  // As per HostsPerLocality::get(), the per_locality vector must have the
+  // local locality hosts first if non_empty_local_locality.
+  if (non_empty_local_locality) {
+    per_locality.emplace_back(hosts_per_locality[local_locality]);
+    if (locality_weighted_lb) {
+      locality_weights->emplace_back(new_locality_weights_map[local_locality]);
+    }
+  }
+
+  // After the local locality hosts (if any), we place the remaining locality
+  // host groups in lexicographic order. This provides a stable ordering for
+  // zone aware routing.
+  for (auto& entry : hosts_per_locality) {
+    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+      per_locality.emplace_back(entry.second);
+      if (locality_weighted_lb) {
+        locality_weights->emplace_back(new_locality_weights_map[entry.first]);
+      }
+    }
+  }
+
+  auto per_locality_shared =
+      std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
+
+  host_set.updateHosts(current_hosts_copy, createHealthyHostList(*current_hosts_copy),
+                       per_locality_shared, createHealthyHostLists(*per_locality_shared),
+                       std::move(locality_weights), hosts_added, {});
+}
+
+const envoy::api::v2::ClusterLoadAssignment StaticClusterImpl::translateClusterHosts(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
+      load_assignment.add_endpoints();
+
+  for (const envoy::api::v2::core::Address& host : hosts) {
+    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->CopyFrom(host);
+  }
+
+  return load_assignment;
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
@@ -672,12 +774,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
   bool health_changed = false;
 
-  // Go through and see if the list we have is different from what we just got. If it is, we make a
-  // new host list and raise a change notification. This uses an N^2 search given that this does not
-  // happen very often and the list sizes should be small (see
+  // Go through and see if the list we have is different from what we just got. If it is, we make
+  // a new host list and raise a change notification. This uses an N^2 search given that this does
+  // not happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
-  // do the same thing.
+  // possible for DNS to return the same address multiple times, and a bad SDS implementation
+  // could do the same thing.
   std::unordered_set<std::string> host_addresses;
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
@@ -688,8 +790,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      // If we find a host matched based on address, we keep it. However we do change weight inline
-      // so do that here.
+      // If we find a host matched based on address, we keep it. However we do change weight
+      // inline so do that here.
       if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
@@ -856,9 +958,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
-          // a new address that has port in it. We need to both support IPv6 as well as potentially
-          // move port handling into the DNS interface itself, which would work better for SRV.
+          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
+          // make a new address that has port in it. We need to both support IPv6 as well as
+          // potentially move port handling into the DNS interface itself, which would work better
+          // for SRV.
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
@@ -874,9 +977,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         }
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
-        // multiple DNS names, this will return initialized after a single DNS resolution completes.
-        // This is not perfect but is easier to code and unclear if the extra complexity is needed
-        // so will start with this.
+        // multiple DNS names, this will return initialized after a single DNS resolution
+        // completes. This is not perfect but is easier to code and unclear if the extra
+        // complexity is needed so will start with this.
         parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });

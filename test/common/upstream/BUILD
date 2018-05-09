@@ -321,6 +321,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/mocks:common_lib",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
