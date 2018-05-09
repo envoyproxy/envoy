@@ -11,6 +11,7 @@
 #include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
