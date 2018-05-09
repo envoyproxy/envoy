@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/perf_annotation.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
@@ -150,10 +151,26 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
-  return data;
+
+  // Because the RawStatData object is initialized with and contains a truncated
+  // version of the std::string name, storing the stats in a map would require
+  // storing the name twice. Performing a lookup on the set is similarly
+  // expensive to performing a map lookup, since both require copying a truncated version of the
+  // string before doing the hash lookup.
+  absl::ReleasableMutexLock lock(&mutex_);
+  auto ret = stats_.insert(data);
+  RawStatData* existing_data = *ret.first;
+  lock.Release();
+
+  if (!ret.second) {
+    ::free(data);
+    ++existing_data->ref_count_;
+    return existing_data;
+  } else {
+    return data;
+  }
 }
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
@@ -256,18 +273,28 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
-  // This allocator does not ever have concurrent access to the raw data.
-  ASSERT(data.ref_count_ == 1);
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  size_t key_removed;
+  {
+    absl::MutexLock lock(&mutex_);
+    key_removed = stats_.erase(&data);
+  }
+
+  ASSERT(key_removed == 1);
   ::free(&data);
 }
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  if (key.size() > maxNameLength()) {
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), maxNameLength());
+        key.size(), Stats::RawStatData::maxNameLength());
   }
   ref_count_ = 1;
 
@@ -275,6 +302,39 @@ void RawStatData::initialize(absl::string_view key) {
   size_t xfer_size = std::min(nameSize() - 1, key.size());
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
+}
+
+HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
+    : computed_quantiles_(supportedQuantiles().size(), 0.0) {
+  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
+                       computed_quantiles_.data());
+}
+
+const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
+  static const std::vector<double> supported_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
+                                                          0.95, 0.99, 0.999, 1};
+  return supported_quantiles;
+}
+
+std::string HistogramStatisticsImpl::summary() const {
+  std::vector<std::string> summary;
+  const std::vector<double>& supported_quantiles_ref = supportedQuantiles();
+  summary.reserve(supported_quantiles_ref.size());
+  for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+    summary.push_back(
+        fmt::format("P{}: {}", 100 * supported_quantiles_ref[i], computed_quantiles_[i]));
+  }
+  return absl::StrJoin(summary, ", ");
+}
+
+/**
+ * Clears the old computed values and refreshes it with values computed from passed histogram.
+ */
+void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
+  std::fill(computed_quantiles_.begin(), computed_quantiles_.end(), 0.0);
+  ASSERT(supportedQuantiles().size() == computed_quantiles_.size());
+  hist_approx_quantile(new_histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
+                       computed_quantiles_.data());
 }
 
 } // namespace Stats

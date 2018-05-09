@@ -32,8 +32,6 @@ public:
     grpc_mux_subscription_.updateResources(resources);
   }
 
-  const std::string versionInfo() const override { return grpc_mux_subscription_.versionInfo(); }
-
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }
 
 private:

@@ -1,0 +1,36 @@
+static_resources {
+  clusters {
+    name: "www.google.com"
+    connect_timeout {
+      nanos: 1
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: " "
+      }
+    }
+    tls_context {
+      sni: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+    }
+  }
+}
+cluster_manager {
+  load_stats_config {
+    api_type: REST
+    cluster_names: "www.google.com"
+  }
+}
+watchdog {
+  miss_timeout {
+    nanos: 64
+  }
+}
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "["
+    }
+  }
+}

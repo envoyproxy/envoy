@@ -175,11 +175,11 @@ public:
   }
 
   MOCK_METHOD2(createNetworkFilterFactoryList,
-               std::vector<Configuration::NetworkFilterFactoryCb>(
+               std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
                    Configuration::FactoryContext& context));
   MOCK_METHOD2(createListenerFilterFactoryList,
-               std::vector<Configuration::ListenerFilterFactoryCb>(
+               std::vector<Network::ListenerFilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>&,
                    Configuration::ListenerFactoryContext& context));
   MOCK_METHOD3(createListenSocket,

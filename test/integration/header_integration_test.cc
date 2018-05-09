@@ -319,14 +319,14 @@ protected:
     registerTestServerPorts({"http"});
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-    codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest();
 
     upstream_request_->encodeHeaders(response_headers, true);
-    response_->waitForEndStream();
+    response->waitForEndStream();
 
     compareHeaders(upstream_request_->headers(), expected_request_headers);
-    compareHeaders(response_->headers(), expected_response_headers);
+    compareHeaders(response->headers(), expected_response_headers);
   }
 
   void compareHeaders(Http::TestHeaderMapImpl&& headers,

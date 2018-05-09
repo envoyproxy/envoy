@@ -336,7 +336,7 @@ message AccessLogFilter {
     // Or filter.
     OrFilter or_filter = 7;
 
-    // [#not-implemented-hide:] Header filter.
+    // Header filter.
     HeaderFilter header_filter = 8;
   }
 }
@@ -421,7 +421,7 @@ message OrFilter {
   repeated AccessLogFilter filters = 2 [(validate.rules).repeated .min_items = 2];
 }
 
-// [#not-implemented-hide:] Filters requests based on the presence or value of a request header.
+// Filters requests based on the presence or value of a request header.
 message HeaderFilter {
   // Only requests with a header which matches the specified HeaderMatcher will pass the filter
   // check.

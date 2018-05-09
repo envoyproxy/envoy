@@ -14,6 +14,7 @@
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -65,6 +66,8 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
     return FilterPtr{new AndFilter(config.and_filter(), runtime, random)};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kOrFilter:
     return FilterPtr{new OrFilter(config.or_filter(), runtime, random)};
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kHeaderFilter:
+    return FilterPtr{new HeaderFilter(config.header_filter())};
   default:
     NOT_REACHED;
   }
@@ -160,6 +163,15 @@ bool AndFilter::evaluate(const RequestInfo::RequestInfo& info,
 
 bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   return !info.healthCheck();
+}
+
+HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config) {
+  header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
+}
+
+bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
+                            const Http::HeaderMap& request_headers) {
+  return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
 InstanceSharedPtr

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
 
@@ -24,42 +24,39 @@ namespace Router {
 RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
-    Runtime::Loader& runtime, Upstream::ClusterManager& cm, Stats::Scope& scope,
-    const std::string& stat_prefix, Init::Manager& init_manager,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     RouteConfigProviderManager& route_config_provider_manager) {
   switch (config.route_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
     return route_config_provider_manager.getStaticRouteConfigProvider(config.route_config(),
-                                                                      runtime, cm);
+                                                                      factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
-    return route_config_provider_manager.getRdsRouteConfigProvider(config.rds(), cm, scope,
-                                                                   stat_prefix, init_manager);
+    return route_config_provider_manager.getRdsRouteConfigProvider(config.rds(), factory_context,
+                                                                   stat_prefix);
   default:
     NOT_REACHED;
   }
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::api::v2::RouteConfiguration& config, Runtime::Loader& runtime,
-    Upstream::ClusterManager& cm)
-    : config_(new ConfigImpl(config, runtime, cm, true)), route_config_proto_{config} {}
+    const envoy::api::v2::RouteConfiguration& config,
+    Server::Configuration::FactoryContext& factory_context)
+    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config} {}
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 // initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const std::string& manager_identifier, Runtime::Loader& runtime, Upstream::ClusterManager& cm,
-    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, const std::string& stat_prefix,
-    ThreadLocal::SlotAllocator& tls, RouteConfigProviderManagerImpl& route_config_provider_manager)
-    : runtime_(runtime), cm_(cm), tls_(tls.allocateSlot()),
+    const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
+    const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager)
+    : factory_context_(factory_context), tls_(factory_context.threadLocal().allocateSlot()),
       route_config_name_(rds.route_config_name()),
-      scope_(scope.createScope(stat_prefix + "rds." + route_config_name_ + ".")),
+      scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
-  ::Envoy::Config::Utility::checkLocalInfo("rds", local_info);
+  ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -67,11 +64,13 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   });
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::RouteConfiguration>(
-      rds.config_source(), local_info.node(), dispatcher, cm, random, *scope_,
-      [this, &rds, &dispatcher, &random,
-       &local_info]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {
-        return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds, cm_,
-                                   dispatcher, random, local_info);
+      rds.config_source(), factory_context.localInfo().node(), factory_context.dispatcher(),
+      factory_context.clusterManager(), factory_context.random(), *scope_,
+      [this, &rds,
+       &factory_context]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {
+        return new RdsSubscription(Envoy::Config::Utility::generateStats(*scope_), rds,
+                                   factory_context.clusterManager(), factory_context.dispatcher(),
+                                   factory_context.random(), factory_context.localInfo());
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
@@ -93,7 +92,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
   return tls_->getTyped<ThreadLocalConfig>().config_;
 }
 
-void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources) {
+void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
+                                                const std::string& version_info) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
     stats_.update_empty_.inc();
@@ -111,10 +111,9 @@ void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources)
                                      route_config_name_, route_config.name()));
   }
   const uint64_t new_hash = MessageUtil::hash(route_config);
-  if (new_hash != last_config_hash_ || !initialized_) {
-    ConfigConstSharedPtr new_config(new ConfigImpl(route_config, runtime_, cm_, false));
-    initialized_ = true;
-    last_config_hash_ = new_hash;
+  if (!config_info_ || new_hash != config_info_.value().last_config_hash_) {
+    ConfigConstSharedPtr new_config(new ConfigImpl(route_config, factory_context_, false));
+    config_info_ = {new_hash, version_info};
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
               new_hash);
@@ -142,13 +141,9 @@ void RdsRouteConfigProviderImpl::registerInitTarget(Init::Manager& init_manager)
   init_manager.registerTarget(*this);
 }
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
-    Runtime::Loader& runtime, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, ThreadLocal::SlotAllocator& tls, Server::Admin& admin)
-    : runtime_(runtime), dispatcher_(dispatcher), random_(random), local_info_(local_info),
-      tls_(tls), admin_(admin) {
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
   config_tracker_entry_ =
-      admin_.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+      admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_);
@@ -173,19 +168,22 @@ std::vector<RouteConfigProviderSharedPtr>
 RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
   std::vector<RouteConfigProviderSharedPtr> providers_strong;
   // Collect non-expired providers.
-  std::transform(static_route_config_providers_.begin(), static_route_config_providers_.end(),
-                 providers_strong.begin(), [](auto&& weak) { return weak.lock(); });
+  for (const auto& weak_provider : static_route_config_providers_) {
+    const auto strong_provider = weak_provider.lock();
+    if (strong_provider != nullptr) {
+      providers_strong.push_back(strong_provider);
+    }
+  }
 
   // Replace our stored list of weak_ptrs with the filtered list.
-  static_route_config_providers_.assign(providers_strong.begin(), providers_strong.begin());
+  static_route_config_providers_.assign(providers_strong.begin(), providers_strong.end());
 
   return providers_strong;
 };
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Upstream::ClusterManager& cm, Stats::Scope& scope, const std::string& stat_prefix,
-    Init::Manager& init_manager) {
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
 
   // RdsRouteConfigProviders are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a
@@ -197,11 +195,10 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
     // std::make_shared does not work for classes with private constructors. There are ways
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
-    std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
-        new RdsRouteConfigProviderImpl(rds, manager_identifier, runtime_, cm, dispatcher_, random_,
-                                       local_info_, scope, stat_prefix, tls_, *this)};
+    std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{new RdsRouteConfigProviderImpl(
+        rds, manager_identifier, factory_context, stat_prefix, *this)};
 
-    new_provider->registerInitTarget(init_manager);
+    new_provider->registerInitTarget(factory_context.initManager());
 
     route_config_providers_.insert({manager_identifier, new_provider});
 
@@ -217,24 +214,32 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
 };
 
 RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfigProvider(
-    const envoy::api::v2::RouteConfiguration& route_config, Runtime::Loader& runtime,
-    Upstream::ClusterManager& cm) {
+    const envoy::api::v2::RouteConfiguration& route_config,
+    Server::Configuration::FactoryContext& factory_context) {
   auto provider =
-      std::make_shared<StaticRouteConfigProviderImpl>(std::move(route_config), runtime, cm);
+      std::make_shared<StaticRouteConfigProviderImpl>(std::move(route_config), factory_context);
   static_route_config_providers_.push_back(provider);
   return provider;
 }
 
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::v2::RouteConfigDump>();
-  auto* const dynamic_configs = config_dump->mutable_dynamic_route_configs();
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
+
   for (const auto& provider : getRdsRouteConfigProviders()) {
-    dynamic_configs->Add()->MergeFrom(provider->configAsProto());
+    auto config_info = provider->configInfo();
+    if (config_info) {
+      auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
+      dynamic_config->set_version_info(config_info.value().version_);
+      dynamic_config->mutable_route_config()->MergeFrom(config_info.value().config_);
+    }
   }
-  auto* const static_configs = config_dump->mutable_static_route_configs();
+
   for (const auto& provider : getStaticRouteConfigProviders()) {
-    static_configs->Add()->MergeFrom(provider->configAsProto());
+    ASSERT(provider->configInfo());
+    config_dump->mutable_static_route_configs()->Add()->MergeFrom(
+        provider->configInfo().value().config_);
   }
+
   return ProtobufTypes::MessagePtr{std::move(config_dump)};
 }
 

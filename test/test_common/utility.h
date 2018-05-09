@@ -329,7 +329,9 @@ public:
   }
 
   using HeaderMapImpl::addCopy;
+  using HeaderMapImpl::remove;
   void addCopy(const std::string& key, const std::string& value);
+  void remove(const std::string& key);
   std::string get_(const std::string& key);
   std::string get_(const LowerCaseString& key);
   bool has(const std::string& key);

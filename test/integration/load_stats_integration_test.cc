@@ -18,7 +18,11 @@ namespace {
 class LoadStatsIntegrationTest : public HttpIntegrationTest,
                                  public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    // We rely on some fairly specific load balancing picks in this test, so
+    // determinizie the schedule.
+    setDeterministic();
+  }
 
   void addEndpoint(envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
                    uint32_t index, uint32_t& num_endpoints) {
@@ -139,8 +143,7 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    response_.reset(new IntegrationStreamDecoder(*dispatcher_));
-    codec_client_->makeRequestWithBody(headers, request_size_, *response_);
+    response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
   void waitForLoadStatsStream() {
@@ -297,6 +300,7 @@ public:
 
   static constexpr uint32_t upstream_endpoints_ = 5;
 
+  IntegrationStreamDecoderPtr response_;
   std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;
@@ -346,7 +350,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   requestLoadStatsResponse({"cluster_0"});
 
   for (uint32_t i = 0; i < 6; ++i) {
-    sendAndReceiveUpstream(i % 3);
+    sendAndReceiveUpstream((4 + i) % 3);
   }
 
   // No locality for priority=1 since there's no "winter" endpoints.

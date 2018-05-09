@@ -36,7 +36,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushCountersAndGaugesToSinks(sinks, store);
+  InstanceUtil::flushMetricsToSinks(sinks, store);
 }
 
 class RunHelperTest : public testing::Test {
@@ -103,7 +103,8 @@ protected:
     server_.reset(new InstanceImpl(
         options_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_, thread_local_));
+        hooks_, restart_, stats_store_, fakelock_, component_factory_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
 
     EXPECT_TRUE(server_->api().fileExists("/dev/null"));
   }
@@ -231,7 +232,8 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       server_.reset(new InstanceImpl(
           options_,
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-          hooks_, restart_, stats_store_, fakelock_, component_factory_, thread_local_)),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
       EnvoyException, "unable to read file: ")
 }
 } // namespace Server

@@ -17,11 +17,11 @@ namespace Lua {
  */
 class LuaFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
-  Server::Configuration::HttpFilterFactoryCb
+  Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override;
@@ -33,9 +33,9 @@ public:
   std::string name() override { return HttpFilterNames::get().LUA; }
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config, const std::string&,
-               Server::Configuration::FactoryContext& context);
+  Http::FilterFactoryCb createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config,
+                                     const std::string&,
+                                     Server::Configuration::FactoryContext& context);
 };
 
 } // namespace Lua

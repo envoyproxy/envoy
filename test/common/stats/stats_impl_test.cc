@@ -478,5 +478,21 @@ TEST(RawStatDataTest, Truncate) {
   alloc.free(*stat);
 }
 
+TEST(RawStatDataTest, HeapAlloc) {
+  HeapRawStatDataAllocator alloc;
+  RawStatData* stat_1 = alloc.alloc("ref_name");
+  ASSERT_NE(stat_1, nullptr);
+  RawStatData* stat_2 = alloc.alloc("ref_name");
+  ASSERT_NE(stat_2, nullptr);
+  RawStatData* stat_3 = alloc.alloc("not_ref_name");
+  ASSERT_NE(stat_3, nullptr);
+  EXPECT_EQ(stat_1, stat_2);
+  EXPECT_NE(stat_1, stat_3);
+  EXPECT_NE(stat_2, stat_3);
+  alloc.free(*stat_1);
+  alloc.free(*stat_2);
+  alloc.free(*stat_3);
+}
+
 } // namespace Stats
 } // namespace Envoy

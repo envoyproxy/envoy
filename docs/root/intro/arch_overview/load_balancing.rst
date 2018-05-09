@@ -124,6 +124,12 @@ runtime as well as in the :ref:`cluster configuration
 is used to avoid a situation in which host failures cascade throughout the cluster as load
 increases.
 
+Note that panic thresholds are *per-priority*. This means that if the percentage of healthy nodes
+in a single priority goes below the threshold, that priority will enter panic mode. In general
+it is discouraged to use panic thresholds in conjunction with priorities, as by the time enough
+nodes are unhealthy to trigger the panic threshold most of the traffic should already have spilled
+over to the next priority level.
+
 .. _arch_overview_load_balancing_priority_levels:
 
 Priority levels
