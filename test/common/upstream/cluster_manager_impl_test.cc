@@ -1001,7 +1001,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
@@ -1073,7 +1073,7 @@ TEST_F(ClusterManagerImplTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   Network::MockClientConnection* connection1 = new NiceMock<Network::MockClientConnection>();
   Host::CreateConnectionData conn_info1;
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
   EXPECT_CALL(*cluster1, initialize(_))
