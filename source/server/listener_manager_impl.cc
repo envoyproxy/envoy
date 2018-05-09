@@ -624,15 +624,15 @@ void ListenerManagerImpl::stopListeners() {
 
 void ListenerManagerImpl::closeListeners() {
   for (auto& listener : active_listeners_) {
-    listener->close();
+    listener->closeSocket();
   }
 
   for (auto& listener : warming_listeners_) {
-    listener->close();
+    listener->closeSocket();
   }
 
   for (auto& draining_listener : draining_listeners_) {
-    draining_listener.listener_->close();
+    draining_listener.listener_->closeSocket();
   }
 }
 

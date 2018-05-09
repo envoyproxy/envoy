@@ -204,7 +204,10 @@ public:
     return ret;
   }
 
-  void close() { socket_->close(); }
+  /**
+   * Close the listening socket.
+   */
+  void closeSocket() { socket_->close(); }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }
