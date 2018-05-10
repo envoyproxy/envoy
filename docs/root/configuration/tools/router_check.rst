@@ -69,7 +69,7 @@ expects a cluster name match of "instant-server".::
                "..."
             }
           ]
-        }
+        },
       "validate": {
         "cluster_name": "...",
         "virtual_cluster_name": "...",
