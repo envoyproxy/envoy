@@ -503,9 +503,9 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string
-AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                       const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                                   const std::list<Stats::ParentHistogramSharedPtr>& all_histograms,
+                                   const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -574,8 +574,13 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   stats_array.PushBack(histograms_container_obj, allocator);
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
+  if (pretty_print) {
+    rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  } else {
+    rapidjson::Writer<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  }
   return strbuf.GetString();
 }
 

@@ -33,46 +33,6 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-/**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
- */
-class TestAllocator : public Stats::RawStatDataAllocator {
-public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  Stats::RawStatData* alloc(const std::string& name) override {
-    CSmartPtr<Stats::RawStatData, freeAdapter>& stat_ref = stats_[name];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<Stats::RawStatData*>(::calloc(Stats::RawStatData::size(), 1)));
-      stat_ref->initialize(name);
-    } else {
-      stat_ref->ref_count_++;
-    }
-
-    return stat_ref.get();
-  }
-
-  void free(Stats::RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
-    }
-
-    FAIL();
-  }
-
-private:
-  static void freeAdapter(Stats::RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<Stats::RawStatData, freeAdapter>> stats_;
-};
-
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion>,
                        public Stats::RawStatDataAllocator {
 public:
@@ -94,7 +54,7 @@ public:
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
                      const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
-    return AdminImpl::statsAsJson(all_stats, all_histograms);
+    return AdminImpl::statsAsJson(all_stats, all_histograms, true);
   }
 
   MOCK_METHOD1(alloc, Stats::RawStatData*(const std::string& name));
@@ -102,7 +62,7 @@ public:
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestAllocator alloc_;
+  Stats::TestAllocator alloc_;
   Stats::MockSink sink_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
