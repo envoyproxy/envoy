@@ -86,6 +86,10 @@ private:
  * Implements a LockGuard that is identical to absl::ReleasableMutexLock, but takes a
  * BasicLockable& to allow usages to be agnostic to cross-process mutexes vs. single-process
  * mutexes.
+ *
+ * Note: this implementation holds the mutex for the lifetime of the LockGuard, simplifying
+ * implementation (no conditionals) and readability at call-sites. In some cases, an early
+ * release is needed, in which case, a ReleasableLockGuard can be used.
  */
 class SCOPED_LOCKABLE LockGuard {
 public:
