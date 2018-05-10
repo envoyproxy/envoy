@@ -949,7 +949,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
-                     end_stream && continue_data_entry == encoder_filters_.end(), headers);
+                   end_stream && continue_data_entry == encoder_filters_.end(), headers);
 
   // Now actually encode via the codec.
   request_info_.onFirstDownstreamTxByteSent();
