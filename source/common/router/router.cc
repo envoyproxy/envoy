@@ -290,6 +290,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
+
+  // Ensure an http transport scheme is selected before continuing with decoding.
+  ASSERT(headers.Scheme());
+  
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
@@ -297,10 +301,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                                               callbacks_->streamId());
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
-
-  // Finally assert that an http scheme was selected
-  // in the before continuing.
-  ASSERT(headers.Scheme());
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
