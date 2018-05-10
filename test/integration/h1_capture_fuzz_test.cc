@@ -52,7 +52,7 @@ public:
     }
     if (fake_upstream_connection != nullptr) {
       fake_upstream_connection->close();
-      fake_upstream_connection->waitForDisconnect();
+      fake_upstream_connection->waitForDisconnect(true);
     }
     tcp_client->close();
   }
