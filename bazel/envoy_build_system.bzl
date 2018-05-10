@@ -358,8 +358,8 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
     py_proto_deps = ["@com_google_protobuf//:protobuf_python"]
 
     if "http_api_protos" in external_deps:
-        # TODO(htuch): Do we need to handle the Python case here?
         cc_proto_deps.append("@googleapis//:http_api_protos")
+        py_proto_deps.append("@googleapis//:http_api_protos_py")
 
     if "well_known_protos" in external_deps:
         # WKT is already included for Python as part of standard deps above.
