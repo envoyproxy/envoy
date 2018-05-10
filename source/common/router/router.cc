@@ -298,8 +298,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  // Finally assert that an http sceme was selected
-  // in the setUpstreamScheme function.
+  // Finally assert that an http scheme was selected
+  // in the before continuing.
   ASSERT(headers.Scheme());
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
