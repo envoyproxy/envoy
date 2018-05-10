@@ -14,14 +14,13 @@ namespace Grpc {
  * gRPC.
  */
 
-const grpc::SslCredentialsOptions BuildSslOptionsFromConfig(
+grpc::SslCredentialsOptions buildSslOptionsFromConfig(
     const envoy::api::v2::core::GrpcService::GoogleGrpc::SslCredentials& ssl_config) {
-  const grpc::SslCredentialsOptions ssl_creds = {
+  return {
       .pem_root_certs = Config::DataSource::read(ssl_config.root_certs(), true),
       .pem_private_key = Config::DataSource::read(ssl_config.private_key(), true),
       .pem_cert_chain = Config::DataSource::read(ssl_config.cert_chain(), true),
   };
-  return ssl_creds;
 }
 
 /**
@@ -41,7 +40,7 @@ public:
     if (google_grpc.has_channel_credentials() &&
         google_grpc.channel_credentials().has_ssl_credentials()) {
       return grpc::SslCredentials(
-          BuildSslOptionsFromConfig(google_grpc.channel_credentials().ssl_credentials()));
+          buildSslOptionsFromConfig(google_grpc.channel_credentials().ssl_credentials()));
     }
     return creds;
   }

@@ -20,7 +20,7 @@ AccessTokenExampleGrpcCredentialsFactory::getChannelCredentials(
   if (google_grpc.has_channel_credentials() &&
       google_grpc.channel_credentials().has_ssl_credentials()) {
     creds = grpc::SslCredentials(
-        Grpc::BuildSslOptionsFromConfig(google_grpc.channel_credentials().ssl_credentials()));
+        Grpc::buildSslOptionsFromConfig(google_grpc.channel_credentials().ssl_credentials()));
   }
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {

@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Grpc {
 
-const grpc::SslCredentialsOptions BuildSslOptionsFromConfig(
+grpc::SslCredentialsOptions buildSslOptionsFromConfig(
     const envoy::api::v2::core::GrpcService::GoogleGrpc::SslCredentials& ssl_config);
 
 std::shared_ptr<grpc::ChannelCredentials>

@@ -8,12 +8,6 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
-    # gRPC Credentials
-    #
-
-    "envoy.grpc_credentials.access_token_example":      "//source/extensions/grpc_credentials/example:config",
-
-    #
     # Health checkers
     #
 

@@ -853,8 +853,7 @@ public:
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
-    google_grpc->set_credentials_factory_name(
-        Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE);
+    google_grpc->set_credentials_factory_name(credentials_factory_name_);
     auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
@@ -863,6 +862,7 @@ public:
   }
 
   std::string access_token_value_{};
+  std::string credentials_factory_name_{};
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.
@@ -873,6 +873,8 @@ INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegratio
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
+  credentials_factory_name_ =
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -883,6 +885,8 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
+  credentials_factory_name_ =
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -890,6 +894,14 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   stream->sendReply();
   stream->sendServerTrailers(Status::GrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+}
+
+// Validate that an unknown credentials factory name throws an EnvoyException
+TEST_P(GrpcAccessTokenClientIntegrationTest, InvalidCredentialFactory) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  credentials_factory_name_ = "unknown";
+  EXPECT_THROW_WITH_MESSAGE(initialize(), EnvoyException,
+                            "Unknown google grpc credentials factory: unknown");
 }
 #endif
 
