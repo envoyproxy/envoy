@@ -39,8 +39,8 @@ expects a cluster name match of "instant-server".::
          {
            ":authority":"api.lyft.com",
            ":path": "/api/locations"
-         }
-       "validate"
+         },
+       "validate":
          {
            "cluster_name": "instant-server"
          }
