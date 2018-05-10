@@ -47,7 +47,7 @@ base_ejection_time_ms
 
 max_ejection_percent
   *(optional, integer)* The maximum % of hosts in an upstream cluster that can be ejected due to outlier detection.
-  Defaults to 10%.
+  Defaults to 10% but will eject at least one host regardless of the value.
 
 .. _config_cluster_manager_cluster_outlier_detection_enforcing_consecutive_5xx:
 
