@@ -306,7 +306,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Http::Utility::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
   }
 
@@ -377,7 +377,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   if (!grpc_status || grpc_status.value() == Grpc::Status::GrpcStatus::InvalidCode) {
     response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
   } else {
-    response_headers_->Status()->value(Grpc::Common::grpcToHttpStatus(grpc_status.value()));
+    response_headers_->Status()->value(Http::Utility::grpcToHttpStatus(grpc_status.value()));
     response_headers_->insertGrpcStatus().value(enumToInt(grpc_status.value()));
   }
 

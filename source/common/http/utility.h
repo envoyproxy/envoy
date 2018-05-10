@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
@@ -89,6 +90,34 @@ public:
    * - Upgrade: websocket
    */
   static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is gRPC.
+   */
+  static bool hasGrpcContentType(const HeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @param bool indicating wether the header is at end_stream.
+   * @return bool indicating whether the header is a gRPC reseponse header
+   */
+  static bool isGrpcResponseHeader(const HeaderMap& headers, bool end_stream);
+
+  /**
+   * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
+   * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
+   * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+   * @param http_response_status HTTP status code.
+   * @return Status::GrpcStatus corresponding gRPC status code.
+   */
+  static Grpc::Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status);
+
+  /**
+   * @param grpc_status gRPC status from grpc-status header.
+   * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
+   */
+  static uint64_t grpcToHttpStatus(Grpc::Status::GrpcStatus grpc_status);
 
   /**
    * @return Http2Settings An Http2Settings populated from the

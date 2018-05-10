@@ -484,7 +484,7 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
     stream->expectTrailingMetadata(empty_metadata_);
     // Technically this should be
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Common::httpToGrpcStatus(), but the Google gRPC client treats
+    // as given by Http::Utility::httpToGrpcStatus(), but the Google gRPC client treats
     // this as GrpcStatus::Canceled.
     stream->expectGrpcStatus(Status::GrpcStatus::Canceled);
     stream->fake_stream_->encodeHeaders(reply_headers, true);

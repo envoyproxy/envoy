@@ -21,43 +21,6 @@
 namespace Envoy {
 namespace Grpc {
 
-bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type == nullptr) {
-    return false;
-  }
-  // Fail fast if this is not gRPC.
-  if (!StringUtil::startsWith(content_type->value().c_str(),
-                              Http::Headers::get().ContentTypeValues.Grpc)) {
-    return false;
-  }
-  // Exact match with application/grpc. This and the above case are likely the
-  // two most common encountered.
-  if (content_type->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str()) {
-    return true;
-  }
-  // Prefix match with application/grpc+. It's not sufficient to rely on the an
-  // application/grpc prefix match, since there are related content types such as
-  // application/grpc-web.
-  if (content_type->value().size() > Http::Headers::get().ContentTypeValues.Grpc.size() &&
-      content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+') {
-    return true;
-  }
-  // This must be something like application/grpc-web.
-  return false;
-}
-
-bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
-  if (end_stream) {
-    // Trailers-only response, only grpc-status is required.
-    return headers.GrpcStatus() != nullptr;
-  }
-  if (Http::Utility::getResponseStatus(headers) != enumToInt(Http::Code::OK)) {
-    return false;
-  }
-  return hasGrpcContentType(headers);
-}
-
 void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string& protocol,
                         const std::string& grpc_service, const std::string& grpc_method,
                         const Http::HeaderEntry* grpc_status) {
@@ -122,88 +85,6 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   service->assign(parts[0].data(), parts[0].size());
   method->assign(parts[1].data(), parts[1].size());
   return true;
-}
-
-Status::GrpcStatus Common::httpToGrpcStatus(uint64_t http_response_status) {
-  // From
-  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
-  switch (http_response_status) {
-  case 400:
-    return Status::GrpcStatus::Internal;
-  case 401:
-    return Status::GrpcStatus::Unauthenticated;
-  case 403:
-    return Status::GrpcStatus::PermissionDenied;
-  case 404:
-    return Status::GrpcStatus::Unimplemented;
-  case 429:
-  case 502:
-  case 503:
-  case 504:
-    return Status::GrpcStatus::Unavailable;
-  default:
-    return Status::GrpcStatus::Unknown;
-  }
-}
-
-uint64_t Common::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
-  // From https://cloud.google.com/apis/design/errors#handling_errors.
-  switch (grpc_status) {
-  case Status::GrpcStatus::Ok:
-    return 200;
-  case Status::GrpcStatus::Canceled:
-    // Client closed request.
-    return 499;
-  case Status::GrpcStatus::Unknown:
-    // Internal server error.
-    return 500;
-  case Status::GrpcStatus::InvalidArgument:
-    // Bad request.
-    return 400;
-  case Status::GrpcStatus::DeadlineExceeded:
-    // Gateway Time-out.
-    return 504;
-  case Status::GrpcStatus::NotFound:
-    // Not found.
-    return 404;
-  case Status::GrpcStatus::AlreadyExists:
-    // Conflict.
-    return 409;
-  case Status::GrpcStatus::PermissionDenied:
-    // Forbidden.
-    return 403;
-  case Status::GrpcStatus::ResourceExhausted:
-    //  Too many requests.
-    return 429;
-  case Status::GrpcStatus::FailedPrecondition:
-    // Bad request.
-    return 400;
-  case Status::GrpcStatus::Aborted:
-    // Conflict.
-    return 409;
-  case Status::GrpcStatus::OutOfRange:
-    // Bad request.
-    return 400;
-  case Status::GrpcStatus::Unimplemented:
-    // Not implemented.
-    return 501;
-  case Status::GrpcStatus::Internal:
-    // Internal server error.
-    return 500;
-  case Status::GrpcStatus::Unavailable:
-    // Service unavailable.
-    return 503;
-  case Status::GrpcStatus::DataLoss:
-    // Internal server error.
-    return 500;
-  case Status::GrpcStatus::Unauthenticated:
-    // Unauthorized.
-    return 401;
-  case Status::GrpcStatus::InvalidCode:
-  default:
-    // Internal server error.
-    return 500;
-  }
 }
 
 void Common::sendLocalReply(

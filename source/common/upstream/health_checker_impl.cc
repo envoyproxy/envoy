@@ -362,11 +362,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
         return;
       }
     }
-    onRpcComplete(Grpc::Common::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
+    onRpcComplete(Http::Utility::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
                   end_stream);
     return;
   }
-  if (!Grpc::Common::hasGrpcContentType(*headers)) {
+  if (!Http::Utility::hasGrpcContentType(*headers)) {
     onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid gRPC content-type", false);
     return;
   }

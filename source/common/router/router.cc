@@ -183,7 +183,7 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
           }
           callbacks_->encodeHeaders(std::move(headers), end_stream);
         },
-        Grpc::Common::httpToGrpcStatus(enumToInt(code)), body);
+        Http::Utility::httpToGrpcStatus(enumToInt(code)), body);
     return;
   }
 
@@ -205,7 +205,7 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  grpc_request_ = Http::Utility::hasGrpcContentType(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -568,7 +568,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
     if (end_stream) {
       absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
       if (grpc_status &&
-          !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+          !Http::CodeUtility::is5xx(Http::Utility::grpcToHttpStatus(grpc_status.value()))) {
         upstream_request_->upstream_host_->stats().rq_success_.inc();
       } else {
         upstream_request_->upstream_host_->stats().rq_error_.inc();
@@ -675,7 +675,7 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   if (upstream_request_->grpc_rq_success_deferred_) {
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
-        !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+        !Http::CodeUtility::is5xx(Http::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request_->upstream_host_->stats().rq_success_.inc();
     } else {
       upstream_request_->upstream_host_->stats().rq_error_.inc();

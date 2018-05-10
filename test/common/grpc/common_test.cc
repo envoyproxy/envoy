@@ -1,6 +1,7 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -121,7 +122,7 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
       {Status::GrpcStatus::InvalidCode, 500},
   };
   for (const auto& test_case : test_set) {
-    EXPECT_EQ(test_case.second, Common::grpcToHttpStatus(test_case.first));
+    EXPECT_EQ(test_case.second, Http::Utility::grpcToHttpStatus(test_case.first));
   }
 }
 
@@ -134,18 +135,18 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
       {500, Status::GrpcStatus::Unknown},
   };
   for (const auto& test_case : test_set) {
-    EXPECT_EQ(test_case.second, Common::httpToGrpcStatus(test_case.first));
+    EXPECT_EQ(test_case.second, Http::Utility::httpToGrpcStatus(test_case.first));
   }
 }
 
 TEST(GrpcCommonTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
-    EXPECT_FALSE(Common::hasGrpcContentType(headers));
+    EXPECT_FALSE(Http::Utility::hasGrpcContentType(headers));
   }
   auto isGrpcContentType = [](const std::string& s) {
     Http::TestHeaderMapImpl headers{{"content-type", s}};
-    return Common::hasGrpcContentType(headers);
+    return Http::Utility::hasGrpcContentType(headers);
   };
   EXPECT_FALSE(isGrpcContentType(""));
   EXPECT_FALSE(isGrpcContentType("application/text"));
@@ -159,18 +160,18 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
 
 TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
-  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
-  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
+  EXPECT_TRUE(Http::Utility::isGrpcResponseHeader(grpc_status_only, true));
+  EXPECT_FALSE(Http::Utility::isGrpcResponseHeader(grpc_status_only, false));
 
   Http::TestHeaderMapImpl grpc_response_header{{":status", "200"},
                                                {"content-type", "application/grpc"}};
-  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_response_header, true));
-  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_response_header, false));
+  EXPECT_FALSE(Http::Utility::isGrpcResponseHeader(grpc_response_header, true));
+  EXPECT_TRUE(Http::Utility::isGrpcResponseHeader(grpc_response_header, false));
 
   Http::TestHeaderMapImpl json_response_header{{":status", "200"},
                                                {"content-type", "application/json"}};
-  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
-  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
+  EXPECT_FALSE(Http::Utility::isGrpcResponseHeader(json_response_header, true));
+  EXPECT_FALSE(Http::Utility::isGrpcResponseHeader(json_response_header, false));
 }
 
 TEST(GrpcCommonTest, ValidateResponse) {

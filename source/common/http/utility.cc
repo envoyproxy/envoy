@@ -186,6 +186,125 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
+bool Utility::hasGrpcContentType(const HeaderMap& headers) {
+  const HeaderEntry* content_type = headers.ContentType();
+  if (content_type == nullptr) {
+    return false;
+  }
+  // Fail fast if this is not gRPC.
+  if (!StringUtil::startsWith(content_type->value().c_str(),
+                              Headers::get().ContentTypeValues.Grpc)) {
+    return false;
+  }
+  // Exact match with application/grpc. This and the above case are likely the
+  // two most common encountered.
+  if (content_type->value() == Headers::get().ContentTypeValues.Grpc.c_str()) {
+    return true;
+  }
+  // Prefix match with application/grpc+. It's not sufficient to rely on the an
+  // application/grpc prefix match, since there are related content types such as
+  // application/grpc-web.
+  if (content_type->value().size() > Headers::get().ContentTypeValues.Grpc.size() &&
+      content_type->value().c_str()[Headers::get().ContentTypeValues.Grpc.size()] == '+') {
+    return true;
+  }
+  // This must be something like application/grpc-web.
+  return false;
+}
+
+bool Utility::isGrpcResponseHeader(const HeaderMap& headers, bool end_stream) {
+  if (end_stream) {
+    // Trailers-only response, only grpc-status is required.
+    return headers.GrpcStatus() != nullptr;
+  }
+  if (Utility::getResponseStatus(headers) != enumToInt(Code::OK)) {
+    return false;
+  }
+  return hasGrpcContentType(headers);
+}
+
+Grpc::Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
+  // From
+  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
+  switch (http_response_status) {
+  case 400:
+    return Grpc::Status::GrpcStatus::Internal;
+  case 401:
+    return Grpc::Status::GrpcStatus::Unauthenticated;
+  case 403:
+    return Grpc::Status::GrpcStatus::PermissionDenied;
+  case 404:
+    return Grpc::Status::GrpcStatus::Unimplemented;
+  case 429:
+  case 502:
+  case 503:
+  case 504:
+    return Grpc::Status::GrpcStatus::Unavailable;
+  default:
+    return Grpc::Status::GrpcStatus::Unknown;
+  }
+}
+
+uint64_t Utility::grpcToHttpStatus(Grpc::Status::GrpcStatus grpc_status) {
+  // From https://cloud.google.com/apis/design/errors#handling_errors.
+  switch (grpc_status) {
+  case Grpc::Status::GrpcStatus::Ok:
+    return 200;
+  case Grpc::Status::GrpcStatus::Canceled:
+    // Client closed request.
+    return 499;
+  case Grpc::Status::GrpcStatus::Unknown:
+    // Internal server error.
+    return 500;
+  case Grpc::Status::GrpcStatus::InvalidArgument:
+    // Bad request.
+    return 400;
+  case Grpc::Status::GrpcStatus::DeadlineExceeded:
+    // Gateway Time-out.
+    return 504;
+  case Grpc::Status::GrpcStatus::NotFound:
+    // Not found.
+    return 404;
+  case Grpc::Status::GrpcStatus::AlreadyExists:
+    // Conflict.
+    return 409;
+  case Grpc::Status::GrpcStatus::PermissionDenied:
+    // Forbidden.
+    return 403;
+  case Grpc::Status::GrpcStatus::ResourceExhausted:
+    //  Too many requests.
+    return 429;
+  case Grpc::Status::GrpcStatus::FailedPrecondition:
+    // Bad request.
+    return 400;
+  case Grpc::Status::GrpcStatus::Aborted:
+    // Conflict.
+    return 409;
+  case Grpc::Status::GrpcStatus::OutOfRange:
+    // Bad request.
+    return 400;
+  case Grpc::Status::GrpcStatus::Unimplemented:
+    // Not implemented.
+    return 501;
+  case Grpc::Status::GrpcStatus::Internal:
+    // Internal server error.
+    return 500;
+  case Grpc::Status::GrpcStatus::Unavailable:
+    // Service unavailable.
+    return 503;
+  case Grpc::Status::GrpcStatus::DataLoss:
+    // Internal server error.
+    return 500;
+  case Grpc::Status::GrpcStatus::Unauthenticated:
+    // Unauthorized.
+    return 401;
+  case Grpc::Status::GrpcStatus::InvalidCode:
+  default:
+    // Internal server error.
+    return 500;
+  }
+}
+
 Http2Settings
 Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& config) {
   Http2Settings ret;
