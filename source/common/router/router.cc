@@ -174,6 +174,19 @@ void Filter::chargeUpstreamCode(Http::Code code,
 
 void Filter::sendLocalReply(Http::Code code, const std::string& body,
                             std::function<void(Http::HeaderMap& headers)> modify_headers) {
+  // Respond with a gRPC trailers-only response if the request is gRPC
+  if (grpc_request_) {
+    Grpc::Common::sendLocalReply(
+        [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
+          if (headers != nullptr && modify_headers != nullptr) {
+            modify_headers(*headers);
+          }
+          callbacks_->encodeHeaders(std::move(headers), end_stream);
+        },
+        Grpc::Common::httpToGrpcStatus(enumToInt(code)), body);
+    return;
+  }
+
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
@@ -192,6 +205,8 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
+  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
   config_.stats_.rq_total_.inc();
@@ -204,9 +219,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().c_str());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    sendLocalReply(Http::Code::NotFound, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -236,10 +249,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-        {Http::Headers::get().Status,
-         std::to_string(enumToInt(route_entry_->clusterNotFoundResponseCode()))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "");
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -308,7 +318,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Host());
   ASSERT(headers.Path());
 
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {

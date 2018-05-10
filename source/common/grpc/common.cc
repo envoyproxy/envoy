@@ -206,6 +206,19 @@ uint64_t Common::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
   }
 }
 
+void Common::sendLocalReply(
+    std::function<void(Http::HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    Status::GrpcStatus grpc_status, const std::string& message) {
+  Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
+      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::OK))},
+      {Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Grpc},
+      {Http::Headers::get().GrpcStatus, std::to_string(enumToInt(grpc_status))}}};
+  if (!message.empty()) {
+    response_headers->insertGrpcMessage().value(message);
+  }
+  encode_headers(std::move(response_headers), true); // Trailers only response
+}
+
 Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
