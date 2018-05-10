@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "empty_http_filter_config_lib",
     hdrs = ["empty_http_filter_config.h"],
     deps = [
-        "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
     ],
 )
