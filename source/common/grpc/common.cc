@@ -228,8 +228,7 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   return body;
 }
 
-Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
-                                        const std::string& service_full_name,
+Http::MessagePtr Common::prepareHeaders(const std::string& service_full_name,
                                         const std::string& method_name) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
@@ -238,7 +237,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                                  service_full_name.size());
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
-  message->headers().insertHost().value(upstream_cluster);
+  message->headers().insertHost().value(service_full_name);
   message->headers().insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Grpc);
   message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);

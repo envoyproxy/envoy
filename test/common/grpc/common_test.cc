@@ -70,11 +70,11 @@ TEST(GrpcCommonTest, ChargeStats) {
 }
 
 TEST(GrpcCommonTest, PrepareHeaders) {
-  Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name");
+  Http::MessagePtr message = Common::prepareHeaders("service_name", "method_name");
 
   EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
   EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-  EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
+  EXPECT_STREQ("service_name", message->headers().Host()->value().c_str());
   EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
 }
 

@@ -123,8 +123,7 @@ public:
   /**
    * Prepare headers for protobuf service.
    */
-  static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
-                                         const std::string& service_full_name,
+  static Http::MessagePtr prepareHeaders(const std::string& service_full_name,
                                          const std::string& method_name);
 
   /**

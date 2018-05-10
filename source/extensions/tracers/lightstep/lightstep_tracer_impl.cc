@@ -49,9 +49,8 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
   active_callback_ = &callback;
   active_response_ = &response;
 
-  Http::MessagePtr message =
-      Grpc::Common::prepareHeaders(driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
-                                   lightstep::CollectorMethodName());
+  Http::MessagePtr message = Grpc::Common::prepareHeaders(lightstep::CollectorServiceFullName(),
+                                                          lightstep::CollectorMethodName());
   message->body() = Grpc::Common::serializeBody(request);
 
   const uint64_t timeout =
