@@ -23,6 +23,11 @@ public:
     for (int i = 0; i < input.events().size(); ++i) {
       const auto& event = input.events(i);
       ENVOY_LOG_MISC(debug, "Processing event: {}", event.DebugString());
+      // If we're disconnected, we fail out.
+      if (!tcp_client->connected()) {
+        EXPECT_TRUE(tcp_client->connected());
+        break;
+      }
       switch (event.event_selector_case()) {
       case test::integration::Event::kDownstreamSendBytes:
         tcp_client->write(event.downstream_send_bytes());
