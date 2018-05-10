@@ -195,6 +195,8 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
       }
       watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
     }
+    // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
+    // that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
   } catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "gRPC config for {} update rejected: {}", message->type_url(), e.what());

@@ -115,10 +115,7 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
-    const envoy::api::v2::RouteConfiguration& configAsProto() const override {
-      return envoy::api::v2::RouteConfiguration::default_instance();
-    }
-    const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+    absl::optional<ConfigInfo> configInfo() const override { return {}; }
 
     Router::ConfigConstSharedPtr config_;
   };

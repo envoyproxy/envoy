@@ -146,7 +146,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   }
 
   codec_client_ = makeHttpConnection(std::move(conn));
-  codec_client_->makeHeaderOnlyRequest(header_map, *response_);
+  auto response = codec_client_->makeHeaderOnlyRequest(header_map);
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);
@@ -157,9 +157,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
                  upstream_request_->headers().ForwardedClientCert()->value().c_str());
   }
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
-  response_->waitForEndStream();
+  response->waitForEndStream();
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_TRUE(response_->complete());
+  EXPECT_TRUE(response->complete());
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,

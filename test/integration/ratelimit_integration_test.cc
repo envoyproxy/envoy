@@ -54,7 +54,7 @@ public:
     Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
                                     {":scheme", "http"},       {":authority", "host"},
                                     {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    codec_client_->makeRequestWithBody(headers, request_size_, *response_);
+    response_ = codec_client_->makeRequestWithBody(headers, request_size_);
   }
 
   void waitForRatelimitRequest() {
@@ -122,6 +122,7 @@ public:
 
   FakeHttpConnectionPtr fake_ratelimit_connection_;
   FakeStreamPtr ratelimit_request_;
+  IntegrationStreamDecoderPtr response_;
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;

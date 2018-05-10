@@ -189,6 +189,7 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
+  MOCK_CONST_METHOD1(mergeMatchCriteria, MetadataMatchCriteriaConstPtr(const ProtobufWkt::Struct&));
 };
 
 class MockPathMatchCriterion : public PathMatchCriterion {
@@ -228,6 +229,12 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(useWebSocket, bool());
+  MOCK_CONST_METHOD5(createWebSocketProxy,
+                     Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
+                                             const RequestInfo::RequestInfo& request_info,
+                                             Http::WebSocketProxyCallbacks& callbacks,
+                                             Upstream::ClusterManager& cluster_manager,
+                                             Network::ReadFilterCallbacks* read_callbacks));
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());

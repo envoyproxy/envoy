@@ -1,6 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"

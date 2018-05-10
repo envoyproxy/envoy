@@ -100,7 +100,7 @@ public:
         response->add_resources()->PackFrom(*load_assignment);
       }
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources)))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage(last_cluster_names_, version);
@@ -111,7 +111,6 @@ public:
                         "bad config");
     }
     subscription_->grpcMux().onReceiveMessage(std::move(response));
-    EXPECT_EQ(version_, subscription_->versionInfo());
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

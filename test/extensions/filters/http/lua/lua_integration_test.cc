@@ -129,7 +129,9 @@ config:
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"}};
 
-  Http::StreamEncoder& encoder = codec_client_->startRequest(request_headers, *response_);
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::StreamEncoder& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
   Buffer::OwnedImpl request_data1("hello");
   encoder.encodeData(request_data1, false);
   Buffer::OwnedImpl request_data2("world");
@@ -158,17 +160,17 @@ config:
   Buffer::OwnedImpl response_data2("bye");
   upstream_request_->encodeData(response_data2, true);
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
   EXPECT_STREQ(
-      "7", response_->headers().get(Http::LowerCaseString("response_body_size"))->value().c_str());
+      "7", response->headers().get(Http::LowerCaseString("response_body_size"))->value().c_str());
   EXPECT_STREQ(
       "bar",
-      response_->headers().get(Http::LowerCaseString("response_metadata_foo"))->value().c_str());
+      response->headers().get(Http::LowerCaseString("response_metadata_foo"))->value().c_str());
   EXPECT_STREQ(
       "bat",
-      response_->headers().get(Http::LowerCaseString("response_metadata_baz"))->value().c_str());
-  EXPECT_EQ(nullptr, response_->headers().get(Http::LowerCaseString("foo")));
+      response->headers().get(Http::LowerCaseString("response_metadata_baz"))->value().c_str());
+  EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();
 }
@@ -204,7 +206,7 @@ config:
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"}};
-  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
   lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
@@ -224,7 +226,7 @@ config:
                         .c_str());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response_->waitForEndStream();
+  response->waitForEndStream();
 
   cleanup();
 }
@@ -262,7 +264,7 @@ config:
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"}};
-  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
   lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
@@ -270,12 +272,12 @@ config:
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
-  response_->waitForEndStream();
+  response->waitForEndStream();
   cleanup();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("403", response_->headers().Status()->value().c_str());
-  EXPECT_EQ("nope", response_->body());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("nope", response->body());
 }
 
 // Filter alters headers and changes route.
@@ -299,15 +301,15 @@ config:
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"}};
-  codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   waitForNextUpstreamRequest(2);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response_->waitForEndStream();
+  response->waitForEndStream();
   cleanup();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 } // namespace

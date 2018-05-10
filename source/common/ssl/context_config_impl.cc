@@ -15,21 +15,15 @@ namespace Ssl {
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-    "ECDHE-ECDSA-AES128-SHA256:"
-    "ECDHE-RSA-AES128-SHA256:"
     "ECDHE-ECDSA-AES128-SHA:"
     "ECDHE-RSA-AES128-SHA:"
     "AES128-GCM-SHA256:"
-    "AES128-SHA256:"
     "AES128-SHA:"
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-AES256-SHA384:"
-    "ECDHE-RSA-AES256-SHA384:"
     "ECDHE-ECDSA-AES256-SHA:"
     "ECDHE-RSA-AES256-SHA:"
     "AES256-GCM-SHA384:"
-    "AES256-SHA256:"
     "AES256-SHA";
 
 const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
@@ -105,6 +99,11 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config)
     : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
+  // BoringSSL treats this as a C string, so embedded NULL characters will not
+  // be handled correctly.
+  if (server_name_indication_.find('\0') != std::string::npos) {
+    throw EnvoyException("SNI names containing NULL-byte are not allowed");
+  }
   // TODO(PiotrSikora): Support multiple TLS certificates.
   if (config.common_tls_context().tls_certificates().size() > 1) {
     throw EnvoyException("Multiple TLS certificates are not supported for client contexts");

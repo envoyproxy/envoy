@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.health_check",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_utility_lib",
         "//source/extensions/filters/http/health_check:health_check_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",

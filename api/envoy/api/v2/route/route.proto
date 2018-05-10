@@ -305,6 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
+// [#comment:next free field: 23]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -553,23 +554,47 @@ message RouteAction {
   // backend).
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that a HTTP/1.1 client connection to this particular route
-  // should be allowed (and expected) to upgrade to a WebSocket connection. The
-  // default is false.
+  // Indicates that a HTTP/1.1 client connection to this particular route is allowed to
+  // upgrade to a WebSocket connection. The default is false.
   //
   // .. attention::
   //
-  //   If set to true, Envoy will expect the first request matching this route to
-  //   contain WebSocket upgrade headers. If the headers are not present, the
-  //   connection will be rejected. If set to true, Envoy will setup plain TCP
+  //   If a connection is upgraded to a WebSocket connection, Envoy will set up plain TCP
   //   proxying between the client and the upstream server. Hence, an upstream
   //   server that rejects the WebSocket upgrade request is also responsible for
   //   closing the associated connection. Until then, Envoy will continue to
   //   proxy data from the client to the upstream server.
   //
-  //   Redirects, timeouts and retries are not supported on routes where websocket upgrades are
-  //   allowed.
+  //   Redirects are not supported on routes where WebSocket upgrades are allowed.
   google.protobuf.BoolValue use_websocket = 16;
+
+  message WebSocketProxyConfig {
+    // See :ref:`stat_prefix <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`.
+    // If the parameter is not specified, the default value of "websocket" is used.
+    //
+    // WebSocket connections support the :ref:`downstream statistics
+    // <config_network_filters_tcp_proxy_stats>` for TCP proxy, except for the following, which are reported
+    // in the :ref:`HTTP Connection Manager statistics <config_http_conn_man_stats>`:
+    // - downstream_cx_tx_bytes_total
+    // - downstream_cx_tx_bytes_buffered
+    // - downstream_cx_rx_bytes_total
+    // - downstream_cx_rx_bytes_buffered
+    string stat_prefix = 1;
+
+    // See :ref:`idle_timeout <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`.
+    // This timeout is only in effect after the WebSocket upgrade request is received by Envoy. It does
+    // not cover the initial part of the HTTP request.
+    google.protobuf.Duration idle_timeout = 2
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+    // See :ref:`max_connect_attempts
+    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>`.
+    google.protobuf.UInt32Value max_connect_attempts = 3 [(validate.rules).uint32.gte = 1];
+  }
+
+  // Proxy configuration used for WebSocket connections. If unset, the default values as specified
+  // in :ref:`TcpProxy <envoy_api_msg_config.filter.network.tcp_proxy.v2.TcpProxy>` are used.
+  WebSocketProxyConfig websocket_config = 22;
 
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;

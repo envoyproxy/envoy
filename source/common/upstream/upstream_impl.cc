@@ -269,7 +269,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
-      cluster_socket_options_(parseClusterSocketOptions(config, bind_config)) {
+      cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
+      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
@@ -659,7 +660,7 @@ void StaticClusterImpl::startPreInit() {
 bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& current_hosts,
                                                    HostVector& hosts_added,
-                                                   HostVector& hosts_removed, bool depend_on_hc) {
+                                                   HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
@@ -729,14 +730,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       hosts_added.push_back(host);
 
       // If we are depending on a health checker, we initialize to unhealthy.
-      if (depend_on_hc) {
+      if (health_checker_ != nullptr) {
         hosts_added.back()->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       }
     }
   }
 
+  const bool dont_remove_healthy_hosts =
+      health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
-  if (!current_hosts.empty() && depend_on_hc) {
+  if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
@@ -865,7 +868,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector hosts_added;
         HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, false)) {
+        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed);
         }

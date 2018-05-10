@@ -9,7 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/router/config_utility.h"
+#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +49,7 @@ typedef std::map<std::string, double> ClusterMinHealthyPercentages;
 typedef std::shared_ptr<const ClusterMinHealthyPercentages>
     ClusterMinHealthyPercentagesConstSharedPtr;
 
-typedef std::shared_ptr<std::vector<Router::ConfigUtility::HeaderData>> HeaderDataVectorSharedPtr;
+typedef std::shared_ptr<std::vector<Http::HeaderUtility::HeaderData>> HeaderDataVectorSharedPtr;
 
 /**
  * Health check responder filter.

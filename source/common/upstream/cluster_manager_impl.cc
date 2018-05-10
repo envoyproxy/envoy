@@ -610,13 +610,6 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
   }
 }
 
-const std::string ClusterManagerImpl::versionInfo() const {
-  if (cds_api_) {
-    return cds_api_->versionInfo();
-  }
-  return "static";
-}
-
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();

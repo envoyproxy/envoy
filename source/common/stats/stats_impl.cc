@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/perf_annotation.h"
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 
@@ -150,10 +151,26 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  // This must be zero-initialized
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
   data->initialize(name);
-  return data;
+
+  // Because the RawStatData object is initialized with and contains a truncated
+  // version of the std::string name, storing the stats in a map would require
+  // storing the name twice. Performing a lookup on the set is similarly
+  // expensive to performing a map lookup, since both require copying a truncated version of the
+  // string before doing the hash lookup.
+  absl::ReleasableMutexLock lock(&mutex_);
+  auto ret = stats_.insert(data);
+  RawStatData* existing_data = *ret.first;
+  lock.Release();
+
+  if (!ret.second) {
+    ::free(data);
+    ++existing_data->ref_count_;
+    return existing_data;
+  } else {
+    return data;
+  }
 }
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
@@ -256,18 +273,28 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 }
 
 void HeapRawStatDataAllocator::free(RawStatData& data) {
-  // This allocator does not ever have concurrent access to the raw data.
-  ASSERT(data.ref_count_ == 1);
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  size_t key_removed;
+  {
+    absl::MutexLock lock(&mutex_);
+    key_removed = stats_.erase(&data);
+  }
+
+  ASSERT(key_removed == 1);
   ::free(&data);
 }
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  if (key.size() > maxNameLength()) {
+  if (key.size() > Stats::RawStatData::maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), maxNameLength());
+        key.size(), Stats::RawStatData::maxNameLength());
   }
   ref_count_ = 1;
 
