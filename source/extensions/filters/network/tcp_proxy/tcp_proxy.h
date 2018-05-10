@@ -22,7 +22,6 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
-#include "common/router/config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -155,11 +154,7 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (config_) {
-      return config_->metadataMatchCriteria();
-    }
-
-    return nullptr;
+    return config_->metadataMatchCriteria();
   }
 
   const Network::Connection* downstreamConnection() const override {
@@ -231,6 +226,7 @@ protected:
 
   virtual void onConnectionSuccess() {}
 
+  void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
@@ -241,7 +237,7 @@ protected:
   void resetIdleTimer();
   void disableIdleTimer();
 
-  TcpProxyConfigSharedPtr config_;
+  const TcpProxyConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_;

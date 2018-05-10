@@ -26,9 +26,9 @@ public:
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
-  MOCK_METHOD1_T(
-      onConfigUpdate,
-      void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources));
+  MOCK_METHOD2_T(onConfigUpdate,
+                 void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources,
+                      const std::string& version_info));
   MOCK_METHOD1_T(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
@@ -38,8 +38,6 @@ public:
   MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
                              SubscriptionCallbacks<ResourceType>& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
-
-  MOCK_CONST_METHOD0_T(versionInfo, const std::string());
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {

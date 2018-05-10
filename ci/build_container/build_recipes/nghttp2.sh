@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=1.31.1
+VERSION=1.32.0
 
 wget -O nghttp2-"$VERSION".tar.gz https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz
 tar xf nghttp2-"$VERSION".tar.gz

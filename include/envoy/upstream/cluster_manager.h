@@ -166,14 +166,6 @@ public:
   virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
 
   /**
-   * Return the current version info string for dynamic clusters, if CDS is setup.
-   *
-   * @return std::string the current version info string for dynamic clusters,
-   *                     or "static" if CDS is not in use.
-   */
-  virtual const std::string versionInfo() const PURE;
-
-  /**
    * Return the local cluster name, if it was configured.
    *
    * @return std::string the local cluster name, or "" if no local cluster was configured.
@@ -216,11 +208,6 @@ public:
 
   /**
    * @return std::string last accepted version from fetch.
-   *
-   * TODO(dnoe): This would ideally return by reference, but this causes a
-   *             problem due to incompatible string implementations returned by
-   *             protobuf generated code. Revisit when string implementations
-   *             are converged.
    */
   virtual const std::string versionInfo() const PURE;
 };

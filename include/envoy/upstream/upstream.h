@@ -528,6 +528,12 @@ public:
    *         connections for this cluster.
    */
   virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
+
+  /**
+   * @return whether to skip waiting for health checking before draining connections
+   *         after a host is removed from service discovery.
+   */
+  virtual bool drainConnectionsOnHostRemoval() const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

@@ -40,17 +40,18 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                             {":path", "/dynamo/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"},
-                                                             {"x-forwarded-for", "10.0.0.1"},
-                                                             {"x-envoy-retry-on", "5xx"}},
-                                     1024 * 65, *response_);
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/dynamo/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024 * 65);
 
-  response_->waitForEndStream();
-  ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
@@ -77,19 +78,20 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"},
-                                                             {"x-forwarded-for", "10.0.0.1"}},
-                                     1024 * 65, *response_);
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"}},
+                                         1024 * 65);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
 
-  response_->waitForEndStream();
-  ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(BufferIntegrationTest, RouteOverride) {
@@ -103,19 +105,20 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"},
-                                                             {"x-forwarded-for", "10.0.0.1"}},
-                                     1024 * 65, *response_);
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"}},
+                                         1024 * 65);
 
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
 
-  response_->waitForEndStream();
-  ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 } // namespace

@@ -19,7 +19,7 @@ def envoy_copts(repository, test = False):
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
-        repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
