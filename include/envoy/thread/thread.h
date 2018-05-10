@@ -130,11 +130,7 @@ public:
   /**
    * Destruction of the LockGuard unlocks the lock, if it has not already been explicitly released.
    */
-  ~ReleasableLockGuard() UNLOCK_FUNCTION() {
-    if (lock_ != nullptr) {
-      lock_->unlock();
-    }
-  }
+  ~ReleasableLockGuard() UNLOCK_FUNCTION() { release(); }
 
   /**
    * Unlocks the mutex. This enables call-sites to release the mutex prior to the Lock going out of
