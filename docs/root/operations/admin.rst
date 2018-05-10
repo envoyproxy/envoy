@@ -190,9 +190,56 @@ The fields are:
 
   .. http:get:: /stats?format=json
 
-  Outputs /stats in JSON format. This can be used for programmatic access of stats.
+  Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
+  will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
+  that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
+  that has the computed quantile for each histogram. Only histograms with recorded values will be exported.
 
-  .. http:get:: /stats?format=prometheus
+  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
+  
+  Example histogram output:
+
+.. code-block:: json
+
+  {
+    "histograms": {
+      "supported_quantiles": [
+        0, 25, 50, 75, 90, 95, 99, 99.9, 100
+      ],
+      "computed_quantiles": [
+        {
+          "name": "cluster.external_auth_cluster.upstream_cx_length_ms",
+          "values": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 1.0435787, "cumulative": 1.0435787},
+            {"interval": 1.0941565, "cumulative": 1.0941565},
+            {"interval": 2.0860023, "cumulative": 2.0860023},
+            {"interval": 3.0665233, "cumulative": 3.0665233},
+            {"interval": 6.046609, "cumulative": 6.046609},
+            {"interval": 229.57333,"cumulative": 229.57333},
+            {"interval": 260,"cumulative": 260}
+          ]
+        },
+        {
+          "name": "http.admin.downstream_rq_time",
+          "values": [
+            {"interval": null, "cumulative": 0},
+            {"interval": null, "cumulative": 0},
+            {"interval": null, "cumulative": 1.0435787},
+            {"interval": null, "cumulative": 1.0941565},
+            {"interval": null, "cumulative": 2.0860023},
+            {"interval": null, "cumulative": 3.0665233},
+            {"interval": null, "cumulative": 6.046609},
+            {"interval": null, "cumulative": 229.57333},
+            {"interval": null, "cumulative": 260}
+          ]
+        }
+      ]
+    }
+  }
+
+.. http:get:: /stats?format=prometheus
 
   or alternatively,
 

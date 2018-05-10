@@ -1,4 +1,4 @@
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -355,11 +355,14 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
     # cc_proto_library; you end up with the same file built twice. So, also
     # using protobuf.bzl cc_proto_library here.
     cc_proto_deps = []
+    py_proto_deps = ["@com_google_protobuf//:protobuf_python"]
 
     if "http_api_protos" in external_deps:
         cc_proto_deps.append("@googleapis//:http_api_protos")
+        py_proto_deps.append("@googleapis//:http_api_protos_py")
 
     if "well_known_protos" in external_deps:
+        # WKT is already included for Python as part of standard deps above.
         cc_proto_deps.append("@com_google_protobuf//:cc_wkt_protos")
 
     cc_proto_library(
@@ -371,6 +374,14 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,
+        visibility = ["//visibility:public"],
+    )
+    py_proto_library(
+        name = name + "_py",
+        srcs = srcs,
+        default_runtime = "@com_google_protobuf//:protobuf_python",
+        protoc = "@com_google_protobuf//:protoc",
+        deps = deps + py_proto_deps,
         visibility = ["//visibility:public"],
     )
 

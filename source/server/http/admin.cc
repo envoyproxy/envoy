@@ -403,17 +403,19 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   // implemented this can be switched back to a normal map.
   std::multimap<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-    std::vector<std::string> summary;
-    const std::vector<double>& supported_quantiles_ref =
-        histogram->intervalStatistics().supportedQuantiles();
-    summary.reserve(supported_quantiles_ref.size());
-    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                                    histogram->intervalStatistics().computedQuantiles()[i],
-                                    histogram->cumulativeStatistics().computedQuantiles()[i]));
-    }
+    if (histogram->used()) {
+      std::vector<std::string> summary;
+      const std::vector<double>& supported_quantiles_ref =
+          histogram->intervalStatistics().supportedQuantiles();
+      summary.reserve(supported_quantiles_ref.size());
+      for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+        summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                      histogram->intervalStatistics().computedQuantiles()[i],
+                                      histogram->cumulativeStatistics().computedQuantiles()[i]));
+      }
 
-    all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+      all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+    }
   }
 
   if (params.size() == 0) {
@@ -499,9 +501,9 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string
-AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                       const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                                   const std::list<Stats::ParentHistogramSharedPtr>& all_histograms,
+                                   const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -518,43 +520,66 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     stats_array.PushBack(stat_obj, allocator);
   }
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    Value histogram_obj;
-    histogram_obj.SetObject();
-    Value histogram_name;
-    histogram_name.SetString(histogram->name().c_str(), allocator);
-    histogram_obj.AddMember("name", histogram_name, allocator);
+  Value histograms_container_obj;
+  histograms_container_obj.SetObject();
 
-    rapidjson::Value quantile_array(rapidjson::kArrayType);
+  Value histograms_obj;
+  histograms_obj.SetObject();
 
-    // TODO(ramaraochavali): consider optimizing the model here. Quantiles can be added once,
-    // followed by two arrays interval and cumulative.
-    for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
-      Value quantile_obj;
-      quantile_obj.SetObject();
-      Value quantile_type;
-      quantile_type.SetDouble(histogram->intervalStatistics().supportedQuantiles()[i] * 100);
-      quantile_obj.AddMember("quantile", quantile_type, allocator);
-      Value interval_value;
-      if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
-        interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
-      }
-      quantile_obj.AddMember("interval_value", interval_value, allocator);
-      Value cumulative_value;
-      if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
-        cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
-      }
-      quantile_obj.AddMember("cumulative_value", cumulative_value, allocator);
-      quantile_array.PushBack(quantile_obj, allocator);
-    }
-    histogram_obj.AddMember("quantiles", quantile_array, allocator);
-    stats_array.PushBack(histogram_obj, allocator);
+  // It is not possible for the supported quantiles to differ across histograms, so it is ok to
+  // send them once.
+  Stats::HistogramStatisticsImpl empty_statistics;
+  rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
+  for (double quantile : empty_statistics.supportedQuantiles()) {
+    Value quantile_type;
+    quantile_type.SetDouble(quantile * 100);
+    supported_quantile_array.PushBack(quantile_type, allocator);
   }
+  histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
+  rapidjson::Value histogram_array(rapidjson::kArrayType);
 
+  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
+    if (histogram->used()) {
+      Value histogram_obj;
+      histogram_obj.SetObject();
+      Value histogram_name;
+      histogram_name.SetString(histogram->name().c_str(), allocator);
+      histogram_obj.AddMember("name", histogram_name, allocator);
+
+      rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
+
+      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+        Value quantile_obj;
+        quantile_obj.SetObject();
+        Value interval_value;
+        if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
+          interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("interval", interval_value, allocator);
+        Value cumulative_value;
+        // We skip nan entries to put in the {null, null} entry to keep other data aligned.
+        if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
+          cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("cumulative", cumulative_value, allocator);
+        computed_quantile_array.PushBack(quantile_obj, allocator);
+      }
+      histogram_obj.AddMember("values", computed_quantile_array, allocator);
+      histogram_array.PushBack(histogram_obj, allocator);
+    }
+  }
+  histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
+  histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
+  stats_array.PushBack(histograms_container_obj, allocator);
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
+  if (pretty_print) {
+    rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  } else {
+    rapidjson::Writer<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  }
   return strbuf.GetString();
 }
 
