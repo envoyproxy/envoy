@@ -94,20 +94,49 @@ public:
    *
    * @param lock the mutex.
    */
-  explicit LockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(&lock) {
+  explicit LockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(lock) {
+    lock_.lock();
+  }
+
+  /**
+   * Destruction of the LockGuard unlocks the lock.
+   */
+  ~LockGuard() UNLOCK_FUNCTION() { lock_.unlock(); }
+
+private:
+  BasicLockable& lock_; // Set to nullptr on unlock, to prevent double-unlocking.
+};
+
+/**
+ * Implements a LockGuard that is identical to absl::ReleasableMutexLock, but takes a
+ * BasicLockable& to allow usages to be agnostic to cross-process mutexes vs. single-process
+ * mutexes.
+ */
+class SCOPED_LOCKABLE ReleasableLockGuard {
+public:
+  /**
+   * Establishes a scoped mutex-lock; the mutex is locked upon construction.
+   *
+   * @param lock the mutex.
+   */
+  explicit ReleasableLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(&lock) {
     lock_->lock();
   }
 
   /**
-   * Destruction of the LockGuard unlocks the lock, if it has not already been explicitly unlocked.
+   * Destruction of the LockGuard unlocks the lock, if it has not already been explicitly released.
    */
-  ~LockGuard() UNLOCK_FUNCTION() { unlock(); }
+  ~ReleasableLockGuard() UNLOCK_FUNCTION() {
+    if (lock_ != nullptr) {
+      lock_->unlock();
+    }
+  }
 
   /**
    * Unlocks the mutex. This enables call-sites to release the mutex prior to the Lock going out of
-   * scope.
+   * scope. This is called release() for consistency with absl::ReleasableMutexLock.
    */
-  void unlock() UNLOCK_FUNCTION() {
+  void release() UNLOCK_FUNCTION() {
     if (lock_ != nullptr) {
       lock_->unlock();
       lock_ = nullptr;
