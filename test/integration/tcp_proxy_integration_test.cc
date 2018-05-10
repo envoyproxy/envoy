@@ -223,8 +223,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("envoy.file_access_log");
     envoy::config::filter::accesslog::v2::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.set_format("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-                                 "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_ADDRESS%\n");
+    access_log_config.set_format(
+        "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
+        "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
     MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
 
     MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
