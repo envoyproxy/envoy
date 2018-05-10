@@ -36,6 +36,9 @@ public:
 
 typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
 
+class Extractor;
+typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
+
 /**
  * Extracts JWT from locations specified in the config.
  *
@@ -64,6 +67,7 @@ typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
  *     }
  *  }
  */
+
 class Extractor {
 public:
   virtual ~Extractor() {}
@@ -74,17 +78,15 @@ public:
    * @return list of extracted Jwt location info.
    */
   virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Create an instance of Extractor for a given config.
+   * @param the JwtAuthentication config.
+   * @return the extractor object.
+   */
+  static ExtractorConstPtr
+  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 };
-
-typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
-
-/**
- * Create an instance of Extractor for a given config.
- * @param the JwtAuthentication config.
- * @return the extractor object.
- */
-ExtractorConstPtr
-createExtractor(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

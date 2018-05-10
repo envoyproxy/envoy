@@ -191,7 +191,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
 
 } // namespace
 
-ExtractorConstPtr createExtractor(const JwtAuthentication& config) {
+ExtractorConstPtr Extractor::create(const JwtAuthentication& config) {
   return ExtractorConstPtr(new ExtractorImpl(config));
 }
 

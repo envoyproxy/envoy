@@ -11,12 +11,22 @@ envoy_package()
 envoy_cc_library(
     name = "jwt_lib",
     srcs = [
+        "authenticator.cc",
         "extractor.cc",
+        "filter.cc",
+        "filter_factory.cc",
+        "jwks_cache.cc",
     ],
     hdrs = [
+        "authenticator.h",
+        "data_store.h",
         "extractor.h",
+        "filter.h",
+        "filter_factory.h",
+        "jwks_cache.h",
     ],
     external_deps = [
+        "jwt_verify",
         "rapidjson",
         "ssl",
     ],

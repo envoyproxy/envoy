@@ -45,7 +45,7 @@ class ExtractorTest : public ::testing::Test {
 public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    extractor_ = createExtractor(config_);
+    extractor_ = Extractor::create(config_);
   }
 
   JwtAuthentication config_;
