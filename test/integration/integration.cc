@@ -185,9 +185,9 @@ void IntegrationTcpClient::write(const std::string& data, bool end_stream) {
 
   connection_->write(buffer, end_stream);
   do {
-    EXPECT_FALSE(disconnected_);
     connection_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  } while (client_write_buffer_->bytes_written() != bytes_expected);
+  } while (client_write_buffer_->bytes_written() != bytes_expected && !disconnected_);
+  EXPECT_FALSE(disconnected_);
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
