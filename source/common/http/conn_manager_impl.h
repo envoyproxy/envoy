@@ -27,6 +27,7 @@
 #include "common/common/linked_object.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
+#include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
