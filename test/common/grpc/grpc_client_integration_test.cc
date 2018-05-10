@@ -847,7 +847,9 @@ public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
     fake_stream.waitForHeadersComplete();
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
+    if (access_token_value_ != "") {
+      EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
+    }
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
@@ -861,11 +863,15 @@ public:
     if (access_token_value_2_ != "") {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_2_);
     }
+    if (refresh_token_value_ != "") {
+      google_grpc->add_call_credentials()->set_google_refresh_token(refresh_token_value_);
+    }
     return config;
   }
 
   std::string access_token_value_{};
   std::string access_token_value_2_{};
+  std::string refresh_token_value_{};
   std::string credentials_factory_name_{};
 };
 
@@ -905,6 +911,30 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, MultipleAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   access_token_value_2_ = "accesstokenvalue2";
+  credentials_factory_name_ =
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that extra params are accepted
+TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  access_token_value_ = "accesstokenvalue";
+  refresh_token_value_ = "refreshtokenvalue";
+  credentials_factory_name_ =
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+  initialize();
+  auto request = createRequest(empty_metadata_);
+  request->sendReply();
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that no access token still works
+TEST_P(GrpcAccessTokenClientIntegrationTest, NoAccessTokens) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   credentials_factory_name_ =
       Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
   initialize();
