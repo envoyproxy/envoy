@@ -1353,7 +1353,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestDataTooLarge() {
     onDecoderFilterAboveWriteBufferHighWatermark();
   } else {
     parent_.connection_manager_.stats_.named_.downstream_rq_too_large_.inc();
-    Http::Utility::sendLocalReply(*this, parent_.state_.destroyed_, Http::Code::PayloadTooLarge,
+    Http::Utility::sendLocalReply(*parent_.request_headers_, *this, parent_.state_.destroyed_,
+                                  Http::Code::PayloadTooLarge,
                                   CodeUtility::toString(Http::Code::PayloadTooLarge));
   }
 }
@@ -1426,18 +1427,19 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
 
-      Http::Utility::sendLocalReply(
-          [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
-            parent_.response_headers_ = std::move(response_headers);
-            parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
-          },
-          [&](Buffer::Instance& data, bool end_stream) -> void {
-            parent_.response_encoder_->encodeData(data, end_stream);
-            parent_.state_.local_complete_ = end_stream;
-            parent_.maybeEndEncode(end_stream);
-          },
-          parent_.state_.destroyed_, Http::Code::InternalServerError,
-          CodeUtility::toString(Http::Code::InternalServerError));
+      Http::Utility::sendLocalReply(*parent_.request_headers_,
+                                    [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+                                      parent_.response_headers_ = std::move(response_headers);
+                                      parent_.response_encoder_->encodeHeaders(
+                                          *parent_.response_headers_, end_stream);
+                                    },
+                                    [&](Buffer::Instance& data, bool end_stream) -> void {
+                                      parent_.response_encoder_->encodeData(data, end_stream);
+                                      parent_.state_.local_complete_ = end_stream;
+                                      parent_.maybeEndEncode(end_stream);
+                                    },
+                                    parent_.state_.destroyed_, Http::Code::InternalServerError,
+                                    CodeUtility::toString(Http::Code::InternalServerError));
     } else {
       resetStream();
     }

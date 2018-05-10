@@ -68,7 +68,7 @@ void BufferFilter::initConfig() {
   settings_ = route_local ?: settings_;
 }
 
-Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
+Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   if (end_stream) {
     // If this is a header-only request, we don't need to do any buffering.
     return Http::FilterHeadersStatus::Continue;
@@ -83,6 +83,7 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
   request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
   request_timeout_->enableTimer(settings_->maxRequestTime());
+  downstream_headers_ = &headers;
 
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -113,12 +114,16 @@ void BufferFilter::onDestroy() {
 }
 
 void BufferFilter::onRequestTimeout() {
-  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_, Http::Code::RequestTimeout,
-                                "buffer request timeout");
+  ASSERT(downstream_headers_);
+  Http::Utility::sendLocalReply(*downstream_headers_, *callbacks_, stream_destroyed_,
+                                Http::Code::RequestTimeout, "buffer request timeout");
   config_->stats().rq_timeout_.inc();
 }
 
-void BufferFilter::resetInternalState() { request_timeout_.reset(); }
+void BufferFilter::resetInternalState() {
+  downstream_headers_ = nullptr;
+  request_timeout_.reset();
+}
 
 void BufferFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;

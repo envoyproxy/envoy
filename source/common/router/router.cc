@@ -174,22 +174,10 @@ void Filter::chargeUpstreamCode(Http::Code code,
 
 void Filter::sendLocalReply(Http::Code code, const std::string& body,
                             std::function<void(Http::HeaderMap& headers)> modify_headers) {
-  // Respond with a gRPC trailers-only response if the request is gRPC
-  if (grpc_request_) {
-    Grpc::Common::sendLocalReply(
-        [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-          if (headers != nullptr && modify_headers != nullptr) {
-            modify_headers(*headers);
-          }
-          callbacks_->encodeHeaders(std::move(headers), end_stream);
-        },
-        Http::Utility::httpToGrpcStatus(enumToInt(code)), body);
-    return;
-  }
-
   // This is a customized version of send local reply that allows us to set the overloaded
   // header.
   Http::Utility::sendLocalReply(
+      grpc_request_,
       [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
         if (headers != nullptr && modify_headers != nullptr) {
           modify_headers(*headers);

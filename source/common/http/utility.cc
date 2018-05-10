@@ -329,22 +329,55 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
-void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
+void Utility::sendLocalReply(const HeaderMap& request_headers,
+                             StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                              Code response_code, const std::string& body_text) {
-  sendLocalReply(
-      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-        callbacks.encodeHeaders(std::move(headers), end_stream);
-      },
-      [&](Buffer::Instance& data, bool end_stream) -> void {
-        callbacks.encodeData(data, end_stream);
-      },
-      is_reset, response_code, body_text);
+  sendLocalReply(hasGrpcContentType(request_headers), callbacks, is_reset, response_code,
+                 body_text);
+}
+
+void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
+                             const bool& is_reset, Code response_code,
+                             const std::string& body_text) {
+  sendLocalReply(is_grpc,
+                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+                   callbacks.encodeHeaders(std::move(headers), end_stream);
+                 },
+                 [&](Buffer::Instance& data, bool end_stream) -> void {
+                   callbacks.encodeData(data, end_stream);
+                 },
+                 is_reset, response_code, body_text);
 }
 
 void Utility::sendLocalReply(
+    const HeaderMap& request_headers,
     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, const std::string& body_text) {
+  // Respond with a gRPC trailers-only response if the request is gRPC
+  sendLocalReply(hasGrpcContentType(request_headers), encode_headers, encode_data, is_reset,
+                 response_code, body_text);
+}
+
+void Utility::sendLocalReply(
+    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
+    Code response_code, const std::string& body_text) {
+  // Respond with a gRPC trailers-only response if the request is gRPC
+  if (is_grpc) {
+    HeaderMapPtr response_headers{
+        new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+                          {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+                          {Headers::get().GrpcStatus,
+                           std::to_string(enumToInt(httpToGrpcStatus(enumToInt(response_code))))}}};
+    if (!body_text.empty()) {
+      // TODO: GrpcMessage should be percent-encoded
+      response_headers->insertGrpcMessage().value(body_text);
+    }
+    encode_headers(std::move(response_headers), true); // Trailers only response
+    return;
+  }
+
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {

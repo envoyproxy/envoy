@@ -44,15 +44,6 @@ public:
   static std::string getGrpcMessage(const Http::HeaderMap& trailers);
 
   /**
-   * @param encode_headers supplies the function to encode response headers.
-   * @param grpc_status gRPC status for grpc-status header.
-   * @param message gRPC message for grpc-message header.
-   */
-  static void
-  sendLocalReply(std::function<void(Http::HeaderMapPtr&& headers, bool end_stream)> encode_headers,
-                 Status::GrpcStatus grpc_status, const std::string& message);
-
-  /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.

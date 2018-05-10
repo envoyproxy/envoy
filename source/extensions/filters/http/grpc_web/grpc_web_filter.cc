@@ -41,6 +41,7 @@ bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
 // TODO(fengli): Implements the subtypes of gRPC-Web content-type other than proto, like +json, etc.
 Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   const Http::HeaderEntry* content_type = headers.ContentType();
+  is_grpc_request_ = Http::Utility::hasGrpcContentType(headers);
   if (!isGrpcWebRequest(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -94,7 +95,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
     }
     if (available % 4 != 0) {
       // Client end stream with invalid base64. Note, base64 padding is mandatory.
-      Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
+      Http::Utility::sendLocalReply(is_grpc_request_, *decoder_callbacks_, stream_destroyed_,
+                                    Http::Code::BadRequest,
                                     "Bad gRPC-web request, invalid base64 data.");
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
@@ -110,7 +112,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
                   decoding_buffer_.length()));
   if (decoded.empty()) {
     // Error happened when decoding base64.
-    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
+    Http::Utility::sendLocalReply(is_grpc_request_, *decoder_callbacks_, stream_destroyed_,
+                                  Http::Code::BadRequest,
                                   "Bad gRPC-web request, invalid base64 data.");
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
