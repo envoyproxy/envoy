@@ -138,7 +138,8 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
   } else if (field_name == "START_TIME_SINCE_EPOCH") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       // Returns the start timestamp in milliseconds.
-      return AccessLog::AccessLogFormatUtils::durationToString(request_info.startTime().time_since_epoch());
+      return AccessLog::AccessLogFormatUtils::durationToString(
+          request_info.startTime().time_since_epoch());
     };
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
