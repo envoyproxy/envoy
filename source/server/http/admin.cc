@@ -557,6 +557,7 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
         }
         quantile_obj.AddMember("interval", interval_value, allocator);
         Value cumulative_value;
+        // We skip nan entries to put in the {null, null} entry to keep other data aligned.
         if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
           cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
         }

@@ -368,14 +368,9 @@ public:
       return;
     }
 
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
+    if (stats_.erase(std::string(data.name_)) == 0) {
+      FAIL();
     }
-
-    FAIL();
   }
 
 private:
