@@ -190,9 +190,11 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
-  // Do a check for the HTTP Path header value,
-  // This is a required http header.
+  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
+  // These get stripped by HTTP/1 codec where applicable.
   ASSERT(headers.Path());
+  ASSERT(headers.Method());
+  ASSERT(headers.Host());
 
   downstream_headers_ = &headers;
 
@@ -296,11 +298,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
-  // These get stripped by HTTP/1 codec where applicable.
+  // Finally assert that an http sceme was selected
+  // in the setUpstreamScheme function.
   ASSERT(headers.Scheme());
-  ASSERT(headers.Method());
-  ASSERT(headers.Host());
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
