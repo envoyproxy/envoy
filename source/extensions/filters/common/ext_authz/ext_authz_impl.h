@@ -98,19 +98,6 @@ public:
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                              envoy::service::auth::v2alpha::CheckRequest& request);
-
-private:
-  static void setAttrContextPeer(envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
-                                 const Network::Connection& connection, const std::string& service,
-                                 const bool local);
-  static void setHttpRequest(::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
-                             const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                             const Envoy::Http::HeaderMap& headers);
-  static void setAttrContextRequest(::envoy::service::auth::v2alpha::AttributeContext_Request& req,
-                                    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                    const Envoy::Http::HeaderMap& headers);
-  static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
-  static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };
 
 } // namespace ExtAuthz
