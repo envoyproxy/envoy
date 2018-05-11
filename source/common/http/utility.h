@@ -171,6 +171,22 @@ public:
    * @return string representation of the protocol.
    */
   static const std::string& getProtocolString(const Protocol p);
+
+  /**
+   * Appends data to header. If header already has a value, the string ',' is added between the
+   * existing value and data.
+   * @param header the header to append to.
+   * @param data to append to the header.
+   */
+  static void appendToHeader(HeaderString& header, const std::string& data);
+
+  /**
+   * Extract host and path from a URI
+   * @param the input URI string
+   * @param the output host string.
+   * @param the output path string.
+   */
+  static void extractHostPathFromUri(const std::string& uri, std::string& host, std::string& path);
 };
 
 } // namespace Http

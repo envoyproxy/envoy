@@ -338,5 +338,39 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED;
 }
 
+void Utility::appendToHeader(HeaderString& header, const std::string& data) {
+  if (data.empty()) {
+    return;
+  }
+  if (!header.empty()) {
+    header.append(",", 1);
+  }
+  header.append(data.c_str(), data.size());
+}
+
+void Utility::extractHostPathFromUri(const std::string& uri, std::string& host, std::string& path) {
+  /**
+   *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
+   *
+   *  Example:
+   *  uri  = "https://example.com/certs"
+   *  pos  :          ^
+   *  pos1 :                     ^
+   *  host = "example.com"
+   *  path = "/certs"
+   */
+  auto pos = uri.find("://");
+  pos = pos == std::string::npos ? 0 : pos + 3; // Start position of host
+  auto pos1 = uri.find("/", pos);
+  if (pos1 == std::string::npos) {
+    // If uri doesn't have "/", the whole string is treated as host.
+    host = uri.substr(pos);
+    path = "/";
+  } else {
+    host = uri.substr(pos, pos1 - pos);
+    path = "/" + uri.substr(pos1 + 1);
+  }
+}
+
 } // namespace Http
 } // namespace Envoy

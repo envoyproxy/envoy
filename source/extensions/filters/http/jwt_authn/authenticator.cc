@@ -18,27 +18,6 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-// Extract host and path from a URI
-void extractUriHostPath(const std::string& uri, std::string* host, std::string* path) {
-  // Example:
-  // uri  = "https://example.com/certs"
-  // pos  :          ^
-  // pos1 :                     ^
-  // host = "example.com"
-  // path = "/certs"
-  auto pos = uri.find("://");
-  pos = pos == std::string::npos ? 0 : pos + 3; // Start position of host
-  auto pos1 = uri.find("/", pos);
-  if (pos1 == std::string::npos) {
-    // If uri doesn't have "/", the whole string is treated as host.
-    *host = uri.substr(pos);
-    *path = "/";
-  } else {
-    *host = uri.substr(pos, pos1 - pos);
-    *path = "/" + uri.substr(pos1 + 1);
-  }
-}
-
 /**
  * Object to implement Authenticator interface. It only processes one token.
  */
@@ -169,7 +148,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 void AuthenticatorImpl::fetchRemoteJwks() {
   uri_ = jwks_data_->getJwtRule().remote_jwks().http_uri().uri();
   std::string host, path;
-  extractUriHostPath(uri_, &host, &path);
+  Http::Utility::extractHostPathFromUri(uri_, host, path);
 
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);

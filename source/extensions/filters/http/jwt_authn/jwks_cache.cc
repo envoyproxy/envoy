@@ -90,7 +90,7 @@ public:
     return false;
   }
 
-  const Jwks* getJwksObj() const { return jwks_obj_.get(); }
+  const Jwks* getJwksObj() const override { return jwks_obj_.get(); }
 
   bool isExpired() const override { return std::chrono::steady_clock::now() >= expiration_time_; }
 

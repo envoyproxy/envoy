@@ -16,6 +16,7 @@ typedef std::unique_ptr<JwksCache> JwksCachePtr;
 
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
+ * It only caches Jwks specified in the config.
  * Its usage:
  *     auto jwks_cache = JwksCache::create(Config);
  *
@@ -57,7 +58,7 @@ public:
     virtual ::google::jwt_verify::Status setRemoteJwks(const std::string& jwks_str) PURE;
   };
 
-  // Lookup issuer cache map.
+  // Lookup issuer cache map.  The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& name) PURE;
 
   // Factory function to create an instance.
