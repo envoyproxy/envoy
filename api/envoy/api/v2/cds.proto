@@ -151,12 +151,12 @@ message Cluster {
   // when picking a host in the cluster.
   LbPolicy lb_policy = 6 [(validate.rules).enum.defined_only = true];
 
-  // Setting this as a requirement for clusters with discovery type
+  // Setting this is a requirement for clusters with discovery type
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
-  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
-  // is deprecated. Set the :ref:`endpoints<envoy_api_field_Cluster.endpoints>` field
-  // instead.
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // **This field is deprecated**. Set the :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>`
+  // field instead.
   repeated core.Address hosts = 7 [deprecated = true];
 
   // Setting this is required for specifying members of
