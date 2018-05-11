@@ -186,43 +186,6 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
-bool Utility::hasGrpcContentType(const HeaderMap& headers) {
-  const HeaderEntry* content_type = headers.ContentType();
-  if (content_type == nullptr) {
-    return false;
-  }
-  // Fail fast if this is not gRPC.
-  if (!StringUtil::startsWith(content_type->value().c_str(),
-                              Headers::get().ContentTypeValues.Grpc)) {
-    return false;
-  }
-  // Exact match with application/grpc. This and the above case are likely the
-  // two most common encountered.
-  if (content_type->value() == Headers::get().ContentTypeValues.Grpc.c_str()) {
-    return true;
-  }
-  // Prefix match with application/grpc+. It's not sufficient to rely on the an
-  // application/grpc prefix match, since there are related content types such as
-  // application/grpc-web.
-  if (content_type->value().size() > Headers::get().ContentTypeValues.Grpc.size() &&
-      content_type->value().c_str()[Headers::get().ContentTypeValues.Grpc.size()] == '+') {
-    return true;
-  }
-  // This must be something like application/grpc-web.
-  return false;
-}
-
-bool Utility::isGrpcResponseHeader(const HeaderMap& headers, bool end_stream) {
-  if (end_stream) {
-    // Trailers-only response, only grpc-status is required.
-    return headers.GrpcStatus() != nullptr;
-  }
-  if (Utility::getResponseStatus(headers) != enumToInt(Code::OK)) {
-    return false;
-  }
-  return hasGrpcContentType(headers);
-}
-
 Grpc::Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
   // From
   // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.

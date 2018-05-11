@@ -306,7 +306,7 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& headers,
                                                               bool end_stream) {
-  if (!Http::Utility::isGrpcResponseHeader(headers, end_stream)) {
+  if (!Grpc::Common::isGrpcResponseHeader(headers, end_stream)) {
     error_ = true;
   }
 

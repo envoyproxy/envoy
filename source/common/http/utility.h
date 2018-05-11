@@ -92,19 +92,6 @@ public:
   static bool isWebSocketUpgradeRequest(const HeaderMap& headers);
 
   /**
-   * @param headers the headers to parse.
-   * @return bool indicating whether content-type is gRPC.
-   */
-  static bool hasGrpcContentType(const HeaderMap& headers);
-
-  /**
-   * @param headers the headers to parse.
-   * @param bool indicating wether the header is at end_stream.
-   * @return bool indicating whether the header is a gRPC reseponse header
-   */
-  static bool isGrpcResponseHeader(const HeaderMap& headers, bool end_stream);
-
-  /**
    * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
    * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
    * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.

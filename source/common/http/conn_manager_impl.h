@@ -25,6 +25,7 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
+#include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
 #include "common/http/utility.h"
@@ -192,7 +193,7 @@ private:
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
 
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
-      is_grpc_request_ = Http::Utility::hasGrpcContentType(headers);
+      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
       return handle_->decodeHeaders(headers, end_stream);
     }
 

@@ -175,7 +175,7 @@ void Filter::chargeUpstreamCode(Http::Code code,
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
-  grpc_request_ = Http::Utility::hasGrpcContentType(headers);
+  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.

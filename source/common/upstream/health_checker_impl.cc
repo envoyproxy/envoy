@@ -366,7 +366,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
                   end_stream);
     return;
   }
-  if (!Http::Utility::hasGrpcContentType(*headers)) {
+  if (!Grpc::Common::hasGrpcContentType(*headers)) {
     onRpcComplete(Grpc::Status::GrpcStatus::Internal, "invalid gRPC content-type", false);
     return;
   }
