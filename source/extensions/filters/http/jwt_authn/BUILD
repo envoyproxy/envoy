@@ -26,7 +26,7 @@ envoy_cc_library(
         "jwks_cache.h",
     ],
     external_deps = [
-        "jwt_verify",
+        "jwt_verify_lib",
         "rapidjson",
         "ssl",
     ],

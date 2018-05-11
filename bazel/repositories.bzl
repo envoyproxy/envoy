@@ -461,6 +461,6 @@ def _com_github_google_jwt_verify():
     _repository_impl("com_github_google_jwt_verify")
 
     native.bind(
-      name = "jwt_verify",
-      actual = "@com_github_google_jwt_verify//:jwt_lib",
+      name = "jwt_verify_lib",
+      actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )

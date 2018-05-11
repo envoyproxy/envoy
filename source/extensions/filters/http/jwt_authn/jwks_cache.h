@@ -4,7 +4,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
-#include "jwks.h"
+#include "include/jwt_verify_lib/jwks.h"
 
 namespace Envoy {
 namespace Extensions {

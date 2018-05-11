@@ -59,7 +59,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_google_jwt_verify = dict(
-        commit = "cbd9a95b0e1901f66b88f6d173caac0792eab264",
+        commit = "d4b187f25fdb81b801e3d81378cc6ebb3fc51804",
         # TODO, switch to github.com/google/jwt_verify_lib
         remote = "https://github.com/qiwzhang/jwt_verify_lib",
     ),
