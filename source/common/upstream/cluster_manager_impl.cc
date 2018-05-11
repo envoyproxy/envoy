@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -168,11 +169,14 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
-                                       Event::Dispatcher& main_thread_dispatcher)
+                                       Event::Dispatcher& main_thread_dispatcher,
+                                       Server::Admin& admin)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
-      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
+      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
+      config_tracker_entry_(
+          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -196,7 +200,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
     if (cluster.type() != envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false, active_clusters_);
+      loadCluster(cluster, "", false, active_clusters_);
     }
   }
 
@@ -218,7 +222,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
     if (cluster.type() == envoy::api::v2::Cluster::EDS) {
-      loadCluster(cluster, false, active_clusters_);
+      loadCluster(cluster, "", false, active_clusters_);
     }
   }
 
@@ -335,7 +339,8 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster) {
+bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+                                            const std::string& version_info) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -373,7 +378,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   //       and easy to understand.
   const bool use_active_map =
       init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, true, use_active_map ? active_clusters_ : warming_clusters_);
+  loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
 
   if (use_active_map) {
     ENVOY_LOG(info, "add/update cluster {} during init", cluster_name);
@@ -464,7 +469,8 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, bool added_via_api,
+void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
+                                     const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
   ClusterSharedPtr new_cluster =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
@@ -495,8 +501,8 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster, boo
     });
   }
 
-  cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
-      MessageUtil::hash(cluster), added_via_api, std::move(new_cluster));
+  cluster_map[cluster_reference.info()->name()] =
+      std::make_unique<ClusterData>(cluster, version_info, added_via_api, std::move(new_cluster));
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
@@ -614,6 +620,30 @@ ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
+}
+
+ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+  config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
+  for (const auto& active_cluster_pair : active_clusters_) {
+    const auto& cluster = *active_cluster_pair.second;
+    if (!cluster.added_via_api_) {
+      config_dump->mutable_static_clusters()->Add()->MergeFrom(cluster.cluster_config_);
+    } else {
+      auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
+      dynamic_cluster.set_version_info(cluster.version_info_);
+      dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+    }
+  }
+
+  for (const auto& warming_cluster_pair : warming_clusters_) {
+    const auto& cluster = *warming_cluster_pair.second;
+    auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
+    dynamic_cluster.set_version_info(cluster.version_info_);
+    dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+  }
+
+  return config_dump;
 }
 
 ClusterManagerImpl::ClusterUpdateCallbacksHandleImpl::ClusterUpdateCallbacksHandleImpl(
@@ -906,10 +936,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
+    const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
+    Server::Admin& admin) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
-                                                  local_info, log_manager,
-                                                  main_thread_dispatcher_)};
+                                                  local_info, log_manager, main_thread_dispatcher_,
+                                                  admin)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

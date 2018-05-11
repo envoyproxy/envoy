@@ -73,8 +73,7 @@ public:
 class RdsImplTest : public RdsTestBase {
 public:
   RdsImplTest() {
-    EXPECT_CALL(factory_context_.admin_.config_tracker, addReturnsRaw("routes", _))
-        .WillOnce(Return(new Server::MockConfigTracker::MockEntryOwner()));
+    EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
     route_config_provider_manager_.reset(
         new RouteConfigProviderManagerImpl(factory_context_.admin_));
   }
@@ -378,20 +377,14 @@ public:
   }
 
   RouteConfigProviderManagerImplTest() {
-    ON_CALL(factory_context_.admin_, getConfigTracker()).WillByDefault(ReturnRef(config_tracker_));
-    EXPECT_CALL(config_tracker_, addReturnsRaw("routes", _))
-        .WillOnce(DoAll(SaveArg<1>(&config_tracker_callback_),
-                        Return(new Server::MockConfigTracker::MockEntryOwner())));
+    EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
     route_config_provider_manager_.reset(
         new RouteConfigProviderManagerImpl(factory_context_.admin_));
   }
 
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
-  NiceMock<Server::MockConfigTracker> config_tracker_;
-  Server::ConfigTracker::Cb config_tracker_callback_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
-  Server::Admin::HandlerCb handler_callback_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
@@ -403,7 +396,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
-  auto message_ptr = config_tracker_callback_();
+  auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
@@ -431,7 +424,7 @@ virtual_hosts:
   RouteConfigProviderSharedPtr static_config =
       route_config_provider_manager_->getStaticRouteConfigProvider(
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
-  message_ptr = config_tracker_callback_();
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
@@ -465,7 +458,7 @@ dynamic_route_configs:
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  message_ptr = config_tracker_callback_();
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);

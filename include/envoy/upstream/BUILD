@@ -22,6 +22,7 @@ envoy_cc_library(
         "//include/envoy/http:conn_pool_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/server:admin_interface",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],

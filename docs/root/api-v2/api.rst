@@ -14,5 +14,6 @@ v2 API reference
   config/filter/filter
   config/health_checker/health_checker
   config/transport_socket/transport_socket
+  admin/admin
   common_messages/common_messages
   types/types
