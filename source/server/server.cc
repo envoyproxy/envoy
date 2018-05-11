@@ -156,7 +156,9 @@ void InstanceImpl::flushStats() {
         sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
-    stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+    if (stat_flush_timer_ != nullptr) {
+      stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+    }
   });
 }
 
@@ -459,6 +461,9 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
+  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
+  //                     histogram flushing. In the future we can consider whether we want to
+  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->mutable_socket().close();
