@@ -107,14 +107,6 @@ The following command operators are supported:
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
-%DOWNSTREAM_ADDRESS%
-  Remote address of the downstream connection *without IP port if the address is an IP address*.
-
-  .. attention::
-
-    This field is deprecated. Use **DOWNSTREAM_REMOTE_ADDRESS** or
-    **DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT** instead.
-
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
