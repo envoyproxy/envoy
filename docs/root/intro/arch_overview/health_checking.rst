@@ -27,10 +27,9 @@ unhealthy, successes required before marking a host healthy, etc.):
 Per cluster member health checking config
 -----------------------------------------
 
-If the active health checking is configured for an upstream cluster, a specific additional configuration
-for each registered member in that cluster's :ref:`endpoints<envoy_api_field_Cluster.endpoints>` can be
-specified by setting the :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
-of each of them.
+If active health checking is configured for an upstream cluster, a specific additional configuration
+for each registered member in the can be specified by setting the
+:ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`.
 
 Passive health checking
 -----------------------
