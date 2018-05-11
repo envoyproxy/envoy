@@ -553,12 +553,8 @@ private:
     struct LcNode {
       uint32_t branch_ : 5;
       uint32_t skip_ : 7;
-      uint32_t address_ : 20; // If this 20-bit size changes, please change MaxLcTrieNodes too
+      uint32_t address_ : 20; // If this 20-bit size changes, please change MaxLcTrieNodes too.
     };
-
-    // Refer to LcNode to for further explanation on the current limitations for the maximum number
-    // of CIDR ranges supported and the maximum amount of nodes of supported in the trie.
-    static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = (1 << 19);
 
     // During build(), an estimate of the number of nodes required will be made and set this value.
     // This is used to ensure no out_of_range exception is thrown.

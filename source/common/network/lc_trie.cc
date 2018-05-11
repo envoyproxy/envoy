@@ -4,9 +4,6 @@ namespace Envoy {
 namespace Network {
 namespace LcTrie {
 
-template <class IpType, uint32_t address_size>
-const uint32_t LcTrie::LcTrieInternal<IpType, address_size>::MAXIMUM_CIDR_RANGE_ENTRIES;
-
 LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
                double fill_factor, uint32_t root_branching_factor) {
 

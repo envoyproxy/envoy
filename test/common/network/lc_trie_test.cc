@@ -300,8 +300,30 @@ TEST_F(LcTrieTest, NestedPrefixesWithCatchAll) {
   expectIPAndTags(test_case);
 }
 
-// Test the trie can only support 2^19 Cidr Entries.
-TEST_F(LcTrieTest, MaximumEntriesException) {
+// Ensure the trie will reject inputs that would cause it to exceed the maximum 2^20 nodes
+// when using the default fill factor.
+TEST_F(LcTrieTest, MaximumEntriesExceptionDefault) {
+  static const size_t num_prefixes = 1 << 19;
+  Address::CidrRange address = Address::CidrRange::create("10.0.0.1/8");
+  std::vector<Address::CidrRange> prefixes;
+  prefixes.reserve(num_prefixes);
+  for (size_t i = 0; i < num_prefixes; i++) {
+    prefixes.push_back(address);
+  }
+  EXPECT_EQ(num_prefixes, prefixes.size());
+
+  std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
+      std::make_pair("bad_tag", prefixes);
+  std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input), EnvoyException,
+                            "The input vector has '524288' CIDR range entries. "
+                            "LC-Trie can only support '262144' CIDR ranges with "
+                            "the specified fill factor.");
+}
+
+// Ensure the trie will reject inputs that would cause it to exceed the maximum 2^20 nodes
+// when using a fill factor override.
+TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
   static const size_t num_prefixes = 8192;
   std::vector<Address::CidrRange> prefixes;
   prefixes.reserve(num_prefixes);
