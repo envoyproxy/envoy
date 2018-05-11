@@ -367,7 +367,7 @@ void Utility::sendLocalReply(
     response_headers->insertContentLength().value(body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
-
+  // Somehow it's OK to encode headers even if 'is_reset' is true?
   encode_headers(std::move(response_headers), body_text.empty());
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
