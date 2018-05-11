@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   auto filter_config =

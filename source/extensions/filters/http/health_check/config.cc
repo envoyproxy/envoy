@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-Http::FilterFactoryCb HealthCheckFilterConfig::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
@@ -75,7 +75,7 @@ HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
                                              Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
   Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
-  return createTypedFilterFactoryFromProto(proto_config, stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 /**

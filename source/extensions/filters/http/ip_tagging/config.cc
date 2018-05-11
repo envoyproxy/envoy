@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-Http::FilterFactoryCb IpTaggingFilterFactory::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 

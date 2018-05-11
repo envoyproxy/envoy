@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-Http::FilterFactoryCb FaultFilterFactory::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::fault::v2::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(
@@ -28,11 +28,11 @@ FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
                                         Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::fault::v2::HTTPFault proto_config;
   Config::FilterJson::translateFaultFilter(json_config, proto_config);
-  return createTypedFilterFactoryFromProto(proto_config, stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-FaultFilterFactory::createTypedRouteSpecificFilterConfig(
+FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::fault::v2::HTTPFault& config,
     Server::Configuration::FactoryContext&) {
   return std::make_shared<const Fault::FaultSettings>(config);

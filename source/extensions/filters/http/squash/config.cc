@@ -22,10 +22,10 @@ SquashFilterConfigFactory::createFilterFactory(const Envoy::Json::Object& json_c
                                                Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::squash::v2::Squash proto_config;
   Config::FilterJson::translateSquashConfig(json_config, proto_config);
-  return createTypedFilterFactoryFromProto(proto_config, stat_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
 }
 
-Http::FilterFactoryCb SquashFilterConfigFactory::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::squash::v2::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
 

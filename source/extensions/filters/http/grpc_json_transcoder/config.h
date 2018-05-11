@@ -23,7 +23,7 @@ public:
                       Server::Configuration::FactoryContext& context) override;
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

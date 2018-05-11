@@ -25,7 +25,7 @@ public:
                       Server::Configuration::FactoryContext& context) override;
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::router::v2::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;
 };

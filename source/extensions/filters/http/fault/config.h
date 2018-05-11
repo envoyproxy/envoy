@@ -23,11 +23,11 @@ public:
                       Server::Configuration::FactoryContext& context) override;
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::fault::v2::HTTPFault& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createTypedRouteSpecificFilterConfig(
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
       const envoy::config::filter::http::fault::v2::HTTPFault& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };

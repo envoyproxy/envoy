@@ -19,7 +19,7 @@ public:
 
 private:
   Http::FilterFactoryCb
-  createTypedFilterFactoryFromProto(const envoy::config::filter::http::gzip::v2::Gzip& config,
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::gzip::v2::Gzip& config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;
 };

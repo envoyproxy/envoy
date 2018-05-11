@@ -19,7 +19,7 @@ public:
   IpTaggingFilterFactory() : FactoryBase(HttpFilterNames::get().IP_TAGGING) {}
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

@@ -25,22 +25,22 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                const std::string& stats_prefix,
                                Server::Configuration::FactoryContext& context) override {
-    return createTypedFilterFactoryFromProto(
+    return createFilterFactoryFromProtoTyped(
         MessageUtil::downcastAndValidate<const ConfigProto&>(proto_config), stats_prefix, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ConfigProto()};
+    return std::make_unique<ConfigProto>();
   }
 
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-    return ProtobufTypes::MessagePtr{new RouteConfigProto()};
+    return std::make_unique<RouteConfigProto>();
   }
 
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
                                   Server::Configuration::FactoryContext& context) override {
-    return createTypedRouteSpecificFilterConfig(
+    return createRouteSpecificFilterConfigTyped(
         MessageUtil::downcastAndValidate<const RouteConfigProto&>(proto_config), context);
   }
 
@@ -51,12 +51,12 @@ protected:
 
 private:
   virtual Http::FilterFactoryCb
-  createTypedFilterFactoryFromProto(const ConfigProto& proto_config,
+  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) PURE;
 
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
-  createTypedRouteSpecificFilterConfig(const RouteConfigProto&,
+  createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
                                        Server::Configuration::FactoryContext&) {
     return nullptr;
   }

@@ -23,7 +23,7 @@ public:
                       Server::Configuration::FactoryContext& context) override;
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::rate_limit::v2::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

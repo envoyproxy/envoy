@@ -23,7 +23,7 @@ public:
 
 private:
   Http::FilterFactoryCb
-  createTypedFilterFactoryFromProto(const envoy::config::filter::http::lua::v2::Lua& proto_config,
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::lua::v2::Lua& proto_config,
                                     const std::string&,
                                     Server::Configuration::FactoryContext& context) override;
 };

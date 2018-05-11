@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-Http::FilterFactoryCb BufferFilterFactory::createTypedFilterFactoryFromProto(
+Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
@@ -35,11 +35,11 @@ BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
                                          Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::buffer::v2::Buffer proto_config;
   Config::FilterJson::translateBufferFilter(json_config, proto_config);
-  return createTypedFilterFactoryFromProto(proto_config, stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-BufferFilterFactory::createTypedRouteSpecificFilterConfig(
+BufferFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
     Server::Configuration::FactoryContext&) {
   return std::make_shared<const BufferFilterSettings>(proto_config);

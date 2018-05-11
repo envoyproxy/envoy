@@ -20,7 +20,7 @@ public:
                       Server::Configuration::FactoryContext& context) override;
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

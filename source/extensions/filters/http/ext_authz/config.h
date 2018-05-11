@@ -19,7 +19,7 @@ public:
   ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().EXT_AUTHORIZATION) {}
 
 private:
-  Http::FilterFactoryCb createTypedFilterFactoryFromProto(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
