@@ -98,8 +98,8 @@ private:
   // it or has completed.
   enum class Status { NotStarted, Calling, Complete };
   // FilterReturn is used to capture what the return code should be to the filter chain.
-  // if this filter is either in the middle of calling the external service or the result is denied then
-  // the filter chain should stop. Otherwise the filter chain can continue to the next filter.
+  // if this filter is either in the middle of calling the external service or the result is denied
+  // then the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { Stop, Continue };
   void callCheck();
 
