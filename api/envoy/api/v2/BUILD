@@ -81,7 +81,7 @@ api_go_grpc_library(
     proto = ":cds",
     deps = [
         ":discovery_go_proto",
-        ":eds_go_proto",
+        ":eds_go_grpc",
         "//envoy/api/v2/auth:cert_go_proto",
         "//envoy/api/v2/cluster:circuit_breaker_go_proto",
         "//envoy/api/v2/cluster:outlier_detection_go_proto",
