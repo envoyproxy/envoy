@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
-#include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -13,23 +13,15 @@ namespace Gzip {
 /**
  * Config registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
-class GzipFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class GzipFilterFactory : public Common::FactoryBase<envoy::config::filter::http::gzip::v2::Gzip> {
 public:
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override;
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::gzip::v2::Gzip()};
-  }
-
-  std::string name() override { return HttpFilterNames::get().ENVOY_GZIP; }
+  GzipFilterFactory() : FactoryBase(HttpFilterNames::get().ENVOY_GZIP) {}
 
 private:
-  Http::FilterFactoryCb createFilter(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::gzip::v2::Gzip& config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Gzip

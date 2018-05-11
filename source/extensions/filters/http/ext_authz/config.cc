@@ -16,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   auto filter_config =
@@ -34,22 +34,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
     callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
         std::make_shared<Filter>(filter_config, std::move(client))});
   };
-}
-
-Http::FilterFactoryCb
-ExtAuthzFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
-                                          Server::Configuration::FactoryContext&) {
-  NOT_IMPLEMENTED;
-}
-
-Http::FilterFactoryCb
-ExtAuthzFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                   const std::string& stats_prefix,
-                                                   Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),
-      stats_prefix, context);
 }
 
 /**

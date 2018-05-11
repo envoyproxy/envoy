@@ -12,10 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-Http::FilterFactoryCb
-FaultFilterFactory::createFilter(const envoy::config::filter::http::fault::v2::HTTPFault& config,
-                                 const std::string& stats_prefix,
-                                 Server::Configuration::FactoryContext& context) {
+Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(
       new FaultFilterConfig(config, context.runtime(), stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -29,25 +28,14 @@ FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
                                         Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::fault::v2::HTTPFault proto_config;
   Config::FilterJson::translateFaultFilter(json_config, proto_config);
-  return createFilter(proto_config, stats_prefix, context);
-}
-
-Http::FilterFactoryCb
-FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                 const std::string& stats_prefix,
-                                                 Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
-          proto_config),
-      stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-FaultFilterFactory::createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
-                                                    Server::Configuration::FactoryContext&) {
-  return std::make_shared<const Fault::FaultSettings>(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
-          proto_config));
+FaultFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<const Fault::FaultSettings>(config);
 }
 
 /**

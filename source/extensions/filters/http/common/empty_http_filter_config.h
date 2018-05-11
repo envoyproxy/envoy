@@ -37,6 +37,14 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
+
+  std::string name() override { return name_; }
+
+protected:
+  EmptyHttpFilterConfig(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
 };
 
 } // namespace Common

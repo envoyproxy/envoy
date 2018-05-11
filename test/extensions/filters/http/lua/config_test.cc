@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
+
 #include "extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/mocks.h"
