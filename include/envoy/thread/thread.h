@@ -63,7 +63,7 @@ public:
   DeferredLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(&lock) {
     // Note that we annotate this as a lock-taking function, even
     // thought we are not taking locks. Ideally, the annotation should
-    // be on tryLock (EXCLUSIVE_LOCK_FUNCTION(true)), however that
+    // be on tryLock (EXCLUSIVE_TRYLOCK_FUNCTION(true)), however that
     // does not appear to work with this class in
     // clang+llvm-5.0.1. The problem appears to be that there is no
     // way to declare an UNLOCK function for a conditionally held
@@ -76,7 +76,7 @@ public:
    * Destruction of the DeferredLockGuard unlocks the lock, if it was locked.
    */
   ~DeferredLockGuard() UNLOCK_FUNCTION() {
-    if (lock_ != nullptr) {
+    if (is_locked_) {
       lock_->unlock();
     }
   }
@@ -84,16 +84,15 @@ public:
   // Attempts to lock the mutex, if present. Returns false if no lock was taken.
   bool tryLock() NO_THREAD_SAFETY_ANALYSIS {
     // Thread safety analysis had to be disabled to avoid a warning about retaking a lock
-    // already held, which we falsly claim in the constructor declaration).
-    if (!lock_->tryLock()) {
-      lock_ = nullptr;  // Avoids unlocking it in the destructor.
-      return false;
-    }
-    return true;
+    // already held, which we falsly claim in the constructor declaration). Ideally we
+    // should use EXCLUSIVE_TRYLOCK_FUNCTION(true) here.
+    is_locked_ = lock_->tryLock();
+    return is_locked_;
   }
 
 private:
   BasicLockable* lock_;
+  bool is_locked_{false};
 };
 
 /**
