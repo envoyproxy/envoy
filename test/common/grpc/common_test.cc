@@ -142,11 +142,11 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
 TEST(GrpcCommonTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
-    EXPECT_FALSE(Grpc::Common::hasGrpcContentType(headers));
+    EXPECT_FALSE(Common::hasGrpcContentType(headers));
   }
   auto isGrpcContentType = [](const std::string& s) {
     Http::TestHeaderMapImpl headers{{"content-type", s}};
-    return Grpc::Common::hasGrpcContentType(headers);
+    return Common::hasGrpcContentType(headers);
   };
   EXPECT_FALSE(isGrpcContentType(""));
   EXPECT_FALSE(isGrpcContentType("application/text"));
@@ -160,18 +160,18 @@ TEST(GrpcCommonTest, HasGrpcContentType) {
 
 TEST(GrpcCommonTest, IsGrpcResponseHeader) {
   Http::TestHeaderMapImpl grpc_status_only{{":status", "500"}, {"grpc-status", "14"}};
-  EXPECT_TRUE(Grpc::Common::isGrpcResponseHeader(grpc_status_only, true));
-  EXPECT_FALSE(Grpc::Common::isGrpcResponseHeader(grpc_status_only, false));
+  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_status_only, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_status_only, false));
 
   Http::TestHeaderMapImpl grpc_response_header{{":status", "200"},
                                                {"content-type", "application/grpc"}};
-  EXPECT_FALSE(Grpc::Common::isGrpcResponseHeader(grpc_response_header, true));
-  EXPECT_TRUE(Grpc::Common::isGrpcResponseHeader(grpc_response_header, false));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(grpc_response_header, true));
+  EXPECT_TRUE(Common::isGrpcResponseHeader(grpc_response_header, false));
 
   Http::TestHeaderMapImpl json_response_header{{":status", "200"},
                                                {"content-type", "application/json"}};
-  EXPECT_FALSE(Grpc::Common::isGrpcResponseHeader(json_response_header, true));
-  EXPECT_FALSE(Grpc::Common::isGrpcResponseHeader(json_response_header, false));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, true));
+  EXPECT_FALSE(Common::isGrpcResponseHeader(json_response_header, false));
 }
 
 TEST(GrpcCommonTest, ValidateResponse) {
