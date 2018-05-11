@@ -50,49 +50,36 @@ private:
 };
 
 /**
- * A lock guard that deals with a lock that is not locked on construction, although
- * it is unlocked on destruction, if necessary.
+ * Like LockGuard, but uses a tryLock() on construction rather than a lock().
  */
-class SCOPED_LOCKABLE DeferredLockGuard {
+class SCOPED_LOCKABLE TryLockGuard {
 public:
   /**
-   * Establishes a scoped mutex-lock; the mutex is not locked upon construction.
+   * Establishes a scoped mutex-lock; the a mutex lock is attempted via tryLock, so
+   * an expected outcome is that the lock may fail. isLocked() must be called to
+   * determine whether he lock was actually acquired.
    *
    * @param lock the mutex.
    */
-  DeferredLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock) : lock_(&lock) {
-    // Note that we annotate this as a lock-taking function, even
-    // thought we are not taking locks. Ideally, the annotation should
-    // be on tryLock (EXCLUSIVE_TRYLOCK_FUNCTION(true)), however that
-    // does not appear to work with this class in
-    // clang+llvm-5.0.1. The problem appears to be that there is no
-    // way to declare an UNLOCK function for a conditionally held
-    // lock, at least in the context of this class.
-    //
-    // TODO(jmarantz): revisit when clang is upgraded to a later version in Envoy.
-  }
+  TryLockGuard(BasicLockable& lock) EXCLUSIVE_TRYLOCK_FUNCTION(true)
+      : lock_(lock.tryLock() ? &lock : nullptr) {}
 
   /**
    * Destruction of the DeferredLockGuard unlocks the lock, if it was locked.
    */
-  ~DeferredLockGuard() UNLOCK_FUNCTION() {
-    if (is_locked_) {
+  ~TryLockGuard() UNLOCK_FUNCTION() {
+    if (isLocked()) {
       lock_->unlock();
     }
   }
 
-  // Attempts to lock the mutex, if present. Returns false if no lock was taken.
-  bool tryLock() NO_THREAD_SAFETY_ANALYSIS {
-    // Thread safety analysis had to be disabled to avoid a warning about retaking a lock
-    // already held, which we falsly claim in the constructor declaration). Ideally we
-    // should use EXCLUSIVE_TRYLOCK_FUNCTION(true) here.
-    is_locked_ = lock_->tryLock();
-    return is_locked_;
-  }
+  /**
+   * @return bool whether the lock was successfully acquired.
+   */
+  bool isLocked() const { return lock_ != nullptr; }
 
 private:
   BasicLockable* lock_;
-  bool is_locked_{false};
 };
 
 /**

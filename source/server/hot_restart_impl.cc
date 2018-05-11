@@ -251,17 +251,19 @@ void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
   // Instead, we guard this condition with a lock. However, to avoid deadlock, we must tryLock()
   // in this path, since this call runs in the same thread as the event loop that is receiving
   // messages. If tryLock() fails it is sufficient to not return any parent stats.
-  Thread::DeferredLockGuard lock(init_lock_);
   memset(&info, 0, sizeof(info));
-  if (options_.restartEpoch() == 0 || parent_terminated_ || !lock.tryLock()) {
+  if (options_.restartEpoch() == 0 || parent_terminated_) {
     return;
   }
 
-  RpcBase rpc(RpcMessageType::GetStatsRequest);
-  sendMessage(parent_address_, rpc);
-  RpcGetStatsReply* reply = receiveTypedRpc<RpcGetStatsReply, RpcMessageType::GetStatsReply>();
-  info.memory_allocated_ = reply->memory_allocated_;
-  info.num_connections_ = reply->num_connections_;
+  Thread::TryLockGuard lock(init_lock_);
+  if (lock.isLocked()) {
+    RpcBase rpc(RpcMessageType::GetStatsRequest);
+    sendMessage(parent_address_, rpc);
+    RpcGetStatsReply* reply = receiveTypedRpc<RpcGetStatsReply, RpcMessageType::GetStatsReply>();
+    info.memory_allocated_ = reply->memory_allocated_;
+    info.num_connections_ = reply->num_connections_;
+  }
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
