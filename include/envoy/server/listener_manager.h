@@ -21,7 +21,7 @@ public:
   virtual ~LdsApi() {}
 
   /**
-   * @return the last received version by the xDS API for LDS.
+   * @return std::string the last received version by the xDS API for LDS.
    */
   virtual std::string versionInfo() const PURE;
 };
@@ -114,6 +114,7 @@ public:
    * Instruct the listener manager to create an LDS API provider. This is a separate operation
    * during server initialization because the listener manager is created prior to several core
    * pieces of the server existing.
+   * @param lds_config supplies the management server configuration.
    */
   virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
 
