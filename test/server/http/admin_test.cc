@@ -53,7 +53,7 @@ public:
 
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms) {
     return AdminImpl::statsAsJson(all_stats, all_histograms, true);
   }
 
