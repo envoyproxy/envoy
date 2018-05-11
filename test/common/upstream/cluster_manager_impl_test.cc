@@ -1,6 +1,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
@@ -19,6 +20,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -80,17 +82,17 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager) override {
-    return ClusterManagerPtr{
-        clusterManagerFromProto_(bootstrap, stats, tls, runtime, random, local_info, log_manager)};
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override {
+    return ClusterManagerPtr{clusterManagerFromProto_(bootstrap, stats, tls, runtime, random,
+                                                      local_info, log_manager, admin)};
   }
 
-  MOCK_METHOD7(clusterManagerFromProto_,
+  MOCK_METHOD8(clusterManagerFromProto_,
                ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                Stats::Store& stats, ThreadLocal::Instance& tls,
                                Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                const LocalInfo::LocalInfo& local_info,
-                               AccessLog::AccessLogManager& log_manager));
+                               AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
   MOCK_METHOD1(allocateConnPool_, Http::ConnectionPool::Instance*(HostConstSharedPtr host));
   MOCK_METHOD4(clusterFromProto_,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
@@ -114,7 +116,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -126,9 +128,20 @@ public:
     EXPECT_EQ(warming, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
   }
 
+  void checkConfigDump(const std::string& expected_dump_yaml) {
+    auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
+    const auto& clusters_config_dump =
+        dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
+
+    envoy::admin::v2alpha::ClustersConfigDump expected_clusters_config_dump;
+    MessageUtil::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
+    EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
+  }
+
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
+  NiceMock<Server::MockAdmin> admin_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
@@ -172,6 +185,17 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
   create(parseBootstrapFromV2Yaml(yaml));
+  checkConfigDump(R"EOF(
+static_clusters:
+  - name: http12_cluster
+    connect_timeout: 0.250s
+    lb_policy: ROUND_ROBIN
+    http2_protocol_options: {}
+    http_protocol_options: {}
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF");
 }
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
@@ -626,7 +650,8 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   }
   )EOF",
       defaultStaticClusterJson("cds_cluster"),
-      clustersJson({defaultStaticClusterJson("cluster_0"), defaultStaticClusterJson("cluster_1")}));
+      clustersJson(
+          {defaultStaticClusterJson("fake_cluster"), defaultStaticClusterJson("fake_cluster2")}));
 
   MockCdsApi* cds = new MockCdsApi();
   std::shared_ptr<MockCluster> cds_cluster(new NiceMock<MockCluster>());
@@ -638,12 +663,12 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
+  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster2));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cds_cluster));
-  ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
   EXPECT_CALL(*cds, setInitializedCb(_));
   EXPECT_CALL(*cds_cluster, initialize(_));
@@ -671,18 +696,73 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1");
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2");
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3");
 
   cds->initialized_callback_();
+  EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
+  checkConfigDump(R"EOF(
+version_info: version3
+static_clusters:
+  - name: "cds_cluster"
+    connect_timeout: 0.25s
+    hosts:
+    - socket_address:
+        address: "127.0.0.1"
+        port_value: 11001
+    dns_lookup_family: V4_ONLY
+  - name: "fake_cluster"
+    connect_timeout: 0.25s
+    hosts:
+    - socket_address:
+        address: "127.0.0.1"
+        port_value: 11001
+    dns_lookup_family: V4_ONLY
+  - name: "fake_cluster2"
+    connect_timeout: 0.25s
+    hosts:
+    - socket_address:
+        address: "127.0.0.1"
+        port_value: 11001
+    dns_lookup_family: V4_ONLY
+dynamic_active_clusters:
+  - version_info: "version1"
+    cluster:
+      name: "cluster3"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+  - version_info: "version2"
+    cluster:
+      name: "cluster4"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+  - version_info: "version3"
+    cluster:
+      name: "cluster5"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+dynamic_warming_clusters:
+)EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
   cluster4->initialize_callback_();
@@ -731,7 +811,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"));
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "");
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -774,9 +854,22 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  checkConfigDump(R"EOF(
+dynamic_warming_clusters:
+  - version_info: "version1"
+    cluster:
+      name: "fake_cluster"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+)EOF");
 
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   checkStats(1 /*added*/, 0 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
@@ -807,7 +900,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   cluster1->initialize_callback_();
@@ -816,7 +909,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   // Now try to update again but with the same hash.
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
 
   // Now do it again with a different hash.
   auto update_cluster = defaultStaticCluster("fake_cluster");
@@ -833,7 +926,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         initialize_callback();
       }));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -895,7 +988,7 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster")));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("fake_cluster"));

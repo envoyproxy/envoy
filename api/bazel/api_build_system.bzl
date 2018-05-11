@@ -98,6 +98,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
             "@com_google_protobuf//:any_proto",
             "@com_google_protobuf//:descriptor_proto",
             "@com_google_protobuf//:duration_proto",
+            "@com_google_protobuf//:empty_proto",
             "@com_google_protobuf//:struct_proto",
             "@com_google_protobuf//:timestamp_proto",
             "@com_google_protobuf//:wrappers_proto",

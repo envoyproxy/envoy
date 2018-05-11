@@ -25,46 +25,6 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-/**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
- */
-class TestAllocator : public RawStatDataAllocator {
-public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  RawStatData* alloc(const std::string& name) override {
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
-    } else {
-      stat_ref->ref_count_++;
-    }
-
-    return stat_ref.get();
-  }
-
-  void free(RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
-    }
-
-    FAIL();
-  }
-
-private:
-  static void freeAdapter(RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
-};
-
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
 public:
   StatsThreadLocalStoreTest() {

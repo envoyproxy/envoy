@@ -120,6 +120,8 @@ private:
     Router::ConfigConstSharedPtr config_;
   };
 
+  friend class AdminStatsTest;
+
   /**
    * Attempt to change the log level of a logger or all loggers
    * @param params supplies the incoming endpoint query params.
@@ -131,9 +133,9 @@ private:
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
-  static std::string
-  statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-              const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms);
+  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                                 bool pretty_print = false);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;

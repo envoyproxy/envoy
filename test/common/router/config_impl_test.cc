@@ -3431,7 +3431,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
         "request_headers_to_add": [
           {
             "key": "x-client-ip",
-            "value": "%CLIENT_IP%"
+            "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
           }
         ],
         "routes": [
@@ -3442,7 +3442,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
             "request_headers_to_add": [
               {
                 "key": "x-client-ip",
-                "value": "%CLIENT_IP%"
+                "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
               }
             ]
           }
@@ -3452,7 +3452,7 @@ TEST(CustomRequestHeadersTest, AddNewHeader) {
     "request_headers_to_add": [
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP%"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       }
     ]
   }
@@ -3482,7 +3482,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
         "request_headers_to_add": [
           {
             "key": "x-client-ip",
-            "value": "%CLIENT_IP%"
+            "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
           }
         ],
         "routes": [
@@ -3493,7 +3493,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
             "request_headers_to_add": [
               {
                 "key": "x-client-ip",
-                "value": "%CLIENT_IP"
+                "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
               }
             ]
           }
@@ -3503,7 +3503,7 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
     "request_headers_to_add": [
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
       }
     ]
   }
@@ -3513,7 +3513,8 @@ TEST(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true),
       EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression 'CLIENT_IP'");
+      "Invalid header configuration. Un-terminated variable expression "
+      "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
@@ -4229,6 +4230,8 @@ public:
   };
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
+    TestFilterConfig() : EmptyHttpFilterConfig("test.filter") {}
+
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED;
@@ -4243,7 +4246,6 @@ public:
       obj->config_.MergeFrom(message);
       return obj;
     }
-    std::string name() override { return "test.filter"; }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,

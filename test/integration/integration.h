@@ -82,6 +82,7 @@ public:
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false);
   const std::string& data() { return payload_reader_->data(); }
+  bool connected() const { return !disconnected_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

@@ -8,6 +8,7 @@
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
 #include "common/stats/stats_impl.h"
+#include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
 
@@ -23,11 +24,48 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
+using testing::Ref;
 using testing::_;
 
 namespace Envoy {
 namespace Server {
+
+class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                       public Stats::RawStatDataAllocator {
+public:
+public:
+  AdminStatsTest() {
+    ON_CALL(*this, alloc(_))
+        .WillByDefault(Invoke(
+            [this](const std::string& name) -> Stats::RawStatData* { return alloc_.alloc(name); }));
+
+    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](Stats::RawStatData& data) -> void {
+      return alloc_.free(data);
+    }));
+
+    EXPECT_CALL(*this, alloc("stats.overflow"));
+    store_.reset(new Stats::ThreadLocalStoreImpl(*this));
+    store_->addSink(sink_);
+  }
+
+  static std::string
+  statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
+                     const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+    return AdminImpl::statsAsJson(all_stats, all_histograms, true);
+  }
+
+  MOCK_METHOD1(alloc, Stats::RawStatData*(const std::string& name));
+  MOCK_METHOD1(free, void(Stats::RawStatData& data));
+
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::TestAllocator alloc_;
+  Stats::MockSink sink_;
+  std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
+};
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
@@ -48,6 +86,146 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestHeaderMapImpl request_headers_;
 };
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AdminStatsTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(AdminStatsTest, StatsAsJson) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Stats::Histogram& h1 = store_->histogram("h1");
+  Stats::Histogram& h2 = store_->histogram("h2");
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+  h2.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  // Again record a new value in h1 so that it has both interval and cumulative values.
+  // h2 should only have cumulative values.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(*this, free(_));
+
+  std::map<std::string, uint64_t> all_stats;
+
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms());
+
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
+                    {
+                        "name": "h2",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 102.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 107.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.99
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 110.0
+                            }
+                        ]
+                    },
+                    {
+                        "name": "h1",
+                        "values": [
+                            {
+                                "interval": 100.0,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": 102.5,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": 105.0,
+                                "cumulative": 110.0
+                            },
+                            {
+                                "interval": 107.5,
+                                "cumulative": 205.0
+                            },
+                            {
+                                "interval": 109.0,
+                                "cumulative": 208.0
+                            },
+                            {
+                                "interval": 109.5,
+                                "cumulative": 209.0
+                            },
+                            {
+                                "interval": 109.9,
+                                "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.99,
+                                "cumulative": 209.98
+                            },
+                            {
+                                "interval": 110.0,
+                                "cumulative": 210.0
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_EQ(expected_json, actual_json);
+  store_->shutdownThreading();
+}
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
