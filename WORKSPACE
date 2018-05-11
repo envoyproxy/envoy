@@ -3,7 +3,7 @@ workspace(name = "envoy")
 load("//bazel:repositories.bzl", "envoy_dependencies")
 load("//bazel:cc_configure.bzl", "cc_configure")
 
-envoy_dependencies()
+envoy_dependencies(skip_targets=["tcmalloc_and_profiler"])
 cc_configure()
 
 load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
