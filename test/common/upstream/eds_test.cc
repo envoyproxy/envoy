@@ -594,6 +594,20 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
     auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
     EXPECT_EQ(1, hosts_per_locality.size());
   }
+
+  // Clear out the new ClusterLoadAssignment. This should leave us with 0 localities per priority. 
+  cluster_load_assignment->clear_endpoints();
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+
+  {
+    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
+    EXPECT_EQ(0, hosts_per_locality.size());
+  }
+
+  {
+    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
+    EXPECT_EQ(0, hosts_per_locality.size());
+  }
 }
 
 // Validate that onConfigUpdate() updates bins hosts per locality as expected.
