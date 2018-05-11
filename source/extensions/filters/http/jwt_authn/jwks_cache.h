@@ -58,7 +58,7 @@ public:
     virtual ::google::jwt_verify::Status setRemoteJwks(const std::string& jwks_str) PURE;
   };
 
-  // Lookup issuer cache map.  The cache only stores Jwks specified in the config.
+  // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& name) PURE;
 
   // Factory function to create an instance.
