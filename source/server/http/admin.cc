@@ -503,9 +503,10 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
   return metric_type_tracker.size();
 }
 
-std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                   const bool pretty_print) {
+std::string
+AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                       const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
