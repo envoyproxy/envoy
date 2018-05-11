@@ -163,7 +163,12 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     return;
   }
   if (api_state_[type_url].watches_.empty()) {
-    ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+    if (message->resources().empty()) {
+      api_state_[type_url].request_.set_version_info(message->version_info());
+      api_state_[type_url].request_.set_response_nonce(message->nonce());
+    } else {
+      ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+    }
     return;
   }
   try {
