@@ -19,9 +19,13 @@ message ConfigDump {
   // This map is serialized and dumped in its entirety at the
   // :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
   //
-  // Keys should be a short descriptor of the config object they map to. For example, Envoy's HTTP
-  // routing subsystem uses "routes" as the key for its config, for which it uses the message
-  // :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>` as defined below.
+  // Keys are a short descriptor of the config object they map to. The following keys (and the
+  // messages they map to) are currently supported:
+  //
+  // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>`
+  // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
+  // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
+  // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
   map<string, google.protobuf.Any> configs = 1 [(gogoproto.nullable) = false];
 }
 
