@@ -19,16 +19,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-namespace {
-
-const Http::HeaderMap* getDeniedHeader() {
-  static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Forbidden))}};
-  return header_map;
-}
-
-} // namespace
-
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (route == nullptr || route->routeEntry() == nullptr) {
@@ -112,8 +102,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
   // if there is an error contacting the service.
   if (status == CheckStatus::Denied ||
       (status == CheckStatus::Error && !config_->failureModeAllow())) {
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getDeniedHeader())};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->sendLocalReply(Http::Code::Forbidden, "", nullptr);
     callbacks_->requestInfo().setResponseFlag(
         RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
