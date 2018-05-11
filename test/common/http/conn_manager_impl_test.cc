@@ -18,7 +18,9 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/websocket/ws_handler_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -31,6 +33,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -195,13 +198,28 @@ public:
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   }
 
+  void configureRouteForWebsocket(Router::MockRouteEntry& route_entry) {
+    ON_CALL(route_entry, useWebSocket()).WillByDefault(Return(true));
+    ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
+        .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
+                                                   const RequestInfo::RequestInfo& request_info,
+                                                   Http::WebSocketProxyCallbacks& callbacks,
+                                                   Upstream::ClusterManager& cluster_manager,
+                                                   Network::ReadFilterCallbacks* read_callbacks) {
+          auto config(std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyConfig>(
+              envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), factory_context_));
+          auto ret = std::make_unique<Http::WebSocket::WsHandlerImpl>(
+              request_headers, request_info, route_entry, callbacks, cluster_manager,
+              read_callbacks, config);
+          return ret;
+        }));
+  }
+
   void expectOnUpstreamInitFailure() {
     StreamDecoder* decoder = nullptr;
     NiceMock<MockStreamEncoder> encoder;
 
-    ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-        .WillByDefault(Return(true));
-
+    configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
       decoder = &conn_manager_->newStream(encoder);
       HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
@@ -272,6 +290,7 @@ public:
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
   RouteConfigProvider route_config_provider_;
   TracingConnectionManagerConfigPtr tracing_config_;
@@ -1160,8 +1179,7 @@ TEST_F(HttpConnectionManagerImplTest, AllowNonWebSocketOnWebSocketRoute) {
   NiceMock<MockStreamEncoder> encoder;
 
   // Websocket enabled route
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   // Non websocket request
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
@@ -1276,8 +1294,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -1325,8 +1342,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -1377,8 +1393,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
       envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
   EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
               finalizeRequestHeaders(_, _));
@@ -1428,8 +1443,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -1481,8 +1495,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);
@@ -1536,8 +1549,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
 
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, useWebSocket())
-      .WillByDefault(Return(true));
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     decoder = &conn_manager_->newStream(encoder);

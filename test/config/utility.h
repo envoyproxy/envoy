@@ -15,8 +15,11 @@
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"
+#include "common/protobuf/protobuf.h"
 
 #include "test/integration/server_stats.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -114,6 +117,11 @@ private:
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
+
+  // Configure a capture transport socket for a cluster/filter chain.
+  void setCaptureTransportSocket(const std::string& capture_path, const std::string& type,
+                                 envoy::api::v2::core::TransportSocket& transport_socket,
+                                 const absl::optional<ProtobufWkt::Struct>& tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;
