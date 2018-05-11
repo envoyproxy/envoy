@@ -49,6 +49,7 @@ public:
 
   void expectSendMessage(const std::string& type_url,
                          const std::vector<std::string>& resource_names, const std::string& version,
+                         const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::GrpcStatus::Ok,
                          const std::string& error_message = "") {
     envoy::api::v2::DiscoveryRequest expected_request;
@@ -59,7 +60,7 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
-    expected_request.set_response_nonce("");
+    expected_request.set_response_nonce(nonce);
     expected_request.set_type_url(type_url);
     if (error_code != Grpc::Status::GrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
@@ -170,7 +171,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
 
-    expectSendMessage("foo", {"x", "y"}, "", Grpc::Status::GrpcStatus::Internal,
+    expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
