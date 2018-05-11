@@ -1431,14 +1431,15 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
                                       parent_.response_headers_ = std::move(response_headers);
                                       parent_.response_encoder_->encodeHeaders(
                                           *parent_.response_headers_, end_stream);
+                                      parent_.state_.local_complete_ = end_stream;
                                     },
                                     [&](Buffer::Instance& data, bool end_stream) -> void {
                                       parent_.response_encoder_->encodeData(data, end_stream);
                                       parent_.state_.local_complete_ = end_stream;
-                                      parent_.maybeEndEncode(end_stream);
                                     },
                                     parent_.state_.destroyed_, Http::Code::InternalServerError,
                                     CodeUtility::toString(Http::Code::InternalServerError));
+      parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
       resetStream();
     }
