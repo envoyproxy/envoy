@@ -529,7 +529,7 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
 }
 
 // Validate that onConfigUpdate() removes any locality not referenced in the
-// config update in each priority. 
+// config update in each priority.
 TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -568,12 +568,14 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   EXPECT_TRUE(initialized);
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
     EXPECT_EQ(2, hosts_per_locality.size());
   }
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
     EXPECT_EQ(2, hosts_per_locality.size());
   }
 
@@ -586,26 +588,30 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
     EXPECT_EQ(1, hosts_per_locality.size());
   }
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
     EXPECT_EQ(1, hosts_per_locality.size());
   }
 
-  // Clear out the new ClusterLoadAssignment. This should leave us with 0 localities per priority. 
+  // Clear out the new ClusterLoadAssignment. This should leave us with 0 localities per priority.
   cluster_load_assignment->clear_endpoints();
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get();
     EXPECT_EQ(0, hosts_per_locality.size());
   }
 
   {
-    auto& hosts_per_locality = cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
+    auto& hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get();
     EXPECT_EQ(0, hosts_per_locality.size());
   }
 }
