@@ -168,16 +168,7 @@ private:
     }
     void sendLocalReply(Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers) override {
-      Utility::sendLocalReply(
-          is_grpc_request_,
-          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-            if (headers != nullptr && modify_headers != nullptr) {
-              modify_headers(*headers);
-            }
-            encodeHeaders(std::move(headers), end_stream);
-          },
-          [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-          parent_.state_.destroyed_, code, body);
+      parent_.sendLocalReply(nullptr, is_grpc_request_, code, body, modify_headers);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -278,6 +269,9 @@ private:
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    void sendLocalReply(ActiveStreamEncoderFilter* filter, bool is_grpc_request, Code code,
+                        const std::string& body,
+                        std::function<void(HeaderMap& headers)> modify_headers);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
