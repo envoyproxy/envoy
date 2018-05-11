@@ -819,20 +819,21 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   cached_route_ = std::move(route);
 }
 
-void ConnectionManagerImpl::ActiveStream::sendLocalReply(ActiveStreamEncoderFilter* filter,
-							 bool is_grpc_request, Code code,
-							 const std::string& body,
-							 std::function<void(HeaderMap& headers)> modify_headers) {
+void ConnectionManagerImpl::ActiveStream::sendLocalReply(
+    ActiveStreamEncoderFilter* filter, bool is_grpc_request, Code code, const std::string& body,
+    std::function<void(HeaderMap& headers)> modify_headers) {
   Utility::sendLocalReply(
       is_grpc_request,
       [this, filter, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
         if (headers != nullptr && modify_headers != nullptr) {
           modify_headers(*headers);
         }
-	response_headers_ = std::move(headers);
+        response_headers_ = std::move(headers);
         encodeHeaders(filter, *response_headers_, end_stream);
       },
-      [this, filter](Buffer::Instance& data, bool end_stream) -> void { encodeData(filter, data, end_stream); },
+      [this, filter](Buffer::Instance& data, bool end_stream) -> void {
+        encodeData(filter, data, end_stream);
+      },
       state_.destroyed_, code, body);
 }
 
