@@ -155,7 +155,7 @@ message StatsdSink {
     // Envoy will connect to this cluster to flush statistics.
     string tcp_cluster_name = 2;
   }
-  // [#not-implemented-hide:] Optional custom prefix for StatsdSink. If
+  // Optional custom prefix for StatsdSink. If
   // specified, this will override the default prefix.
   // For example:
   //
