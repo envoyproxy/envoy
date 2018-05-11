@@ -46,7 +46,7 @@ public:
   }
 
 private:
-  BasicLockable* lock_;
+  BasicLockable* const lock_;
 };
 
 /**
@@ -61,7 +61,7 @@ public:
    *
    * @param lock the mutex.
    */
-  TryLockGuard(BasicLockable& lock) EXCLUSIVE_TRYLOCK_FUNCTION(true)
+  TryLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock)
       : lock_(lock.tryLock() ? &lock : nullptr) {}
 
   /**
@@ -79,7 +79,7 @@ public:
   bool isLocked() const { return lock_ != nullptr; }
 
 private:
-  BasicLockable* lock_;
+  BasicLockable* const lock_;
 };
 
 /**
