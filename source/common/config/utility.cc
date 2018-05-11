@@ -228,7 +228,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
-const envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
+envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
   envoy::api::v2::ClusterLoadAssignment load_assignment;
   envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =

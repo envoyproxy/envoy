@@ -290,7 +290,7 @@ public:
    * @param hosts cluster's list of hosts.
    * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
    */
-  const static envoy::api::v2::ClusterLoadAssignment
+  static envoy::api::v2::ClusterLoadAssignment
   translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
 };
 
