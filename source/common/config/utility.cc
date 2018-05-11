@@ -228,5 +228,17 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }
 
+const envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
+      load_assignment.add_endpoints();
+  for (const envoy::api::v2::core::Address& host : hosts) {
+    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->CopyFrom(host);
+  }
+  return load_assignment;
+}
+
 } // namespace Config
 } // namespace Envoy
