@@ -16,7 +16,7 @@
           "access_log": [
             {
               "path": "{{ test_tmpdir }}/tcp_{{ ip_loopback_address }}.log",
-              "format": "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_ADDRESS%\n"
+              "format": "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n"
             }
           ]
         }

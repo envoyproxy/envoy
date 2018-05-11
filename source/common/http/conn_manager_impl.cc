@@ -447,18 +447,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   maybeEndDecode(end_stream);
   request_headers_ = std::move(headers);
 
-  // Iterate and log headers only if logger's level is at least debug
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
-
-    request_headers_->iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+                   *request_headers_);
 
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
@@ -861,16 +851,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec", *this);
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, headers);
 
   // Now actually encode via the codec.
   response_encoder_->encode100ContinueHeaders(headers);
@@ -967,17 +948,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   chargeStats(headers);
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):", *this,
-                     end_stream && continue_data_entry == encoder_filters_.end());
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
+                   end_stream && continue_data_entry == encoder_filters_.end(), headers);
 
   // Now actually encode via the codec.
   request_info_.onFirstDownstreamTxByteSent();
@@ -1054,16 +1026,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     }
   }
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding trailers via codec", *this);
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
   response_encoder_->encodeTrailers(trailers);
   maybeEndEncode(true);

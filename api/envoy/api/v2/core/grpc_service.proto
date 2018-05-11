@@ -6,6 +6,7 @@ import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/empty.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -28,7 +29,7 @@ message GrpcService {
   message GoogleGrpc {
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
-    // :ref:`credentials <envoy_api_field_core.GrpcService.credentials>`.
+    // :ref:`channel_credentials <envoy_api_field_core.GrpcService.GoogleGrpc.channel_credentials>`.
     string target_uri = 1 [(validate.rules).string.min_bytes = 1];
 
     // See https://grpc.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html.
@@ -42,7 +43,75 @@ message GrpcService {
       // PEM encoded client certificate chain.
       DataSource cert_chain = 3;
     }
-    SslCredentials ssl_credentials = 2;
+
+    // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
+    // credential types.
+    message ChannelCredentials {
+      oneof credential_specifier {
+        option (validate.required) = true;
+        SslCredentials ssl_credentials = 1;
+
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
+        google.protobuf.Empty google_default = 2;
+      }
+    }
+
+    ChannelCredentials channel_credentials = 2;
+
+    message CallCredentials {
+      message ServiceAccountJWTAccessCredentials {
+        string json_key = 1;
+        uint64 token_lifetime_seconds = 2;
+      }
+
+      message GoogleIAMCredentials {
+        string authorization_token = 1;
+        string authority_selector = 2;
+      }
+
+      message MetadataCredentialsFromPlugin {
+        string name = 1;
+        google.protobuf.Struct config = 2;
+      }
+
+      oneof credential_specifier {
+        option (validate.required) = true;
+
+        // Access token credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#ad3a80da696ffdaea943f0f858d7a360d.
+        string access_token = 1;
+
+        // Google Compute Engine credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
+        // [#not-implemented-hide:]
+        google.protobuf.Empty google_compute_engine = 2;
+
+        // Google refresh token credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a96901c997b91bc6513b08491e0dca37c.
+        // [#not-implemented-hide:]
+        string google_refresh_token = 3;
+
+        // Service Account JWT Access credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a92a9f959d6102461f66ee973d8e9d3aa.
+        // [#not-implemented-hide:]
+        ServiceAccountJWTAccessCredentials service_account_jwt_access = 4;
+
+        // Google IAM credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a9fc1fc101b41e680d47028166e76f9d0.
+        // [#not-implemented-hide:]
+        GoogleIAMCredentials google_iam = 5;
+
+        // Custom authenticator credentials.
+        // https://grpc.io/grpc/cpp/namespacegrpc.html#a823c6a4b19ffc71fb33e90154ee2ad07.
+        // https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms.
+        // [#not-implemented-hide:]
+        MetadataCredentialsFromPlugin from_plugin = 6;
+      }
+    }
+
+    // A set of call credentials that can be composed with `channel credentials
+    // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
+    repeated CallCredentials call_credentials = 3;
 
     // The human readable prefix to use when emitting statistics for the gRPC
     // service.
@@ -53,11 +122,16 @@ message GrpcService {
     //
     //    streams_total, Counter, Total number of streams opened
     //    streams_closed_<gRPC status code>, Counter, Total streams closed with <gRPC status code>
-    string stat_prefix = 3 [(validate.rules).string.min_bytes = 1];
+    string stat_prefix = 4 [(validate.rules).string.min_bytes = 1];
+
+    // The name of the Google gRPC credentials factory to use. This must have been registered with
+    // Envoy. If this is empty, a default credentials factory will be used that sets up channel
+    // credentials based on other configuration parameters.
+    string credentials_factory_name = 5;
 
     // Additional configuration for site-specific customizations of the Google
     // gRPC library.
-    google.protobuf.Struct config = 4;
+    google.protobuf.Struct config = 6;
   }
 
   oneof target_specifier {
@@ -78,25 +152,8 @@ message GrpcService {
   // request.
   google.protobuf.Duration timeout = 3;
 
-  // gRPC credentials as described at
-  // https://grpc.io/docs/guides/auth.html#credential-types.
-  //
-  // .. note::
-  //
-  //   Credentials are only currently implemented for the Google gRPC client.
-  message Credentials {
-    oneof credential_specifier {
-      option (validate.required) = true;
-
-      // OAuth2 access token, see
-      // https://grpc.io/grpc/cpp/namespacegrpc.html#ad3a80da696ffdaea943f0f858d7a360d.
-      string access_token = 1;
-      // [#comment: TODO(htuch): other gRPC auth types, e.g. IAM credentials, JWT, etc.]
-    }
-  }
-  // A set of credentials that will be composed to form the `channel credentials
-  // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
-  repeated Credentials credentials = 4;
+  // Field 4 reserved due to moving credentials inside the GoogleGrpc message
+  reserved 4;
 
   // Additional metadata to include in streams initiated to the GrpcService.
   // This can be used for scenarios in which additional ad hoc authorization
