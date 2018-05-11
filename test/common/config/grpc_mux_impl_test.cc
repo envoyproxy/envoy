@@ -337,6 +337,37 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
                           onReceiveMessage(1));
 }
 
+//  Verifies that a messsage with empty resources still updates the nonce.
+TEST_F(GrpcMuxImplTest, ADSEmptyRequests) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  grpc_mux_->start();
+  {
+    // subscribe and unsubscribe to simulate a cluster added and removed
+    expectSendMessage(type_url, {"y"}, "");
+    auto temp_sub = grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
+    expectSendMessage(type_url, {}, "");
+  }
+
+  // simulate the server sending empty CLA message to notify envoy that the CLA was removed.
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_nonce("bar");
+  response->set_version_info("1");
+  response->set_type_url(type_url);
+  // This contains zero resources.
+  grpc_mux_->onReceiveMessage(std::move(response));
+
+  // when we add the new subscription version should be 1 and nonce should be bar
+  expectSendMessage(type_url, {"x"}, "1", "bar");
+
+  // simulate a new cluster x is added. add CLA subscription for it.
+  auto sub = grpc_mux_->subscribe(type_url, {"x"}, callbacks_);
+  expectSendMessage(type_url, {}, "1", "bar");
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
