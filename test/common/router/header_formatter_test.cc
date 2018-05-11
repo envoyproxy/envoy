@@ -57,10 +57,6 @@ public:
   }
 };
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
-  testFormatting("CLIENT_IP", "127.0.0.1");
-}
-
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
@@ -439,7 +435,7 @@ TEST(HeaderParserTest, EvaluateHeaders) {
     "request_headers_to_add": [
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP%"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       }
     ]
   }
@@ -510,25 +506,25 @@ route:
   request_headers_to_add:
     - header:
         key: "x-prefix"
-        value: "prefix-%CLIENT_IP%"
+        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-suffix"
-        value: "%CLIENT_IP%-suffix"
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
     - header:
         key: "x-both"
-        value: "prefix-%CLIENT_IP%-suffix"
+        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
     - header:
         key: "x-escaping-1"
-        value: "%%%CLIENT_IP%%%"
+        value: "%%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%%%"
     - header:
         key: "x-escaping-2"
         value: "%%%%%%"
     - header:
         key: "x-multi"
-        value: "%PROTOCOL% from %CLIENT_IP%"
+        value: "%PROTOCOL% from %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-multi-back-to-back"
-        value: "%PROTOCOL%%CLIENT_IP%"
+        value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
@@ -594,7 +590,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP%"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       }
     ]
   }
@@ -645,7 +641,7 @@ route:
   response_headers_to_add:
     - header:
         key: "x-client-ip"
-        value: "%CLIENT_IP%"
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";

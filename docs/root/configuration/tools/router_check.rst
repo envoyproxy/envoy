@@ -39,8 +39,8 @@ expects a cluster name match of "instant-server".::
          {
            ":authority":"api.lyft.com",
            ":path": "/api/locations"
-         }
-       "validate"
+         },
+       "validate":
          {
            "cluster_name": "instant-server"
          }
@@ -69,7 +69,7 @@ expects a cluster name match of "instant-server".::
                "..."
             }
           ]
-        }
+        },
       "validate": {
         "cluster_name": "...",
         "virtual_cluster_name": "...",

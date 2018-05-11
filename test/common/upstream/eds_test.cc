@@ -415,8 +415,8 @@ TEST_F(EdsTest, EndpointLocality) {
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
-// Validate that onConfigUpdate() propagatees locality weights to the host set when locality
-// weighted balancing isn't configured.
+// Validate that onConfigUpdate() does not propagate locality weights to the host set when
+// locality weighted balancing isn't configured.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
