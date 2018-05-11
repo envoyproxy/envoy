@@ -3,6 +3,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <experimental/filesystem>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -22,6 +23,8 @@
 #include "test/test_common/network_utility.h"
 
 #include "spdlog/spdlog.h"
+
+namespace fs = std::experimental::filesystem;
 
 namespace Envoy {
 namespace {
@@ -201,7 +204,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
   const std::string out_json_path =
       TestEnvironment::temporaryPath(path + ".with.ports" + extension);
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
+  fs::create_directories(fs::path(out_json_path).parent_path());
   {
     std::ofstream out_json_file(out_json_path);
     out_json_file << out_json_string;
@@ -231,7 +234,7 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents) {
   const std::string out_path = TestEnvironment::temporaryPath(filename);
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_path + ")").c_str()) == 0);
+  fs::create_directories(fs::path(out_path).parent_path());
   unlink(out_path.c_str());
   {
     std::ofstream out_file(out_path);

@@ -92,7 +92,7 @@ def envoy_test_linkopts():
 
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
-        "//conditions:default": ["-pthread", "-lrt", "-ldl"],
+        "//conditions:default": ["-pthread", "-lrt", "-ldl", "-lstdc++fs"],
     }) + envoy_select_force_libcpp([], ["-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
