@@ -21,7 +21,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * `SAN` is replaced by `URI` in the `x-forwarded-client-cert` header.
 * The `endpoint` field in the http health check filter is deprecated in favor of the `headers`
   field where one can specify HeaderMatch objects to match on.
-* The `hosts` field in the `Cluster` is deprecated in favor of the `endpoints` field to accomodate
+* The `hosts` field in the `Cluster` is deprecated in favor of the `load_assigment` field to accomodate
   specifying `HealthCheckConfig` for each cluster member.
 
 
