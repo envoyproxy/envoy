@@ -40,11 +40,11 @@ Description of documentation changes. These should be made in [docs/root](docs/r
 with the API protos. Please write in N/A if there were no documentation changes.
 
 *Release Notes*:
->If this change is user impacting you **must** add a release note to
-[version_history.rst](docs/root/intro/version_history.rst). Please include any relevant links. Each
-release note should be prefixed with the relevant subsystem in alphabetical order (see existing
-examples as a guide) and include links to relevant parts of the documentation. Thank you! Please
-write in N/A if there are no release notes.
+>If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
+>add a release note to [version_history.rst](docs/root/intro/version_history.rst). Please include
+>any relevant links. Each release note should be prefixed with the relevant subsystem in
+>alphabetical order (see existing examples as a guide) and include links to relevant parts of the
+>documentation. Thank you! Please write in N/A if there are no release notes.
 
 [Optional Fixes #Issue]
 

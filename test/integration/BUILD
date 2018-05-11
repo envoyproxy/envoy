@@ -2,9 +2,11 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_sh_test",
     "envoy_select_hot_restart",
 )
@@ -40,6 +42,37 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
+    ],
+)
+
+py_binary(
+    name = "capture_fuzz_gen",
+    srcs = ["capture_fuzz_gen.py"],
+    licenses = ["notice"],  # Apache 2
+    visibility = ["//visibility:public"],
+    deps = [
+        ":capture_fuzz_proto_py",
+        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_py",
+    ],
+)
+
+envoy_proto_library(
+    name = "capture_fuzz_proto",
+    srcs = [":capture_fuzz.proto"],
+    external_deps = ["well_known_protos"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_fuzz_test",
+    srcs = ["h1_capture_fuzz_test.cc"],
+    corpus = "h1_capture_corpus",
+    deps = [
+        ":capture_fuzz_proto",
+        ":http_integration_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 

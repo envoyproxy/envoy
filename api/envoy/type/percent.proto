@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.type;
 
-import "google/protobuf/wrappers.proto";
-
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 

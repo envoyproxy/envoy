@@ -5,7 +5,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "bd5a2bba8f4238db2e06c99ac808fc8327dec2a0",  # 2018-05-07
+        # Do not upgrade further until https://github.com/abseil/abseil-cpp/issues/118 is fixed.
+        commit = "26b789f9a53d086c8b8c9c2668efb251e37861cd",  # 2018-05-04
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
