@@ -21,6 +21,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "address_range_lib",
+    srcs = ["address_range_impl.cc"],
+    hdrs = ["address_range_impl.h"],
+    deps = [
+        ":address_lib",
+        ":utility_lib",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/network:resolver_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/registry",
+        "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_lib",
+        "@envoy_api//envoy/api/v2/core:address_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "cidr_range_lib",
     srcs = ["cidr_range.cc"],
     hdrs = ["cidr_range.h"],
@@ -168,7 +185,7 @@ envoy_cc_library(
         "//include/envoy/network:resolver_interface",
         "//include/envoy/registry",
         "//source/common/config:well_known_names",
-        "//source/common/network:address_lib",
+        ":address_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
