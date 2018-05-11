@@ -95,12 +95,11 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
   }
 }
 
-void MetricsServiceSink::flush(Stats::FlushDelegate& flush_delegate) {
+void MetricsServiceSink::flush(Stats::FlushSource& flush_source) {
   message_.clear_envoy_metrics();
-  const std::vector<Stats::CounterSharedPtr>& counters = flush_delegate.cachedCounters();
-  const std::vector<Stats::GaugeSharedPtr>& gauges = flush_delegate.cachedGauges();
-  const std::vector<Stats::ParentHistogramSharedPtr>& histograms =
-      flush_delegate.cachedHistograms();
+  const std::vector<Stats::CounterSharedPtr>& counters = flush_source.cachedCounters();
+  const std::vector<Stats::GaugeSharedPtr>& gauges = flush_source.cachedGauges();
+  const std::vector<Stats::ParentHistogramSharedPtr>& histograms = flush_source.cachedHistograms();
   // TODO(mrice32): there's probably some more sophisticated preallocation we can do here where we
   // actually preallocate the submessages and then pass ownership to the proto (rather than just
   // preallocating the pointer array).

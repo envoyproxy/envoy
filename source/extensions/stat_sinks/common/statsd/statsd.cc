@@ -47,17 +47,17 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flush(Stats::FlushDelegate& flush_delegate) {
+void UdpStatsdSink::flush(Stats::FlushSource& flush_source) {
   Writer& writer = tls_->getTyped<Writer>();
-  for (const Stats::CounterSharedPtr& counter : flush_delegate.cachedCounters()) {
-    uint64_t delta = counter->latch();
+  for (const Stats::CounterSharedPtr& counter : flush_source.cachedCounters()) {
     if (counter->used()) {
+      uint64_t delta = counter->latch();
       writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(*counter), delta,
                                buildTagStr(counter->tags())));
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : flush_delegate.cachedGauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : flush_source.cachedGauges()) {
     if (gauge->used()) {
       writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(*gauge), gauge->value(),
                                buildTagStr(gauge->tags())));
@@ -109,17 +109,17 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
   });
 }
 
-void TcpStatsdSink::flush(Stats::FlushDelegate& flush_delegate) {
+void TcpStatsdSink::flush(Stats::FlushSource& flush_source) {
   TlsSink& tls_sink = tls_->getTyped<TlsSink>();
   tls_sink.beginFlush(true);
-  for (const Stats::CounterSharedPtr& counter : flush_delegate.cachedCounters()) {
-    uint64_t delta = counter->latch();
+  for (const Stats::CounterSharedPtr& counter : flush_source.cachedCounters()) {
     if (counter->used()) {
+      uint64_t delta = counter->latch();
       tls_sink.flushCounter(counter->name(), delta);
     }
   }
 
-  for (const Stats::GaugeSharedPtr& gauge : flush_delegate.cachedGauges()) {
+  for (const Stats::GaugeSharedPtr& gauge : flush_source.cachedGauges()) {
     if (gauge->used()) {
       tls_sink.flushGauge(gauge->name(), gauge->value());
     }

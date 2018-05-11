@@ -103,11 +103,13 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::FlushDelegate& flush_delegate) {
+                                       Stats::FlushSource& flush_source) {
   for (const auto& sink : sinks) {
-    sink->flush(flush_delegate);
+    sink->flush(flush_source);
   }
-  flush_delegate.clearFlushCache();
+  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
+  // that it doesn't need to be reset when the set of stats isn't changing.
+  flush_source.resetFlushCache();
 }
 
 void InstanceImpl::flushStats() {
@@ -125,7 +127,7 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.flushDelegate());
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.flushSource());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     stat_flush_timer_->enableTimer(config_->statsFlushInterval());
   });

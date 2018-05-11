@@ -59,13 +59,13 @@ MockParentHistogram::MockParentHistogram() {
 
 MockParentHistogram::~MockParentHistogram() {}
 
-MockFlushDelegate::MockFlushDelegate() {
+MockFlushSource::MockFlushSource() {
   ON_CALL(*this, cachedCounters()).WillByDefault(ReturnRef(counters_));
   ON_CALL(*this, cachedGauges()).WillByDefault(ReturnRef(gauges_));
   ON_CALL(*this, cachedHistograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockFlushDelegate::~MockFlushDelegate() {}
+MockFlushSource::~MockFlushSource() {}
 
 MockSink::MockSink() {}
 MockSink::~MockSink() {}

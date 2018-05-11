@@ -97,7 +97,7 @@ public:
 class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
-  NiceMock<Stats::MockFlushDelegate> flush_delegate;
+  NiceMock<Stats::MockFlushSource> flush_source;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
   MetricsServiceSink sink(streamer_);
@@ -106,13 +106,13 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  flush_delegate.counters_.push_back(counter);
+  flush_source.counters_.push_back(counter);
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  flush_delegate.gauges_.push_back(gauge);
+  flush_source.gauges_.push_back(gauge);
 
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "test_histogram";
@@ -120,11 +120,11 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
   EXPECT_CALL(*streamer_, send(_));
 
-  sink.flush(flush_delegate);
+  sink.flush(flush_source);
 }
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
-  NiceMock<Stats::MockFlushDelegate> flush_delegate;
+  NiceMock<Stats::MockFlushSource> flush_source;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
   MetricsServiceSink sink(streamer_);
@@ -133,20 +133,20 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  flush_delegate.counters_.push_back(counter);
+  flush_source.counters_.push_back(counter);
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  flush_delegate.gauges_.push_back(gauge);
+  flush_source.gauges_.push_back(gauge);
 
-  sink.flush(flush_delegate);
+  sink.flush(flush_source);
   EXPECT_EQ(2, (*streamer_).metric_count);
 
   // Verify only newly added metrics come after endFlush call.
   gauge->used_ = false;
-  sink.flush(flush_delegate);
+  sink.flush(flush_source);
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
