@@ -348,7 +348,8 @@ def _proto_header(proto_path):
   return None
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
+def envoy_proto_library(name, srcs = [], deps = [], external_deps = [],
+                        generate_python = True):
     # Ideally this would be native.{proto_library, cc_proto_library}.
     # Unfortunately, this doesn't work with http_api_protos due to the PGV
     # requirement to also use them in the non-native protobuf.bzl
@@ -376,14 +377,16 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
         linkstatic = 1,
         visibility = ["//visibility:public"],
     )
-    py_proto_library(
-        name = name + "_py",
-        srcs = srcs,
-        default_runtime = "@com_google_protobuf//:protobuf_python",
-        protoc = "@com_google_protobuf//:protoc",
-        deps = deps + py_proto_deps,
-        visibility = ["//visibility:public"],
-    )
+
+    if generate_python:
+        py_proto_library(
+            name = name + "_py",
+            srcs = srcs,
+            default_runtime = "@com_google_protobuf//:protobuf_python",
+            protoc = "@com_google_protobuf//:protoc",
+            deps = deps + py_proto_deps,
+            visibility = ["//visibility:public"],
+        )
 
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.
