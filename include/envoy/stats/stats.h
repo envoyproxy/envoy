@@ -275,7 +275,7 @@ public:
   /**
    * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
    * the metric, so implementations must be thread-safe.
-   * @param histogram the histogram metric that this sample applies to.
+   * @param histogram the histogram that this sample applies to.
    * @param value the value of the sample.
    */
   virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
