@@ -113,6 +113,19 @@ config:
     nanos: 0
 )EOF";
 
+const std::string ConfigHelper::READONLY_RBAC_FILTER =
+    R"EOF(
+name: envoy.rbac_http
+config:
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header: { name: ":method", exact_match: "GET" }
+        principals:
+          - any: true
+)EOF";
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
   RELEASE_ASSERT(!finalized_);
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);

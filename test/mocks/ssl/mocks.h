@@ -47,7 +47,7 @@ public:
   MOCK_METHOD0(uriSanLocalCertificate, std::string());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, std::string&());
   MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
-  MOCK_METHOD0(uriSanPeerCertificate, std::string());
+  MOCK_CONST_METHOD0(uriSanPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
   MOCK_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
