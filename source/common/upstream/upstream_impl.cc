@@ -368,7 +368,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               selected_dns_resolver, cm, dispatcher,
+                                               local_info, selected_dns_resolver, cm, dispatcher,
                                                added_via_api));
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
@@ -638,9 +638,11 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-          info_, "", resolveProtoAddress(host), envoy::api::v2::core::Metadata::default_instance(),
-          1, envoy::api::v2::core::Locality().default_instance(),
-          envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+          info_, "", resolveProtoAddress(host), lb_endpoint.metadata(),
+          lb_endpoint.load_balancing_weight().value() < 1
+              ? 1
+              : lb_endpoint.load_balancing_weight().value(),
+          locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config())});
     }
   }
 }
@@ -783,6 +785,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster,
                                            Runtime::Loader& runtime, Stats::Store& stats,
                                            Ssl::ContextManager& ssl_context_manager,
+                                           const LocalInfo::LocalInfo& local_info,
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
@@ -790,7 +793,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                              added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      local_info_(local_info), priority_state_(1) {
   switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -830,20 +834,87 @@ void StrictDnsClusterImpl::startPreInit() {
 
 void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed) {
+  // If local locality is not defined then skip populating per locality hosts.
+  const auto& local_locality_node = local_info_.node();
+  const auto& local_locality = local_locality_node.locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
+
   // At this point we know that we are different so make a new host list and notify.
-  HostVectorSharedPtr new_hosts(new HostVector());
   for (const ResolveTargetPtr& target : resolve_targets_) {
+    const int32_t priority = target->context_->priority();
+    if (priority_state_[priority].first == nullptr) {
+      priority_state_[priority].first.reset(new HostVector());
+    }
+
     for (const HostSharedPtr& host : target->hosts_) {
-      new_hosts->emplace_back(host);
+      if (target->context_->has_locality() && target->context_->has_load_balancing_weight()) {
+        priority_state_[priority].second[target->context_->locality()] =
+            target->context_->load_balancing_weight();
+      }
+
+      // TODO(dio): Do we need to set the health check flag to be failed in here?
+      priority_state_[priority].first->emplace_back(host);
     }
   }
 
-  // Given the current config, only EDS clusters support multiple priorities.
-  ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-  first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                             HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(), {},
-                             hosts_added, hosts_removed);
+  for (size_t i = 0; i < priority_state_.size(); ++i) {
+    if (priority_state_[i].first != nullptr) {
+      HostVectorSharedPtr new_hosts(std::move(priority_state_[i].first));
+      const LocalityWeightsMap& locality_weights_map = priority_state_[i].second;
+      LocalityWeightsSharedPtr locality_weights;
+      std::vector<HostVector> per_locality;
+
+      auto& host_set = priority_set_.getOrCreateHostSet(i);
+      HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
+
+      // If we are configured for locality weighted LB we populate the locality
+      // weights.
+      const bool locality_weighted_lb = info()->lbConfig().has_locality_weighted_lb_config();
+      if (locality_weighted_lb) {
+        locality_weights = std::make_shared<LocalityWeights>();
+      }
+
+      // We use std::map to guarantee a stable ordering for zone aware routing.
+      std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
+
+      for (const HostSharedPtr& host : *current_hosts_copy) {
+        hosts_per_locality[host->locality()].push_back(host);
+      }
+
+      // Do we have hosts for the local locality?
+      const bool non_empty_local_locality =
+          local_locality_node.has_locality() &&
+          hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+      // As per HostsPerLocality::get(), the per_locality vector must have the
+      // local locality hosts first if non_empty_local_locality.
+      if (non_empty_local_locality) {
+        per_locality.emplace_back(hosts_per_locality[local_locality]);
+        if (locality_weighted_lb) {
+          locality_weights->emplace_back(locality_weights_map.at(local_locality));
+        }
+      }
+
+      // After the local locality hosts (if any), we place the remaining locality
+      // host groups in lexicographic order. This provides a stable ordering for
+      // zone aware routing.
+      for (auto& entry : hosts_per_locality) {
+        if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+          per_locality.emplace_back(entry.second);
+          if (locality_weighted_lb) {
+            locality_weights->emplace_back(locality_weights_map.at(entry.first));
+          }
+        }
+      }
+
+      auto per_locality_shared =
+          std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
+
+      host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts), per_locality_shared,
+                           createHealthyHostLists(*per_locality_shared),
+                           std::move(locality_weights), hosts_added, hosts_removed);
+    }
+  }
 }
 
 StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
@@ -879,10 +950,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           // potentially move port handling into the DNS interface itself, which would work better
           // for SRV.
           ASSERT(address != nullptr);
-          new_hosts.emplace_back(new HostImpl(parent_.info_, dns_address_,
-                                              Network::Utility::getAddressWithPort(*address, port_),
-                                              context_->metadata_, context_->weight_,
-                                              context_->locality_, context_->health_check_config_));
+          new_hosts.emplace_back(new HostImpl(
+              parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
+              context_->metadata(), context_->load_balancing_weight(), context_->locality(),
+              context_->health_check_config()));
         }
 
         HostVector hosts_added;

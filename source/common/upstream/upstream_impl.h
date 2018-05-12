@@ -525,6 +525,38 @@ protected:
                              HostVector& hosts_added, HostVector& hosts_removed);
 };
 
+class ResolveTargetContext {
+public:
+  ResolveTargetContext(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                       const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
+      : locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+
+  uint32_t priority() const { return locality_lb_endpoint_.priority(); }
+  bool has_load_balancing_weight() const {
+    return locality_lb_endpoint_.has_load_balancing_weight();
+  }
+  uint32_t load_balancing_weight() const {
+    return locality_lb_endpoint_.load_balancing_weight().value();
+  }
+
+  const envoy::api::v2::core::Metadata& metadata() const { return lb_endpoint_.metadata(); }
+
+  bool has_locality() const { return locality_lb_endpoint_.has_locality(); }
+  const envoy::api::v2::core::Locality& locality() const {
+    return locality_lb_endpoint_.locality();
+  }
+  const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config() const {
+    return lb_endpoint_.endpoint().health_check_config();
+  }
+
+private:
+  // TODO(dio): Should not do copying in here.
+  const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
+  const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
+};
+
+typedef std::shared_ptr<ResolveTargetContext> ResolveTargetContextSharedPtr;
+
 /**
  * Implementation of Upstream::Cluster that does periodic DNS resolution and updates the host
  * member set if the DNS members change.
@@ -533,6 +565,7 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                       const LocalInfo::LocalInfo& local_info,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, bool added_via_api);
 
@@ -540,25 +573,6 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
-  struct ResolveTargetContext {
-    ResolveTargetContext(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
-                         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-        : priority_(locality_lb_endpoints.priority()), metadata_(lb_endpoint.metadata()),
-          weight_(lb_endpoint.load_balancing_weight().value() < 1
-                      ? 1
-                      : lb_endpoint.load_balancing_weight().value()),
-          locality_(locality_lb_endpoints.locality()),
-          health_check_config_(lb_endpoint.endpoint().health_check_config()) {}
-
-    const uint32_t priority_;
-    const envoy::api::v2::core::Metadata metadata_;
-    const uint32_t weight_;
-    const envoy::api::v2::core::Locality locality_;
-    const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig health_check_config_;
-  };
-
-  typedef std::shared_ptr<ResolveTargetContext> ResolveTargetContextSharedPtr;
-
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
                   const std::string& url, ResolveTargetContextSharedPtr context);
@@ -585,6 +599,8 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  const LocalInfo::LocalInfo& local_info_;
+  PriorityState priority_state_;
 };
 
 } // namespace Upstream

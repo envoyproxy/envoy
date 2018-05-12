@@ -32,7 +32,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                                     : Config::Utility::translateClusterHosts(cluster.hosts());
   const auto& endpoints = load_assignment.endpoints();
   if (endpoints.size() != 1 || endpoints[0].lb_endpoints().size() != 1) {
-    throw EnvoyException("logical_dns clusters must have a single endpoints");
+    throw EnvoyException("logical_dns clusters must have a single endpoint");
   }
 
   switch (cluster.dns_lookup_family()) {
@@ -49,13 +49,16 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const envoy::api::v2::endpoint::Endpoint& endpoint = endpoints[0].lb_endpoints()[0].endpoint();
+  const auto& locality_lb_endpoint = endpoints[0];
+  const auto& lb_endpoint = locality_lb_endpoint.lb_endpoints()[0];
+
+  const envoy::api::v2::endpoint::Endpoint& endpoint = lb_endpoint.endpoint();
   const envoy::api::v2::core::SocketAddress& socket_address = endpoint.address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
 
-  health_check_config_ = endpoint.health_check_config();
+  context_ = std::make_shared<ResolveTargetContext>(locality_lb_endpoint, lb_endpoint);
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -95,7 +98,7 @@ void LogicalDnsCluster::startResolve() {
             tls_->runOnAllThreads([this, new_address]() -> void {
               PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
               data.current_resolved_address_ = new_address;
-              data.health_check_config_ = health_check_config_;
+              data.context_ = context_;
             });
           }
 
@@ -138,7 +141,7 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options),
           HostDescriptionConstSharedPtr{new RealHostDescription(
-              data.current_resolved_address_, data.health_check_config_, shared_from_this())}};
+              data.current_resolved_address_, data.context_, shared_from_this())}};
 }
 
 } // namespace Upstream

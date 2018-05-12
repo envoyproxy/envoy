@@ -1110,6 +1110,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
+  EXPECT_CALL(factory_.local_info_, node()).Times(3);
+
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
 
@@ -1143,7 +1145,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
       .Times(4)
       .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
 
-  // This should provide us a CP for each of the above hosts.
+  // This should provide us a connection pool for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 =
       dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
           "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
@@ -1166,7 +1168,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   Http::ConnectionPool::Instance::DrainedCb drained_cb_high;
   EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
 
-  // Remove the first host, this should lead to the first cp being drained.
+  // Remove the first host, this should lead to the first connection pool being drained.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
   drained_cb();
@@ -1212,6 +1214,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   }
   )EOF";
 
+  EXPECT_CALL(factory_.local_info_, node()).Times(2);
+
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
 
@@ -1236,7 +1240,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   EXPECT_CALL(*cp, addDrainedCallback(_))
       .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
 
-  // Remove the first host, this should lead to the cp being drained, without
+  // Remove the first host, this should lead to the connection pool being drained, without
   // crash.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({}));
