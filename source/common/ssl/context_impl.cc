@@ -131,6 +131,15 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
+  // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
+  // directly. However, our new callback is still calling X509_verify_cert() under
+  // the hood. Therefore, to ignore cert expiration, we need to set the callback
+  // for X509_verify_cert to ignore that error.
+  if (!config.verifyCertificateExpiration()) {
+    X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
+    X509_STORE_set_verify_cb(store, ContextImpl::verifyIgnoreCertExpirationCallback);
+  }
+
   if (verify_mode != SSL_VERIFY_NONE) {
     SSL_CTX_set_verify(ctx_.get(), verify_mode, nullptr);
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
@@ -239,6 +248,18 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
 
 bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
+}
+
+int ContextImpl::verifyIgnoreCertExpirationCallback(int ok, X509_STORE_CTX* ctx) {
+  int err = X509_STORE_CTX_get_error(ctx);
+
+  if (err == X509_V_OK || err == X509_V_ERR_CERT_HAS_EXPIRED ||
+      err == X509_V_ERR_CERT_NOT_YET_VALID) {
+    return 1;
+  }
+
+  // Otherwise, return the original value (always 0 in BoringSSL)
+  return ok;
 }
 
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {

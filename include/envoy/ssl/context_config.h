@@ -93,6 +93,11 @@ public:
   virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;
 
   /**
+   * @return whether to ignore expired certificates (both too new and too old).
+   */
+  virtual bool verifyCertificateExpiration() const PURE;
+
+  /**
    * @return The minimum TLS protocol version to negotiate.
    */
   virtual unsigned minProtocolVersion() const PURE;

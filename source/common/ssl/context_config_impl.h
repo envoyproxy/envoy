@@ -46,6 +46,7 @@ public:
   const std::vector<std::string>& verifyCertificateHashList() const override {
     return verify_certificate_hash_list_;
   };
+  bool verifyCertificateExpiration() const override { return verify_certificate_expiration_; };
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
@@ -74,6 +75,7 @@ private:
   const std::string private_key_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::vector<std::string> verify_certificate_hash_list_;
+  const bool verify_certificate_expiration_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };

@@ -59,6 +59,10 @@ void TlsContextJson::translateCommonTlsContext(
   for (const auto& san : json_tls_context.getStringArray("verify_subject_alt_name", true)) {
     validation_context->add_verify_subject_alt_name(san);
   }
+  if (json_tls_context.hasObject("verify_certificate_expiration")) {
+    validation_context->mutable_verify_certificate_expiration()->set_value(
+        json_tls_context.getBoolean("verify_certificate_expiration"));
+  }
 
   const std::string cipher_suites_str{json_tls_context.getString("cipher_suites", "")};
   for (auto cipher_suite : StringUtil::splitToken(cipher_suites_str, ":")) {

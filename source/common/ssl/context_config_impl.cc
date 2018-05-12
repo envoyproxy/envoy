@@ -61,6 +61,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_list_(config.validation_context().verify_certificate_hash().begin(),
                                     config.validation_context().verify_certificate_hash().end()),
+      verify_certificate_expiration_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.validation_context(), verify_certificate_expiration, true)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
