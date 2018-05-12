@@ -337,8 +337,8 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
                           onReceiveMessage(1));
 }
 
-//  Verifies that a messsage with empty resources still updates the nonce.
-TEST_F(GrpcMuxImplTest, ADSEmptyRequests) {
+//  Verifies that a messsage with no resources is accepted.
+TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
 
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
@@ -357,7 +357,8 @@ TEST_F(GrpcMuxImplTest, ADSEmptyRequests) {
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);
-  // This contains zero resources.
+
+  // This contains zero resources. No discovery request should be sent.
   grpc_mux_->onReceiveMessage(std::move(response));
 
   // when we add the new subscription version should be 1 and nonce should be bar
@@ -366,6 +367,38 @@ TEST_F(GrpcMuxImplTest, ADSEmptyRequests) {
   // simulate a new cluster x is added. add CLA subscription for it.
   auto sub = grpc_mux_->subscribe(type_url, {"x"}, callbacks_);
   expectSendMessage(type_url, {}, "1", "bar");
+}
+
+//  Verifies that a messsage with some resources is rejected when there are no watches.
+TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  grpc_mux_->start();
+  {
+    // subscribe and unsubscribe so that the type is known to envoy
+    expectSendMessage(type_url, {"y"}, "");
+    expectSendMessage(type_url, {}, "");
+    grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
+  }
+
+  // simulate the server sending CLA message to notify envoy that the CLA was added,
+  // even though envoy doesn't expect it. Envoy should reject this update.
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_nonce("bar");
+  response->set_version_info("1");
+  response->set_type_url(type_url);
+
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("x");
+  response->add_resources()->PackFrom(load_assignment);
+
+  // The message should be rejected.
+  expectSendMessage(type_url, {}, "", "bar");
+  EXPECT_LOG_CONTAINS("warning", "Ignoring unwatched type URL " + type_url,
+                      grpc_mux_->onReceiveMessage(std::move(response)));
 }
 
 } // namespace
