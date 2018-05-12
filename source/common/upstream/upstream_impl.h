@@ -403,6 +403,11 @@ private:
   const bool drain_connections_on_host_removal_;
 };
 
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+
 /**
  * Base class all primary clusters.
  */
@@ -459,6 +464,12 @@ protected:
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
 
+  static void initializePrioritySet(PrioritySetImpl& priority_set, PriorityState& priority_state,
+                                    ClusterInfoConstSharedPtr cluster_info,
+                                    const LocalInfo::LocalInfo& local_info,
+                                    const HostVector& hosts_added, const HostVector& hosts_removed,
+                                    const bool health_checker_flag);
+
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
    * query DNS, contact EDS, etc.
@@ -489,11 +500,6 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
-typedef std::unique_ptr<HostVector> HostListPtr;
-typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
-    LocalityWeightsMap;
-typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
-
 /**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
  * hosts with resolved IP addresses).
@@ -502,7 +508,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -511,7 +517,10 @@ private:
   // ClusterImplBase
   void startPreInit() override;
 
-  HostVectorSharedPtr initial_hosts_;
+  void initializePriorityState(const envoy::api::v2::ClusterLoadAssignment& load_assignment);
+
+  const LocalInfo::LocalInfo& local_info_;
+  PriorityState priority_state_;
 };
 
 /**
