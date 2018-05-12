@@ -111,7 +111,7 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
                            const std::string& name, bool modifiable, bool workers_started,
-                           uint64_t hash)
+                           uint64_t hash, Secret::SecretManager& secret_manager)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -125,7 +125,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       metadata_(config.has_metadata() ? config.metadata()
-                                      : envoy::api::v2::core::Metadata::default_instance()) {
+                                      : envoy::api::v2::core::Metadata::default_instance()),
+      secret_manager_(secret_manager) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
@@ -350,7 +351,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   }
 
   ListenerImplPtr new_listener(
-      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash));
+      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash,
+                       server_.secretManager()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

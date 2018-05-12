@@ -10,6 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -168,11 +169,13 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        Runtime::RandomGenerator& random,
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
-                                       Event::Dispatcher& main_thread_dispatcher)
+                                       Event::Dispatcher& main_thread_dispatcher,
+                                       Secret::SecretManager& secret_manager)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
       local_info_(local_info), cm_stats_(generateStats(stats)),
-      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }) {
+      init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
+      secret_manager_(secret_manager) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -909,7 +912,8 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager,
-                                                  main_thread_dispatcher_)};
+                                                  main_thread_dispatcher_,
+                                                  ssl_context_manager_.secretManager())};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

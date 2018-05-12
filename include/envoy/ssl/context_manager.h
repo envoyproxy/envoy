@@ -5,6 +5,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/stats.h"
+#include "envoy/secret/secret_manager.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -49,6 +50,12 @@ public:
    * Iterate through all currently allocated contexts.
    */
   virtual void iterateContexts(std::function<void(const Context&)> callback) PURE;
+
+  /**
+   * Return the secret manager
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
+
 };
 
 } // namespace Ssl

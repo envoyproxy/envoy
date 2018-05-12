@@ -19,6 +19,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -104,17 +105,20 @@ public:
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
+  Secret::MockSecretManager secret_manager_;
+  Ssl::ContextManagerImpl ssl_context_manager_{runtime_, secret_manager_};
   NiceMock<Event::MockDispatcher> dispatcher_;
   LocalInfo::MockLocalInfo local_info_;
 };
 
 class ClusterManagerImplTest : public testing::Test {
 public:
+  Secret::MockSecretManager secret_manager_;
+
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, secret_manager_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

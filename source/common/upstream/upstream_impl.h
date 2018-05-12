@@ -362,6 +362,7 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
+  Secret::SecretManager& secretManager() { return ssl_context_manager_.secretManager(); }
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,

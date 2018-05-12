@@ -8,6 +8,7 @@
 
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -16,7 +17,8 @@
 namespace Envoy {
 namespace Ssl {
 
-class SslContextImplTest : public SslCertsTest {};
+class SslContextImplTest : public SslCertsTest {
+};
 
 TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_TRUE(ContextImpl::dNSNameMatch("lyft.com", "lyft.com"));
@@ -77,9 +79,9 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW(manager.createSslClientContext(store, cfg), EnvoyException);
 }
@@ -93,9 +95,9 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
 
@@ -116,9 +118,9 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
@@ -134,9 +136,9 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Stats::IsolatedStoreImpl store;
 
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
@@ -160,20 +162,22 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
 TEST_F(SslContextImplTest, TestNoCert) {
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager_);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Stats::IsolatedStoreImpl store;
   ClientContextPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ("", context->getCaCertInformation());
   EXPECT_EQ("", context->getCertChainInformation());
 }
 
+
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   static void loadConfig(ServerContextConfigImpl& cfg) {
     Runtime::MockLoader runtime;
-    ContextManagerImpl manager(runtime);
+    Secret::MockSecretManager secret_manager;
+    ContextManagerImpl manager(runtime, secret_manager);
     Stats::IsolatedStoreImpl store;
     ServerContextPtr server_ctx(manager.createSslServerContext("", {}, store, cfg, true));
   }
@@ -187,13 +191,15 @@ public:
     server_cert->mutable_private_key()->set_filename(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
 
-    ServerContextConfigImpl server_context_config(cfg);
+    Secret::MockSecretManager secret_manager;
+    ServerContextConfigImpl server_context_config(cfg, secret_manager);
     loadConfig(server_context_config);
   }
 
   static void loadConfigJson(const std::string& json) {
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-    ServerContextConfigImpl cfg(*loader);
+    Secret::MockSecretManager secret_manager;
+    ServerContextConfigImpl cfg(*loader, secret_manager);
     loadConfig(cfg);
   }
 };
@@ -331,14 +337,19 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
                           "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
+class ClientContextConfigImplTest : public SslCertsTest {
+};
+
 // Validate that empty SNI (according to C string rules) fails config validation.
 TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  Secret::MockSecretManager secret_manager;
+
   tls_context.set_sni(std::string("\000", 1));
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException, "SNI names containing NULL-byte are not allowed");
   tls_context.set_sni(std::string("a\000b", 3));
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException, "SNI names containing NULL-byte are not allowed");
 }
 
@@ -346,13 +357,14 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
 // TODO(htuch): Support multiple hashes.
 TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  Secret::MockSecretManager secret_manager;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->add_verify_certificate_hash();
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->add_verify_certificate_hash();
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException,
                             "Multiple TLS certificate verification hashes are not supported");
 }
@@ -361,9 +373,10 @@ TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  Secret::MockSecretManager secret_manager;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
+  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException,
                             "Multiple TLS certificates are not supported for client contexts");
 }
@@ -373,12 +386,13 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
+  Secret::MockSecretManager secret_manager;
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException,
                             "A single TLS certificate is required for server contexts");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context),
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context, secret_manager),
                             EnvoyException,
                             "A single TLS certificate is required for server contexts");
 }
@@ -386,10 +400,11 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
 // TlsCertificate messages must have a cert for servers.
 TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  Secret::MockSecretManager secret_manager;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  ServerContextConfigImpl client_context_config(tls_context);
+  ServerContextConfigImpl client_context_config(tls_context, secret_manager);
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  ContextManagerImpl manager(runtime, secret_manager);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(ServerContextPtr server_ctx(manager.createSslServerContext(
                                 "", {}, store, client_context_config, true)),

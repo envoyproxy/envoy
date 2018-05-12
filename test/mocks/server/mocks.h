@@ -18,6 +18,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/ssl/context_manager_impl.h"
+#include "common/secret/secret_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -192,6 +193,15 @@ public:
   std::shared_ptr<Network::MockListenSocket> socket_;
 };
 
+class MockSecretManager : public Secret::SecretManager {
+ public:
+  MockSecretManager() {};
+  ~MockSecretManager() {};
+
+  MOCK_METHOD1(addOrUpdateStaticSecret, bool(const Secret::SecretPtr secret));
+  MOCK_METHOD1(getStaticSecret, Secret::SecretPtr(const std::string& name));
+};
+
 class MockListenerManager : public ListenerManager {
 public:
   MockListenerManager();
@@ -259,6 +269,8 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
+  Secret::SecretManager& secretManager() { return secret_manager_; }
+
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -299,6 +311,7 @@ public:
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
   Ssl::ContextManagerImpl ssl_context_manager_;
+  MockSecretManager secret_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

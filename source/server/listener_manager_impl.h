@@ -184,7 +184,8 @@ public:
    * @param hash supplies the hash to use for duplicate checking.
    */
   ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-               const std::string& name, bool modifiable, bool workers_started, uint64_t hash);
+               const std::string& name, bool modifiable, bool workers_started, uint64_t hash,
+               Secret::SecretManager& secret_manager);
   ~ListenerImpl();
 
   /**
@@ -274,6 +275,7 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 private:
   ListenerManagerImpl& parent_;
@@ -299,6 +301,7 @@ private:
   bool saw_listener_create_failure_{};
   const envoy::api::v2::core::Metadata metadata_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
+  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Server

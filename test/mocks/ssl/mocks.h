@@ -3,11 +3,13 @@
 #include <functional>
 #include <string>
 
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats.h"
+#include "test/mocks/secret/mocks.h"
 
 #include "gmock/gmock.h"
 
@@ -32,6 +34,8 @@ public:
         createSslServerContext_(listener_name, server_names, scope, config, skip_context_update)};
   }
 
+  Secret::SecretManager& secretManager() { return secret_manager_; }
+
   MOCK_METHOD2(createSslClientContext_,
                ClientContext*(Stats::Scope& scope, const ClientContextConfig& config));
   MOCK_METHOD5(createSslServerContext_,
@@ -41,6 +45,8 @@ public:
   MOCK_CONST_METHOD2(findSslServerContext, ServerContext*(const std::string&, const std::string&));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
+
+  Secret::MockSecretManager secret_manager_;
 };
 
 class MockConnection : public Connection {

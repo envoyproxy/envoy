@@ -32,7 +32,7 @@ void SslIntegrationTest::initialize() {
   HttpIntegrationTest::initialize();
 
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
-  context_manager_.reset(new ContextManagerImpl(*runtime_));
+  context_manager_.reset(new ContextManagerImpl(*runtime_, secret_manager_));
 
   registerTestServerPorts({"http"});
   client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
