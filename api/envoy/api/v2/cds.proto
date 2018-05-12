@@ -167,6 +167,8 @@ message Cluster {
   //
   // .. attention::
   //
+  //   Setting this allows to use logical DNS for CDS by defining it as an embedded
+  //   :ref:`ClusterLoadAssignment<envoy_api_msg_ClusterLoadAssignment>`.
   //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   ClusterLoadAssignment load_assignment = 33;
 

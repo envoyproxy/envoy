@@ -28,7 +28,7 @@ Per cluster member health checking config
 -----------------------------------------
 
 If active health checking is configured for an upstream cluster, a specific additional configuration
-for each registered member in the can be specified by setting the
+for each registered member can be specified by setting the
 :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`.
 
 Passive health checking
