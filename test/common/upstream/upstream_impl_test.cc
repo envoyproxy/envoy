@@ -311,6 +311,162 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
+TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  // gmock matches in LIFO order which is why these are swapped.
+  ResolverData resolver2(*dns_resolver, dispatcher);
+  ResolverData resolver1(*dns_resolver, dispatcher);
+
+  const std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+
+    dns_lookup_family: V4_ONLY
+    connect_timeout: 0.25s
+    dns_refresh_rate: 4s
+
+    lb_policy: ROUND_ROBIN
+
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 43
+        max_pending_requests: 57
+        max_requests: 50
+        max_retries: 10
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+
+    max_requests_per_connection: 3
+
+    http2_protocol_options:
+      hpack_table_size: 0
+
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost1
+                port_value: 11001
+            health_check_config:
+              port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost2
+                port_value: 11002
+            health_check_config:
+              port_value: 8000
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               local_info, dns_resolver, cm, dispatcher, false);
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
+  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.name.default.max_pending_requests", 57));
+  EXPECT_EQ(57U,
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
+  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
+  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
+  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
+  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
+  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
+  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
+  EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
+
+  cluster.info()->stats().upstream_rq_total_.inc();
+  EXPECT_EQ(1UL, stats.counter("cluster.name.upstream_rq_total").value());
+
+  EXPECT_CALL(runtime.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
+  EXPECT_FALSE(cluster.info()->maintenanceMode());
+
+  ReadyWatcher membership_updated;
+  cluster.prioritySet().addMemberUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+
+  cluster.initialize([] {});
+
+  resolver1.expectResolve(*dns_resolver);
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  resolver1.timer_->callback_();
+  EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver1.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  // Make sure we de-dup the same address.
+  EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000)));
+  EXPECT_CALL(membership_updated, ready());
+  resolver2.dns_callback_(TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
+  EXPECT_THAT(
+      std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
+      ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
+
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(1UL,
+            cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  for (const HostSharedPtr& host : cluster.prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    EXPECT_EQ(cluster.info().get(), &host->cluster());
+  }
+
+  // Make sure we cancel.
+  resolver1.expectResolve(*dns_resolver);
+  resolver1.timer_->callback_();
+  resolver2.expectResolve(*dns_resolver);
+  resolver2.timer_->callback_();
+
+  EXPECT_CALL(resolver1.active_dns_query_, cancel());
+  EXPECT_CALL(resolver2.active_dns_query_, cancel());
+}
+
 // Verifies that host removal works correctly when hosts are being health checked
 // but the cluster is configured to always remove hosts
 TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
@@ -437,7 +593,32 @@ TEST(StaticClusterImplTest, InitialHosts) {
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
 
-TEST(StaticClusterImplTest, ClusterLoadAssignment) {
+TEST(StaticClusterImplTest, EmptyHostname) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  const std::string json = R"EOF(
+  {
+    "name": "staticcluster",
+    "connect_timeout_ms": 250,
+    "type": "static",
+    "lb_type": "random",
+    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
+  }
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
+                            local_info, cm, false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
+  EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+
+TEST(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
@@ -461,31 +642,6 @@ TEST(StaticClusterImplTest, ClusterLoadAssignment) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                            local_info, cm, false);
-  cluster.initialize([] {});
-
-  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
-  EXPECT_FALSE(cluster.info()->addedViaApi());
-}
-
-TEST(StaticClusterImplTest, EmptyHostname) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  const std::string json = R"EOF(
-  {
-    "name": "staticcluster",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "random",
-    "hosts": [{"url": "tcp://10.0.0.1:11001"}]
-  }
-  )EOF";
-
-  NiceMock<MockClusterManager> cm;
-  StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
                             local_info, cm, false);
   cluster.initialize([] {});
 

@@ -291,8 +291,33 @@ TEST_F(LogicalDnsClusterTest, Basic) {
       port_value: 443
   )EOF";
 
+  const std::string basic_yaml_load_assignment = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+
+  load_assignment:
+    cluster_name: name
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.bar.com
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+  )EOF";
+
   testBasicSetup(json, ConfigType::V1_JSON);
   testBasicSetup(basic_yaml_hosts);
+  testBasicSetup(basic_yaml_load_assignment);
 }
 
 } // namespace Upstream
