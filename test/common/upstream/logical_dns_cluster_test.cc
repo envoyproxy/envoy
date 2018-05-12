@@ -9,6 +9,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -34,8 +35,8 @@ public:
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
     cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                         ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
-                                         false));
+                                         ssl_context_manager_, local_info_, dns_resolver_, tls_, cm,
+                                         dispatcher_, false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -47,8 +48,8 @@ public:
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
     cluster_.reset(new LogicalDnsCluster(parseClusterFromV2Yaml(yaml), runtime_, stats_store_,
-                                         ssl_context_manager_, dns_resolver_, tls_, cm, dispatcher_,
-                                         false));
+                                         ssl_context_manager_, local_info_, dns_resolver_, tls_, cm,
+                                         dispatcher_, false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -80,10 +81,10 @@ public:
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-    EXPECT_EQ(0UL,
+    EXPECT_EQ(1UL,
               cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
     EXPECT_EQ(
-        0UL,
+        1UL,
         cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
     EXPECT_EQ(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
               cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
@@ -173,6 +174,7 @@ public:
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>

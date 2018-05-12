@@ -18,6 +18,7 @@ namespace Upstream {
 LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager,
+                                     const LocalInfo::LocalInfo& local_info,
                                      Network::DnsResolverSharedPtr dns_resolver,
                                      ThreadLocal::SlotAllocator& tls, ClusterManager& cm,
                                      Event::Dispatcher& dispatcher, bool added_via_api)
@@ -26,7 +27,8 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
+      local_info_(local_info) {
   const auto& load_assignment = cluster.has_load_assignment()
                                     ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts());
@@ -117,14 +119,24 @@ void LogicalDnsCluster::startResolve() {
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
               break;
             }
-            HostVectorSharedPtr new_hosts(new HostVector());
-            new_hosts->emplace_back(logical_host_);
-            // Given the current config, only EDS clusters support multiple priorities.
-            ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-            auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-            first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                                       HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
-                                       {}, *new_hosts, {});
+
+            const uint32_t priority = context_->priority();
+            if (priority_state_.size() <= priority) {
+              priority_state_.resize(priority + 1);
+            }
+
+            if (priority_state_[priority].first == nullptr) {
+              priority_state_[priority].first.reset(new HostVector());
+            }
+
+            if (context_->has_locality() && context_->has_load_balancing_weight()) {
+              priority_state_[priority].second[context_->locality()] =
+                  context_->load_balancing_weight();
+            }
+
+            priority_state_[priority].first->emplace_back(logical_host_);
+            initializePrioritySet(priority_set_, priority_state_, info(), local_info_, {}, {},
+                                  false);
           }
         }
 

@@ -373,7 +373,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
-                                            selected_dns_resolver, tls, cm, dispatcher,
+                                            local_info, selected_dns_resolver, tls, cm, dispatcher,
                                             added_via_api));
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:

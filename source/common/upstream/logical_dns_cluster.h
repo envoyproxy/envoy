@@ -30,6 +30,7 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                    const LocalInfo::LocalInfo& local_info,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
                     ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
@@ -109,6 +110,8 @@ private:
   HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
   ResolveTargetContextSharedPtr context_;
+  const LocalInfo::LocalInfo& local_info_;
+  PriorityState priority_state_;
 };
 
 } // namespace Upstream
