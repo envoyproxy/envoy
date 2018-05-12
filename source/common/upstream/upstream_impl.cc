@@ -755,12 +755,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
   bool health_changed = false;
 
-  // Go through and see if the list we have is different from what we just got. If it is, we make
-  // a new host list and raise a change notification. This uses an N^2 search given that this does
-  // not happen very often and the list sizes should be small (see
+  // Go through and see if the list we have is different from what we just got. If it is, we make a
+  // new host list and raise a change notification. This uses an N^2 search given that this does not
+  // happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
-  // possible for DNS to return the same address multiple times, and a bad SDS implementation
-  // could do the same thing.
+  // possible for DNS to return the same address multiple times, and a bad SDS implementation could
+  // do the same thing.
   std::unordered_set<std::string> host_addresses;
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
@@ -771,8 +771,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
-      // If we find a host matched based on address, we keep it. However we do change weight
-      // inline so do that here.
+      // If we find a host matched based on address, we keep it. However we do change weight inline
+      // so do that here.
       if (*(*i)->address() == *host->address()) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
@@ -959,10 +959,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
-          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
-          // make a new address that has port in it. We need to both support IPv6 as well as
-          // potentially move port handling into the DNS interface itself, which would work better
-          // for SRV.
+          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
+          // a new address that has port in it. We need to both support IPv6 as well as potentially
+          // move port handling into the DNS interface itself, which would work better for SRV.
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
@@ -978,9 +977,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         }
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
-        // multiple DNS names, this will return initialized after a single DNS resolution
-        // completes. This is not perfect but is easier to code and unclear if the extra
-        // complexity is needed so will start with this.
+        // multiple DNS names, this will return initialized after a single DNS resolution completes.
+        // This is not perfect but is easier to code and unclear if the extra complexity is needed
+        // so will start with this.
         parent_.onPreInitComplete();
         resolve_timer_->enableTimer(parent_.dns_refresh_rate_ms_);
       });
