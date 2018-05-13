@@ -76,6 +76,12 @@ message Http2ProtocolOptions {
   // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
+
+  // `SETTINGS_MAX_HEADER_LIST_SIZE <https://tools.ietf.org/html/rfc7540#section-6.5>`_
+  //  This option indicates client the maximum size of header, server is ready to accept
+  //  otherwise it throws an error.
+  google.protobuf.UInt32Value max_header_list_size = 5
+      [(validate.rules).uint32 = {gte: 8000, lte: 16000}];
 }
 
 // [#not-implemented-hide:]

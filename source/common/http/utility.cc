@@ -198,6 +198,8 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.max_header_list_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, max_header_list_size, Http::Http2Settings::DEFAULT_MAX_HEADER_LIST_SIZE);
   return ret;
 }
 
