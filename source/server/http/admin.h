@@ -49,6 +49,9 @@ public:
   bool endStreamOnComplete() const override { return end_stream_on_complete_; }
 
 private:
+  // the callbacks member is a reference to a member of a ConnectionManagerImpl object. It is
+  // destroyed when connection is terminated. handlers using it should invalidate the reference by
+  // adding a method to be run when onDestroy() is invoked, using addOnDestroyCallback().
   const Http::StreamDecoderFilterCallbacks& callbacks_;
   const Http::HeaderMap& request_headers_;
   std::list<std::function<void()>>& on_destroy_callbacks_;
