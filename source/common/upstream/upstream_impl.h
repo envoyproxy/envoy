@@ -534,34 +534,25 @@ protected:
                              HostVector& hosts_added, HostVector& hosts_removed);
 };
 
+/**
+ * Current locality LB endpoint and the corresponding LB endpoint context of a resolved upstream
+ * host.
+ */
 class ResolveTargetContext {
 public:
   ResolveTargetContext(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-      : locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+      : context_(locality_lb_endpoint, lb_endpoint) {}
 
-  uint32_t priority() const { return locality_lb_endpoint_.priority(); }
-  bool has_load_balancing_weight() const {
-    return locality_lb_endpoint_.has_load_balancing_weight();
+  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint() const {
+    return context_.first;
   }
-  uint32_t load_balancing_weight() const {
-    return locality_lb_endpoint_.load_balancing_weight().value();
-  }
-
-  const envoy::api::v2::core::Metadata& metadata() const { return lb_endpoint_.metadata(); }
-
-  bool has_locality() const { return locality_lb_endpoint_.has_locality(); }
-  const envoy::api::v2::core::Locality& locality() const {
-    return locality_lb_endpoint_.locality();
-  }
-  const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config() const {
-    return lb_endpoint_.endpoint().health_check_config();
-  }
+  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint() const { return context_.second; }
 
 private:
-  // TODO(dio): Should not do copying in here.
-  const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-  const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
+  const std::pair<const envoy::api::v2::endpoint::LocalityLbEndpoints,
+                  const envoy::api::v2::endpoint::LbEndpoint>
+      context_;
 };
 
 typedef std::shared_ptr<ResolveTargetContext> ResolveTargetContextSharedPtr;

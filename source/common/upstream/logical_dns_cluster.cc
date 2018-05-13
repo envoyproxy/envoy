@@ -120,7 +120,10 @@ void LogicalDnsCluster::startResolve() {
               break;
             }
 
-            const uint32_t priority = context_->priority();
+            const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint =
+                context_->locality_lb_endpoint();
+
+            const uint32_t priority = locality_lb_endpoint.priority();
             if (priority_state_.size() <= priority) {
               priority_state_.resize(priority + 1);
             }
@@ -129,9 +132,10 @@ void LogicalDnsCluster::startResolve() {
               priority_state_[priority].first.reset(new HostVector());
             }
 
-            if (context_->has_locality() && context_->has_load_balancing_weight()) {
-              priority_state_[priority].second[context_->locality()] =
-                  context_->load_balancing_weight();
+            if (locality_lb_endpoint.has_locality() &&
+                locality_lb_endpoint.has_load_balancing_weight()) {
+              priority_state_[priority].second[locality_lb_endpoint.locality()] =
+                  locality_lb_endpoint.load_balancing_weight().value();
             }
 
             priority_state_[priority].first->emplace_back(logical_host_);

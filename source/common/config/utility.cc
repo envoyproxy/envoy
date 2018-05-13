@@ -238,6 +238,7 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   for (const envoy::api::v2::core::Address& host : hosts) {
     envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
     lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
+    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
   }
   return load_assignment;
 }

@@ -43,9 +43,10 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, parent.context_->metadata(),
-                   parent.context_->load_balancing_weight(), parent.context_->locality(),
-                   parent.context_->health_check_config()),
+        : HostImpl(cluster, hostname, address, parent.context_->lb_endpoint().metadata(),
+                   parent.context_->lb_endpoint().load_balancing_weight().value(),
+                   parent.context_->locality_lb_endpoint().locality(),
+                   parent.context_->lb_endpoint().endpoint().health_check_config()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -60,15 +61,19 @@ private:
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
                         ResolveTargetContextSharedPtr context, HostConstSharedPtr logical_host)
         : address_(address),
-          health_check_address_(context->health_check_config().port_value() == 0
-                                    ? address
-                                    : Network::Utility::getAddressWithPort(
-                                          *address, context->health_check_config().port_value())),
+          health_check_address_(
+              context->lb_endpoint().endpoint().health_check_config().port_value() == 0
+                  ? address
+                  : Network::Utility::getAddressWithPort(
+                        *address,
+                        context->lb_endpoint().endpoint().health_check_config().port_value())),
           context_(context), logical_host_(logical_host) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
-    const envoy::api::v2::core::Metadata& metadata() const override { return context_->metadata(); }
+    const envoy::api::v2::core::Metadata& metadata() const override {
+      return context_->lb_endpoint().metadata();
+    }
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     HealthCheckHostMonitor& healthChecker() const override {
       return logical_host_->healthChecker();
@@ -79,7 +84,9 @@ private:
     const HostStats& stats() const override { return logical_host_->stats(); }
     const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-    const envoy::api::v2::core::Locality& locality() const override { return context_->locality(); }
+    const envoy::api::v2::core::Locality& locality() const override {
+      return context_->locality_lb_endpoint().locality();
+    }
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }

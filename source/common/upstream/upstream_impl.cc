@@ -908,7 +908,10 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed) {
   // At this point we know that we are different so make a new host list and notify.
   for (const ResolveTargetPtr& target : resolve_targets_) {
-    const uint32_t priority = target->context_->priority();
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint =
+        target->context_->locality_lb_endpoint();
+
+    const uint32_t priority = locality_lb_endpoint.priority();
     if (priority_state_.size() <= priority) {
       priority_state_.resize(priority + 1);
     }
@@ -918,9 +921,9 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
     }
 
     for (const HostSharedPtr& host : target->hosts_) {
-      if (target->context_->has_locality() && target->context_->has_load_balancing_weight()) {
-        priority_state_[priority].second[target->context_->locality()] =
-            target->context_->load_balancing_weight();
+      if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+        priority_state_[priority].second[locality_lb_endpoint.locality()] =
+            locality_lb_endpoint.load_balancing_weight().value();
       }
 
       priority_state_[priority].first->emplace_back(host);
@@ -957,6 +960,10 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
+        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint =
+            context_->locality_lb_endpoint();
+        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint = context_->lb_endpoint();
+
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
@@ -965,8 +972,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
-              context_->metadata(), context_->load_balancing_weight(), context_->locality(),
-              context_->health_check_config()));
+              lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
+              locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config()));
         }
 
         HostVector hosts_added;
