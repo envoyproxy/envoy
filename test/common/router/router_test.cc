@@ -1154,6 +1154,9 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   per_try_timeout_->callback_();
   response_decoder->decodeData(body, true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
 }
 
 TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {

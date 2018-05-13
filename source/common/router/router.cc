@@ -932,11 +932,12 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
-  ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
-  parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
   // If we've sent anything downstream but per try timeout occurred
+  // no need and not point to cancel it now
   // we still have time to wait for full response up until GlobalTimeout
   if (!parent_.downstream_response_started_) {
+    ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
+    parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
     if (upstream_host_) {
       upstream_host_->stats().rq_timeout_.inc();
     }
@@ -945,6 +946,10 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
     parent_.onUpstreamReset(
         UpstreamResetType::PerTryTimeout,
         absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
+  } else {
+    ENVOY_STREAM_LOG(debug,
+                     "ignored upstream per try timeout due to already started downstream response",
+                     *parent_.callbacks_);
   }
 }
 
