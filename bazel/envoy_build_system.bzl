@@ -93,7 +93,7 @@ def envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp([], ["-latomic"])
+    }) + envoy_select_force_libcpp(["-lc++experimental"], ["-lstdc++fs", "-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -298,6 +298,14 @@ def envoy_cc_test_library(name,
         alwayslink = 1,
         linkstatic = 1,
     )
+
+# Envoy test binaries should be specified with this function.
+def envoy_cc_test_binary(name,
+                         **kargs):
+    envoy_cc_binary(name,
+                    testonly = 1,
+                    linkopts = envoy_test_linkopts(),
+                    **kargs)
 
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(name,
