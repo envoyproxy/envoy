@@ -1,4 +1,3 @@
-
 #include <arpa/inet.h>
 
 #include "envoy/api/v2/core/address.pb.h"
@@ -6,17 +5,16 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/address_range_impl.h"
-#include "common/network/utility.h"
 #include "common/network/resolver_impl.h"
+#include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-
-#include "absl/strings/str_cat.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -37,18 +35,16 @@ void makeFdBlocking(int fd) {
 // Make an IP instance suitable for testing.
 InstanceConstSharedPtr makeIpVersionedInstance(IpVersion version) {
   switch (version) {
-    case IpVersion::v4:
-      return std::make_shared<Ipv4Instance>("127.0.0.1", 0u);
-    case IpVersion::v6:
-      return std::make_shared<Ipv6Instance>("::0001", 0u);
+  case IpVersion::v4:
+    return std::make_shared<Ipv4Instance>("127.0.0.1", 0u);
+  case IpVersion::v6:
+    return std::make_shared<Ipv6Instance>("::0001", 0u);
   }
   return nullptr;
 }
 
 // Return a IpInstance when version doesn't matter
-InstanceConstSharedPtr makeIpInstance() {
-  return makeIpVersionedInstance(IpVersion::v4);
-}
+InstanceConstSharedPtr makeIpInstance() { return makeIpVersionedInstance(IpVersion::v4); }
 
 // Return the port bound to the fd.
 uint32_t getPort(int fd) {
@@ -58,22 +54,22 @@ uint32_t getPort(int fd) {
     return -1;
   }
   switch (address.sa_family) {
-    case AF_INET:
-      struct sockaddr_in address_in;
-      address_len = sizeof(address_in);
-      if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&address_in), &address_len) < 0) {
-        return -1;
-      }
-      return ntohs(address_in.sin_port);
-    case AF_INET6:
-      struct sockaddr_in6 address_in6;
-      address_len = sizeof(address_in6);
-      if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&address_in6), &address_len) < 0) {
-        return -1;
-      }
-      return ntohs(address_in6.sin6_port);
-    default:
+  case AF_INET:
+    struct sockaddr_in address_in;
+    address_len = sizeof(address_in);
+    if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&address_in), &address_len) < 0) {
       return -1;
+    }
+    return ntohs(address_in.sin_port);
+  case AF_INET6:
+    struct sockaddr_in6 address_in6;
+    address_len = sizeof(address_in6);
+    if (getsockname(fd, reinterpret_cast<struct sockaddr*>(&address_in6), &address_len) < 0) {
+      return -1;
+    }
+    return ntohs(address_in6.sin6_port);
+  default:
+    return -1;
   }
 }
 
@@ -98,36 +94,29 @@ TEST(IpRangeInstanceTest, Simple) {
 TEST(IpRangeInstanceTest, BadPortInInstance) {
   InstanceConstSharedPtr instance(std::make_shared<Ipv4Instance>("127.0.0.1", 3u));
   Runtime::RandomGeneratorImpl random;
-  EXPECT_THROW(
-      IpInstanceRange test_range(std::move(instance), "2048-2049", random), EnvoyException);
+  EXPECT_THROW(IpInstanceRange test_range(std::move(instance), "2048-2049", random),
+               EnvoyException);
 }
 
-// Try several variations on format and confirm they do or don't error as appropriate. 
+// Try several variations on format and confirm they do or don't error as appropriate.
 TEST(IpRangeInstanceTest, FormatVariations) {
   Runtime::RandomGeneratorImpl random;
 
   std::unique_ptr<IpInstanceRange> ptr;
 
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2048", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2048-2049-2050", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "-2050", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2049-2048", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2048-", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "-", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2048:2049", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "a-2049", random)), EnvoyException);
-  EXPECT_THROW(
-      ptr.reset(new IpInstanceRange(makeIpInstance(), "2049-b", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2048", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2048-2049-2050", random)),
+               EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "-2050", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2049-2048", random)),
+               EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2048-", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "-", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2048:2049", random)),
+               EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "a-2049", random)), EnvoyException);
+  EXPECT_THROW(ptr.reset(new IpInstanceRange(makeIpInstance(), "2049-b", random)), EnvoyException);
 
   ptr.reset(new IpInstanceRange(makeIpInstance(), "2048-2049 ", random));
   EXPECT_EQ(2048u, ptr->startPort());
@@ -149,16 +138,12 @@ TEST(IpRangeInstanceTest, FormatVariations) {
 // Test operator==() behavior.
 TEST(IpRangeInstanceTest, Equals) {
   Runtime::RandomGeneratorImpl random;
-  IpInstanceRange range1(makeIpInstance(),
-                         "2048-2049", random);
-  IpInstanceRange range2(makeIpInstance(),
-                         "2048-2049", random);
+  IpInstanceRange range1(makeIpInstance(), "2048-2049", random);
+  IpInstanceRange range2(makeIpInstance(), "2048-2049", random);
   EXPECT_EQ(range1, range2);
-  IpInstanceRange range3(makeIpInstance(),
-                         "2048-2050", random);
+  IpInstanceRange range3(makeIpInstance(), "2048-2050", random);
   EXPECT_NE(range1, range3);
-  IpInstanceRange range4(std::make_shared<Ipv4Instance>("127.0.0.2", 0u),
-                         "2048-2049", random);
+  IpInstanceRange range4(std::make_shared<Ipv4Instance>("127.0.0.2", 0u), "2048-2049", random);
   EXPECT_NE(range1, range4);
 }
 
@@ -184,9 +169,9 @@ TEST(IpRangeInstanceTest, Connect) {
 
   // Create an instance range and try to connect through it.
   Runtime::RandomGeneratorImpl random;
-  IpInstanceRange instance_range(std::make_shared<Ipv4Instance>(addr_port->ip()->addressAsString()),
-                                 absl::StrCat(addr_port->ip()->port(), "-", addr_port->ip()->port()),
-                                 random);
+  IpInstanceRange instance_range(
+      std::make_shared<Ipv4Instance>(addr_port->ip()->addressAsString()),
+      absl::StrCat(addr_port->ip()->port(), "-", addr_port->ip()->port()), random);
   int client_fd = instance_range.socket(SocketType::Stream);
   ScopedFdCloser closer2(client_fd);
   makeFdBlocking(client_fd);
@@ -227,15 +212,14 @@ TEST_P(IpVersionRangeInstanceTest, RetryOnCollision) {
   // Return one value in the low half of the range, one in the high half.
   // The first will cause a collision, the second will not.
   // Note that there is the possibility of colliding with other stuff happening on the machine, so
-  // the only thing this test is checking is whether or not the RNG was called more than once. 
+  // the only thing this test is checking is whether or not the RNG was called more than once.
   Runtime::MockRandomGenerator random;
   EXPECT_CALL(random, random())
-      .Times(Between(2,4))
+      .Times(Between(2, 4))
       .WillOnce(Return(100u))
       .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
 
-  IpInstanceRange range(makeIpVersionedInstance(GetParam()),
-                        absl::StrCat(port, "-", port+1),
+  IpInstanceRange range(makeIpVersionedInstance(GetParam()), absl::StrCat(port, "-", port + 1),
                         random);
 
   int probe_fd = range.socket(SocketType::Stream);
@@ -259,14 +243,11 @@ TEST_P(IpVersionRangeInstanceTest, EnoughRetriesFail) {
   // Return one value in the low half of the range, one in the high half.
   // The first will cause a collision, the second will not.
   // Note that there is the possibility of colliding with other stuff happening on the machine, so
-  // the only thing this test is checking is whether or not the RNG was called more than once. 
+  // the only thing this test is checking is whether or not the RNG was called more than once.
   Runtime::MockRandomGenerator random;
-  EXPECT_CALL(random, random())
-      .Times(kExpectedRetries)
-      .WillRepeatedly(Return(100u));
+  EXPECT_CALL(random, random()).Times(kExpectedRetries).WillRepeatedly(Return(100u));
 
-  IpInstanceRange range(makeIpVersionedInstance(GetParam()),
-                        absl::StrCat(port, "-", port+1),
+  IpInstanceRange range(makeIpVersionedInstance(GetParam()), absl::StrCat(port, "-", port + 1),
                         random);
 
   int probe_fd = range.socket(SocketType::Stream);
@@ -286,13 +267,11 @@ TEST_P(IpVersionRangeInstanceTest, TopRangeBound) {
   ASSERT_NE(0u, port);
 
   close(blocking_fd);
-  
-  Runtime::MockRandomGenerator random;
-  EXPECT_CALL(random, random())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
 
-  IpInstanceRange range(makeIpVersionedInstance(GetParam()),
-                        absl::StrCat(port-1, "-", port),
+  Runtime::MockRandomGenerator random;
+  EXPECT_CALL(random, random()).WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  IpInstanceRange range(makeIpVersionedInstance(GetParam()), absl::StrCat(port - 1, "-", port),
                         random);
   int probe_fd = range.socket(SocketType::Stream);
   ScopedFdCloser closer2(probe_fd);
@@ -308,14 +287,12 @@ TEST_P(IpVersionRangeInstanceTest, BottomRangeBound) {
   EXPECT_EQ(0, blocking_instance->bind(blocking_fd));
   uint32_t port = getPort(blocking_fd);
   close(blocking_fd);
-  ASSERT_LT(1u, port);                  // So port-1 is still valid.  
-  
-  Runtime::MockRandomGenerator random;
-  EXPECT_CALL(random, random())
-      .WillOnce(Return(0u));
+  ASSERT_LT(1u, port); // So port-1 is still valid.
 
-  IpInstanceRange range(makeIpVersionedInstance(GetParam()),
-                        absl::StrCat(port, "-", port+1),
+  Runtime::MockRandomGenerator random;
+  EXPECT_CALL(random, random()).WillOnce(Return(0u));
+
+  IpInstanceRange range(makeIpVersionedInstance(GetParam()), absl::StrCat(port, "-", port + 1),
                         random);
   int probe_fd = range.socket(SocketType::Stream);
   ScopedFdCloser closer2(probe_fd);
@@ -343,11 +320,10 @@ TEST(IpRangeResolverTest, RequireNamedPort) {
   socket_address.set_address("1.2.3.4");
   socket_address.set_port_value(2000);
   socket_address.set_resolver_name("google.ipRange");
-  EXPECT_THROW(
-      InstanceConstSharedPtr result(resolveProtoSocketAddress(socket_address)),
-      EnvoyException);
+  EXPECT_THROW(InstanceConstSharedPtr result(resolveProtoSocketAddress(socket_address)),
+               EnvoyException);
 }
 
-}  // namespace Address
-}  // namespace Network
-}  // namespace Envoy
+} // namespace Address
+} // namespace Network
+} // namespace Envoy

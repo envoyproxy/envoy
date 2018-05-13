@@ -1,9 +1,7 @@
 #pragma once
 
 #include "envoy/network/address.h"
-
 #include "envoy/runtime/runtime.h"
-
 
 namespace Envoy {
 namespace Network {
@@ -13,9 +11,8 @@ namespace Address {
  * IP address + port range
  */
 class IpInstanceRange : public Instance {
- public:
-  IpInstanceRange(InstanceConstSharedPtr&& address_instance,
-                  const std::string& range_as_named_port,
+public:
+  IpInstanceRange(InstanceConstSharedPtr&& address_instance, const std::string& range_as_named_port,
                   Runtime::RandomGenerator& random);
   virtual ~IpInstanceRange() {}
 
@@ -32,7 +29,7 @@ class IpInstanceRange : public Instance {
   int socket(SocketType type) const override { return address_instance_->socket(type); }
   virtual Type type() const override { return Type::Ip; }
 
- private:
+private:
   // Contains IP address information; port is zero, meaning "unspecified".
   const InstanceConstSharedPtr address_instance_;
   uint32_t start_port_;

@@ -105,7 +105,7 @@ public:
 
   /**
    * @return a human readable string for the address that represents the
-   * physical/resolved address.  (This will not necessarily include port
+   * physical/resolved address. (This will not necessarily include port
    * information, if applicable, since that may not be resolved until bind()).
    *
    * This string will be compatible with the following example formats:
