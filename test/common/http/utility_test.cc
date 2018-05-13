@@ -114,13 +114,15 @@ TEST(HttpUtility, parseHttp2Settings) {
                                             "hpack_table_size": 1,
                                             "max_concurrent_streams": 2,
                                             "initial_stream_window_size": 3,
-                                            "initial_connection_window_size": 4
+                                            "initial_connection_window_size": 4,
+                                            "max_header_list_size": 5
                                           }
                                         })raw");
     EXPECT_EQ(1U, http2_settings.hpack_table_size_);
     EXPECT_EQ(2U, http2_settings.max_concurrent_streams_);
     EXPECT_EQ(3U, http2_settings.initial_stream_window_size_);
     EXPECT_EQ(4U, http2_settings.initial_connection_window_size_);
+    EXPECT_EQ(5U, http2_settings.max_header_list_size_);
   }
 }
 
