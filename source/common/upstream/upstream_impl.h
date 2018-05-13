@@ -464,12 +464,6 @@ protected:
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                   bool added_via_api);
 
-  static void initializePrioritySet(PrioritySetImpl& priority_set, PriorityState& priority_state,
-                                    ClusterInfoConstSharedPtr cluster_info,
-                                    const LocalInfo::LocalInfo& local_info,
-                                    const HostVector& hosts_added, const HostVector& hosts_removed,
-                                    const bool health_checker_flag);
-
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
    * query DNS, contact EDS, etc.
