@@ -381,6 +381,10 @@ def _com_google_googletest():
         actual = "@com_google_googletest//:gtest",
     )
 
+# TODO(jmarantz): replace the use of bind and external_deps with just
+# the direct Bazel path at all sites.  This will make it easier to
+# pull in more bits of abseil as needed, and is now the preferred
+# method for pure Bazel deps.
 def _com_google_absl():
     _repository_impl("com_google_absl")
     native.bind(
@@ -398,6 +402,10 @@ def _com_google_absl():
     native.bind(
         name = "abseil_optional",
         actual = "@com_google_absl//absl/types:optional",
+    )
+    native.bind(
+        name = "abseil_synchronization",
+        actual = "@com_google_absl//absl/synchronization:synchronization",
     )
 
 def _com_google_protobuf():

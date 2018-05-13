@@ -497,6 +497,16 @@ public:
 };
 
 /**
+ * This function is used to wrap the creation of an HTTP filter chain for new streams as they
+ * come in. Filter factories create the function at configuration initialization time, and then
+ * they are used at runtime.
+ * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
+ * function will install a single filter, but it's technically possibly to install more than one
+ * if desired.
+ */
+typedef std::function<void(FilterChainFactoryCallbacks& callbacks)> FilterFactoryCb;
+
+/**
  * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
  * new stream is created on the connection (either locally or remotely). Typically it would be
  * implemented by a configuration engine that would install a set of filters that are able to

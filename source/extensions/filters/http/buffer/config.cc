@@ -8,7 +8,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
@@ -17,43 +16,39 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilter(
+Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_max_request_bytes());
   ASSERT(proto_config.has_max_request_time());
 
-  BufferFilterConfigConstSharedPtr filter_config(new BufferFilterConfig{
-      BufferFilter::generateStats(stats_prefix, context.scope()),
-      static_cast<uint64_t>(proto_config.max_request_bytes().value()),
-      std::chrono::seconds(PROTOBUF_GET_SECONDS_REQUIRED(proto_config, max_request_time))});
+  BufferFilterConfigSharedPtr filter_config(
+      new BufferFilterConfig(proto_config, stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
   };
 }
 
-Server::Configuration::HttpFilterFactoryCb
-BufferFilterConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                               const std::string& stats_prefix,
-                                               Server::Configuration::FactoryContext& context) {
+Http::FilterFactoryCb
+BufferFilterFactory::createFilterFactory(const Json::Object& json_config,
+                                         const std::string& stats_prefix,
+                                         Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::buffer::v2::Buffer proto_config;
   Config::FilterJson::translateBufferFilter(json_config, proto_config);
-  return createFilter(proto_config, stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb BufferFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::buffer::v2::Buffer&>(
-          proto_config),
-      stats_prefix, context);
+Router::RouteSpecificFilterConfigConstSharedPtr
+BufferFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::buffer::v2::BufferPerRoute& proto_config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<const BufferFilterSettings>(proto_config);
 }
 
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BufferFilterConfigFactory,
+static Registry::RegisterFactory<BufferFilterFactory,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

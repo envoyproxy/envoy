@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -45,7 +46,13 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
 }
 
-TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
+class StatsConfigParameterizedTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigParameterizedTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   const std::string name = StatsSinkNames::get().STATSD;
   auto defaultPrefix = Common::Statsd::getDefaultPrefix();
 
@@ -53,7 +60,11 @@ TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();
   envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
-  socket_address.set_address("127.0.0.1");
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    socket_address.set_address("127.0.0.1");
+  } else {
+    socket_address.set_address("::1");
+  }
   socket_address.set_port_value(8125);
   EXPECT_EQ(sink_config.prefix(), "");
 
@@ -72,7 +83,7 @@ TEST(StatsConfigTest, UdpSinkDefaultPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), defaultPrefix);
 }
 
-TEST(StatsConfigTest, UdpSinkCustomPrefix) {
+TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().STATSD;
   const std::string customPrefix = "prefix.test";
 
@@ -80,7 +91,11 @@ TEST(StatsConfigTest, UdpSinkCustomPrefix) {
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();
   envoy::api::v2::core::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::api::v2::core::SocketAddress::UDP);
-  socket_address.set_address("127.0.0.1");
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    socket_address.set_address("127.0.0.1");
+  } else {
+    socket_address.set_address("::1");
+  }
   socket_address.set_port_value(8125);
   sink_config.set_prefix(customPrefix);
   EXPECT_NE(sink_config.prefix(), "");
@@ -127,7 +142,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().STATSD;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
-  std::string prefix = "prefixTest";
+  ProtobufTypes::String prefix = "prefixTest";
   sink_config.set_tcp_cluster_name("fake_cluster");
   ASSERT_NE(sink_config.prefix(), prefix);
   sink_config.set_prefix(prefix);

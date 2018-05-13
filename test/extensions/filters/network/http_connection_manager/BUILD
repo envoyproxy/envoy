@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/router:rds_lib",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/mocks/network:network_mocks",

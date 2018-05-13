@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
-#include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -13,27 +13,19 @@ namespace GrpcJsonTranscoder {
 /**
  * Config registration for the gRPC JSON transcoder filter. @see NamedHttpFilterConfigFactory.
  */
-class GrpcJsonTranscoderFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+class GrpcJsonTranscoderFilterConfig
+    : public Common::FactoryBase<envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder> {
 public:
-  Server::Configuration::HttpFilterFactoryCb
+  GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GRPC_JSON_TRANSCODER) {}
+
+  Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::HttpFilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder()};
-  }
-
-  std::string name() override { return HttpFilterNames::get().GRPC_JSON_TRANSCODER; };
 
 private:
-  Server::Configuration::HttpFilterFactoryCb
-  createFilter(const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
-               const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace GrpcJsonTranscoder

@@ -13,3 +13,4 @@ BROWSE
 *.pyc
 SOURCE_VERSION
 .cache
+.vimrc

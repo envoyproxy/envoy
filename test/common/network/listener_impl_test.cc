@@ -111,8 +111,10 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket.addOption(option);
   EXPECT_CALL(*option, setOption(_, Socket::SocketState::Listening)).WillOnce(Return(false));
-  EXPECT_THROW(TestListenerImpl(dispatcher, socket, listener_callbacks, true, false),
-               CreateListenerException);
+  EXPECT_THROW_WITH_MESSAGE(TestListenerImpl(dispatcher, socket, listener_callbacks, true, false),
+                            CreateListenerException,
+                            fmt::format("cannot set post-listen socket option on socket: {}",
+                                        socket.localAddress()->asString()));
 }
 
 TEST_P(ListenerImplTest, UseActualDst) {

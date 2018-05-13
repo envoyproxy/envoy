@@ -44,7 +44,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config,
           "envoy.api.v2.ClusterDiscoveryService.StreamClusters");
 }
 
-void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
+void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().ClusterLoadAssignment);
   Cleanup eds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().ClusterLoadAssignment); });
   for (const auto& cluster : resources) {
@@ -55,7 +55,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster)) {
+    if (cm_.addOrUpdateCluster(cluster, version_info)) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
     }
   }
@@ -67,6 +67,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources) {
     }
   }
 
+  version_info_ = version_info;
   runInitializeCallbackIfAny();
 }
 

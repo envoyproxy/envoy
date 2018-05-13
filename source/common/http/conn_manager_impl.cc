@@ -376,10 +376,12 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
-    access_log->log(request_headers_.get(), response_headers_.get(), request_info_);
+    access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                    request_info_);
   }
   for (const auto& log_handler : access_log_handlers_) {
-    log_handler->log(request_headers_.get(), response_headers_.get(), request_info_);
+    log_handler->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
+                     request_info_);
   }
 
   if (request_info_.healthCheck()) {
@@ -445,18 +447,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   maybeEndDecode(end_stream);
   request_headers_ = std::move(headers);
 
-  // Iterate and log headers only if logger's level is at least debug
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):", *this, end_stream);
-
-    request_headers_->iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
+                   *request_headers_);
 
   if (!connection_manager_.config_.proxy100Continue() && request_headers_->Expect() &&
       request_headers_->Expect()->value() == Headers::get().ExpectValues._100Continue.c_str()) {
@@ -567,10 +559,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (websocket_requested && websocket_allowed) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
-      connection_manager_.ws_connection_.reset(new WebSocket::WsHandlerImpl(
-          *request_headers_, request_info_, *route_entry, *this,
-          connection_manager_.cluster_manager_, connection_manager_.read_callbacks_));
-      connection_manager_.ws_connection_->onNewConnection();
+      connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
+          *request_headers_, request_info_, *this, connection_manager_.cluster_manager_,
+          connection_manager_.read_callbacks_);
+      ASSERT(connection_manager_.ws_connection_ != nullptr);
       connection_manager_.stats_.named_.downstream_cx_websocket_active_.inc();
       connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
@@ -859,16 +851,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec", *this);
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, headers);
 
   // Now actually encode via the codec.
   response_encoder_->encode100ContinueHeaders(headers);
@@ -965,17 +948,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   chargeStats(headers);
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):", *this,
-                     end_stream && continue_data_entry == encoder_filters_.end());
-    headers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
+                   end_stream && continue_data_entry == encoder_filters_.end(), headers);
 
   // Now actually encode via the codec.
   request_info_.onFirstDownstreamTxByteSent();
@@ -1052,16 +1026,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     }
   }
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    ENVOY_STREAM_LOG(debug, "encoding trailers via codec", *this);
-    trailers.iterate(
-        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'", *static_cast<ActiveStream*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return HeaderMap::Iterate::Continue;
-        },
-        this);
-  }
+  ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
   response_encoder_->encodeTrailers(trailers);
   maybeEndEncode(true);

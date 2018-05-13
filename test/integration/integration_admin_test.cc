@@ -161,10 +161,37 @@ TEST_P(IntegrationAdminTest, Admin) {
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+
   Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
   EXPECT_TRUE(statsjson->hasObject("stats"));
   EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+
+  uint64_t histogram_count = 0;
+  for (Json::ObjectSharedPtr obj_ptr : statsjson->getObjectArray("stats")) {
+    if (obj_ptr->hasObject("histograms")) {
+      histogram_count++;
+      const Json::ObjectSharedPtr& histograms_ptr = obj_ptr->getObject("histograms");
+      // Validate that both supported_quantiles and computed_quantiles are present in JSON.
+      EXPECT_TRUE(histograms_ptr->hasObject("supported_quantiles"));
+      EXPECT_TRUE(histograms_ptr->hasObject("computed_quantiles"));
+
+      const std::vector<Json::ObjectSharedPtr>& computed_quantiles =
+          histograms_ptr->getObjectArray("computed_quantiles");
+      EXPECT_GT(computed_quantiles.size(), 0);
+
+      // Validate that each computed_quantile has name and value objects.
+      EXPECT_TRUE(computed_quantiles[0]->hasObject("name"));
+      EXPECT_TRUE(computed_quantiles[0]->hasObject("values"));
+
+      // Validate that supported and computed quantiles are of the same size.
+      EXPECT_EQ(histograms_ptr->getObjectArray("supported_quantiles").size(),
+                computed_quantiles[0]->getObjectArray("values").size());
+    }
+  }
+
+  // Validate that the stats JSON has exactly one histograms element.
+  EXPECT_EQ(1, histogram_count);
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
@@ -209,7 +236,6 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
-  EXPECT_THAT(response->body(), testing::HasSubstr("version_info::static\n"));
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
@@ -264,6 +290,16 @@ TEST_P(IntegrationAdminTest, Admin) {
     EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
               (*listener_info_it)->asString());
   }
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+  json = Json::Factory::loadFromString(response->body());
+  EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
+  EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
+  EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
 }
 
 // Successful call to startProfiler requires tcmalloc.

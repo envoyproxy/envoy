@@ -27,7 +27,6 @@
 #include "common/common/linked_object.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
-#include "common/http/websocket/ws_handler_impl.h"
 #include "common/request_info/request_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -241,7 +240,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WsHandlerCallbacks,
+                        public WebSocketProxyCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -289,7 +288,7 @@ private:
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
-    // Http::WsHandlerCallbacks
+    // Http::WebSocketProxyCallbacks
     void sendHeadersOnlyResponse(HeaderMap& headers) override {
       encodeHeaders(nullptr, headers, true);
     }
@@ -417,7 +416,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  WebSocket::WsHandlerImplPtr ws_connection_{};
+  WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
 };

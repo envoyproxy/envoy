@@ -115,13 +115,12 @@ private:
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
-    const envoy::api::v2::RouteConfiguration& configAsProto() const override {
-      return envoy::api::v2::RouteConfiguration::default_instance();
-    }
-    const std::string versionInfo() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+    absl::optional<ConfigInfo> configInfo() const override { return {}; }
 
     Router::ConfigConstSharedPtr config_;
   };
+
+  friend class AdminStatsTest;
 
   /**
    * Attempt to change the log level of a logger or all loggers
@@ -135,7 +134,8 @@ private:
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::list<Stats::ParentHistogramSharedPtr>& all_histograms);
+                                 const std::list<Stats::ParentHistogramSharedPtr>& all_histograms,
+                                 bool pretty_print = false);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;

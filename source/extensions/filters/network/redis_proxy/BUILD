@@ -39,7 +39,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
     ],
 )
@@ -53,7 +53,7 @@ envoy_cc_library(
         ":conn_pool_interface",
         ":supported_commands_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:to_lower_table_lib",
     ],
 )

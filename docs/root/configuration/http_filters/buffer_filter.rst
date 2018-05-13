@@ -10,6 +10,13 @@ with partial requests and high network latency.
 * :ref:`v1 API reference <config_http_filters_buffer_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.buffer.v2.Buffer>`
 
+Per-Route Configuration
+-----------------------
+
+The buffer filter configuration can be overridden or disabled on a per-route basis by providing a
+:ref:`BufferPerRoute <envoy_api_msg_config.filter.http.buffer.v2.BufferPerRoute>` configuration on
+the virtual host, route, or weighted cluster.
+
 Statistics
 ----------
 

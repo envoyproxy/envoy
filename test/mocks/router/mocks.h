@@ -189,6 +189,7 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_CONST_METHOD0(metadataMatchCriteria,
                      const std::vector<MetadataMatchCriterionConstSharedPtr>&());
+  MOCK_CONST_METHOD1(mergeMatchCriteria, MetadataMatchCriteriaConstPtr(const ProtobufWkt::Struct&));
 };
 
 class MockPathMatchCriterion : public PathMatchCriterion {
@@ -228,6 +229,12 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(useWebSocket, bool());
+  MOCK_CONST_METHOD5(createWebSocketProxy,
+                     Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
+                                             const RequestInfo::RequestInfo& request_info,
+                                             Http::WebSocketProxyCallbacks& callbacks,
+                                             Upstream::ClusterManager& cluster_manager,
+                                             Network::ReadFilterCallbacks* read_callbacks));
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
@@ -296,18 +303,17 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
-  MOCK_METHOD5(getRdsRouteConfigProvider,
+  MOCK_METHOD3(getRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-                   Upstream::ClusterManager& cm, Stats::Scope& scope,
-                   const std::string& stat_prefix, Init::Manager& init_manager));
-  MOCK_METHOD3(getStaticRouteConfigProvider,
-               RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
-                                            Runtime::Loader& runtime,
-                                            Upstream::ClusterManager& cm));
-
-  MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
+                   Server::Configuration::FactoryContext& factory_context,
+                   const std::string& stat_prefix));
+  MOCK_METHOD2(
+      getStaticRouteConfigProvider,
+      RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
+                                   Server::Configuration::FactoryContext& factory_context));
+  MOCK_METHOD0(getRdsRouteConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD0(getStaticRouteConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
 };
 
 } // namespace Router

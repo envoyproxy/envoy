@@ -33,8 +33,8 @@ envoy_cc_library(
     deps = [
         ":ext_authz",
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
     ],
 )

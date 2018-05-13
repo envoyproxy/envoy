@@ -1,7 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/http/date_provider_impl.h"
-#include "common/router/rds_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -34,9 +33,7 @@ class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
-  Router::RouteConfigProviderManagerImpl route_config_provider_manager_{
-      context_.runtime(),   context_.dispatcher(),  context_.random(),
-      context_.localInfo(), context_.threadLocal(), context_.admin()};
+  NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
@@ -149,10 +146,8 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
-  Server::Configuration::NetworkFilterFactoryCb cb1 =
-      factory.createFilterFactory(*json_config, context_);
-  Server::Configuration::NetworkFilterFactoryCb cb2 =
-      factory.createFilterFactory(*json_config, context_);
+  Network::FilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
+  Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
 }
 
 TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {

@@ -34,9 +34,6 @@ public:
     return OpenTracingDriver::PropagationMode::TracerNative;
   }
 
-protected:
-  bool useTagForSamplingDecision() override { return true; }
-
 private:
   opentracing::DynamicTracingLibraryHandle library_handle_;
   std::shared_ptr<opentracing::Tracer> tracer_;

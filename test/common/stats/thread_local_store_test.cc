@@ -25,46 +25,6 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-/**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
- */
-class TestAllocator : public RawStatDataAllocator {
-public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  RawStatData* alloc(const std::string& name) override {
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
-    } else {
-      stat_ref->ref_count_++;
-    }
-
-    return stat_ref.get();
-  }
-
-  void free(RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
-    }
-
-    FAIL();
-  }
-
-private:
-  static void freeAdapter(RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
-};
-
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
 public:
   StatsThreadLocalStoreTest() {
@@ -457,6 +417,29 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
 
   // Includes overflow stat.
   EXPECT_CALL(*this, free(_)).Times(5);
+}
+
+TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Histogram& h1 = store_->histogram("h1");
+  EXPECT_EQ("h1", h1.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+  h1.recordValue(1);
+
+  store_->shutdownThreading();
+
+  // Validate that merge callback is called during shutdown and there is no ASSERT.
+  bool merge_called = false;
+  store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
+
+  EXPECT_TRUE(merge_called);
+
+  tls_.shutdownThread();
+
+  EXPECT_CALL(*this, free(_));
 }
 
 // Histogram tests

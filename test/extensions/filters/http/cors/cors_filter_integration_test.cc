@@ -66,20 +66,20 @@ protected:
                      Http::TestHeaderMapImpl&& expected_response_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    codec_client_->makeHeaderOnlyRequest(request_headers, *response_);
-    response_->waitForEndStream();
-    EXPECT_TRUE(response_->complete());
-    compareHeaders(response_->headers(), expected_response_headers);
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    response->waitForEndStream();
+    EXPECT_TRUE(response->complete());
+    compareHeaders(response->headers(), expected_response_headers);
   }
 
   void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
                          Http::TestHeaderMapImpl&& expected_response_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, expected_response_headers, 0);
 
-    EXPECT_TRUE(response_->complete());
-    compareHeaders(response_->headers(), expected_response_headers);
+    EXPECT_TRUE(response->complete());
+    compareHeaders(response->headers(), expected_response_headers);
   }
 
   void compareHeaders(Http::TestHeaderMapImpl&& response_headers,

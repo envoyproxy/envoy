@@ -28,7 +28,6 @@ api_go_test(
         "//envoy/api/v2:eds_go_grpc",
         "//envoy/api/v2:lds_go_grpc",
         "//envoy/api/v2:rds_go_grpc",
-        "//envoy/api/v2/auth:auth_go_proto",
         "//envoy/api/v2/auth:cert_go_proto",
         "//envoy/config/bootstrap/v2:bootstrap_go_proto",
         "//envoy/service/discovery/v2:ads_go_grpc",

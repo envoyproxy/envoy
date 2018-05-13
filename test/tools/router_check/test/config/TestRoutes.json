@@ -92,7 +92,7 @@
           "cluster": "ats",
           "host_rewrite": "new_host",
           "request_headers_to_add":[
-            {"key": "X-Client-IP", "value":"%CLIENT_IP%"}
+            {"key": "X-Client-IP", "value":"%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"}
           ]
         },
         {

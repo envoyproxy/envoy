@@ -307,6 +307,58 @@ TEST(StrictDnsClusterImplTest, Basic) {
   EXPECT_CALL(resolver2.active_dns_query_, cancel());
 }
 
+// Verifies that host removal works correctly when hosts are being health checked
+// but the cluster is configured to always remove hosts
+TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    drain_connections_on_host_removal: true
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+  )EOF";
+
+  ResolverData resolver(*dns_resolver, dispatcher);
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  cluster.setHealthChecker(health_checker);
+  cluster.initialize([&]() -> void {});
+
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(*resolver.timer_, enableTimer(_)).Times(2);
+  resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+  // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
+  // clear the flag to simulate that these endpoints have been sucessfully health
+  // checked.
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2UL, hosts.size());
+
+    for (size_t i = 0; i < hosts.size(); ++i) {
+      EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    }
+  }
+
+  // Re-resolve the DNS name with only one record
+  resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1"}));
+
+  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(1UL, hosts.size());
+}
+
 TEST(HostImplTest, HostCluster) {
   MockCluster cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -702,6 +754,31 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
+}
+
+// Test that the correct feature() is set when close_connections_on_host_health_failure is
+// configured.
+TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
+  Stats::IsolatedStoreImpl stats;
+  Ssl::MockContextManager ssl_context_manager;
+  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<MockClusterManager> cm;
+  ReadyWatcher initialized;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    close_connections_on_host_health_failure: true
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+  )EOF";
+  StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
+                               dns_resolver, cm, dispatcher, false);
+  EXPECT_TRUE(cluster.info()->features() &
+              ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
 
 // Test creating and extending a priority set.

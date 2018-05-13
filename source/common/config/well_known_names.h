@@ -130,7 +130,7 @@ public:
   // Operation name for the Dynamo http filter
   const std::string DYNAMO_OPERATION = "envoy.dynamo_operation";
   // Table name for the Dynamo http filter
-  const std::string DYNAMO_TABLE = "envoy.dyanmo_table";
+  const std::string DYNAMO_TABLE = "envoy.dynamo_table";
   // Partition ID for the Dynamo http filter
   const std::string DYNAMO_PARTITION_ID = "envoy.dynamo_partition_id";
   // Request service name GRPC Bridge http filter

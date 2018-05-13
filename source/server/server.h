@@ -130,7 +130,7 @@ public:
   InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               ThreadLocal::Instance& tls);
+               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
 
   ~InstanceImpl() override;
 
@@ -151,7 +151,7 @@ public:
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
-  Runtime::RandomGenerator& random() override { return random_generator_; }
+  Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
     return config_->rateLimitClientFactory().create(timeout);
@@ -170,6 +170,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
 private:
+  ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
@@ -190,7 +191,7 @@ private:
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
-  Runtime::RandomGeneratorImpl random_generator_;
+  Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
@@ -207,6 +208,8 @@ private:
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };
 
 } // namespace Server

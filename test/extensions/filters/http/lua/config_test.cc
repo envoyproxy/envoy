@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
+
 #include "extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -29,8 +31,7 @@ TEST(LuaFilterConfigTest, LuaFilterInJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

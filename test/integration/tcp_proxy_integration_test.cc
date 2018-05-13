@@ -1,6 +1,7 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
@@ -222,8 +223,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     access_log->set_name("envoy.file_access_log");
     envoy::config::filter::accesslog::v2::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
-    access_log_config.set_format("upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
-                                 "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_ADDRESS%\n");
+    access_log_config.set_format(
+        "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "
+        "upstreamhost=%UPSTREAM_HOST% downstream=%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%\n");
     MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
 
     MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
@@ -261,6 +263,34 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   EXPECT_THAT(log_result,
               MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\n.*",
                                        ip_port_regex, ip_regex)));
+}
+
+// Test that the server shuts down without crashing when connections are open.
+TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      cluster->set_close_connections_on_host_health_failure(true);
+    }
+  });
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->write("hello");
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(5);
+  fake_upstream_connection->write("world");
+  tcp_client->waitForData("world");
+  tcp_client->write("hello", false);
+  fake_upstream_connection->waitForData(10);
+  test_server_.reset();
+  fake_upstream_connection->waitForHalfClose();
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect(true);
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  // Success criteria is that no ASSERTs fire and there are no leaks.
 }
 
 void TcpProxySslIntegrationTest::initialize() {

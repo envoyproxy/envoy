@@ -23,8 +23,6 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
-#include "server/lds_api.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -96,14 +94,14 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::vector<NetworkFilterFactoryCb>& factories);
+                               const std::vector<Network::FilterFactoryCb>& factories);
 
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const std::vector<ListenerFilterFactoryCb>& factories);
+                               const std::vector<Network::ListenerFilterFactoryCb>& factories);
 };
 
 /**
@@ -147,7 +145,6 @@ private:
                             Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
-  std::unique_ptr<LdsApi> lds_api_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Stats::SinkPtr> stats_sinks_;
   RateLimit::ClientFactoryPtr ratelimit_client_factory_;

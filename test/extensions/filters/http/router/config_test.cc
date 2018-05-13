@@ -1,3 +1,4 @@
+#include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/router/config.h"
@@ -25,8 +26,7 @@ TEST(RouterFilterConfigTest, RouterFilterInJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -52,8 +52,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(router_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -62,7 +61,7 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
 TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RouterFilterConfig factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
+  Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

@@ -8,6 +8,7 @@
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
+#include "exe/terminate_handler.h"
 #endif
 
 namespace Envoy {
@@ -48,6 +49,7 @@ public:
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs;
+  Envoy::TerminateHandler log_on_terminate;
 #endif
 
   Envoy::OptionsImpl options_;

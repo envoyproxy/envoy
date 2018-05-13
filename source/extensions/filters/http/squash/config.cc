@@ -16,26 +16,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 SquashFilterConfigFactory::createFilterFactory(const Envoy::Json::Object& json_config,
-                                               const std::string&,
+                                               const std::string& stat_prefix,
                                                Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::squash::v2::Squash proto_config;
   Config::FilterJson::translateSquashConfig(json_config, proto_config);
-
-  return createFilter(proto_config, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
 }
 
-Server::Configuration::HttpFilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProto(
-    const Envoy::Protobuf::Message& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
-  return createFilter(Envoy::MessageUtil::downcastAndValidate<
-                          const envoy::config::filter::http::squash::v2::Squash&>(proto_config),
-                      context);
-}
-
-Server::Configuration::HttpFilterFactoryCb SquashFilterConfigFactory::createFilter(
-    const envoy::config::filter::http::squash::v2::Squash& proto_config,
+Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::http::squash::v2::Squash& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(

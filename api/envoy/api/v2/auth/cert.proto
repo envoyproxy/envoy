@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package envoy.api.v2.auth;
+option go_package = "auth";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
@@ -46,21 +47,15 @@ message TlsParameters {
   //
   //   [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]
   //   [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]
-  //   ECDHE-ECDSA-AES128-SHA256
-  //   ECDHE-RSA-AES128-SHA256
   //   ECDHE-ECDSA-AES128-SHA
   //   ECDHE-RSA-AES128-SHA
   //   AES128-GCM-SHA256
-  //   AES128-SHA256
   //   AES128-SHA
   //   ECDHE-ECDSA-AES256-GCM-SHA384
   //   ECDHE-RSA-AES256-GCM-SHA384
-  //   ECDHE-ECDSA-AES256-SHA384
-  //   ECDHE-RSA-AES256-SHA384
   //   ECDHE-ECDSA-AES256-SHA
   //   ECDHE-RSA-AES256-SHA
   //   AES256-GCM-SHA384
-  //   AES256-SHA256
   //   AES256-SHA
   //
   // will be used.
@@ -214,7 +209,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2;
+  string sni = 2 [(validate.rules).string.max_bytes = 255];
 }
 
 message DownstreamTlsContext {

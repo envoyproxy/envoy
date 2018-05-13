@@ -45,7 +45,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:filter_lib",
@@ -115,7 +115,7 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:wshandler_callback_interface",
+        "//include/envoy/http:websocket_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -137,7 +137,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/runtime:uuid_util_lib",
@@ -262,5 +261,20 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_utility_lib",
+    srcs = ["header_utility.cc"],
+    hdrs = ["header_utility.h"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/json:json_object_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/config:rds_json_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/type:range_cc",
     ],
 )
