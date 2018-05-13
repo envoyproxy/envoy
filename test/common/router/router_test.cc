@@ -1139,8 +1139,7 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   expectResponseTimerCreate();
   expectPerTryTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                  {"x-envoy-internal", "true"},
+  Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
@@ -1149,10 +1148,11 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  Buffer::OwnedImpl body("test body");
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   per_try_timeout_->callback_();
-  router_.onDestroy();
+  response_decoder->decodeData(body, true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
