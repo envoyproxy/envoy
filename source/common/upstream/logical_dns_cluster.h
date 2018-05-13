@@ -117,8 +117,8 @@ private:
   HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
   ResolveTargetContextSharedPtr context_;
-  const LocalInfo::LocalInfo& local_info_;
-  PriorityState priority_state_;
+
+  PriorityStateManagerPtr priority_state_manager_;
 };
 
 } // namespace Upstream

@@ -219,6 +219,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   }
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
+  EXPECT_CALL(factory_.local_info_, node()).Times(2);
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -258,6 +259,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
       "{%s}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
+  EXPECT_CALL(factory_.local_info_, node()).Times(2);
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -1117,7 +1119,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
-  EXPECT_CALL(factory_.local_info_, node()).Times(3);
+  EXPECT_CALL(factory_.local_info_, node());
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
@@ -1221,7 +1223,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   }
   )EOF";
 
-  EXPECT_CALL(factory_.local_info_, node()).Times(2);
+  EXPECT_CALL(factory_.local_info_, node());
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
