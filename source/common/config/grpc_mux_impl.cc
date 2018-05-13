@@ -169,7 +169,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     api_state_[type_url].request_.set_response_nonce(message->nonce());
     if (message->resources().empty()) {
       // No watches and no resources. This can happen when envoy unregisters from a resource
-      // that's removed from the server as well. For example, a delted cluster triggers un-watching
+      // that's removed from the server as well. For example, a deleted cluster triggers un-watching
       // the ClusterLoadAssignment watch, and at the same time the xDS server sends an empty list of
       // ClusterLoadAssignment resources. we'll accept this update. no need to send a discovery
       // request, as we don't watch for anything.
