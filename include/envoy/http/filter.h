@@ -191,7 +191,11 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
-   * Create a locally generated response using the provided lambdas.
+   * Create a locally generated response using the provided response_code and body_text paramewters.
+   * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
+   * HTTP response code and grpc-status and grpc-message headers mapped from the provided
+   * parameters.
+   *
    * @param response_code supplies the HTTP response code.
    * @param body_text supplies the optional body text which is sent using the text/plain content
    *                  type.
