@@ -474,8 +474,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explictly configured on.
-      sendLocalReply(nullptr, Grpc::Common::hasGrpcContentType(*request_headers_),
-                     Code::UpgradeRequired, "", nullptr);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::UpgradeRequired, "",
+                     nullptr);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -498,8 +498,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
           connection_manager_.config_.http1Settings().default_host_for_http_10_);
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
-      sendLocalReply(nullptr, Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest,
-                     "", nullptr);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                     nullptr);
       return;
     }
   }
@@ -512,7 +512,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // header size http_parser and nghttp2 will allow, down to 16k or 8k for
   // envoy users who do not wish to proxy large headers.
   if (request_headers_->byteSize() > (60 * 1024)) {
-    sendLocalReply(nullptr, Grpc::Common::hasGrpcContentType(*request_headers_),
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Code::RequestHeaderFieldsTooLarge, "", nullptr);
     return;
   }
@@ -524,7 +524,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(nullptr, Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "",
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "",
                    nullptr);
     return;
   }
@@ -568,8 +568,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     } else if (websocket_requested) {
       // Do not allow WebSocket upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
-      sendLocalReply(nullptr, Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden,
-                     "", nullptr);
+      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
+                     nullptr);
       return;
     }
     // Allow non websocket requests to go through websocket enabled routes.
@@ -820,21 +820,24 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
-    ActiveStreamEncoderFilter* filter, bool is_grpc_request, Code code, const std::string& body,
+    bool is_grpc_request, Code code, const std::string& body,
     std::function<void(HeaderMap& headers)> modify_headers) {
-  Utility::sendLocalReply(
-      is_grpc_request,
-      [this, filter, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (headers != nullptr && modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        encodeHeaders(filter, *response_headers_, end_stream);
-      },
-      [this, filter](Buffer::Instance& data, bool end_stream) -> void {
-        encodeData(filter, data, end_stream);
-      },
-      state_.destroyed_, code, body);
+  Utility::sendLocalReply(is_grpc_request,
+                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+                            if (headers != nullptr && modify_headers != nullptr) {
+                              modify_headers(*headers);
+                            }
+                            response_headers_ = std::move(headers);
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeHeaders(nullptr, *response_headers_, end_stream);
+                          },
+                          [this](Buffer::Instance& data, bool end_stream) -> void {
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeData(nullptr, data, end_stream);
+                          },
+                          state_.destroyed_, code, body);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
