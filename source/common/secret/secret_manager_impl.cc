@@ -17,10 +17,8 @@
 namespace Envoy {
 namespace Secret {
 
-SecretManagerImpl::SecretManagerImpl(Server::Instance& server,
-                                     envoy::config::bootstrap::v2::SecretManager config)
-    : server_(server),
-      config_(config) {
+SecretManagerImpl::SecretManagerImpl(Server::Instance& server)
+    : server_(server) {
 }
 
 bool SecretManagerImpl::addOrUpdateStaticSecret(const SecretPtr secret) {

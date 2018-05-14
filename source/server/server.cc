@@ -270,7 +270,7 @@ void InstanceImpl::initialize(Options& options,
       new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_));
 
   // Shared storage of secrets from SDS
-  secret_manager_.reset(new Secret::SecretManagerImpl(*this, bootstrap.secret_manager()));
+  secret_manager_.reset(new Secret::SecretManagerImpl(*this));
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

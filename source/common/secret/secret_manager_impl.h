@@ -3,8 +3,6 @@
 #include <shared_mutex>
 #include <unordered_map>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "envoy/server/instance.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret.h"
@@ -17,7 +15,7 @@ namespace Secret {
 
 class SecretManagerImpl : public SecretManager, Logger::Loggable<Logger::Id::upstream> {
  public:
-  SecretManagerImpl(Server::Instance& server, envoy::config::bootstrap::v2::SecretManager config);
+  SecretManagerImpl(Server::Instance& server);
 
   virtual ~SecretManagerImpl() {
   }
@@ -28,8 +26,6 @@ class SecretManagerImpl : public SecretManager, Logger::Loggable<Logger::Id::ups
  private:
   Server::Instance& server_;
   SecretPtrMap static_secrets_;
-
-  envoy::config::bootstrap::v2::SecretManager config_;
 };
 
 }  // namespace Secret
