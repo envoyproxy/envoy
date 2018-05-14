@@ -25,6 +25,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "configuration_impl_test",
     srcs = ["configuration_impl_test.cc"],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:cluster_manager_lib",

@@ -261,7 +261,7 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
-  Secret::SecretManager& secretManager() { return secret_manager_; }
+  Secret::SecretManager& secretManager() { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
@@ -292,6 +292,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
 
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
@@ -303,7 +304,6 @@ public:
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
   Ssl::ContextManagerImpl ssl_context_manager_;
-  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
