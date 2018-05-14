@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
+
 #include "extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/mocks.h"

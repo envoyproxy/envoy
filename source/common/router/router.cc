@@ -190,6 +190,12 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
+  // These get stripped by HTTP/1 codec where applicable.
+  ASSERT(headers.Path());
+  ASSERT(headers.Method());
+  ASSERT(headers.Host());
+
   downstream_headers_ = &headers;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
@@ -284,6 +290,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
+
+  // Ensure an http transport scheme is selected before continuing with decoding.
+  ASSERT(headers.Scheme());
+
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
@@ -291,13 +301,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                                               callbacks_->streamId());
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
-
-  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
-  // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.Scheme());
-  ASSERT(headers.Method());
-  ASSERT(headers.Host());
-  ASSERT(headers.Path());
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));

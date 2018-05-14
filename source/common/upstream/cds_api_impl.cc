@@ -55,7 +55,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   for (auto& cluster : resources) {
     const std::string cluster_name = cluster.name();
     clusters_to_remove.erase(cluster_name);
-    if (cm_.addOrUpdateCluster(cluster)) {
+    if (cm_.addOrUpdateCluster(cluster, version_info)) {
       ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
     }
   }

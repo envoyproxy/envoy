@@ -172,6 +172,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
 private:
+  ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
@@ -210,6 +211,8 @@ private:
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
+  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 };
 
 } // namespace Server

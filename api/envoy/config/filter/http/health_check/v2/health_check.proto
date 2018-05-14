@@ -21,7 +21,7 @@ message HealthCheck {
 
   // Specifies the incoming HTTP endpoint that should be considered the
   // health check endpoint. For example */healthcheck*.
-  string endpoint = 2 [(validate.rules).string.min_bytes = 1, deprecated = true];
+  string endpoint = 2 [deprecated = true];
 
   // If operating in pass through mode, the amount of time in milliseconds
   // that the filter should cache the upstream response.
