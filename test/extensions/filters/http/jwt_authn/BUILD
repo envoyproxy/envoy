@@ -19,3 +19,16 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "authenticator_test",
+    srcs = [
+        "authenticator_test.cc",
+    ],
+    deps = [
+        "//source/exe:envoy_common_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+	"//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
