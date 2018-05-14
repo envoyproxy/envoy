@@ -10,6 +10,7 @@
 #include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
 
+#include "common/grpc/status.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"

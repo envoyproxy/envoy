@@ -532,7 +532,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
     if (end_stream) {
       absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
       if (grpc_status &&
-          !Http::CodeUtility::is5xx(Http::Utility::grpcToHttpStatus(grpc_status.value()))) {
+          !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
         upstream_request_->upstream_host_->stats().rq_success_.inc();
       } else {
         upstream_request_->upstream_host_->stats().rq_error_.inc();
@@ -639,7 +639,7 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   if (upstream_request_->grpc_rq_success_deferred_) {
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
-        !Http::CodeUtility::is5xx(Http::Utility::grpcToHttpStatus(grpc_status.value()))) {
+        !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request_->upstream_host_->stats().rq_success_.inc();
     } else {
       upstream_request_->upstream_host_->stats().rq_error_.inc();

@@ -12,6 +12,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/grpc/status.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -186,88 +187,6 @@ bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
                     Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
-Grpc::Status::GrpcStatus Utility::httpToGrpcStatus(uint64_t http_response_status) {
-  // From
-  // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
-  switch (http_response_status) {
-  case 400:
-    return Grpc::Status::GrpcStatus::Internal;
-  case 401:
-    return Grpc::Status::GrpcStatus::Unauthenticated;
-  case 403:
-    return Grpc::Status::GrpcStatus::PermissionDenied;
-  case 404:
-    return Grpc::Status::GrpcStatus::Unimplemented;
-  case 429:
-  case 502:
-  case 503:
-  case 504:
-    return Grpc::Status::GrpcStatus::Unavailable;
-  default:
-    return Grpc::Status::GrpcStatus::Unknown;
-  }
-}
-
-uint64_t Utility::grpcToHttpStatus(Grpc::Status::GrpcStatus grpc_status) {
-  // From https://cloud.google.com/apis/design/errors#handling_errors.
-  switch (grpc_status) {
-  case Grpc::Status::GrpcStatus::Ok:
-    return 200;
-  case Grpc::Status::GrpcStatus::Canceled:
-    // Client closed request.
-    return 499;
-  case Grpc::Status::GrpcStatus::Unknown:
-    // Internal server error.
-    return 500;
-  case Grpc::Status::GrpcStatus::InvalidArgument:
-    // Bad request.
-    return 400;
-  case Grpc::Status::GrpcStatus::DeadlineExceeded:
-    // Gateway Time-out.
-    return 504;
-  case Grpc::Status::GrpcStatus::NotFound:
-    // Not found.
-    return 404;
-  case Grpc::Status::GrpcStatus::AlreadyExists:
-    // Conflict.
-    return 409;
-  case Grpc::Status::GrpcStatus::PermissionDenied:
-    // Forbidden.
-    return 403;
-  case Grpc::Status::GrpcStatus::ResourceExhausted:
-    //  Too many requests.
-    return 429;
-  case Grpc::Status::GrpcStatus::FailedPrecondition:
-    // Bad request.
-    return 400;
-  case Grpc::Status::GrpcStatus::Aborted:
-    // Conflict.
-    return 409;
-  case Grpc::Status::GrpcStatus::OutOfRange:
-    // Bad request.
-    return 400;
-  case Grpc::Status::GrpcStatus::Unimplemented:
-    // Not implemented.
-    return 501;
-  case Grpc::Status::GrpcStatus::Internal:
-    // Internal server error.
-    return 500;
-  case Grpc::Status::GrpcStatus::Unavailable:
-    // Service unavailable.
-    return 503;
-  case Grpc::Status::GrpcStatus::DataLoss:
-    // Internal server error.
-    return 500;
-  case Grpc::Status::GrpcStatus::Unauthenticated:
-    // Unauthorized.
-    return 401;
-  case Grpc::Status::GrpcStatus::InvalidCode:
-  default:
-    // Internal server error.
-    return 500;
-  }
-}
-
 Http2Settings
 Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& config) {
   Http2Settings ret;
@@ -313,11 +232,11 @@ void Utility::sendLocalReply(
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
   if (is_grpc) {
-    HeaderMapPtr response_headers{
-        new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(Code::OK))},
-                          {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
-                          {Headers::get().GrpcStatus,
-                           std::to_string(enumToInt(httpToGrpcStatus(enumToInt(response_code))))}}};
+    HeaderMapPtr response_headers{new HeaderMapImpl{
+        {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+        {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+        {Headers::get().GrpcStatus,
+         std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
     if (!body_text.empty()) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);
