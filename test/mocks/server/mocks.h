@@ -30,6 +30,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -193,15 +194,6 @@ public:
   std::shared_ptr<Network::MockListenSocket> socket_;
 };
 
-class MockSecretManager : public Secret::SecretManager {
- public:
-  MockSecretManager() {};
-  ~MockSecretManager() {};
-
-  MOCK_METHOD1(addOrUpdateStaticSecret, bool(const Secret::SecretPtr secret));
-  MOCK_METHOD1(getStaticSecret, Secret::SecretPtr(const std::string& name));
-};
-
 class MockListenerManager : public ListenerManager {
 public:
   MockListenerManager();
@@ -311,7 +303,7 @@ public:
   Thread::MutexBasicLockable access_log_lock_;
   testing::NiceMock<Runtime::MockLoader> runtime_loader_;
   Ssl::ContextManagerImpl ssl_context_manager_;
-  MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

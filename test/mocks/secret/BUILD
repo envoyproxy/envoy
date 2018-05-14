@@ -22,9 +22,7 @@ envoy_cc_mock(
         "//include/envoy/server:instance_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/server:worker_interface",
-
         "//include/envoy/secret:secret_interface",
-
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//source/common/singleton:manager_impl_lib",

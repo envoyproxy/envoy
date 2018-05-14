@@ -46,7 +46,7 @@ public:
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
 
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 class MockConnection : public Connection {
