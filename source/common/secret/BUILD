@@ -29,3 +29,4 @@ envoy_cc_library(
         "//include/envoy/secret:secret_manager_interface",
     ],
 )
+

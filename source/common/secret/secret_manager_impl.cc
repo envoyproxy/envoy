@@ -12,8 +12,6 @@
 #include "common/secret/secret_impl.h"
 #include "common/common/logger.h"
 
-#include "openssl/ssl.h"
-
 namespace Envoy {
 namespace Secret {
 

@@ -148,6 +148,5 @@ void BootstrapJson::translateStaticSecretsBootstrap(
   }
 }
 
-
 } // namespace Config
 } // namespace Envoy

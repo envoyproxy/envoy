@@ -55,7 +55,6 @@ public:
    * Return the secret manager
    */
   virtual Secret::SecretManager& secretManager() PURE;
-
 };
 
 } // namespace Ssl

@@ -77,7 +77,6 @@ void TlsContextJson::translateTlsCertificate(
     tls_certificate.mutable_certificate_chain()->set_filename(
         json_tls_context.getString("cert_chain_file", ""));
   }
-
   if (json_tls_context.hasObject("private_key_file")) {
     tls_certificate.mutable_private_key()->set_filename(
         json_tls_context.getString("private_key_file", ""));
