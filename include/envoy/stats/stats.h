@@ -225,29 +225,31 @@ public:
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
 
 /**
- * Provides sinks with access to stats during periodic stat flushes.
+ * Provides cached access to a particular store's stats.
  */
 class StatsSource {
 public:
   virtual ~StatsSource() {}
 
   /**
-   * Returns all known counters. Will use values cached during the flush if already accessed.
+   * Returns all known counters. Will use cached values if already accessed and clearCache() hasn't
+   * been called since.
    * @return std::vector<CounterSharedPtr>& all known counters. Note: reference may not be valid
    * after clearCache() is called.
    */
   virtual const std::vector<CounterSharedPtr>& cachedCounters() PURE;
 
   /**
-   * Returns all known gauges. Will use values cached during the flush if already accessed.
+   * Returns all known gauges. Will use cached values if already accessed and clearCache() hasn't
+   * been called since.
    * @return std::vector<GaugeSharedPtr>& all known counters. Note: reference may not be valid after
    * clearCache() is called.
    */
   virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
 
   /**
-   * Returns all known parent histograms. Will use values cached during the flush if already
-   * accessed.
+   * Returns all known parent histograms. Will use cached values if already accessed and
+   * clearCache() hasn't been called since.
    * @return std::vector<ParentHistogramSharedPtr>& all known counters. Note: reference may not be
    * valid after clearCache() is called.
    */
@@ -390,8 +392,8 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Returns the statsSource that provides metrics to Sinks during a flush.
-   * @return StatsSource& the flush source.
+   * Returns the StatsSource to provide cached metrics.
+   * @return StatsSource& the stats source.
    */
   virtual StatsSource& statsSource() PURE;
 };
