@@ -78,6 +78,7 @@ jobs:
            EOF
 
            sudo service docker restart
+     - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
      - run: ./ci/do_circle_ci_ipv6_tests.sh
 
    coverage:
