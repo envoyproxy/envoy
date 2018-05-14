@@ -175,7 +175,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
       // request, as we don't watch for anything.
       api_state_[type_url].request_.set_version_info(message->version_info());
     } else {
-      // No watches and we have resources - this should not happen. send ad NACK (by not updateding
+      // No watches and we have resources - this should not happen. send a NACK (by not updating
       // the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
       sendDiscoveryRequest(type_url);

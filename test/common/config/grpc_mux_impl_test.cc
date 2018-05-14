@@ -376,12 +376,10 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
 
   grpc_mux_->start();
-  {
-    // subscribe and unsubscribe so that the type is known to envoy
-    expectSendMessage(type_url, {"y"}, "");
-    expectSendMessage(type_url, {}, "");
-    grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
-  }
+  // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
+  expectSendMessage(type_url, {"y"}, "");
+  expectSendMessage(type_url, {}, "");
+  grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
 
   // simulate the server sending CLA message to notify envoy that the CLA was added,
   // even though envoy doesn't expect it. Envoy should reject this update.
