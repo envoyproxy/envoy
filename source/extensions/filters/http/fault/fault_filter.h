@@ -123,7 +123,6 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr delay_timer_;
   std::string downstream_cluster_{};
-  bool stream_destroyed_{};
   const FaultSettings* fault_settings_;
 
   std::string downstream_cluster_delay_percent_key_{};
