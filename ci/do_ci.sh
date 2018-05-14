@@ -106,7 +106,7 @@ elif [[ "$1" == "bazel.dev" ]]; then
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
   # as possible for basic sanity testing.
-  apt-get install -y dig && dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
+  apt-get install -y dnsutils && dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
   setup_clang_toolchain
   echo "Testing..."
   cd "${ENVOY_CI_DIR}"
