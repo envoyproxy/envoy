@@ -77,11 +77,10 @@ message Http2ProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
 
-  // `SETTINGS_MAX_HEADER_LIST_SIZE <https://tools.ietf.org/html/rfc7540#section-6.5>`_
-  //  This option indicates client the maximum size of header, server is ready to accept
-  //  otherwise it throws an error.
-  google.protobuf.UInt32Value max_header_list_size = 5
-      [(validate.rules).uint32 = {gte: 8000, lte: 16000}];
+  // `SETTINGS_MAX_HEADER_LIST_SIZE <https://httpwg.org/specs/rfc7540.html#SettingValues>`_
+  //  This option informs upstream peers the maximum size of header list the sender is ready to accept
+  //  in octets. Initial value of this setting is unlimited.
+  google.protobuf.UInt32Value max_header_list_size = 5;
 }
 
 // [#not-implemented-hide:]

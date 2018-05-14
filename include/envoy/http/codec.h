@@ -242,8 +242,8 @@ struct Http2Settings {
   // our default connection-level window also equals to our stream-level
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
-  // defaults to maximum, value in octet
-  static const uint32_t DEFAULT_MAX_HEADER_LIST_SIZE = 8000;
+  // defaults to unlimited, value in octet
+  static const uint32_t DEFAULT_MAX_HEADER_LIST_SIZE = std::numeric_limits<uint32_t>::max();
 };
 
 /**
