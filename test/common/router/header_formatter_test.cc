@@ -304,7 +304,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
       // TODO(dio): Un-terminated variable expressions with arguments and argument errors are not
-      // checked anymore. Find a way to check it, either at UPSTREAM_METADATA site or somewhere else.
+      // checked anymore. Find a way to check it, either at UPSTREAM_METADATA site or somewhere
+      // else.
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -530,7 +531,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-request-start",
-        "value": "%START_TIME%"
+        "value": "%START_TIME(%since_epoch_ms)%"
       }
     ]
   }
@@ -593,7 +594,7 @@ route:
       append: true
     - header:
         key: "x-request-start"
-        value: "%START_TIME(OK)%"
+        value: "%START_TIME(%ms and %since_epoch_ms)%"
       append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -608,7 +609,6 @@ route:
   EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
-  EXPECT_EQ("OK", headerMap.get_("x-request-start"));
 }
 
 } // namespace Router

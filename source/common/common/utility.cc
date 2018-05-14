@@ -20,8 +20,60 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
+namespace {
+
+typedef std::unordered_map<std::string, std::function<std::string(const SystemTime& time)>>
+    FunctionMap;
+
+const FunctionMap& dateFormatterReplacers() {
+  CONSTRUCT_ON_FIRST_USE(
+      FunctionMap,
+      {{"%ms",
+        [](const SystemTime& time) -> std::string {
+          const std::chrono::milliseconds epoch_time_ms =
+              std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
+
+          uint32_t msec = epoch_time_ms.count() % 1000;
+          std::string msec_str;
+          msec_str.push_back('0' + (msec / 100));
+          msec %= 100;
+          msec_str.push_back('0' + (msec / 10));
+          msec %= 10;
+          msec_str.push_back('0' + msec);
+          return msec_str;
+        }},
+
+       {"%since_epoch_ms", [](const SystemTime& time) -> std::string {
+          return fmt::FormatInt(
+                     std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch())
+                         .count())
+              .str();
+        }}});
+}
+
+} // namespace
+
 std::string DateFormatter::fromTime(const SystemTime& time) const {
-  return fromTime(std::chrono::system_clock::to_time_t(time));
+  std::string new_format_string = format_string_;
+  for (const auto& replacer : dateFormatterReplacers()) {
+    // TODO(dio): The following is a hammer, need to optimize it since most of the time the
+    // occurrence of each pattern to be replaced is only once.
+    std::vector<std::string> pieces = absl::StrSplit(new_format_string, replacer.first);
+    if (!pieces.empty()) {
+      new_format_string = absl::StrJoin(pieces, replacer.second(time));
+    }
+  }
+
+  return fromTime(std::chrono::system_clock::to_time_t(time), new_format_string);
+}
+
+std::string DateFormatter::fromTime(time_t time, const std::string& new_format_string) const {
+  tm current_tm;
+  gmtime_r(&time, &current_tm);
+
+  std::array<char, 1024> buf;
+  strftime(&buf[0], buf.size(), new_format_string.c_str(), &current_tm);
+  return std::string(&buf[0]);
 }
 
 std::string DateFormatter::fromTime(time_t time) const {

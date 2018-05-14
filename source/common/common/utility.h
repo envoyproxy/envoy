@@ -48,6 +48,8 @@ public:
   const std::string& formatString() const { return format_string_; }
 
 private:
+  std::string fromTime(time_t time, const std::string& new_format_string) const;
+
   std::string format_string_;
 };
 
