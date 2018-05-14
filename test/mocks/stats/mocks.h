@@ -105,15 +105,15 @@ public:
       std::make_shared<HistogramStatisticsImpl>();
 };
 
-class MockFlushSource : public FlushSource {
+class MockStatsSource : public StatsSource {
 public:
-  MockFlushSource();
-  ~MockFlushSource();
+  MockStatsSource();
+  ~MockStatsSource();
 
   MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
   MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
   MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
-  MOCK_METHOD0(resetFlushCache, void());
+  MOCK_METHOD0(clearCache, void());
 
   std::vector<CounterSharedPtr> counters_;
   std::vector<GaugeSharedPtr> gauges_;
@@ -125,7 +125,7 @@ public:
   MockSink();
   ~MockSink();
 
-  MOCK_METHOD1(flush, void(FlushSource& flush_source));
+  MOCK_METHOD1(flush, void(StatsSource& stats_source));
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 

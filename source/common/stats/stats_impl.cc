@@ -336,26 +336,26 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
                        computed_quantiles_.data());
 }
 
-std::vector<CounterSharedPtr>& FlushSourceImpl::cachedCounters() {
+std::vector<CounterSharedPtr>& StatsSourceImpl::cachedCounters() {
   if (!counters_) {
     counters_ = store_.counters();
   }
   return *counters_;
 }
-std::vector<GaugeSharedPtr>& FlushSourceImpl::cachedGauges() {
+std::vector<GaugeSharedPtr>& StatsSourceImpl::cachedGauges() {
   if (!gauges_) {
     gauges_ = store_.gauges();
   }
   return *gauges_;
 }
-std::vector<ParentHistogramSharedPtr>& FlushSourceImpl::cachedHistograms() {
+std::vector<ParentHistogramSharedPtr>& StatsSourceImpl::cachedHistograms() {
   if (!histograms_) {
     histograms_ = store_.histograms();
   }
   return *histograms_;
 }
 
-void FlushSourceImpl::resetFlushCache() {
+void StatsSourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
   histograms_.reset();

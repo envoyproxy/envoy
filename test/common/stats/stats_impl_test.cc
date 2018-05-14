@@ -498,7 +498,7 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
-TEST(FlushSourceImplTest, Caching) {
+TEST(StatsSourceImplTest, Caching) {
   NiceMock<MockStore> store;
   std::vector<CounterSharedPtr> stored_counters;
   std::vector<GaugeSharedPtr> stored_gauges;
@@ -508,29 +508,29 @@ TEST(FlushSourceImplTest, Caching) {
   ON_CALL(store, gauges()).WillByDefault(ReturnPointee(&stored_gauges));
   ON_CALL(store, histograms()).WillByDefault(ReturnPointee(&stored_histograms));
 
-  FlushSourceImpl flush_source(store);
+  StatsSourceImpl stats_source(store);
 
   // Once cached, new values should not be reflected by the return value.
   stored_counters.push_back(std::make_shared<MockCounter>());
-  EXPECT_EQ(flush_source.cachedCounters(), stored_counters);
+  EXPECT_EQ(stats_source.cachedCounters(), stored_counters);
   stored_counters.push_back(std::make_shared<MockCounter>());
-  EXPECT_NE(flush_source.cachedCounters(), stored_counters);
+  EXPECT_NE(stats_source.cachedCounters(), stored_counters);
 
   stored_gauges.push_back(std::make_shared<MockGauge>());
-  EXPECT_EQ(flush_source.cachedGauges(), stored_gauges);
+  EXPECT_EQ(stats_source.cachedGauges(), stored_gauges);
   stored_gauges.push_back(std::make_shared<MockGauge>());
-  EXPECT_NE(flush_source.cachedGauges(), stored_gauges);
+  EXPECT_NE(stats_source.cachedGauges(), stored_gauges);
 
   stored_histograms.push_back(std::make_shared<MockParentHistogram>());
-  EXPECT_EQ(flush_source.cachedHistograms(), stored_histograms);
+  EXPECT_EQ(stats_source.cachedHistograms(), stored_histograms);
   stored_histograms.push_back(std::make_shared<MockParentHistogram>());
-  EXPECT_NE(flush_source.cachedHistograms(), stored_histograms);
+  EXPECT_NE(stats_source.cachedHistograms(), stored_histograms);
 
   // After clearing, the new values should be reflected in the cache.
-  flush_source.resetFlushCache();
-  EXPECT_EQ(flush_source.cachedCounters(), stored_counters);
-  EXPECT_EQ(flush_source.cachedGauges(), stored_gauges);
-  EXPECT_EQ(flush_source.cachedHistograms(), stored_histograms);
+  stats_source.clearCache();
+  EXPECT_EQ(stats_source.cachedCounters(), stored_counters);
+  EXPECT_EQ(stats_source.cachedGauges(), stored_gauges);
+  EXPECT_EQ(stats_source.cachedHistograms(), stored_histograms);
 }
 
 } // namespace Stats

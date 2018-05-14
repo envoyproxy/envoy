@@ -52,7 +52,7 @@ public:
   }
 
   // Stats::Sink
-  void flush(Stats::FlushSource& flush_source) override;
+  void flush(Stats::StatsSource& stats_source) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   // Called in unit test to validate writer construction and address.
@@ -81,7 +81,7 @@ public:
                 Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
-  void flush(Stats::FlushSource& flush_source) override;
+  void flush(Stats::StatsSource& stats_source) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers.
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),

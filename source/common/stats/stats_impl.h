@@ -408,15 +408,15 @@ private:
   Store& parent_;
 };
 
-class FlushSourceImpl : public FlushSource {
+class StatsSourceImpl : public StatsSource {
 public:
-  FlushSourceImpl(Store& store) : store_(store){};
+  StatsSourceImpl(Store& store) : store_(store){};
 
-  // Stats::FlushSource
+  // Stats::StatsSource
   std::vector<CounterSharedPtr>& cachedCounters() override;
   std::vector<GaugeSharedPtr>& cachedGauges() override;
   std::vector<ParentHistogramSharedPtr>& cachedHistograms() override;
-  void resetFlushCache() override;
+  void clearCache() override;
 
 private:
   Store& store_;

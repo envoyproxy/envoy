@@ -147,7 +147,7 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  TestIsolatedStoreImpl() : flush_source_(*this) {}
+  TestIsolatedStoreImpl() : stats_source_(*this) {}
   // Stats::Scope
   Counter& counter(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
@@ -188,12 +188,12 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
-  FlushSource& flushSource() override { return flush_source_; }
+  StatsSource& statsSource() override { return stats_source_; }
 
 private:
   mutable std::mutex lock_;
   IsolatedStoreImpl store_;
-  FlushSourceImpl flush_source_;
+  StatsSourceImpl stats_source_;
 };
 
 } // namespace Stats

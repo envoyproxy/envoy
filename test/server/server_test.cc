@@ -28,24 +28,24 @@ TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
   Stats::IsolatedStoreImpl store;
-  Stats::FlushSourceImpl flush_source(store);
+  Stats::StatsSourceImpl stats_source(store);
   store.counter("hello").inc();
   store.gauge("world").set(5);
   std::unique_ptr<Stats::MockSink> sink(new StrictMock<Stats::MockSink>());
-  EXPECT_CALL(*sink, flush(Ref(flush_source)))
-      .WillOnce(Invoke([](Stats::FlushSource& flush_source) {
-        ASSERT_EQ(flush_source.cachedCounters().size(), 1);
-        EXPECT_EQ(flush_source.cachedCounters().front()->name(), "hello");
-        EXPECT_EQ(flush_source.cachedCounters().front()->latch(), 1);
+  EXPECT_CALL(*sink, flush(Ref(stats_source)))
+      .WillOnce(Invoke([](Stats::StatsSource& stats_source) {
+        ASSERT_EQ(stats_source.cachedCounters().size(), 1);
+        EXPECT_EQ(stats_source.cachedCounters().front()->name(), "hello");
+        EXPECT_EQ(stats_source.cachedCounters().front()->latch(), 1);
 
-        ASSERT_EQ(flush_source.cachedGauges().size(), 1);
-        EXPECT_EQ(flush_source.cachedGauges().front()->name(), "world");
-        EXPECT_EQ(flush_source.cachedGauges().front()->value(), 5);
+        ASSERT_EQ(stats_source.cachedGauges().size(), 1);
+        EXPECT_EQ(stats_source.cachedGauges().front()->name(), "world");
+        EXPECT_EQ(stats_source.cachedGauges().front()->value(), 5);
       }));
 
   std::list<Stats::SinkPtr> sinks;
   sinks.emplace_back(std::move(sink));
-  InstanceUtil::flushMetricsToSinks(sinks, flush_source);
+  InstanceUtil::flushMetricsToSinks(sinks, stats_source);
 }
 
 class RunHelperTest : public testing::Test {

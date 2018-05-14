@@ -276,15 +276,15 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(2UL, store_->counters().size());
   CounterSharedPtr c1 = store_->counters().front();
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(store_->flushSource().cachedCounters().front(), c1);
+  EXPECT_EQ(store_->statsSource().cachedCounters().front(), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
-  EXPECT_EQ(2UL, store_->flushSource().cachedCounters().size());
-  store_->flushSource().resetFlushCache();
-  EXPECT_EQ(1UL, store_->flushSource().cachedCounters().size());
+  EXPECT_EQ(2UL, store_->statsSource().cachedCounters().size());
+  store_->statsSource().clearCache();
+  EXPECT_EQ(1UL, store_->statsSource().cachedCounters().size());
 
   EXPECT_CALL(*this, free(_));
   EXPECT_EQ(1L, c1.use_count());

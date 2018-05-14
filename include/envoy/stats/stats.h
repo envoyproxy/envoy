@@ -227,21 +227,21 @@ typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
 /**
  * Provides sinks with access to stats during periodic stat flushes.
  */
-class FlushSource {
+class StatsSource {
 public:
-  virtual ~FlushSource() {}
+  virtual ~StatsSource() {}
 
   /**
    * Returns all known counters. Will use values cached during the flush if already accessed.
    * @return std::vector<CounterSharedPtr>& all known counters. Note: reference may not be valid
-   * after resetFlushCache() is called.
+   * after clearCache() is called.
    */
   virtual const std::vector<CounterSharedPtr>& cachedCounters() PURE;
 
   /**
    * Returns all known gauges. Will use values cached during the flush if already accessed.
    * @return std::vector<GaugeSharedPtr>& all known counters. Note: reference may not be valid after
-   * resetFlushCache() is called.
+   * clearCache() is called.
    */
   virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
 
@@ -249,14 +249,14 @@ public:
    * Returns all known parent histograms. Will use values cached during the flush if already
    * accessed.
    * @return std::vector<ParentHistogramSharedPtr>& all known counters. Note: reference may not be
-   * valid after resetFlushCache() is called.
+   * valid after clearCache() is called.
    */
   virtual const std::vector<ParentHistogramSharedPtr>& cachedHistograms() PURE;
 
   /**
    * Resets the cache so that any future calls to get cached metrics will refresh the set.
    */
-  virtual void resetFlushCache() PURE;
+  virtual void clearCache() PURE;
 };
 
 /**
@@ -268,9 +268,9 @@ public:
 
   /**
    * Periodic metric flush to the sink.
-   * @param flush_source interface through which the sink can access all metrics being flushed.
+   * @param stats_source interface through which the sink can access all metrics being flushed.
    */
-  virtual void flush(FlushSource& flush_source) PURE;
+  virtual void flush(StatsSource& stats_source) PURE;
 
   /**
    * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
@@ -390,10 +390,10 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Returns the flushSource that provides metrics to Sinks during a flush.
-   * @return FlushDelegate& the flush source.
+   * Returns the statsSource that provides metrics to Sinks during a flush.
+   * @return StatsSource& the flush source.
    */
-  virtual FlushSource& flushSource() PURE;
+  virtual StatsSource& statsSource() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
