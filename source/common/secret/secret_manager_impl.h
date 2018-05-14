@@ -24,7 +24,6 @@ class SecretManagerImpl : public SecretManager, Logger::Loggable<Logger::Id::ups
   SecretPtr getStaticSecret(const std::string& name) override;
 
  private:
-  Server::Instance& server_;
   SecretPtrMap static_secrets_;
 };
 
