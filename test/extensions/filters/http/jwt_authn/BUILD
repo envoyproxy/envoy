@@ -28,7 +28,7 @@ envoy_cc_test(
     deps = [
         "//source/exe:envoy_common_lib",
         "//source/extensions/filters/http/jwt_authn:jwt_lib",
-	"//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
 )
