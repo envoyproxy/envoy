@@ -1,5 +1,5 @@
 #include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
@@ -230,9 +230,7 @@ public:
   void SetUp() { SetupConfig(ExampleConfig); }
 
   void SetupConfig(const std::string& json_str) {
-    google::protobuf::util::Status status =
-        ::google::protobuf::util::JsonStringToMessage(json_str, &config_);
-    ASSERT_TRUE(status.ok());
+    MessageUtil::loadFromJson(json_str, config_);
     store_factory_ = ::std::make_shared<DataStoreFactory>(config_, mock_factory_ctx_);
     auth_ = Authenticator::create(store_factory_);
   }
