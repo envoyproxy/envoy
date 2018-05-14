@@ -30,7 +30,7 @@ message OutlierDetection {
   google.protobuf.Duration base_ejection_time = 3 [(validate.rules).duration.gt = {}];
 
   // The maximum % of an upstream cluster that can be ejected due to outlier
-  // detection. Defaults to 10%.
+  // detection. Defaults to 10% but will eject at least one host regardless of the value.
   google.protobuf.UInt32Value max_ejection_percent = 4 [(validate.rules).uint32.lte = 100];
 
   // The % chance that a host will be actually ejected when an outlier status

@@ -120,8 +120,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(request_info.protocol());
     };
-  } else if (field_name == "CLIENT_IP" || field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    // DEPRECATED: "CLIENT_IP" will be removed post 1.6.0.
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
       return RequestInfo::Utility::formatDownstreamAddressNoPort(
           *request_info.downstreamRemoteAddress());

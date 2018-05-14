@@ -59,10 +59,6 @@ public:
   }
 };
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithClientIpVariable) {
-  testFormatting("CLIENT_IP", "127.0.0.1");
-}
-
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDownstreamRemoteAddressVariable) {
   testFormatting("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT", "127.0.0.1");
 }
@@ -253,7 +249,7 @@ TEST(HeaderParserTest, TestParseInternal) {
     absl::optional<std::string> expected_exception_;
   };
 
-  time_t start_time_epoch = 1522280158;
+  const time_t start_time_epoch = 1522280158;
   SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
   const std::string timestamp =
       AccessLog::AccessLogFormatUtils::durationToString(start_time.time_since_epoch());
@@ -449,7 +445,7 @@ TEST(HeaderParserTest, EvaluateHeaders) {
     "request_headers_to_add": [
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP%"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       }
     ]
   }
@@ -520,25 +516,25 @@ route:
   request_headers_to_add:
     - header:
         key: "x-prefix"
-        value: "prefix-%CLIENT_IP%"
+        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-suffix"
-        value: "%CLIENT_IP%-suffix"
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
     - header:
         key: "x-both"
-        value: "prefix-%CLIENT_IP%-suffix"
+        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
     - header:
         key: "x-escaping-1"
-        value: "%%%CLIENT_IP%%%"
+        value: "%%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%%%"
     - header:
         key: "x-escaping-2"
         value: "%%%%%%"
     - header:
         key: "x-multi"
-        value: "%PROTOCOL% from %CLIENT_IP%"
+        value: "%PROTOCOL% from %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-multi-back-to-back"
-        value: "%PROTOCOL%%CLIENT_IP%"
+        value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
@@ -604,7 +600,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-client-ip",
-        "value": "%CLIENT_IP%"
+        "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       },
       {
         "key": "x-request-start",
@@ -626,7 +622,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  time_t start_time_epoch = 1522280158;
+  const time_t start_time_epoch = 1522280158;
   SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
   EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
 
@@ -667,7 +663,7 @@ route:
   response_headers_to_add:
     - header:
         key: "x-client-ip"
-        value: "%CLIENT_IP%"
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       append: true
     - header:
         key: "x-request-start"

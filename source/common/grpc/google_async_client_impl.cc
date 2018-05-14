@@ -1,9 +1,8 @@
 #include "common/grpc/google_async_client_impl.h"
 
-#include "envoy/grpc/google_async_site.h"
-
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
+#include "common/grpc/google_grpc_creds_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -71,25 +70,8 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  const auto& google_grpc = config.google_grpc();
-  std::shared_ptr<grpc::ChannelCredentials> creds = GoogleSite::channelCredentials(google_grpc);
-  // TODO(htuch): add support for OAuth2, GCP, etc. credentials.
-  if (creds == nullptr) {
-    if (google_grpc.has_ssl_credentials()) {
-      const grpc::SslCredentialsOptions ssl_creds = {
-          .pem_root_certs =
-              Config::DataSource::read(google_grpc.ssl_credentials().root_certs(), true),
-          .pem_private_key =
-              Config::DataSource::read(google_grpc.ssl_credentials().private_key(), true),
-          .pem_cert_chain =
-              Config::DataSource::read(google_grpc.ssl_credentials().cert_chain(), true),
-      };
-      creds = grpc::SslCredentials(ssl_creds);
-    } else {
-      creds = grpc::InsecureChannelCredentials();
-    }
-  }
-  std::shared_ptr<grpc::Channel> channel = CreateChannel(google_grpc.target_uri(), creds);
+  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config);
+  std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
   stats_.streams_total_ = &scope_->counter("streams_total");

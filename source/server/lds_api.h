@@ -15,16 +15,18 @@ namespace Server {
 /**
  * LDS API implementation that fetches via Subscription.
  */
-class LdsApi : public Init::Target,
-               Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
-               Logger::Loggable<Logger::Id::upstream> {
+class LdsApiImpl : public LdsApi,
+                   public Init::Target,
+                   Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
+                   Logger::Loggable<Logger::Id::upstream> {
 public:
-  LdsApi(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
-         Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-         Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-         ListenerManager& lm);
+  LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
+             Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+             Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
+             Stats::Scope& scope, ListenerManager& lm);
 
-  const std::string versionInfo() const { return version_info_; }
+  // Server::LdsApi
+  std::string versionInfo() const override { return version_info_; }
 
   // Init::Target
   void initialize(std::function<void()> callback) override;

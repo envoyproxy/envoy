@@ -1,10 +1,8 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
-#include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -15,22 +13,15 @@ namespace IpTagging {
 /**
  * Config registration for the router filter. @see NamedHttpFilterConfigFactory.
  */
-class IpTaggingFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class IpTaggingFilterFactory
+    : public Common::FactoryBase<envoy::config::filter::http::ip_tagging::v2::IPTagging> {
 public:
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override;
+  IpTaggingFilterFactory() : FactoryBase(HttpFilterNames::get().IP_TAGGING) {}
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::ip_tagging::v2::IPTagging()};
-  }
-
-  std::string name() override { return HttpFilterNames::get().IP_TAGGING; }
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::ip_tagging::v2::IPTagging& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace IpTagging

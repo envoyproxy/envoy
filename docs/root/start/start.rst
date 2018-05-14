@@ -149,6 +149,7 @@ features. The following sandboxes are available:
     sandboxes/front_proxy
     sandboxes/zipkin_tracing
     sandboxes/jaeger_tracing
+    sandboxes/jaeger_native_tracing
     sandboxes/grpc_bridge
 
 Other use cases

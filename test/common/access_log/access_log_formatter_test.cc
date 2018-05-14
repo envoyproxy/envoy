@@ -155,11 +155,6 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter upstream_format("DOWNSTREAM_ADDRESS");
-    EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, header, request_info));
-  }
-
-  {
     RequestInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, header, request_info));
   }

@@ -5,7 +5,8 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "bd5a2bba8f4238db2e06c99ac808fc8327dec2a0",  # 2018-05-07
+        # Do not upgrade further until https://github.com/abseil/abseil-cpp/issues/118 is fixed.
+        commit = "26b789f9a53d086c8b8c9c2668efb251e37861cd",  # 2018-05-04
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
@@ -13,7 +14,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "0c44450723e34c9d8768e69b11bf919be83fd2ed",  # 2018-04-30
+        commit = "476687ac9cc636fc92ac3070246d757ae6854547",  # 2018-05-08
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
@@ -79,9 +80,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(
-        sha256 = "0cc6607e2daa675101e9b7398a436f09167dffb8ca0489b0307ff7260498c13c",
-        strip_prefix = "protobuf-3.5.0",
-        urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
+        sha256 = "826425182ee43990731217b917c5c3ea7190cfda141af4869e6d4ad9085a740f",
+        strip_prefix = "protobuf-3.5.1",
+        urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",

@@ -9,7 +9,8 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
-* admin: added :http:get:`/config_dump` for dumping current configs
+* admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
+  version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
@@ -27,6 +28,7 @@ Version history
   to close tcp_proxy upstream connections when health checks fail.
 * cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -73,6 +75,8 @@ Version history
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * stats: added support for histograms.
+* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
+* tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.

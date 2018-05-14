@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilter(
+Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
   JsonTranscoderConfigSharedPtr filter_config =
@@ -29,16 +29,7 @@ Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactory(
     Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
   Config::FilterJson::translateGrpcJsonTranscoder(json_config, proto_config);
-  return createFilter(proto_config, stat_prefix, context);
-}
-
-Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stat_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder&>(proto_config),
-      stat_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
 }
 
 /**

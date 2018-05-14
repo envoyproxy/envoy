@@ -81,12 +81,20 @@ public:
 
 class MockConfigTracker : public ConfigTracker {
 public:
-  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
-  MOCK_METHOD2(addReturnsRaw, EntryOwner*(std::string, Cb));
-  EntryOwnerPtr add(const std::string& key, Cb callback) override {
-    return EntryOwnerPtr{addReturnsRaw(key, std::move(callback))};
-  }
+  MockConfigTracker();
+  ~MockConfigTracker();
+
   struct MockEntryOwner : public EntryOwner {};
+
+  MOCK_METHOD2(add_, EntryOwner*(std::string, Cb));
+
+  // Server::ConfigTracker
+  MOCK_CONST_METHOD0(getCallbacksMap, const CbsMap&());
+  EntryOwnerPtr add(const std::string& key, Cb callback) override {
+    return EntryOwnerPtr{add_(key, std::move(callback))};
+  }
+
+  std::unordered_map<std::string, Cb> config_tracker_callbacks_;
 };
 
 class MockAdmin : public Admin {
@@ -101,7 +109,7 @@ public:
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
 
-  NiceMock<MockConfigTracker> config_tracker;
+  NiceMock<MockConfigTracker> config_tracker_;
 };
 
 class MockDrainManager : public DrainManager {
@@ -173,7 +181,11 @@ public:
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override {
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+    return LdsApiPtr{createLdsApi_(lds_config)};
+  }
 
+  MOCK_METHOD1(createLdsApi_, LdsApi*(const envoy::api::v2::core::ConfigSource& lds_config));
   MOCK_METHOD2(createNetworkFilterFactoryList,
                std::vector<Network::FilterFactoryCb>(
                    const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -197,7 +209,9 @@ public:
   MockListenerManager();
   ~MockListenerManager();
 
-  MOCK_METHOD2(addOrUpdateListener, bool(const envoy::api::v2::Listener& config, bool modifiable));
+  MOCK_METHOD3(addOrUpdateListener, bool(const envoy::api::v2::Listener& config,
+                                         const std::string& version_info, bool modifiable));
+  MOCK_METHOD1(createLdsApi, void(const envoy::api::v2::core::ConfigSource& lds_config));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package test.integration;
+
+import "google/protobuf/empty.proto";
+
+message Event {
+  oneof event_selector {
+    // Downstream sent given bytes.
+    bytes downstream_send_bytes = 1;
+    // Downstream received some bytes.
+    google.protobuf.Empty downstream_recv_bytes = 2;
+    // Upstream sent given bytes.
+    bytes upstream_send_bytes = 3;
+    // Upstream received some bytes.
+    google.protobuf.Empty upstream_recv_bytes = 4;
+  }
+}
+
+// Test case in corpus for *_capture_fuzz_test.
+message CaptureFuzzTestCase {
+  repeated Event events = 1;
+}

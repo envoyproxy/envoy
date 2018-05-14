@@ -1,0 +1,74 @@
+version: '2'
+services:
+
+  front-envoy:
+    build:
+      context: ../
+      dockerfile: front-proxy/Dockerfile-frontenvoy
+    volumes:
+      - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
+      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
+      - ./start-front.sh:/start-front.sh
+    entrypoint: /start-front.sh
+    networks:
+      - envoymesh
+    expose:
+      - "80"
+      - "8001"
+    ports:
+      - "8000:80"
+      - "8001:8001"
+
+  service1:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
+      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
+      - ./start-service.sh:/start-service.sh
+    entrypoint: /start-service.sh
+    networks:
+      envoymesh:
+        aliases:
+          - service1
+    environment:
+      - SERVICE_NAME=1
+    expose:
+      - "80"
+
+  service2:
+    build:
+      context: ../front-proxy
+      dockerfile: Dockerfile-service
+    volumes:
+      - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
+      - ./install-jaeger-plugin.sh:/install-jaeger-plugin.sh
+      - ./start-service.sh:/start-service.sh
+    entrypoint: /start-service.sh
+    networks:
+      envoymesh:
+        aliases:
+          - service2
+    environment:
+      - SERVICE_NAME=2
+    expose:
+      - "80"
+
+  jaeger:
+    image: jaegertracing/all-in-one
+    environment:
+      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+    networks:
+      envoymesh:
+        aliases:
+          - jaeger
+    expose:
+      - "9411"
+      - "16686"
+    ports:
+      - "9411:9411"
+      - "16686:16686"
+
+networks:
+  envoymesh: {}
