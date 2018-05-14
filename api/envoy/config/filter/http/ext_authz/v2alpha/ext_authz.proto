@@ -6,7 +6,9 @@ option go_package = "v2alpha";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
-// The external authorization HTTP service configuration.
+// [#protodoc-title: HTTP External Authorization ]
+// The external authorization HTTP service configuration :ref:`configuration overview <config_http_filters_ext_authz>`.
+
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;
@@ -15,6 +17,10 @@ message HttpService {
   string path_prefix = 2;
 }
 
+// External Authorization filter calls out to an external service over the
+// gRPC Authorization API defined by
+// :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+// A failed check will cause this filter to close the HTTP request with 403(Forbidden).
 message ExtAuthz {
 
   oneof services {
@@ -27,8 +33,8 @@ message ExtAuthz {
 
   // The filter's behaviour in case the external authorization service does
   // not respond back. If set to true then in case of failure to get a
-  // response back from the authorization service or getting a response that
-  // is NOT denied then traffic will be permitted.
+  // response back or a response that is NOT denied then traffic will be
+  // permitted.
   // Defaults to false.
   bool failure_mode_allow = 2;
 }

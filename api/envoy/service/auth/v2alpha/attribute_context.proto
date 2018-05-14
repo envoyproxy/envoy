@@ -1,12 +1,15 @@
 syntax = "proto3";
 
-// [#proto-status: draft]
-
 package envoy.service.auth.v2alpha;
 
 import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/timestamp.proto";
+
+// [#protodoc-title: Attribute Context ]
+
+// See :ref:`network filter configuration overview <config_network_filters_ext_authz>`
+// and :ref:`HTTP filter configuration overview <config_http_filters_ext_authz>`.
 
 // An attribute is a piece of metadata that describes an activity on a network.
 // For example, the size of an HTTP request, or the status code of an HTTP response.
