@@ -43,11 +43,6 @@ public:
    * request.
    */
   virtual const Http::HeaderMap& getRequestHeaders() const PURE;
-
-  /**
-   * @return bool value of end_stream_on_complete.
-   */
-  virtual bool endStreamOnComplete() const PURE;
 };
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds

@@ -32,33 +32,6 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Implementation of Server::AdminStream.
- */
-class AdminStreamImpl : public AdminStream {
-public:
-  AdminStreamImpl(Http::StreamDecoderFilterCallbacks& callbacks, Http::HeaderMap& request_headers,
-                  std::list<std::function<void()>>& on_destroy_callbacks)
-      : callbacks_(callbacks), request_headers_(request_headers),
-        on_destroy_callbacks_(on_destroy_callbacks){};
-  void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
-  void addOnDestroyCallback(std::function<void()> cb) override;
-  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override {
-    return callbacks_;
-  }
-  const Http::HeaderMap& getRequestHeaders() const override { return request_headers_; }
-  bool endStreamOnComplete() const override { return end_stream_on_complete_; }
-
-private:
-  // the callbacks member is a reference to a member of a ConnectionManagerImpl object. It is
-  // destroyed when connection is terminated. handlers using it should invalidate the reference by
-  // adding a method to be run when onDestroy() is invoked, using addOnDestroyCallback().
-  const Http::StreamDecoderFilterCallbacks& callbacks_;
-  const Http::HeaderMap& request_headers_;
-  std::list<std::function<void()>>& on_destroy_callbacks_;
-  bool end_stream_on_complete_ = true;
-};
-
-/**
  * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
@@ -262,7 +235,9 @@ private:
 /**
  * A terminal HTTP filter that implements server admin functionality.
  */
-class AdminFilter : public Http::StreamDecoderFilter, Logger::Loggable<Logger::Id::admin> {
+class AdminFilter : public Http::StreamDecoderFilter,
+                    public AdminStream,
+                    Logger::Loggable<Logger::Id::admin> {
 public:
   AdminFilter(AdminImpl& parent);
 
@@ -277,6 +252,14 @@ public:
     callbacks_ = &callbacks;
   }
 
+  // AdminStream
+  void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
+  void addOnDestroyCallback(std::function<void()> cb) override;
+  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override {
+    return *callbacks_;
+  }
+  const Http::HeaderMap& getRequestHeaders() const override { return *request_headers_; }
+
 private:
   /**
    * Called when an admin request has been completely received.
@@ -284,9 +267,13 @@ private:
   void onComplete();
 
   AdminImpl& parent_;
+  // Handlers relying on the reference should use addOnDestroyCallback()
+  // to add a callback that will notify them when the reference is no
+  // longer valid.
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::HeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
+  bool end_stream_on_complete_ = true;
 };
 
 /**

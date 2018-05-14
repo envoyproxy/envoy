@@ -91,12 +91,8 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
-    Http::MockStreamDecoderFilterCallbacks callbacks;
-    std::list<std::function<void()>> on_destroy_callbacks{};
     admin_filter_.decodeHeaders(request_headers_, false);
-    AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
-
-    return admin_.runCallback(path_and_query, response_headers, response, admin_stream);
+    return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -160,13 +156,9 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
   admin_filter_.decodeHeaders(request_headers_, false);
-  Http::MockStreamDecoderFilterCallbacks callbacks;
-  std::list<std::function<void()>> on_destroy_callbacks{};
-
-  AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
-  EXPECT_NO_LOGS(EXPECT_EQ(
-      Http::Code::InternalServerError,
-      admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map, data, admin_stream)));
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
+                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
+                                                              data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -214,47 +206,6 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
-}
-
-TEST_P(AdminInstanceTest, AdminStream) {
-  // Cover endStreamOnComplete().
-  // Add an handler that sets end_stream_on_complete on the AdminStream object.
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream& admin_stream) -> Http::Code {
-    admin_stream.setEndStreamOnComplete(false);
-
-    // check that value is set to false
-    if (admin_stream.endStreamOnComplete())
-      return Http::Code::NotAcceptable;
-    return Http::Code::OK;
-  };
-
-  // Add non removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
-  Http::HeaderMapImpl header_map;
-  Buffer::OwnedImpl response;
-  EXPECT_EQ(Http::Code::OK, getCallback("/foo/bar", header_map, response));
-
-  // Cover getDecoderFilterCallbacks() method.
-  auto method = Http::Headers::get().MethodValues.Get;
-  request_headers_.insertMethod().value(method.data(), method.size());
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
-  ON_CALL(callbacks, streamId()).WillByDefault(testing::Return(1234));
-  std::list<std::function<void()>> on_destroy_callbacks{};
-  AdminStreamImpl admin_stream(callbacks, request_headers_, on_destroy_callbacks);
-
-  // Instead of the double cast, maybe streamId() can be changed to const method?
-  Http::MockStreamDecoderFilterCallbacks& got_callbacks =
-      const_cast<Http::MockStreamDecoderFilterCallbacks&>(
-          dynamic_cast<const Http::MockStreamDecoderFilterCallbacks&>(
-              admin_stream.getDecoderFilterCallbacks()));
-  EXPECT_EQ(got_callbacks.streamId(), 1234);
-
-  // Cover getRequestHeaders() method.
-  const Http::TestHeaderMapImpl temp_request_headers;
-
-  const Http::TestHeaderMapImpl got_request_headers = admin_stream.getRequestHeaders();
-  EXPECT_EQ(got_request_headers.byteSize(), request_headers_.byteSize());
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
