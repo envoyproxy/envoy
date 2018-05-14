@@ -183,44 +183,62 @@ message JwtHeader {
   string value_prefix = 2;
 }
 
+// This message specifies a Jwt requirement.
+//
+// .. code-block:: yaml
+//
+//    required_issuers: [jwt_issuer1, jwt_issuer2]
+//
+// PerRouteConfig for jwt_authn filter uses this message.
+message JwtRequirement {
+  // Specify list of required Jwt issuers. If list is empty,  Jwt is NOT required.
+  repeated string required_issuers = 1;
+
+  // It only applies when required_issuers field is not empty.
+  // If true, the request is allowed if JWT is missing or JWT verification fails.
+  // Default is false, a request without JWT or failed JWT verification is not allowed.
+  bool allow_missing_or_failed = 2;
+}
+
+// This message specifies a Jwt requirement for a specific Route condition.
+// For example:
+//
+// .. code-block:: yaml
+//
+//    - match:
+//         prefix: "/healthz"
+//      requirement:
+//         required_issuers: []
+//    - match:
+//         prefix: "/"
+//      requirement:
+//         required_issuers: [jwt_issuer1]
+//         allow_missing_or_failed: true
+//
+message RouteRequirement {
+  // The route matching parameter.  Only match is satisfied, the other fields will apply.
+  //
+  // For example: following match will match all requests.
+  //
+  // .. code-block:: yaml
+  //
+  //    match:
+  //       prefix: "/"
+  //
+  envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
+
+  // Specifies the Jwt requiement for matched routes.
+  JwtRequirement requirement = 2;
+}
+
 // This is the Envoy HTTP filter config for JWT authentication.
 // [#not-implemented-hide:]
 message JwtAuthentication {
   // List of JWT rules to valide.
   repeated JwtRule rules = 1;
 
-  // If true, the request is allowed if JWT is missing or JWT verification fails.
-  // Default is false, a request without JWT or failed JWT verification is not allowed.
-  bool allow_missing_or_failed = 2;
-
-  // This field lists the patterns allowed to bypass JWT verification. This only applies when
-  // `allow_missing_or_failed_jwt` is false. Under this config, if a request doesn't have JWT, it
-  // will be rejected. But some requests still needed to be forwarded without JWT, such as OPTIONS
-  // for CORS and some health checking paths.
-  //
-  // Examples: bypass all CORS options requests
-  //
-  // .. code-block:: yaml
-  //
-  //   bypass:
-  //   - headers:
-  //     - name: :method
-  //       value: OPTIONS
-  //   - headers:
-  //     - name: :path
-  //       regex_match: /.*
-  //
-  // Examples: bypass /healthz check
-  //
-  // .. code-block:: yaml
-  //
-  //   bypass:
-  //   - headers:
-  //     - name: :method
-  //       value: GET
-  //   - headers:
-  //     - name: :path
-  //       exact_match: /healthz
-  //
-  repeated envoy.api.v2.route.RouteMatch bypass = 3;
+  // Specifies requirements based on the route matches. The first matched requirement will be
+  // applied. If there are overlapped match conditions, please put the most specific match first.
+  // If PerRouteConfig is specified for the route, this field will not be uesd.
+  repeated RouteRequirement routes = 2;
 }
