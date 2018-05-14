@@ -197,6 +197,7 @@ public:
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
   void enableHalfClose(bool enabled);
+  bool connected() const { return !disconnected_; }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
