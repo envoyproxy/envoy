@@ -273,7 +273,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
-      {"%START_TIME_SINCE_EPOCH%", {timestamp}, {}},
+      {"%START_TIME%", {timestamp}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -303,82 +303,8 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
-      // Un-terminated variable expressions with arguments.
-      {"%VAR(no array)%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after "
-        "'VAR(', but found 'n'"}},
-      {"%VAR( no array)%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after "
-        "'VAR( ', but found 'n'"}},
-      {"%VAR([)",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ')'"}},
-      {"%VAR([ )",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([ ', but found "
-        "')'"}},
-      {"%VAR([\"x\")%",
-       {},
-       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
-        "'VAR([\"x\"', but found ')'"}},
-      {"%VAR([\"x\" )%",
-       {},
-       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
-        "'VAR([\"x\" ', but found ')'"}},
-      {"%VAR([\"x\\",
-       {},
-       {"Invalid header configuration. Un-terminated backslash in JSON string after 'VAR([\"x'"}},
-      {"%VAR([\"x\"]!",
-       {},
-       {"Invalid header configuration. Expecting ')' or whitespace after "
-        "'VAR([\"x\"]', but found '!'"}},
-      {"%VAR([\"x\"] !",
-       {},
-       {"Invalid header configuration. Expecting ')' or whitespace after "
-        "'VAR([\"x\"] ', but found '!'"}},
-      {"%VAR([\"x\"])!",
-       {},
-       {"Invalid header configuration. Expecting '%' or whitespace after "
-        "'VAR([\"x\"])', but found '!'"}},
-      {"%VAR([\"x\"]) !",
-       {},
-       {"Invalid header configuration. Expecting '%' or whitespace after "
-        "'VAR([\"x\"]) ', but found '!'"}},
-
-      // Argument errors
-      {"%VAR()%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "')'"}},
-      {"%VAR( )%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR( ', but found "
-        "')'"}},
-      {"%VAR([])%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ']'"}},
-      {"%VAR( [ ] )%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ ', but found "
-        "']'"}},
-      {"%VAR([\"ns\",])%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([\"ns\",', but "
-        "found ']'"}},
-      {"%VAR( [ \"ns\" , ] )%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ \"ns\" , ', but "
-        "found ']'"}},
-      {"%VAR({\"ns\": \"key\"})%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "'{'"}},
-      {"%VAR(\"ns\", \"key\")%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "'\"'"}},
+      // TODO(dio): Un-terminated variable expressions with arguments and argument errors are not
+      // checked anymore. Find a way to check it, either at UPSTREAM_METADATA site or somewhere else.
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -604,7 +530,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-request-start",
-        "value": "%START_TIME_SINCE_EPOCH%"
+        "value": "%START_TIME%"
       }
     ]
   }
@@ -667,7 +593,7 @@ route:
       append: true
     - header:
         key: "x-request-start"
-        value: "%START_TIME_SINCE_EPOCH%"
+        value: "%START_TIME(OK)%"
       append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -682,6 +608,7 @@ route:
   EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
+  EXPECT_EQ("OK", headerMap.get_("x-request-start"));
 }
 
 } // namespace Router
