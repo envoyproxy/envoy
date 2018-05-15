@@ -192,13 +192,11 @@ message JwtHeader {
 // PerRouteConfig for jwt_authn filter uses this message.
 message JwtRequirement {
   // Specify list of required Jwt issuers. If list is empty,  Jwt is NOT required.
-  // For multiple required_issuers, all are required.
+  // If any of required issuers is missing, or its verification fails, the request will
+  // be rejected.
+  // If a Jwt issuer is not required and is in the config, it will be verified.
+  // But it will not fail the request if its verification fails.
   repeated string required_issuers = 1;
-
-  // It only applies when required_issuers field is not empty.
-  // If true, the request is allowed if JWT is missing or JWT verification fails.
-  // Default is false, a request without JWT or failed JWT verification is not allowed.
-  bool allow_missing_or_failed = 2;
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
