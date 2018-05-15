@@ -16,7 +16,7 @@ LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::Cid
   for (const auto& tag : tag_data) {
     num_prefixes += tag.second.size();
   }
-  size_t max_prefixes = MaxLcTrieNodes * fill_factor / 2;
+  const size_t max_prefixes = MaxLcTrieNodes * fill_factor / 2;
   if (num_prefixes > max_prefixes) {
     throw EnvoyException(fmt::format("The input vector has '{0}' CIDR range entries. LC-Trie "
                                      "can only support '{1}' CIDR ranges with the specified "

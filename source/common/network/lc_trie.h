@@ -26,7 +26,7 @@ namespace LcTrie {
  * @note If the size of LcTrieInternal::LcNode::address_ ever changes, this constant
  *       should be changed to match.
  */
-static const size_t MaxLcTrieNodes = (1 << 20);
+constexpr size_t MaxLcTrieNodes = (1 << 20);
 
 /**
  * Level Compressed Trie for tagging IP addresses. Both IPv4 and IPv6 addresses are supported
