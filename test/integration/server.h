@@ -44,8 +44,8 @@ public:
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool v2ConfigOnly() const override { return false; }
-  const std::string& adminAddressPath() const  override { return admin_address_path_; }
-  Network::Address::IpVersion localAddressIpVersion() const  override {
+  const std::string& adminAddressPath() const override { return admin_address_path_; }
+  Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }

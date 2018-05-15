@@ -37,7 +37,9 @@ public:
   const std::string& configYaml() const override { return config_yaml_; }
   bool v2ConfigOnly() const override { return v2_config_only_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
-  Network::Address::IpVersion localAddressIpVersion() const override { return local_address_ip_version_; }
+  Network::Address::IpVersion localAddressIpVersion() const override {
+    return local_address_ip_version_;
+  }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
   const std::string& logFormat() const override { return log_format_; }
@@ -45,7 +47,9 @@ public:
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
-  std::chrono::milliseconds fileFlushIntervalMsec() const override { return file_flush_interval_msec_; }
+  std::chrono::milliseconds fileFlushIntervalMsec() const override {
+    return file_flush_interval_msec_;
+  }
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
