@@ -112,8 +112,9 @@ TEST_P(Http2IntegrationTest, MaxHeadersInCodec) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  codec_client_->startRequest(big_headers, *response_);
-  response_->waitForReset();
+  auto encoder_decoder = codec_client_->startRequest(big_headers);
+  auto response = std::move(encoder_decoder.second);
+  response->waitForReset();
   codec_client_->close();
 }
 
@@ -158,18 +159,17 @@ TEST_P(Http2IntegrationTest, GoAway) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  request_encoder_ = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                                          {":path", "/healthcheck"},
-                                                                          {":scheme", "http"},
-                                                                          {":authority", "host"}},
-                                                  *response_);
+  auto encoder_decoder = codec_client_->startRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
   codec_client_->goAway();
   codec_client_->sendData(*request_encoder_, 0, true);
-  response_->waitForEndStream();
+  response->waitForEndStream();
   codec_client_->close();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
@@ -190,8 +190,6 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::StreamEncoder* encoder1;
   Http::StreamEncoder* encoder2;
-  IntegrationStreamDecoderPtr response1(new IntegrationStreamDecoder(*dispatcher_));
-  IntegrationStreamDecoderPtr response2(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   int32_t request1_bytes = 1024;
@@ -212,22 +210,25 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Start request 1
-  encoder1 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response1);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  encoder1 = &encoder_decoder.first;
+  auto response1 = std::move(encoder_decoder.second);
 
   fake_upstream_connection1 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   upstream_request1 = fake_upstream_connection1->waitForNewStream(*dispatcher_);
 
   // Start request 2
-  response2.reset(new IntegrationStreamDecoder(*dispatcher_));
-  encoder2 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response2);
+  auto encoder_decoder2 =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  encoder2 = &encoder_decoder2.first;
+  auto response2 = std::move(encoder_decoder2.second);
   fake_upstream_connection2 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   upstream_request2 = fake_upstream_connection2->waitForNewStream(*dispatcher_);
 
@@ -235,7 +236,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   codec_client_->sendData(*encoder1, request1_bytes, true);
   upstream_request1->waitForEndStream(*dispatcher_);
 
-  // Finish request 2
+  // Finish request i2
   codec_client_->sendData(*encoder2, request2_bytes, true);
   upstream_request2->waitForEndStream(*dispatcher_);
 
@@ -275,30 +276,31 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::StreamEncoder* encoder1;
   Http::StreamEncoder* encoder2;
-  IntegrationStreamDecoderPtr response1(new IntegrationStreamDecoder(*dispatcher_));
-  IntegrationStreamDecoderPtr response2(new IntegrationStreamDecoder(*dispatcher_));
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Start request 1
-  encoder1 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response1);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  encoder1 = &encoder_decoder.first;
+  auto response1 = std::move(encoder_decoder.second);
 
   fake_upstream_connection1 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   upstream_request1 = fake_upstream_connection1->waitForNewStream(*dispatcher_);
 
   // Start request 2
-  response2.reset(new IntegrationStreamDecoder(*dispatcher_));
-  encoder2 = &codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                  {":path", "/test/long/url"},
-                                                                  {":scheme", "http"},
-                                                                  {":authority", "host"}},
-                                          *response2);
+  auto encoder_decoder2 =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  encoder2 = &encoder_decoder2.first;
+  auto response2 = std::move(encoder_decoder2.second);
   fake_upstream_connection2 = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   upstream_request2 = fake_upstream_connection2->waitForNewStream(*dispatcher_);
 
@@ -391,8 +393,9 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
-    responses.push_back(IntegrationStreamDecoderPtr{new IntegrationStreamDecoder(*dispatcher_)});
-    encoders.push_back(&codec_client_->startRequest(headers, *responses[i]));
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    encoders.push_back(&encoder_decoder.first);
+    responses.push_back(std::move(encoder_decoder.second));
     codec_client_->sendData(*encoders[i], request_bytes, true);
   }
 

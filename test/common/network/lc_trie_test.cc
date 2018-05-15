@@ -46,7 +46,6 @@ public:
   std::unique_ptr<LcTrie> trie_;
 };
 
-// TODO(ccaraman): Add a performance and memory benchmark test.
 // Use the default constructor values.
 TEST_F(LcTrieTest, IPv4Defaults) {
   std::vector<std::vector<std::string>> cidr_range_strings = {
@@ -303,8 +302,19 @@ TEST_F(LcTrieTest, NestedPrefixesWithCatchAll) {
 
 // Test the trie can only support 2^19 Cidr Entries.
 TEST_F(LcTrieTest, MaximumEntriesException) {
-  Address::CidrRange cidr_entry = Address::CidrRange::create("1.2.3.4/32");
-  std::vector<Address::CidrRange> large_vector_cidr(((1 << 19) + 1), cidr_entry);
+  static const size_t num_prefixes = (1 << 19) + 1;
+  std::vector<Address::CidrRange> large_vector_cidr;
+  large_vector_cidr.reserve(num_prefixes);
+  for (size_t i = 0; i < 256; i++) {
+    for (size_t j = 0; j < 256; j++) {
+      for (size_t k = 0; k < 8; k++) {
+        large_vector_cidr.emplace_back(
+            Address::CidrRange::create(fmt::format("10.{}.{}.{}/32", i, j, k)));
+      }
+    }
+  }
+  large_vector_cidr.emplace_back(Address::CidrRange::create("0.0.0.1/32"));
+  EXPECT_EQ(num_prefixes, large_vector_cidr.size());
 
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", large_vector_cidr);

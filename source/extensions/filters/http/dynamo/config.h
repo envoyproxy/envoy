@@ -15,11 +15,10 @@ namespace Dynamo {
  */
 class DynamoFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  Server::Configuration::HttpFilterFactoryCb
-  createFilter(const std::string& stat_prefix,
-               Server::Configuration::FactoryContext& context) override;
+  DynamoFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().DYNAMO) {}
 
-  std::string name() override { return HttpFilterNames::get().DYNAMO; }
+  Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
+                                     Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Dynamo

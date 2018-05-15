@@ -2,9 +2,11 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_sh_test",
     "envoy_select_hot_restart",
 )
@@ -40,6 +42,37 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
+    ],
+)
+
+py_binary(
+    name = "capture_fuzz_gen",
+    srcs = ["capture_fuzz_gen.py"],
+    licenses = ["notice"],  # Apache 2
+    visibility = ["//visibility:public"],
+    deps = [
+        ":capture_fuzz_proto_py",
+        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_py",
+    ],
+)
+
+envoy_proto_library(
+    name = "capture_fuzz_proto",
+    srcs = [":capture_fuzz.proto"],
+    external_deps = ["well_known_protos"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_fuzz_test",
+    srcs = ["h1_capture_fuzz_test.cc"],
+    corpus = "h1_capture_corpus",
+    deps = [
+        ":capture_fuzz_proto",
+        ":http_integration_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 
@@ -221,7 +254,7 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
@@ -239,6 +272,7 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/transport_sockets/capture:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
@@ -360,12 +394,15 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
+        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_cc",
     ],
 )
 

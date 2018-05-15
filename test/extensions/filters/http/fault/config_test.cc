@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
+
 #include "extensions/filters/http/fault/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -35,8 +37,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -49,8 +50,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);
@@ -59,7 +59,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
 TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FaultFilterFactory factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
+  Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));

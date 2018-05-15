@@ -44,9 +44,9 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
+void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   typedef std::unique_ptr<HostVector> HostListPtr;
-  std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state(1);
+  std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state;
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -69,7 +69,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
     }
-    if (priority_state.size() <= priority) {
+    if (priority_state.size() <= priority + 1) {
       priority_state.resize(priority + 1);
     }
     if (priority_state[priority].first == nullptr) {
@@ -95,6 +95,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
 
   // Track whether we rebuilt any LB structures.
   bool cluster_rebuilt = false;
+
+  // Loop over existing priorities not present in the config. This will empty out any priorities
+  // the config update did not refer to
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
       if (locality_weights_map_.size() <= i) {
@@ -105,6 +108,20 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources) {
                                  locality_weights_map_[i], priority_state[i].second);
     }
   }
+
+  // Loop over all priorities not present in the config that already exists. This will
+  // empty out any remaining priority that the config update did not refer to.
+  for (size_t i = priority_state.size(); i < priority_set_.hostSetsPerPriority().size(); ++i) {
+    const HostVector empty_hosts;
+    LocalityWeightsMap empty_locality_map;
+
+    if (locality_weights_map_.size() <= i) {
+      locality_weights_map_.resize(i + 1);
+    }
+    cluster_rebuilt |= updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), empty_hosts,
+                                              locality_weights_map_[i], empty_locality_map);
+  }
+
   if (!cluster_rebuilt) {
     info_->stats().update_no_rebuild_.inc();
   }
@@ -129,8 +146,7 @@ bool EdsClusterImpl::updateHostsPerLocality(HostSet& host_set, const HostVector&
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            health_checker_ != nullptr) ||
+  if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
     LocalityWeightsSharedPtr locality_weights;

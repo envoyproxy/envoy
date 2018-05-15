@@ -15,14 +15,14 @@ namespace Echo {
 class EchoConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
-  createFilterFactory(const Json::Object&, Server::Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
+                                               Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<EchoFilter>());
     };
   }
 
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {

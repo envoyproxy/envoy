@@ -226,11 +226,18 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
 DiskLayer::DiskLayer(const std::string& name, const std::string& path,
                      Api::OsSysCalls& os_sys_calls)
     : OverrideLayerImpl{name}, os_sys_calls_(os_sys_calls) {
-  walkDirectory(path, "");
+  walkDirectory(path, "", 1);
 }
 
-void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix) {
+void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth) {
   ENVOY_LOG(debug, "walking directory: {}", path);
+  if (depth > MaxWalkDepth) {
+    throw EnvoyException(fmt::format("Walk recursion depth exceded {}", MaxWalkDepth));
+  }
+  // Check if this is an obviously bad path.
+  if (Filesystem::illegalPath(path)) {
+    throw EnvoyException(fmt::format("Invalid path: {}", path));
+  }
   Directory current_dir(path);
   while (true) {
     errno = 0;
@@ -259,7 +266,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
     if (S_ISDIR(stat_result.st_mode) && std::string(entry->d_name) != "." &&
         std::string(entry->d_name) != "..") {
-      walkDirectory(full_path, full_prefix);
+      walkDirectory(full_path, full_prefix, depth + 1);
     } else if (S_ISREG(stat_result.st_mode)) {
       // Suck the file into a string. This is not very efficient but it should be good enough
       // for small files. Also, as noted elsewhere, none of this is non-blocking which could

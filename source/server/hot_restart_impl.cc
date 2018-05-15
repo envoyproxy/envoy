@@ -168,7 +168,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
-  memset(&data, 0, Stats::RawStatData::size());
+  memset(static_cast<void*>(&data), 0, Stats::RawStatData::size());
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {

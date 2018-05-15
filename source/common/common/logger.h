@@ -5,14 +5,13 @@
 #include <string>
 #include <vector>
 
-#include "envoy/access_log/access_log.h"
-#include "envoy/filesystem/filesystem.h"
 #include "envoy/thread/thread.h"
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -43,7 +42,9 @@ namespace Logger {
   FUNCTION(testing)              \
   FUNCTION(tracing)              \
   FUNCTION(upstream)             \
-  FUNCTION(grpc)
+  FUNCTION(grpc)                 \
+  FUNCTION(stats)
+
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)
@@ -107,22 +108,6 @@ protected:
 private:
   SinkDelegate* previous_delegate_;
   DelegatingLogSinkPtr log_sink_;
-};
-
-/**
- * SinkDelegate that writes log messages to a file.
- */
-class FileSinkDelegate : public SinkDelegate {
-public:
-  FileSinkDelegate(const std::string& log_path, AccessLog::AccessLogManager& log_manager,
-                   DelegatingLogSinkPtr log_sink);
-
-  // SinkDelegate
-  void log(absl::string_view msg) override;
-  void flush() override;
-
-private:
-  Filesystem::FileSharedPtr log_file_;
 };
 
 /**

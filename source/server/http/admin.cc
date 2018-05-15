@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2/config_dump.pb.h"
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -36,6 +36,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -243,8 +244,6 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 
 Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
                                       Buffer::Instance& response, AdminStream&) {
-  response.add(fmt::format("version_info::{}\n", server_.clusterManager().versionInfo()));
-
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
                    response);
@@ -301,7 +300,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
                                         Buffer::Instance& response, AdminStream&) const {
-  envoy::admin::v2::ConfigDump dump;
+  envoy::admin::v2alpha::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
@@ -311,6 +310,8 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
     config_dump_map[key_callback_pair.first] = any_message;
   }
 
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
@@ -408,8 +409,6 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream& admin_stream) {
-  // We currently don't support timers locally (only via statsd) so just group all the counters
-  // and gauges together, alpha sort them, and spit them out.
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   std::map<std::string, uint64_t> all_stats;
@@ -421,10 +420,33 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     all_stats.emplace(gauge->name(), gauge->value());
   }
 
+  // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
+  // multimap here. This makes sure that duplicate histograms get output. When shared storage is
+  // implemented this can be switched back to a normal map.
+  std::multimap<std::string, std::string> all_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
+    if (histogram->used()) {
+      std::vector<std::string> summary;
+      const std::vector<double>& supported_quantiles_ref =
+          histogram->intervalStatistics().supportedQuantiles();
+      summary.reserve(supported_quantiles_ref.size());
+      for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+        summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                      histogram->intervalStatistics().computedQuantiles()[i],
+                                      histogram->cumulativeStatistics().computedQuantiles()[i]));
+      }
+
+      all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+    }
+  }
+
   if (params.size() == 0) {
     // No Arguments so use the standard.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
+    }
+    for (auto histogram : all_histograms) {
+      response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   } else {
     const std::string format_key = params.begin()->first;
@@ -432,7 +454,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_key == "format" && format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats));
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms()));
     } else if (format_key == "format" && format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -473,6 +495,7 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
   return fmt::format("envoy_{0}", sanitizeName(extractedName));
 }
 
+// TODO(ramaraochavali): Add summary histogram output for Prometheus.
 uint64_t
 PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
                                             const std::list<Stats::GaugeSharedPtr>& gauges,
@@ -500,7 +523,9 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats) {
+std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                                   const std::list<Stats::ParentHistogramSharedPtr>& all_histograms,
+                                   const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -516,10 +541,67 @@ std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_st
     stat_obj.AddMember("value", stat_value, allocator);
     stats_array.PushBack(stat_obj, allocator);
   }
+
+  Value histograms_container_obj;
+  histograms_container_obj.SetObject();
+
+  Value histograms_obj;
+  histograms_obj.SetObject();
+
+  // It is not possible for the supported quantiles to differ across histograms, so it is ok to
+  // send them once.
+  Stats::HistogramStatisticsImpl empty_statistics;
+  rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
+  for (double quantile : empty_statistics.supportedQuantiles()) {
+    Value quantile_type;
+    quantile_type.SetDouble(quantile * 100);
+    supported_quantile_array.PushBack(quantile_type, allocator);
+  }
+  histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
+  rapidjson::Value histogram_array(rapidjson::kArrayType);
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
+    if (histogram->used()) {
+      Value histogram_obj;
+      histogram_obj.SetObject();
+      Value histogram_name;
+      histogram_name.SetString(histogram->name().c_str(), allocator);
+      histogram_obj.AddMember("name", histogram_name, allocator);
+
+      rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
+
+      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+        Value quantile_obj;
+        quantile_obj.SetObject();
+        Value interval_value;
+        if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
+          interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("interval", interval_value, allocator);
+        Value cumulative_value;
+        // We skip nan entries to put in the {null, null} entry to keep other data aligned.
+        if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
+          cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
+        }
+        quantile_obj.AddMember("cumulative", cumulative_value, allocator);
+        computed_quantile_array.PushBack(quantile_obj, allocator);
+      }
+      histogram_obj.AddMember("values", computed_quantile_array, allocator);
+      histogram_array.PushBack(histogram_obj, allocator);
+    }
+  }
+  histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
+  histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
+  stats_array.PushBack(histograms_container_obj, allocator);
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
+  if (pretty_print) {
+    rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  } else {
+    rapidjson::Writer<StringBuffer> writer(strbuf);
+    document.Accept(writer);
+  }
   return strbuf.GetString();
 }
 
@@ -673,9 +755,7 @@ void AdminFilter::onComplete() {
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
-
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
-
   header_map->insertStatus().value(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map->ContentType() == nullptr) {
@@ -708,8 +788,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
     : server_(server), profile_path_(profile_path),
       socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
-      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.tracing.",
-                                                                       server_.stats())),
+      tracing_stats_(
+          Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},

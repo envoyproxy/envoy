@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
+#include "common/router/metadatamatchcriteria_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -336,28 +337,6 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   TcpProxyConfig config_obj(config, factory_context_);
 
   EXPECT_EQ(2, config_obj.accessLogs().size());
-}
-
-class TcpProxyNoConfigTest : public testing::Test {
-public:
-  TcpProxyNoConfigTest() {}
-
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<TcpProxyFilter> filter_;
-};
-
-TEST_F(TcpProxyNoConfigTest, Initialization) {
-  filter_.reset(new TcpProxyFilter(nullptr, factory_context_.cluster_manager_));
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
-}
-
-TEST_F(TcpProxyNoConfigTest, ReadDisableDownstream) {
-  filter_.reset(new TcpProxyFilter(nullptr, factory_context_.cluster_manager_));
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
-
-  filter_->readDisableDownstream(true);
 }
 
 class TcpProxyTest : public testing::Test {
@@ -873,14 +852,14 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
 
-// Test that access log fields %DOWNSTREAM_ADDRESS% and %DOWNSTREAM_LOCAL_ADDRESS% are correctly
-// logged.
+// Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
+// %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.local_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
-  setup(1, accessLogConfig("%DOWNSTREAM_ADDRESS% %DOWNSTREAM_LOCAL_ADDRESS%"));
+  setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }

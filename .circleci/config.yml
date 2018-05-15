@@ -1,6 +1,6 @@
 references:
   envoy-build-image: &envoy-build-image
-    envoyproxy/envoy-build:220e5cb537b5185c953de1aac7d0613f8cf155ac
+    envoyproxy/envoy-build:7f7f5666c72e00ac7c1909b4fc9a2121d772c859
 
 version: 2
 jobs:
@@ -78,6 +78,7 @@ jobs:
            EOF
 
            sudo service docker restart
+     - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
      - run: ./ci/do_circle_ci_ipv6_tests.sh
 
    coverage:

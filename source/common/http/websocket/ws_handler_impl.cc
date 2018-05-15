@@ -13,19 +13,58 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
+Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr
+tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
+               Server::Configuration::FactoryContext& factory_context) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_config;
+
+  // Set the default value. This may be overwritten below.
+  tcp_config.set_stat_prefix("websocket");
+
+  if (route_config.has_websocket_config()) {
+    // WebSocket has its own TcpProxy config type because some of the fields
+    // in envoy::config::filter::network::tcp_proxy::v2::TcpProxy don't apply, and some
+    // are duplicated in the route config (such as the upstream cluster).
+    const envoy::api::v2::route::RouteAction::WebSocketProxyConfig& ws_config =
+        route_config.websocket_config();
+
+    if (!ws_config.stat_prefix().empty()) {
+      tcp_config.set_stat_prefix(ws_config.stat_prefix());
+    }
+
+    if (ws_config.has_idle_timeout()) {
+      *tcp_config.mutable_idle_timeout() = ws_config.idle_timeout();
+    }
+
+    if (ws_config.has_max_connect_attempts()) {
+      *tcp_config.mutable_max_connect_attempts() = ws_config.max_connect_attempts();
+    }
+  }
+  return std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyConfig>(tcp_config,
+                                                                                factory_context);
+}
+
 WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
                              const RequestInfo::RequestInfo& request_info,
-                             const Router::RouteEntry& route_entry, WsHandlerCallbacks& callbacks,
+                             const Router::RouteEntry& route_entry,
+                             WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
-                             Network::ReadFilterCallbacks* read_callbacks)
-    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(nullptr, cluster_manager),
+                             Network::ReadFilterCallbacks* read_callbacks,
+                             Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config)
+    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(config, cluster_manager),
       request_headers_(request_headers), request_info_(request_info), route_entry_(route_entry),
       ws_callbacks_(callbacks) {
 
-  initializeReadFilterCallbacks(*read_callbacks);
+  // set_connection_stats == false because the http connection manager has already set them
+  // and they will be inaccurate if we change them now.
+  initialize(*read_callbacks, false);
+  onNewConnection();
 }
 
 void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
+  ASSERT(state_ == ConnectState::PreConnect);
+  state_ = ConnectState::Failed;
+
   Code http_code = Code::InternalServerError;
   switch (failure_reason) {
   case UpstreamFailureReason::CONNECT_FAILED:
@@ -43,22 +82,29 @@ void WsHandlerImpl::onInitFailure(UpstreamFailureReason failure_reason) {
 }
 
 Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
+  ENVOY_LOG(trace, "WsHandlerImpl::onData with buffer length {}, end_stream == {}", data.length(),
             end_stream);
 
-  // If we are connected to upstream, then data should have been drained already.
-  // And if we're not connected yet, it is expected that TcpProxy will readDisable(true)
-  // the downstream connection until it is ready to send data to the upstream connection,
-  // so onData() should be called zero or one times before is_connected_ is true.
-  ASSERT(queued_data_.length() == 0);
+  switch (state_) {
+  case ConnectState::PreConnect:
+    // It is expected that TcpProxy will readDisable(true) the downstream connection until it is
+    // ready to send data to the upstream connection, so onData() should be called zero or one times
+    // before state_ becomes Connected.
+    ASSERT(queued_data_.length() == 0);
 
-  if (is_connected_) {
-    ENVOY_LOG(debug, "WsHandlerImpl::onData is connected");
-    return Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(data, end_stream);
-  } else {
-    ENVOY_LOG(debug, "WsHandlerImpl::onData is NOT connected");
+    ENVOY_LOG(trace, "WsHandlerImpl::onData is NOT connected");
     queued_data_.move(data);
     queued_end_stream_ = end_stream;
+    break;
+  case ConnectState::Connected:
+    // Data should have been drained already when we transitioned to Connected.
+    ASSERT(queued_data_.length() == 0);
+
+    ENVOY_LOG(trace, "WsHandlerImpl::onData is connected");
+    return Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(data, end_stream);
+  case ConnectState::Failed:
+    ENVOY_LOG(trace, "WsHandlerImpl::onData state_ == Failed; discarding");
+    break;
   }
 
   return Network::FilterStatus::StopIteration;
@@ -92,9 +138,10 @@ void WsHandlerImpl::onConnectionSuccess() {
   Http1::ClientConnectionImpl upstream_http(*upstream_connection_, http_conn_callbacks_);
   Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
   upstream_request.encodeHeaders(request_headers_, false);
-  is_connected_ = true;
+  ASSERT(state_ == ConnectState::PreConnect);
+  state_ = ConnectState::Connected;
   if (queued_data_.length() > 0 || queued_end_stream_) {
-    ENVOY_LOG(debug, "WsHandlerImpl::onConnectionSuccess calling TcpProxy::onData");
+    ENVOY_LOG(trace, "WsHandlerImpl::onConnectionSuccess calling TcpProxy::onData");
     Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(queued_data_, queued_end_stream_);
     ASSERT(queued_data_.length() == 0);
   }

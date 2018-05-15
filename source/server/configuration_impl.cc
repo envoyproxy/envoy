@@ -25,17 +25,18 @@ namespace Server {
 namespace Configuration {
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
-                                          const std::vector<NetworkFilterFactoryCb>& factories) {
-  for (const NetworkFilterFactoryCb& factory : factories) {
+                                          const std::vector<Network::FilterFactoryCb>& factories) {
+  for (const Network::FilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 
   return filter_manager.initializeReadFilters();
 }
 
-bool FilterChainUtility::buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                                          const std::vector<ListenerFilterFactoryCb>& factories) {
-  for (const ListenerFilterFactoryCb& factory : factories) {
+bool FilterChainUtility::buildFilterChain(
+    Network::ListenerFilterManager& filter_manager,
+    const std::vector<Network::ListenerFilterFactoryCb>& factories) {
+  for (const Network::ListenerFilterFactoryCb& factory : factories) {
     factory(filter_manager);
   }
 
@@ -47,18 +48,12 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
-      server.localInfo(), server.accessLogManager());
+      server.localInfo(), server.accessLogManager(), server.admin());
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
-    server.listenerManager().addOrUpdateListener(listeners[i], false);
-  }
-
-  if (bootstrap.dynamic_resources().has_lds_config()) {
-    lds_api_.reset(new LdsApi(bootstrap.dynamic_resources().lds_config(), *cluster_manager_,
-                              server.dispatcher(), server.random(), server.initManager(),
-                              server.localInfo(), server.stats(), server.listenerManager()));
+    server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
 
   stats_flush_interval_ =

@@ -73,10 +73,9 @@ void SdsSubscription::parseResponse(const Http::Message& response) {
     locality_lb_endpoints->mutable_lb_endpoints()->Swap(&it.second);
   }
 
-  callbacks_->onConfigUpdate(resources);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);
-  version_info_ = hash.first;
+  callbacks_->onConfigUpdate(resources, hash.first);
   stats_.version_.set(hash.second);
   stats_.update_success_.inc();
 }

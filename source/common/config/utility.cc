@@ -157,7 +157,7 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
   }
 
   return std::chrono::milliseconds(
-      Protobuf::util::TimeUtil::DurationToMilliseconds(api_config_source.refresh_delay()));
+      DurationUtil::durationToMilliseconds(api_config_source.refresh_delay()));
 }
 
 void Utility::translateEdsConfig(const Json::Object& json_config,

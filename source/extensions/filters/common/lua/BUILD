@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -29,5 +30,6 @@ envoy_cc_library(
     deps = [
         ":lua_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/protobuf",
     ],
 )

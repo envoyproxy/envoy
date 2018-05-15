@@ -5,15 +5,20 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "787891a3882795cee0364e8a0f0dda315578d155",
+        # Do not upgrade further until https://github.com/abseil/abseil-cpp/issues/118 is fixed.
+        commit = "26b789f9a53d086c8b8c9c2668efb251e37861cd",  # 2018-05-04
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
         commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
         remote = "https://github.com/bombela/backward-cpp",
     ),
+    com_github_circonus_labs_libcircllhist = dict(
+        commit = "476687ac9cc636fc92ac3070246d757ae6854547",  # 2018-05-08
+        remote = "https://github.com/circonus-labs/libcircllhist",
+    ),
     com_github_cyan4973_xxhash = dict(
-        commit = "7caf8bd76440c75dfe1070d3acfbd7891aea8fca",  # v0.6.4
+        commit = "7cc9639699f64b750c0b82333dced9ea77e8436e",  # v0.6.5
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
@@ -39,16 +44,16 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "66b9770a8ad326c1ee0dbedc5a8f32a52a604567", # v1.10.1
+        commit = "bd44e485f69d70ca4095cea92decd98de3892aa6", # v1.11.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "f6be24043e00baa2a25e0c1bb8793433d44ecc8b",
+        commit = "900f9d9297a71ddf4a5dff2051a01493014c07c5", # v1.4.0
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
-        commit = "6a198acd328f976984699f7272bbec7c8b220f65",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.6.1
+        commit = "4ea8bda9aed08ad45d6db2a030a1464e8d9b783f",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.7.0
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
@@ -75,9 +80,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(
-        sha256 = "0cc6607e2daa675101e9b7398a436f09167dffb8ca0489b0307ff7260498c13c",
-        strip_prefix = "protobuf-3.5.0",
-        urls = ["https://github.com/google/protobuf/archive/v3.5.0.tar.gz"],
+        sha256 = "826425182ee43990731217b917c5c3ea7190cfda141af4869e6d4ad9085a740f",
+        strip_prefix = "protobuf-3.5.1",
+        urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",

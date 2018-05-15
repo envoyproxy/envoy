@@ -215,10 +215,32 @@ TEST(UtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Duration dest_duration;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::jsonConvert(source_duration, dest_duration),
-                            EnvoyException,
-                            "Unable to convert protobuf message to JSON string: INTERNAL:Duration "
-                            "seconds exceeds limit for field:  seconds: -281474976710656\n");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration), EnvoyException,
+                          "Unable to convert protobuf message to JSON string.*"
+                          "seconds exceeds limit for field:  seconds: -281474976710656\n");
+}
+
+TEST(DurationUtilTest, OutOfRange) {
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(-1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_nanos(1000000000);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
+  {
+    ProtobufWkt::Duration duration;
+    duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
+    EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
+  }
 }
 
 } // namespace Envoy

@@ -12,6 +12,7 @@ package_group(
 proto_library(
     name = "protos",
     deps = [
+        "//envoy/admin/v2alpha:config_dump",
         "//envoy/api/v2:cds",
         "//envoy/api/v2:discovery",
         "//envoy/api/v2:eds",
@@ -48,6 +49,8 @@ proto_library(
         "//envoy/config/metrics/v2:stats",
         "//envoy/config/ratelimit/v2:rls",
         "//envoy/config/trace/v2:trace",
+        "//envoy/config/transport_socket/capture/v2alpha:capture",
+        "//envoy/extensions/common/tap/v2alpha:capture",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/load_stats/v2:lrs",
         "//envoy/service/metrics/v2:metrics_service",

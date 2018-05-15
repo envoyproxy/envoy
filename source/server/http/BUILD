@@ -32,8 +32,8 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
-        "//source/common/common:logger_lib",
         "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/common:version_includes",
         "//source/common/html:utility_lib",
@@ -49,9 +49,10 @@ envoy_cc_library(
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
+        "//source/common/stats:stats_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
-        "@envoy_api//envoy/admin/v2:config_dump_cc",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 

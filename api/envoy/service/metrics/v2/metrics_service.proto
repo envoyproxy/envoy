@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-// [#proto-status: draft]
-
 package envoy.service.metrics.v2;
 option go_package = "v2";
 option java_generic_services = true;

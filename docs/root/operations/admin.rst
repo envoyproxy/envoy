@@ -115,9 +115,8 @@ modify different aspects of the server:
 .. http:get:: /config_dump
 
   Dump currently loaded configuration from various Envoy components as JSON-serialized proto
-  messages. Currently, only route configs are available but more are on the way. See
-  :api:`envoy/admin/v2/config_dump.proto` for more information. That proto is in draft state and is
-  subject to change.
+  messages. See the :ref:`response definition <envoy_api_msg_admin.v2alpha.ConfigDump>` for more
+  information.
 
 .. http:post:: /cpuprofiler
 
@@ -181,16 +180,65 @@ The fields are:
 
 .. http:get:: /stats
 
-  Outputs all statistics on demand. This includes only counters and gauges. Histograms are not
-  output as Envoy currently has no built in histogram support and relies on statsd for
-  aggregation. This command is very useful for local debugging. See :ref:`here <operations_stats>`
-  for more information.
+  Outputs all statistics on demand. This command is very useful for local debugging.
+  Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
+  The output for each quantile will be in the form of (interval,cumulative) where interval value
+  represents the summary since last flush interval and cumulative value represents the
+  summary since the start of envoy instance.
+  See :ref:`here <operations_stats>` for more information.
 
   .. http:get:: /stats?format=json
 
-  Outputs /stats in JSON format. This can be used for programmatic access of stats.
+  Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
+  will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
+  that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
+  that has the computed quantile for each histogram. Only histograms with recorded values will be exported.
 
-  .. http:get:: /stats?format=prometheus
+  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
+  
+  Example histogram output:
+
+.. code-block:: json
+
+  {
+    "histograms": {
+      "supported_quantiles": [
+        0, 25, 50, 75, 90, 95, 99, 99.9, 100
+      ],
+      "computed_quantiles": [
+        {
+          "name": "cluster.external_auth_cluster.upstream_cx_length_ms",
+          "values": [
+            {"interval": 0, "cumulative": 0},
+            {"interval": 0, "cumulative": 0},
+            {"interval": 1.0435787, "cumulative": 1.0435787},
+            {"interval": 1.0941565, "cumulative": 1.0941565},
+            {"interval": 2.0860023, "cumulative": 2.0860023},
+            {"interval": 3.0665233, "cumulative": 3.0665233},
+            {"interval": 6.046609, "cumulative": 6.046609},
+            {"interval": 229.57333,"cumulative": 229.57333},
+            {"interval": 260,"cumulative": 260}
+          ]
+        },
+        {
+          "name": "http.admin.downstream_rq_time",
+          "values": [
+            {"interval": null, "cumulative": 0},
+            {"interval": null, "cumulative": 0},
+            {"interval": null, "cumulative": 1.0435787},
+            {"interval": null, "cumulative": 1.0941565},
+            {"interval": null, "cumulative": 2.0860023},
+            {"interval": null, "cumulative": 3.0665233},
+            {"interval": null, "cumulative": 6.046609},
+            {"interval": null, "cumulative": 229.57333},
+            {"interval": null, "cumulative": 260}
+          ]
+        }
+      ]
+    }
+  }
+
+.. http:get:: /stats?format=prometheus
 
   or alternatively,
 

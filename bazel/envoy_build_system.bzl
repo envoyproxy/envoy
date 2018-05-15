@@ -1,4 +1,4 @@
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 
 def envoy_package():
     native.package(default_visibility = ["//visibility:public"])
@@ -19,7 +19,7 @@ def envoy_copts(repository, test = False):
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
     }) + select({
-        repository + "//bazel:disable_tcmalloc": [],
+        repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
         "//conditions:default": ["-DTCMALLOC"],
     }) + select({
         repository + "//bazel:disable_signal_trace": [],
@@ -37,9 +37,6 @@ def envoy_linkopts():
     return select({
         # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
         # Further, the system library transitively links common libraries (e.g., pthread).
-        # TODO(zuercher): build id could be supported via "-sectcreate __TEXT __build_id <file>"
-        # The file could should contain the current git SHA (or enough placeholder data to allow
-        # it to be rewritten by tools/git_sha_rewriter.py).
         "@bazel_tools//tools/osx:darwin": [
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000", "-image_base 100000000",
@@ -48,15 +45,6 @@ def envoy_linkopts():
             "-pthread",
             "-lrt",
             "-ldl",
-            # Force MD5 hash in build. This is part of the workaround for
-            # https://github.com/bazelbuild/bazel/issues/2805. Bazel actually
-            # does this by itself prior to
-            # https://github.com/bazelbuild/bazel/commit/724706ba4836c3366fc85b40ed50ccf92f4c3882.
-            # Ironically, forcing it here so that in future releases we will
-            # have the same behavior. When everyone is using an updated version
-            # of Bazel, we can use linkopts to set the git SHA1 directly in the
-            # --build-id and avoid doing the following.
-            '-Wl,--build-id=md5',
             '-Wl,--hash-style=gnu',
             "-static-libstdc++",
             "-static-libgcc",
@@ -64,6 +52,35 @@ def envoy_linkopts():
     }) + envoy_select_force_libcpp(["--stdlib=libc++"],
                                    ["-static-libstdc++", "-static-libgcc"]) \
     + envoy_select_exported_symbols(["-Wl,-E"])
+
+def _envoy_stamped_linkopts():
+  return select({
+    # Coverage builds in CI are failing to link when setting a build ID.
+    #
+    # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
+    "@envoy//bazel:coverage_build": [],
+
+    # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
+    # ELF section, so just stuff the raw ID into a new text section.
+    "@bazel_tools//tools/osx:darwin": [
+        "-sectcreate __TEXT __build_id", "$(location @envoy//bazel:raw_build_id.ldscript)"
+    ],
+
+    # Note: assumes GNU GCC (or compatible) handling of `--build-id` flag.
+    "//conditions:default": [
+        "-Wl,@$(location @envoy//bazel:gnu_build_id.ldscript)",
+    ],
+  })
+
+def _envoy_stamped_deps():
+  return select({
+    "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:raw_build_id.ldscript"
+    ],
+    "//conditions:default": [
+        "@envoy//bazel:gnu_build_id.ldscript",
+    ],
+  })
 
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
@@ -76,7 +93,7 @@ def envoy_test_linkopts():
         # TODO(mattklein123): It's not great that we universally link against the following libs.
         # In particular, -latomic and -lrt are not needed on all platforms. Make this more granular.
         "//conditions:default": ["-pthread", "-lrt", "-ldl"],
-    }) + envoy_select_force_libcpp([], ["-latomic"])
+    }) + envoy_select_force_libcpp(["-lc++experimental"], ["-lstdc++fs", "-latomic"])
 
 # References to Envoy external dependencies should be wrapped with this function.
 def envoy_external_dep_path(dep):
@@ -149,21 +166,6 @@ def envoy_cc_library(name,
         strip_include_prefix = strip_include_prefix,
    )
 
-def _git_stamped_genrule(repository, name):
-    # To workaround https://github.com/bazelbuild/bazel/issues/2805, we
-    # do binary rewriting to replace the linker produced MD5 hash with the
-    # version_generated.cc git SHA1 hash (truncated).
-    rewriter = repository + "//tools:git_sha_rewriter.py"
-    native.genrule(
-        name = name + "_stamped",
-        srcs = [name],
-        outs = [name + ".stamped"],
-        cmd = "cp $(location " + name + ") $@ && " +
-              "chmod u+w $@ && " +
-              "$(location " + rewriter + ") $@",
-        tools = [rewriter],
-    )
-
 # Envoy C++ binary targets should be specified with this function.
 def envoy_cc_binary(name,
                     srcs = [],
@@ -178,11 +180,9 @@ def envoy_cc_binary(name,
 
     if not linkopts:
         linkopts = envoy_linkopts()
-
-    # Implicit .stamped targets to obtain builds with the (truncated) git SHA1.
     if stamped:
-        _git_stamped_genrule(repository, name)
-        _git_stamped_genrule(repository, name + ".stripped")
+        linkopts = linkopts + _envoy_stamped_linkopts()
+        deps = deps + _envoy_stamped_deps()
     deps = deps + [envoy_external_dep_path(dep) for dep in external_deps]
     native.cc_binary(
         name = name,
@@ -194,8 +194,6 @@ def envoy_cc_binary(name,
         linkstatic = 1,
         visibility = visibility,
         malloc = tcmalloc_external_dep(repository),
-        # See above comment on MD5 hash, this is another "force MD5 stamps" to make sure our
-        # rewriting is robust.
         stamp = 1,
         deps = deps,
     )
@@ -301,6 +299,14 @@ def envoy_cc_test_library(name,
         linkstatic = 1,
     )
 
+# Envoy test binaries should be specified with this function.
+def envoy_cc_test_binary(name,
+                         **kargs):
+    envoy_cc_binary(name,
+                    testonly = 1,
+                    linkopts = envoy_test_linkopts(),
+                    **kargs)
+
 # Envoy Python test binaries should be specified with this function.
 def envoy_py_test_binary(name,
                          external_deps = [],
@@ -350,18 +356,22 @@ def _proto_header(proto_path):
   return None
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
+def envoy_proto_library(name, srcs = [], deps = [], external_deps = [],
+                        generate_python = True):
     # Ideally this would be native.{proto_library, cc_proto_library}.
     # Unfortunately, this doesn't work with http_api_protos due to the PGV
     # requirement to also use them in the non-native protobuf.bzl
     # cc_proto_library; you end up with the same file built twice. So, also
     # using protobuf.bzl cc_proto_library here.
     cc_proto_deps = []
+    py_proto_deps = ["@com_google_protobuf//:protobuf_python"]
 
     if "http_api_protos" in external_deps:
         cc_proto_deps.append("@googleapis//:http_api_protos")
+        py_proto_deps.append("@googleapis//:http_api_protos_py")
 
     if "well_known_protos" in external_deps:
+        # WKT is already included for Python as part of standard deps above.
         cc_proto_deps.append("@com_google_protobuf//:cc_wkt_protos")
 
     cc_proto_library(
@@ -375,6 +385,16 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = []):
         linkstatic = 1,
         visibility = ["//visibility:public"],
     )
+
+    if generate_python:
+        py_proto_library(
+            name = name + "_py",
+            srcs = srcs,
+            default_runtime = "@com_google_protobuf//:protobuf_python",
+            protoc = "@com_google_protobuf//:protoc",
+            deps = deps + py_proto_deps,
+            visibility = ["//visibility:public"],
+        )
 
 # Envoy proto descriptor targets should be specified with this function.
 # This is used for testing only.

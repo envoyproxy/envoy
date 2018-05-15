@@ -29,10 +29,10 @@ class HttpConnectionManagerFilterConfigFactory
       public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -44,7 +44,7 @@ public:
   std::string name() override { return NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb createFilter(
+  Network::FilterFactoryCb createFilter(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
       Server::Configuration::FactoryContext& context);
@@ -113,7 +113,7 @@ private:
   enum class CodecType { HTTP1, HTTP2, AUTO };
 
   Server::Configuration::FactoryContext& context_;
-  std::list<Server::Configuration::HttpFilterFactoryCb> filter_factories_;
+  std::list<Http::FilterFactoryCb> filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;

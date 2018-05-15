@@ -15,10 +15,11 @@ namespace GrpcHttp1Bridge {
  */
 class GrpcHttp1BridgeFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  Server::Configuration::HttpFilterFactoryCb
-  createFilter(const std::string&, Server::Configuration::FactoryContext& context) override;
+  GrpcHttp1BridgeFilterConfig()
+      : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GRPC_HTTP1_BRIDGE) {}
 
-  std::string name() override { return HttpFilterNames::get().GRPC_HTTP1_BRIDGE; }
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace GrpcHttp1Bridge

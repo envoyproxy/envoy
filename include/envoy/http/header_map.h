@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -466,9 +467,31 @@ public:
   virtual void remove(const LowerCaseString& key) PURE;
 
   /**
+   * Remove all instances of headers where the key begins with the supplied prefix.
+   * @param prefix supplies the prefix to match header keys against.
+   */
+  virtual void removePrefix(const LowerCaseString& prefix) PURE;
+
+  /**
    * @return the number of headers in the map.
    */
   virtual size_t size() const PURE;
+
+  /**
+   * Allow easy pretty-printing of the key/value pairs in HeaderMap
+   * @param os supplies the ostream to print to.
+   * @param headers the headers to print.
+   */
+  friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
+    headers.iterate(
+        [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+          *static_cast<std::ostream*>(context)
+              << "'" << header.key().c_str() << "', '" << header.value().c_str() << "'\n";
+          return HeaderMap::Iterate::Continue;
+        },
+        &os);
+    return os;
+  }
 };
 
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;

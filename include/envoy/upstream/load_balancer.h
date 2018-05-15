@@ -30,7 +30,7 @@ public:
    * @return Router::MetadataMatchCriteria* metadata for use in selecting a subset of hosts
    *         during load balancing.
    */
-  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+  virtual const Router::MetadataMatchCriteria* metadataMatchCriteria() PURE;
 
   /**
    * @return const Network::Connection* the incoming connection or nullptr to use during load

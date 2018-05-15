@@ -40,6 +40,7 @@ MockRequestInfo::MockRequestInfo()
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, bytesReceived()).WillByDefault(ReturnPointee(&bytes_received_));
   ON_CALL(*this, bytesSent()).WillByDefault(ReturnPointee(&bytes_sent_));
+  ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
 }
 
 MockRequestInfo::~MockRequestInfo() {}

@@ -27,6 +27,9 @@ message HttpGrpcAccessLogConfig {
 
   // Additional response headers to log in *HTTPResponseProperties.response_headers*.
   repeated string additional_response_headers_to_log = 3;
+
+  // Additional response trailers to log in *HTTPResponseProperties.response_trailers*.
+  repeated string additional_response_trailers_to_log = 4;
 }
 
 // Common configuration for gRPC access logs.

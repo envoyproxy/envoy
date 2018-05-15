@@ -82,6 +82,7 @@ public:
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false);
   const std::string& data() { return payload_reader_->data(); }
+  bool connected() const { return !disconnected_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -134,6 +135,8 @@ public:
   void setUpstreamProtocol(FakeHttpConnection::Type protocol);
   // Sets fake_upstreams_count_ and alters the upstream protocol in the config_helper_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
+  // Make test more deterministic by using a fixed RNG value.
+  void setDeterministic() { deterministic_ = true; }
 
   FakeHttpConnection::Type upstreamProtocol() const { return upstream_protocol_; }
 
@@ -205,6 +208,8 @@ private:
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   // True if initialized() has been called.
   bool initialized_{};
+  // True if test will use a fixed RNG value.
+  bool deterministic_{};
 };
 
 } // namespace Envoy

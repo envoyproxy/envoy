@@ -13,3 +13,4 @@ Common messages
   ../api/v2/core/grpc_service.proto
   ../api/v2/auth/cert.proto
   ../api/v2/ratelimit/ratelimit.proto
+  ../extensions/common/tap/v2alpha/capture.proto

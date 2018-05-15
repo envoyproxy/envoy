@@ -23,13 +23,11 @@ public:
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                  bool added_via_api);
 
-  const std::string versionInfo() const { return subscription_->versionInfo(); }
-
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources) override;
+  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();

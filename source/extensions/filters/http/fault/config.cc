@@ -12,10 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-Server::Configuration::HttpFilterFactoryCb
-FaultFilterFactory::createFilter(const envoy::config::filter::http::fault::v2::HTTPFault& config,
-                                 const std::string& stats_prefix,
-                                 Server::Configuration::FactoryContext& context) {
+Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
+    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(
       new FaultFilterConfig(config, context.runtime(), stats_prefix, context.scope()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -23,31 +22,20 @@ FaultFilterFactory::createFilter(const envoy::config::filter::http::fault::v2::H
   };
 }
 
-Server::Configuration::HttpFilterFactoryCb
+Http::FilterFactoryCb
 FaultFilterFactory::createFilterFactory(const Json::Object& json_config,
                                         const std::string& stats_prefix,
                                         Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::fault::v2::HTTPFault proto_config;
   Config::FilterJson::translateFaultFilter(json_config, proto_config);
-  return createFilter(proto_config, stats_prefix, context);
-}
-
-Server::Configuration::HttpFilterFactoryCb
-FaultFilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                 const std::string& stats_prefix,
-                                                 Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::http::fault::v2::HTTPFault&>(
-          proto_config),
-      stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 Router::RouteSpecificFilterConfigConstSharedPtr
-FaultFilterFactory::createRouteSpecificFilterConfig(const ProtobufWkt::Struct& struct_config) {
-  envoy::config::filter::http::fault::v2::HTTPFault proto_config;
-  MessageUtil::jsonConvert(struct_config, proto_config);
-  return std::make_shared<const Router::RouteSpecificFilterConfig>(
-      Fault::FaultSettings(proto_config));
+FaultFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::config::filter::http::fault::v2::HTTPFault& config,
+    Server::Configuration::FactoryContext&) {
+  return std::make_shared<const Fault::FaultSettings>(config);
 }
 
 /**

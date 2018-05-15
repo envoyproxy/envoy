@@ -39,16 +39,16 @@ TEST_P(IntegrationTest, ConnectionClose) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                               {":path", "/healthcheck"},
-                                                               {":authority", "host"},
-                                                               {"connection", "close"}},
-                                       *response_);
-  response_->waitForEndStream();
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/healthcheck"},
+                                                                   {":authority", "host"},
+                                                                   {"connection", "close"}});
+  response->waitForEndStream();
   codec_client_->waitForDisconnect();
 
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -112,6 +112,10 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
+  testUpstreamDisconnectWithTwoRequests();
+}
+
 TEST_P(IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
 
 TEST_P(IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
@@ -133,14 +137,13 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  codec_client_->makeHeaderOnlyRequest(
+  auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestHeaderMapImpl{{":method", "POST"},
                               {":path", "/test/long/url"},
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"content-type", "application/grpc"},
-                              {"x-envoy-retry-grpc-on", "cancelled"}},
-      *response_);
+                              {"x-envoy-retry-grpc-on", "cancelled"}});
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
@@ -148,9 +151,9 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024 * 65, false);
 
-  response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("500", response_->headers().Status()->value().c_str());
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -193,20 +196,28 @@ TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
-void setRouteUsingWebsocket(
-    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-  auto route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
-  route->mutable_match()->set_prefix("/websocket/test");
-  route->mutable_route()->set_prefix_rewrite("/websocket");
-  route->mutable_route()->set_cluster("cluster_0");
-  route->mutable_route()->mutable_use_websocket()->set_value(true);
-};
+ConfigHelper::HttpModifierFunction setRouteUsingWebsocket(
+    const envoy::api::v2::route::RouteAction::WebSocketProxyConfig* ws_config = nullptr) {
+  return
+      [ws_config](
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        auto route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        route->mutable_match()->set_prefix("/websocket/test");
+        route->mutable_route()->set_prefix_rewrite("/websocket");
+        route->mutable_route()->set_cluster("cluster_0");
+        route->mutable_route()->mutable_use_websocket()->set_value(true);
+
+        if (ws_config != nullptr) {
+          *route->mutable_route()->mutable_websocket_config() = *ws_config;
+        }
+      };
+}
 
 TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // Set a less permissive default route so it does not pick up the /websocket query.
   config_helper_.setDefaultHostAndRoute("*", "/asd");
   // Enable websockets for the path /websocket/test
-  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
   // WebSocket upgrade, send some data and disconnect downstream
@@ -222,6 +233,7 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str);
+  test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   const std::string data = fake_upstream_connection->waitForData(228);
   // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
@@ -248,7 +260,7 @@ TEST_P(IntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 
 TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   config_helper_.setDefaultHostAndRoute("*", "/asd");
-  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
   // WebSocket upgrade, send some data and disconnect upstream
@@ -288,7 +300,7 @@ TEST_P(IntegrationTest, WebSocketConnectionUpstreamDisconnect) {
 
 TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   config_helper_.setDefaultHostAndRoute("*", "/asd");
-  config_helper_.addConfigModifier(&setRouteUsingWebsocket);
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
   // WebSocket upgrade with early data (HTTP body)
@@ -324,6 +336,45 @@ TEST_P(IntegrationTest, WebSocketConnectionEarlyData) {
   EXPECT_EQ(upgrade_resp_str + early_data_resp_str, tcp_client->data());
 }
 
+TEST_P(IntegrationTest, WebSocketIdleTimeout) {
+  envoy::api::v2::route::RouteAction::WebSocketProxyConfig ws_config;
+  ws_config.mutable_idle_timeout()->set_nanos(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100)).count());
+  *ws_config.mutable_stat_prefix() = "my-stat-prefix";
+  config_helper_.setDefaultHostAndRoute("*", "/asd");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket(&ws_config));
+  initialize();
+
+  // WebSocket upgrade, send some data and disconnect downstream
+  IntegrationTcpClientPtr tcp_client;
+  FakeRawConnectionPtr fake_upstream_connection;
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
+                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+
+  tcp_client = makeTcpConnection(lookupPort("http"));
+  // Send websocket upgrade request
+  // The request path gets rewritten from /websocket/test to /websocket.
+  // The size of headers received by the destination is 228 bytes.
+  tcp_client->write(upgrade_req_str);
+  fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  const std::string data = fake_upstream_connection->waitForData(228);
+  // Accept websocket upgrade request
+  fake_upstream_connection->write(upgrade_resp_str);
+  tcp_client->waitForData(upgrade_resp_str);
+  // Standard TCP proxy semantics post upgrade
+  tcp_client->write("hello");
+  // datalen = 228 + strlen(hello)
+  fake_upstream_connection->waitForData(233);
+  fake_upstream_connection->write("world");
+  tcp_client->waitForData(upgrade_resp_str + "world");
+
+  test_server_->waitForCounterGe("tcp.my-stat-prefix.idle_timeout", 1);
+  tcp_client->waitForDisconnect();
+  fake_upstream_connection->waitForDisconnect();
+}
+
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -337,11 +388,12 @@ TEST_P(IntegrationTest, TestBind) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Request 1.
 
-  codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
-                                                             {":path", "/test/long/url"},
-                                                             {":scheme", "http"},
-                                                             {":authority", "host"}},
-                                     1024, *response_);
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         1024);
 
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   std::string address =
@@ -365,17 +417,16 @@ TEST_P(IntegrationTest, TestFailedBind) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // With no ability to successfully bind on an upstream connection Envoy should
   // send a 500.
-  codec_client_->makeHeaderOnlyRequest(
+  auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestHeaderMapImpl{{":method", "GET"},
                               {":path", "/test/long/url"},
                               {":scheme", "http"},
                               {":authority", "host"},
                               {"x-forwarded-for", "10.0.0.1"},
-                              {"x-envoy-upstream-rq-timeout-ms", "1000"}},
-      *response_);
-  response_->waitForEndStream();
-  EXPECT_TRUE(response_->complete());
-  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+                              {"x-envoy-upstream-rq-timeout-ms", "1000"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 

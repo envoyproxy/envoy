@@ -190,6 +190,12 @@ void Filter::sendLocalReply(Http::Code code, const std::string& body,
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
+  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
+  // These get stripped by HTTP/1 codec where applicable.
+  ASSERT(headers.Path());
+  ASSERT(headers.Method());
+  ASSERT(headers.Host());
+
   downstream_headers_ = &headers;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
@@ -284,29 +290,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
   FilterUtility::setUpstreamScheme(headers, *cluster_);
+
+  // Ensure an http transport scheme is selected before continuing with decoding.
+  ASSERT(headers.Scheme());
+
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
   do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
                                               callbacks_->streamId());
 
-  if (ENVOY_LOG_CHECK_LEVEL(debug)) {
-    headers.iterate(
-        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-          ENVOY_STREAM_LOG(debug, "  '{}':'{}'",
-                           *static_cast<Http::StreamDecoderFilterCallbacks*>(context),
-                           header.key().c_str(), header.value().c_str());
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        callbacks_);
-  }
-
-  // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
-  // These get stripped by HTTP/1 codec where applicable.
-  ASSERT(headers.Scheme());
-  ASSERT(headers.Method());
-  ASSERT(headers.Host());
-  ASSERT(headers.Path());
+  ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
@@ -804,7 +798,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   request_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, request_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
+                      request_info_);
   }
 }
 
@@ -833,6 +828,7 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
+  upstream_trailers_ = trailers.get();
   parent_.onUpstreamTrailers(std::move(trailers));
 }
 

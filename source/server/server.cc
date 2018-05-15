@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/config/bootstrap/v2//bootstrap.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
@@ -43,13 +44,16 @@ namespace Server {
 InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
                            TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
-                           ComponentFactory& component_factory, ThreadLocal::Instance& tls)
+                           ComponentFactory& component_factory,
+                           Runtime::RandomGeneratorPtr&& random_generator,
+                           ThreadLocal::Instance& tls)
     : options_(options), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
+      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
+      worker_factory_(thread_local_, *api_, hooks),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -99,8 +103,8 @@ void InstanceImpl::failHealthcheck(bool fail) {
   server_stats_->live_.set(!fail);
 }
 
-void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                                 Stats::Store& store) {
+void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
+                                       Stats::Store& store) {
   for (const auto& sink : sinks) {
     sink->beginFlush();
   }
@@ -122,6 +126,14 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
     }
   }
 
+  for (const Stats::ParentHistogramSharedPtr& histogram : store.histograms()) {
+    if (histogram->used()) {
+      for (const auto& sink : sinks) {
+        sink->flushHistogram(*histogram);
+      }
+    }
+  }
+
   for (const auto& sink : sinks) {
     sink->endFlush();
   }
@@ -129,19 +141,25 @@ void InstanceUtil::flushCountersAndGaugesToSinks(const std::list<Stats::SinkPtr>
 
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
-  HotRestart::GetParentStatsInfo info;
-  restarter_.getParentStats(info);
-  server_stats_->uptime_.set(time(nullptr) - original_start_time_);
-  server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                       info.memory_allocated_);
-  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-  server_stats_->parent_connections_.set(info.num_connections_);
-  server_stats_->total_connections_.set(numConnections() + info.num_connections_);
-  server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires());
-
-  InstanceUtil::flushCountersAndGaugesToSinks(config_->statsSinks(), stats_store_);
-  stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+  // A shutdown initiated before this callback may prevent this from being called as per
+  // the semantics documented in ThreadLocal's runOnAllThreads method.
+  stats_store_.mergeHistograms([this]() -> void {
+    HotRestart::GetParentStatsInfo info;
+    restarter_.getParentStats(info);
+    server_stats_->uptime_.set(time(nullptr) - original_start_time_);
+    server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
+                                         info.memory_allocated_);
+    server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+    server_stats_->parent_connections_.set(info.num_connections_);
+    server_stats_->total_connections_.set(numConnections() + info.num_connections_);
+    server_stats_->days_until_first_cert_expiring_.set(
+        sslContextManager().daysUntilFirstCertExpires());
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
+    // TODO(ramaraochavali): consider adding different flush interval for histograms.
+    if (stat_flush_timer_ != nullptr) {
+      stat_flush_timer_->enableTimer(config_->statsFlushInterval());
+    }
+  });
 }
 
 void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
@@ -211,12 +229,11 @@ void InstanceImpl::initialize(Options& options,
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options);
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap));
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
@@ -229,13 +246,13 @@ void InstanceImpl::initialize(Options& options,
   }
 
   server_stats_->version_.set(version_int);
-  bootstrap.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_.reset(
-      new LocalInfo::LocalInfoImpl(bootstrap.node(), local_address, options.serviceZone(),
+      new LocalInfo::LocalInfoImpl(bootstrap_.node(), local_address, options.serviceZone(),
                                    options.serviceClusterName(), options.serviceNodeName()));
 
-  Configuration::InitialImpl initial_config(bootstrap);
+  Configuration::InitialImpl initial_config(bootstrap_);
   ENVOY_LOG(debug, "admin address: {}", initial_config.admin().address()->asString());
 
   HotRestart::ShutdownParentAdminInfo info;
@@ -246,6 +263,8 @@ void InstanceImpl::initialize(Options& options,
                              initial_config.admin().profilePath(), options.adminAddressPath(),
                              initial_config.admin().address(), *this,
                              stats_store_.createScope("listener.admin.")));
+  config_tracker_entry_ =
+      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
   handler_->addListener(admin_->listener());
 
   loadServerFlags(initial_config.flagsPath());
@@ -276,7 +295,13 @@ void InstanceImpl::initialize(Options& options,
   // per above. See MainImpl::initialize() for why we do this pointer dance.
   Configuration::MainImpl* main_config = new Configuration::MainImpl();
   config_.reset(main_config);
-  main_config->initialize(bootstrap, *this, *cluster_manager_factory_);
+  main_config->initialize(bootstrap_, *this, *cluster_manager_factory_);
+
+  // Instruct the listener manager to create the LDS provider if needed. This must be done later
+  // because various items do not yet exist when the listener manager is created.
+  if (bootstrap_.dynamic_resources().has_lds_config()) {
+    listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+  }
 
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {
     stats_store_.addSink(*sink);
@@ -436,12 +461,21 @@ void InstanceImpl::shutdown() {
 
 void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
+  // TODO(mattklein123): Since histograms are not shared between processes, this will also stop
+  //                     histogram flushing. In the future we can consider whether we want to
+  //                     somehow keep flushing histograms from the old process.
   stat_flush_timer_.reset();
   handler_->stopListeners();
   admin_->mutable_socket().close();
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();
+}
+
+ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::BootstrapConfigDump>();
+  config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
+  return config_dump;
 }
 
 } // namespace Server

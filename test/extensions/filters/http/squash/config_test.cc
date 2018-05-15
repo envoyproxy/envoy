@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
+
 #include "extensions/filters/http/squash/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -26,8 +28,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SquashFilterConfigFactory factory;
-  Server::Configuration::HttpFilterFactoryCb cb =
-      factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   cb(filter_callback);

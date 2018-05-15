@@ -19,10 +19,10 @@ class MongoProxyFilterConfigFactory
     : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactory(const Json::Object& proto_config,
                       Server::Configuration::FactoryContext& context) override;
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext& context) override;
 
@@ -34,7 +34,7 @@ public:
   std::string name() override { return NetworkFilterNames::get().MONGO_PROXY; }
 
 private:
-  Server::Configuration::NetworkFilterFactoryCb
+  Network::FilterFactoryCb
   createFilter(const envoy::config::filter::network::mongo_proxy::v2::MongoProxy& proto_config,
                Server::Configuration::FactoryContext& context);
 };

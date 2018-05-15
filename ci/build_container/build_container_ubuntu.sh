@@ -4,8 +4,9 @@ set -e
 
 # Setup basic requirements and install them.
 apt-get update
+export DEBIAN_FRONTEND=noninteractive
 apt-get install -y wget software-properties-common make cmake git python python-pip \
-  bc libtool automake zip time golang g++ gdb strace
+  bc libtool automake zip time golang g++ gdb strace wireshark tshark
 # clang head (currently 5.0)
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"

@@ -1,6 +1,7 @@
 #include "uds_integration_test.h"
 
 #include "common/event/dispatcher_impl.h"
+#include "common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
 

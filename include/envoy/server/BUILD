@@ -26,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/http:header_map_interface",
         "//include/envoy/network:listen_socket_interface",
     ],
 )
