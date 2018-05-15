@@ -474,8 +474,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explictly configured on.
-      sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::UpgradeRequired, "",
-                     nullptr);
+      sendLocalReply(false, Code::UpgradeRequired, "", nullptr);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -824,7 +823,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     std::function<void(HeaderMap& headers)> modify_headers) {
   Utility::sendLocalReply(is_grpc_request,
                           [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-                            if (headers != nullptr && modify_headers != nullptr) {
+                            if (modify_headers != nullptr) {
                               modify_headers(*headers);
                             }
                             response_headers_ = std::move(headers);

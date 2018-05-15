@@ -266,7 +266,7 @@ private:
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-          if (headers != nullptr && modify_headers != nullptr) {
+          if (modify_headers != nullptr) {
             modify_headers(*headers);
           }
           encodeHeaders(std::move(headers), end_stream);
