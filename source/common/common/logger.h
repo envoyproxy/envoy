@@ -95,7 +95,7 @@ typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
  * On destruction, logging is reverted to its previous state. SinkDelegates must
  * be allocated/freed as a stack.
  */
-class SinkDelegate : NonCopyable /* circleCI please try again */ {
+class SinkDelegate : NonCopyable {
 public:
   explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
   virtual ~SinkDelegate();
