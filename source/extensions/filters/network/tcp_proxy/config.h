@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
-#include "envoy/server/filter_config.h"
+
+#include "extensions/filters/network/common/factory_base.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,25 +13,20 @@ namespace TcpProxy {
 /**
  * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class TcpProxyConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class TcpProxyConfigFactory
+    : public Common::FactoryBase<envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
 public:
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::FactoryContext& context) override;
+  TcpProxyConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
 
+  // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string name() override;
-
 private:
-  Network::FilterFactoryCb
-  createFilter(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
-               Server::Configuration::FactoryContext& context);
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace TcpProxy
