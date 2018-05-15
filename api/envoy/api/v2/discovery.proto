@@ -93,3 +93,87 @@ message DiscoveryResponse {
   // required for non-stream based xDS implementations.
   string nonce = 5;
 }
+
+// IncrementalDiscoveryRequest and IncrementalDiscoveryResponse are used in a
+// new gRPC endpoint for Incremental xDS. The feature is not supported for REST
+// management servers.
+//
+// With Incremental xDS, the IncrementalDiscoveryResponses do not need to
+// include a full snapshot of the tracked resources. Instead
+// IncrementalDiscoveryResponses are a diff to the state of a xDS client.
+// In Incremental XDS there are per resource versions which allows to track
+// state at the resource granularity.
+// An xDS Incremental session is always in the context of a gRPC bidirectional
+// stream. This allows the xDS server to keep track of the state of xDS clients
+// connected to it.
+//
+// In Incremental xDS the nonce field is required and used to pair
+// IncrementalDiscoveryResponse to a IncrementalDiscoveryRequest ACK or NACK.
+// Optionaly, a response message level system_version_info is present for
+// debugging purposes only.
+//
+// IncrementalDiscoveryRequest can be sent in 3 situations:
+//   1. Initial message in a xDS bidirectional gRPC stream.
+//   2. As a ACK or NACK response to a previous IncrementalDiscoveryResponse.
+//      In this case the response_nonce is set to the nonce value in the Response.
+//      ACK or NACK is determined by the absence or presence of error_detail.
+//      In the case of a ACK the system_version_info must match the value in the
+//      associated Response. Otherwise it must be set the value of the most recently
+//      ACKed Response.
+//   3. Spontaneous IncrementalDiscoveryRequest from the client.
+//      This can be done to dynamically add or remove elements from the tracked
+//      resource_names set.
+message IncrementalDiscoveryRequest {
+  // The node making the request.
+  core.Node node = 1;
+
+  // Type of the resource that is being requested, e.g.
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
+  // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
+  // required for ADS.
+  string type_url = 2;
+
+  // A list of Resource names to add to the list of tracked resources.
+  repeated string resource_names_subscribe = 3;
+  // A list of Resource names to remove from the list of tracked resources.
+  repeated string resource_names_unsubscribe = 4;
+
+  // This map must be populated when the IncrementalDiscoveryRequest is the
+  // first in a stream. The keys are know resources names to the xDS client and
+  // the value is the corresponding resource level version info.
+  resource_versions map<string, string> = 5;
+
+  // When the IncrementalDiscoveryRequest is a ACK or NACK message in response
+  // to a previous IncrementalDiscoveryResponse, the response_nonce must be the
+  // nonce in the IncrementalDiscoveryResponse.
+  string response_nonce = 6;
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  // failed to update configuration. The *message* field in *error_details*
+  // provides the Envoy internal exception related to the failure.
+  google.rpc.Status error_detail = 7;
+}
+
+message IncrementalDiscoveryResponse {
+  // The version of the response data (used for debugging).
+  string system_version_info = 1;
+
+  // The response resources. These are typed resources that match the type url
+  // in the IncrementalDiscoveryRequest.
+  repeated Resource resources = 2 [(gogoproto.nullable) = false];
+  // Resources names of resources that have be deleted and to be removed from the xDS Client.
+  // Removed resources for missing resources can be ignored.
+  repeated string removed_resources = 6;
+
+  // The nonce provides a way for IncrementalDiscoveryRequests to uniquely
+  // reference a IncrementalDiscoveryResponse. The nonce is required.
+  string nonce = 5;
+}
+
+message Resource {
+  // The resource level version. It allows xDS to track the state of individual
+  // resources.
+  string version = 1;
+
+  // The resource being tracked.
+  google.protobuf.Any resource = 2;
+}
