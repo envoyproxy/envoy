@@ -410,7 +410,11 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
 }
 
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
+  std::unique_lock<std::mutex> lock(lock_);
+  ASSERT_FALSE(disconnected_);
   connection_.dispatcher().post([data, end_stream, this]() -> void {
+    std::unique_lock<std::mutex> lock(lock_);
+    ASSERT_FALSE(disconnected_);
     Buffer::OwnedImpl to_write(data);
     connection_.write(to_write, end_stream);
   });
