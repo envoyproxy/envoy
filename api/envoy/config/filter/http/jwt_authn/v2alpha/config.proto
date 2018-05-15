@@ -237,8 +237,44 @@ message JwtAuthentication {
   // List of JWT rules to valide.
   repeated JwtRule rules = 1;
 
+  // DEPRECATED: Please use "routes" field. if "routes" field is not empty,
+  // this field will not be used.
+  // If true, the request is allowed if JWT is missing or JWT verification fails.
+  // Default is false, a request without JWT or failed JWT verification is not allowed.
+  bool allow_missing_or_failed = 2;
+
+  // DEPRECATED: it is not used.  Only keeps for backward compatibility.
+  // Examples: bypass /healthz check
+  //
+  // .. code-block:: yaml
+  //
+  //   bypass:
+  //   - headers:
+  //     - name: :method
+  //       value: GET
+  //   - headers:
+  //     - name: :path
+  //       exact_match: /healthz
+  //
+  repeated envoy.api.v2.route.RouteMatch bypass = 3;
+
   // Specifies requirements based on the route matches. The first matched requirement will be
   // applied. If there are overlapped match conditions, please put the most specific match first.
   // If PerRouteConfig is specified for the route, this field will not be uesd.
-  repeated RouteRequirement routes = 2;
+  //
+  // Examples
+  //
+  // .. code-block:: yaml
+  //
+  //    routes:
+  //    - match:
+  //         prefix: "/healthz"
+  //      requirement:
+  //        required_issuers: []
+  //    - match:
+  //         prefix: "/"
+  //      requirement:
+  //         required_issuers: [jwt_issuer1]
+  //
+  repeated RouteRequirement routes = 4;
 }
