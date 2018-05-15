@@ -4,7 +4,7 @@ MarkupSafe==1.0
 Pygments==2.2.0
 alabaster==0.7.10
 babel==2.4.0
-docutils==0.12
+docutils==0.14
 gitdb==0.6.4
 imagesize==0.7.1
 pytz==2017.2
@@ -12,8 +12,6 @@ requests==2.13.0
 six==1.10.0
 smmap==0.9.0
 snowballstemmer==1.2.1
-sphinx==1.6.5
-sphinxcontrib-httpdomain==1.5.0
-
-# Fix for https://github.com/rtfd/sphinx_rtd_theme/issues/397
-git+https://github.com/rtfd/sphinx_rtd_theme@9d704f287ac197dfb1c9b27f0acfb91267dce4f1
+sphinx==1.7.4
+sphinxcontrib-httpdomain==1.6.1
+sphinx_rtd_theme==0.3.1
