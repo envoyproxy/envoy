@@ -171,7 +171,6 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       http_protocol_options: {}
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
-
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
@@ -599,6 +598,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
+
   create(parseBootstrapFromJson(json));
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
