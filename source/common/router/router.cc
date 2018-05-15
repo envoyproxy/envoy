@@ -928,16 +928,24 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
-  ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
-  parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
-  if (upstream_host_) {
-    upstream_host_->stats().rq_timeout_.inc();
+  // If we've sent anything downstream, ignore the per try timeout and let the response continue up
+  // to the global timeout
+  if (!parent_.downstream_response_started_) {
+    ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
+    parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
+    if (upstream_host_) {
+      upstream_host_->stats().rq_timeout_.inc();
+    }
+    resetStream();
+    request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout);
+    parent_.onUpstreamReset(
+        UpstreamResetType::PerTryTimeout,
+        absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
+  } else {
+    ENVOY_STREAM_LOG(debug,
+                     "ignored upstream per try timeout due to already started downstream response",
+                     *parent_.callbacks_);
   }
-  resetStream();
-  request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout);
-  parent_.onUpstreamReset(
-      UpstreamResetType::PerTryTimeout,
-      absl::optional<Http::StreamResetReason>(Http::StreamResetReason::LocalReset));
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,

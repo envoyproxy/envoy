@@ -61,6 +61,10 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
+* router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
+  already been proxied downstream when the timeout occurs. Previously, the response would be reset 
+  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
+  timeout will be ignored and the response will continue to proxy up to the global request timeout. 
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
