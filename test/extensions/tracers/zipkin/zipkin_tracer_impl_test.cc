@@ -466,6 +466,31 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   EXPECT_TRUE(zipkin_span->span().sampled());
 }
 
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
+  setupValidDriver();
+
+  const std::string trace_id =
+      Hex::uint64ToHex(Util::generateRandom64()) + Hex::uint64ToHex(Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+
+  request_headers_.insertXB3TraceId().value(trace_id);
+  request_headers_.insertXB3SpanId().value(span_id);
+  request_headers_.insertXB3ParentSpanId().value(parent_id);
+
+  // New span will have an SR annotation - so its span and parent ids will be
+  // the same as the supplied span context (i.e. shared context)
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+
+  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->span().sampled());
+}
+
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   setupValidDriver();
 

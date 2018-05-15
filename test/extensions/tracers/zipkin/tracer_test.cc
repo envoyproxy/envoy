@@ -175,7 +175,8 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   const uint generated_parent_id = Util::generateRandom64();
-  SpanContext modified_root_span_context(root_span_context.trace_id(), root_span_context.id(),
+  SpanContext modified_root_span_context(root_span_context.trace_id(),
+                                         root_span_context.trace_id_high(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
   SpanPtr new_shared_context_span =
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);

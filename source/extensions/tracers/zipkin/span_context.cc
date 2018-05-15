@@ -12,6 +12,7 @@ namespace Zipkin {
 
 SpanContext::SpanContext(const Span& span) {
   trace_id_ = span.traceId();
+  trace_id_high_ = span.isSetTraceIdHigh() ? span.traceIdHigh() : 0;
   id_ = span.id();
   parent_id_ = span.isSetParentId() ? span.parentId() : 0;
   sampled_ = span.sampled();

@@ -96,16 +96,31 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
 
   if (request_headers.XB3TraceId() && request_headers.XB3SpanId()) {
     uint64_t trace_id(0);
+    uint64_t trace_id_high(0);
     uint64_t span_id(0);
     uint64_t parent_id(0);
-    if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16) ||
-        !StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
+
+    // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
+    // it needs to be divided into two 64 bit numbers (high and low).
+    if (request_headers.XB3TraceId()->value().size() == 32) {
+      std::string tid = request_headers.XB3TraceId()->value().c_str();
+      std::string high_tid = tid.substr(0, 16);
+      std::string low_tid = tid.substr(16, 16);
+      if (!StringUtil::atoul(high_tid.c_str(), trace_id_high, 16) ||
+          !StringUtil::atoul(low_tid.c_str(), trace_id, 16)) {
+        return Tracing::SpanPtr(new Tracing::NullSpan());
+      }
+    } else if (!StringUtil::atoul(request_headers.XB3TraceId()->value().c_str(), trace_id, 16)) {
+      return Tracing::SpanPtr(new Tracing::NullSpan());
+    }
+
+    if (!StringUtil::atoul(request_headers.XB3SpanId()->value().c_str(), span_id, 16) ||
         (request_headers.XB3ParentSpanId() &&
          !StringUtil::atoul(request_headers.XB3ParentSpanId()->value().c_str(), parent_id, 16))) {
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    SpanContext context(trace_id, span_id, parent_id, sampled);
+    SpanContext context(trace_id, trace_id_high, span_id, parent_id, sampled);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);
