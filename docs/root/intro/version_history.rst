@@ -49,6 +49,9 @@ Version history
   local configuration.
 * http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+* http: local responses to gRPC requests are now sent as trailers-only gRPC responses instead of plain HTTP responses.
+  Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
+  header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin

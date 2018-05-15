@@ -94,8 +94,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
     }
     if (available % 4 != 0) {
       // Client end stream with invalid base64. Note, base64 padding is mandatory.
-      Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
-                                    "Bad gRPC-web request, invalid base64 data.");
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         "Bad gRPC-web request, invalid base64 data.", nullptr);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   } else if (available < 4) {
@@ -110,8 +110,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
                   decoding_buffer_.length()));
   if (decoded.empty()) {
     // Error happened when decoding base64.
-    Http::Utility::sendLocalReply(*decoder_callbacks_, stream_destroyed_, Http::Code::BadRequest,
-                                  "Bad gRPC-web request, invalid base64 data.");
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       "Bad gRPC-web request, invalid base64 data.", nullptr);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
