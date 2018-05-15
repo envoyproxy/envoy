@@ -500,7 +500,6 @@ private:
 class PriorityStateManager {
 public:
   PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
-  ~PriorityStateManager() {}
 
   void
   initializePerPriority(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
@@ -558,29 +557,6 @@ protected:
 };
 
 /**
- * Wrapper of the current locality LB endpoint and its corresponding LB endpoint context of a
- * resolved upstream host.
- */
-class ResolveTargetContext {
-public:
-  ResolveTargetContext(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                       const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-      : context_(locality_lb_endpoint, lb_endpoint) {}
-
-  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint() const {
-    return context_.first;
-  }
-  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint() const { return context_.second; }
-
-private:
-  const std::pair<const envoy::api::v2::endpoint::LocalityLbEndpoints,
-                  const envoy::api::v2::endpoint::LbEndpoint>
-      context_;
-};
-
-typedef std::shared_ptr<ResolveTargetContext> ResolveTargetContextSharedPtr;
-
-/**
  * Implementation of Upstream::Cluster that does periodic DNS resolution and updates the host
  * member set if the DNS members change.
  */
@@ -598,7 +574,9 @@ public:
 private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url, ResolveTargetContextSharedPtr context);
+                  const std::string& url,
+                  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
     void startResolve();
 
@@ -608,7 +586,8 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
-    ResolveTargetContextSharedPtr context_;
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
@@ -623,8 +602,8 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
-
   PriorityStateManagerPtr priority_state_manager_;
+  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
 };
 
 } // namespace Upstream

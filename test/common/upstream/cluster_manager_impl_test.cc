@@ -1413,9 +1413,7 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
 // socket_option_impl_test.cc.
 class FreebindTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) {
-    create(parseBootstrapFromV2Yaml(yaml));
-  }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
@@ -1564,9 +1562,7 @@ TEST_F(FreebindTest, FreebindClusterOverride) {
 // tcp_keepalive_option_impl_test.cc.
 class TcpKeepaliveTest : public ClusterManagerImplTest {
 public:
-  void initialize(const std::string& yaml) {
-    create(parseBootstrapFromV2Yaml(yaml));
-  }
+  void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 

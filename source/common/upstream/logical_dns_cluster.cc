@@ -28,11 +28,11 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
-      priority_state_manager_(new PriorityStateManager(*this, local_info)) {
-  const auto& load_assignment = cluster.has_load_assignment()
-                                    ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts());
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
+      priority_state_manager_(new PriorityStateManager(*this, local_info)),
+      load_assignment_(cluster.has_load_assignment()
+                           ? cluster.load_assignment()
+                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
+  const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
     throw EnvoyException(
         "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
@@ -52,16 +52,12 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& locality_lb_endpoint = locality_lb_endpoints[0];
-  const auto& lb_endpoint = locality_lb_endpoint.lb_endpoints()[0];
-
-  const envoy::api::v2::endpoint::Endpoint& endpoint = lb_endpoint.endpoint();
-  const envoy::api::v2::core::SocketAddress& socket_address = endpoint.address().socket_address();
+  const envoy::api::v2::core::SocketAddress& socket_address =
+      lbEndpoint().endpoint().address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
-  priority_state_manager_->initializePerPriority(locality_lb_endpoint);
-  context_ = std::make_shared<ResolveTargetContext>(locality_lb_endpoint, lb_endpoint);
+  priority_state_manager_->initializePerPriority(localityLbEndpoint());
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -101,7 +97,6 @@ void LogicalDnsCluster::startResolve() {
             tls_->runOnAllThreads([this, new_address]() -> void {
               PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
               data.current_resolved_address_ = new_address;
-              data.context_ = context_;
             });
           }
 
@@ -121,10 +116,7 @@ void LogicalDnsCluster::startResolve() {
               break;
             }
 
-            const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint =
-                context_->locality_lb_endpoint();
-
-            uint32_t priority = locality_lb_endpoint.priority();
+            const uint32_t priority = localityLbEndpoint().priority();
             priority_state_manager_->registerHostPerPriority(logical_host_, priority);
             priority_state_manager_->updateClusterPrioritySet(priority, absl::nullopt,
                                                               absl::nullopt, false);
@@ -143,8 +135,9 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   ASSERT(data.current_resolved_address_);
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options),
-          HostDescriptionConstSharedPtr{new RealHostDescription(
-              data.current_resolved_address_, data.context_, shared_from_this())}};
+          HostDescriptionConstSharedPtr{
+              new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
+                                      parent_.lbEndpoint(), shared_from_this())}};
 }
 
 } // namespace Upstream

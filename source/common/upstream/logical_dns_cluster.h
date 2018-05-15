@@ -43,10 +43,10 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, parent.context_->lb_endpoint().metadata(),
-                   parent.context_->lb_endpoint().load_balancing_weight().value(),
-                   parent.context_->locality_lb_endpoint().locality(),
-                   parent.context_->lb_endpoint().endpoint().health_check_config()),
+        : HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
+                   parent.lbEndpoint().load_balancing_weight().value(),
+                   parent.localityLbEndpoint().locality(),
+                   parent.lbEndpoint().endpoint().health_check_config()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -59,20 +59,22 @@ private:
 
   struct RealHostDescription : public HostDescription {
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
-                        ResolveTargetContextSharedPtr context, HostConstSharedPtr logical_host)
+                        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+                        HostConstSharedPtr logical_host)
         : address_(address),
           health_check_address_(
-              context->lb_endpoint().endpoint().health_check_config().port_value() == 0
+              lb_endpoint.endpoint().health_check_config().port_value() == 0
                   ? address
                   : Network::Utility::getAddressWithPort(
-                        *address,
-                        context->lb_endpoint().endpoint().health_check_config().port_value())),
-          context_(context), logical_host_(logical_host) {}
+                        *address, lb_endpoint.endpoint().health_check_config().port_value())),
+          locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint),
+          logical_host_(logical_host) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
     const envoy::api::v2::core::Metadata& metadata() const override {
-      return context_->lb_endpoint().metadata();
+      return lb_endpoint_.metadata();
     }
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     HealthCheckHostMonitor& healthChecker() const override {
@@ -85,21 +87,32 @@ private:
     const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstanceConstSharedPtr address() const override { return address_; }
     const envoy::api::v2::core::Locality& locality() const override {
-      return context_->locality_lb_endpoint().locality();
+      return locality_lb_endpoint_.locality();
     }
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }
+    uint32_t priority() const { return locality_lb_endpoint_.priority(); }
     Network::Address::InstanceConstSharedPtr address_;
     Network::Address::InstanceConstSharedPtr health_check_address_;
-    ResolveTargetContextSharedPtr context_;
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
     HostConstSharedPtr logical_host_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
     Network::Address::InstanceConstSharedPtr current_resolved_address_;
-    ResolveTargetContextSharedPtr context_;
   };
+
+  const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
+    ASSERT(load_assignment_.endpoints().size() == 1);
+    return load_assignment_.endpoints()[0];
+  }
+
+  const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
+    ASSERT(localityLbEndpoint().lb_endpoints().size() == 1);
+    return localityLbEndpoint().lb_endpoints()[0];
+  }
 
   void startResolve();
 
@@ -116,9 +129,8 @@ private:
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
-  ResolveTargetContextSharedPtr context_;
-
   PriorityStateManagerPtr priority_state_manager_;
+  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
 };
 
 } // namespace Upstream

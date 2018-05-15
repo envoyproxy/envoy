@@ -736,9 +736,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       priority_state_manager_(new PriorityStateManager(*this, local_info)) {
-  const auto& cluster_load_assignment =
+  const auto& cluster_load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts());
+                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     priority_state_manager_->initializePerPriority(locality_lb_endpoint);
 
@@ -885,7 +885,10 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      priority_state_manager_(new PriorityStateManager(*this, local_info)) {
+      priority_state_manager_(new PriorityStateManager(*this, local_info)),
+      load_assignment_(cluster.has_load_assignment()
+                           ? cluster.load_assignment()
+                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
   switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -900,19 +903,14 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     NOT_REACHED;
   }
 
-  const auto& load_assignment = cluster.has_load_assignment()
-                                    ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts());
-
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       const std::string& url = fmt::format("tcp://{}:{}", host.socket_address().address(),
                                            host.socket_address().port_value());
-      ResolveTargetContextSharedPtr context(
-          std::make_shared<ResolveTargetContext>(locality_lb_endpoint, lb_endpoint));
-      resolve_targets_.emplace_back(new ResolveTarget(*this, dispatcher, url, context));
+      resolve_targets_.emplace_back(
+          new ResolveTarget(*this, dispatcher, url, locality_lb_endpoint, lb_endpoint));
     }
   }
 }
@@ -927,10 +925,10 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                           const HostVector& hosts_removed,
                                           uint32_t current_priority) {
   for (const ResolveTargetPtr& target : resolve_targets_) {
-    priority_state_manager_->initializePerPriority(target->context_->locality_lb_endpoint());
+    priority_state_manager_->initializePerPriority(target->locality_lb_endpoint_);
 
     for (const HostSharedPtr& host : target->hosts_) {
-      if (target->context_->locality_lb_endpoint().priority() == current_priority) {
+      if (target->locality_lb_endpoint_.priority() == current_priority) {
         priority_state_manager_->registerHostPerPriority(host, current_priority);
       }
     }
@@ -940,14 +938,14 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
                                                     false);
 }
 
-StrictDnsClusterImpl::ResolveTarget::ResolveTarget(StrictDnsClusterImpl& parent,
-                                                   Event::Dispatcher& dispatcher,
-                                                   const std::string& url,
-                                                   ResolveTargetContextSharedPtr context)
+StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
+    StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher, const std::string& url,
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
       port_(Network::Utility::portFromTcpUrl(url)),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
-      context_(context) {}
+      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -966,10 +964,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
-        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint =
-            context_->locality_lb_endpoint();
-        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint = context_->lb_endpoint();
-
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to make
@@ -978,15 +972,15 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           ASSERT(address != nullptr);
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
-              lb_endpoint.metadata(), lb_endpoint.load_balancing_weight().value(),
-              locality_lb_endpoint.locality(), lb_endpoint.endpoint().health_check_config()));
+              lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
+              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
         }
 
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-          parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint.priority());
+          parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
