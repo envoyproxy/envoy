@@ -73,8 +73,8 @@ TEST_F(SecretManagerImplTest, WeightedClusterFallthroughConfig) {
   ASSERT_NE(secret_manager.getStaticSecret("abc.com"), nullptr);
 
   EXPECT_EQ(kExpectedCertificateChain,
-            secret_manager.getStaticSecret("abc.com")->getCertificateChain());
-  EXPECT_EQ(kExpectedPrivateKey, secret_manager.getStaticSecret("abc.com")->getPrivateKey());
+            secret_manager.getStaticSecret("abc.com")->certificateChain());
+  EXPECT_EQ(kExpectedPrivateKey, secret_manager.getStaticSecret("abc.com")->privateKey());
 }
 
 } // namespace

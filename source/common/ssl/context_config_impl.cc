@@ -53,7 +53,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
                 fmt::format("Static secret is not defined: {}",
                             config.tls_certificate_sds_secret_configs()[0].name()));
           }
-          return static_secret->getCertificateChain();
+          return static_secret->certificateChain();
         } else {
           return std::string("");
         }
@@ -74,7 +74,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
                 fmt::format("Static secret is not defined: {}",
                             config.tls_certificate_sds_secret_configs()[0].name()));
           }
-          return static_secret->getPrivateKey();
+          return static_secret->privateKey();
         } else {
           return std::string("");
         }

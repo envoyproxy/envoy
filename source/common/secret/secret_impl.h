@@ -6,15 +6,17 @@
 namespace Envoy {
 namespace Secret {
 
+typedef std::unordered_map<std::string, SecretSharedPtr> SecretSharedPtrMap;
+
 class SecretImpl : public Secret {
 public:
   SecretImpl(const envoy::api::v2::auth::Secret& config);
 
-  const std::string& getName() override { return name_; }
+  const std::string& name() override { return name_; }
 
-  const std::string& getCertificateChain() override { return certificate_chain_; }
+  const std::string& certificateChain() override { return certificate_chain_; }
 
-  const std::string& getPrivateKey() override { return private_key_; }
+  const std::string& privateKey() override { return private_key_; }
 
 private:
   std::string name_;

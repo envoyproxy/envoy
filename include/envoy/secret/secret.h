@@ -21,39 +21,19 @@ public:
   /**
    * @return a name of the SDS secret
    */
-  virtual const std::string& getName() PURE;
+  virtual const std::string& name() PURE;
 
   /**
    * @return a string of certificate chain
    */
-  virtual const std::string& getCertificateChain() PURE;
+  virtual const std::string& certificateChain() PURE;
   /**
    * @return a string of private key
    */
-  virtual const std::string& getPrivateKey() PURE;
+  virtual const std::string& privateKey() PURE;
 };
 
 typedef std::shared_ptr<Secret> SecretSharedPtr;
-
-typedef std::unordered_map<std::string, SecretSharedPtr> SecretSharedPtrMap;
-
-typedef std::vector<SecretSharedPtr> SecretSharedPtrVector;
-
-/**
- * Throws when the requested static secret is not available
- */
-class EnvoyStaticSecretException : public EnvoyException {
-public:
-  EnvoyStaticSecretException(const std::string& message) : EnvoyException(message) {}
-};
-
-/**
- * Throws when the requested dynamic secret is not available
- */
-class EnvoyDynamicSecretNotReadyException : public EnvoyException {
-public:
-  EnvoyDynamicSecretNotReadyException(const std::string& message) : EnvoyException(message) {}
-};
 
 } // namespace Secret
 } // namespace Envoy
