@@ -24,8 +24,6 @@
 #include "common/request_info/request_info_impl.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
 namespace TcpProxy {
 
 /**
@@ -301,7 +299,5 @@ private:
   std::unordered_map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
 };
 
-} // Filter
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace TcpProxy
 } // namespace Envoy

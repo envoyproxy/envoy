@@ -7,10 +7,10 @@
 #include "common/network/address_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/stats/stats_impl.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/well_known_names.h"
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -33,8 +33,6 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
 namespace TcpProxy {
 
 namespace {
@@ -315,7 +313,7 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
 TEST(TcpProxyConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
-  log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
@@ -325,7 +323,7 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   }
 
   log = config.mutable_access_log()->Add();
-  log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
@@ -365,7 +363,7 @@ public:
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
     envoy::config::filter::accesslog::v2::AccessLog* access_log =
         config.mutable_access_log()->Add();
-    access_log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
@@ -1059,6 +1057,4 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 }
 
 } // namespace TcpProxy
-} // namespace NetworkFilters
-} // namespace Extensions
 } // namespace Envoy

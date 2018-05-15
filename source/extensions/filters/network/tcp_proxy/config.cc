@@ -3,13 +3,12 @@
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
-
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace TcpProxy {
+namespace TcpProxyFilter {
 
 Network::FilterFactoryCb
 TcpProxyConfigFactory::createFilterFactory(const Json::Object& json_config,
@@ -27,10 +26,11 @@ Network::FilterFactoryCb TcpProxyConfigFactory::createFilterFactoryFromProtoType
     ASSERT(proto_config.deprecated_v1().routes_size() > 0);
   }
 
-  TcpProxyConfigSharedPtr filter_config(std::make_shared<TcpProxyConfig>(proto_config, context));
+  TcpProxy::TcpProxyConfigSharedPtr filter_config(
+      std::make_shared<TcpProxy::TcpProxyConfig>(proto_config, context));
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        std::make_shared<TcpProxyFilter>(filter_config, context.clusterManager()));
+        std::make_shared<TcpProxy::TcpProxyFilter>(filter_config, context.clusterManager()));
   };
 }
 
@@ -41,7 +41,7 @@ static Registry::RegisterFactory<TcpProxyConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>
     registered_;
 
-} // namespace TcpProxy
+} // namespace TcpProxyFilter
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

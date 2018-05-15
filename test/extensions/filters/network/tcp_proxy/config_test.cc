@@ -10,7 +10,7 @@ using testing::_;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace TcpProxy {
+namespace TcpProxyFilter {
 
 class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
 
@@ -87,7 +87,7 @@ TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
   cb(connection);
 }
 
-} // namespace TcpProxy
+} // namespace TcpProxyFilter
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

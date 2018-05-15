@@ -227,7 +227,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
-      websocket_config_([&]() -> Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr {
+      websocket_config_([&]() -> TcpProxy::TcpProxyConfigSharedPtr {
         return (PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false))
                    ? Http::WebSocket::tcpProxyConfig(route.route(), factory_context)
                    : nullptr;

@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace TcpProxy {
+namespace TcpProxyFilter {
 
 /**
  * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
@@ -29,7 +29,7 @@ private:
       Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace TcpProxy
+} // namespace TcpProxyFilter
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 
 #include <cstdint>
 #include <string>
@@ -19,8 +19,6 @@
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
 namespace TcpProxy {
 
 TcpProxyConfig::Route::Route(
@@ -602,6 +600,4 @@ void TcpProxyDrainer::cancelDrain() {
 }
 
 } // namespace TcpProxy
-} // namespace NetworkFilters
-} // namespace Extensions
 } // namespace Envoy
