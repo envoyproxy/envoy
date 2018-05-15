@@ -49,6 +49,7 @@ public:
 
   void expectSendMessage(const std::string& type_url,
                          const std::vector<std::string>& resource_names, const std::string& version,
+                         const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::GrpcStatus::Ok,
                          const std::string& error_message = "") {
     envoy::api::v2::DiscoveryRequest expected_request;
@@ -59,7 +60,7 @@ public:
     if (!version.empty()) {
       expected_request.set_version_info(version);
     }
-    expected_request.set_response_nonce("");
+    expected_request.set_response_nonce(nonce);
     expected_request.set_type_url(type_url);
     if (error_code != Grpc::Status::GrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
@@ -170,7 +171,7 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
           IsSubstring("", "", "bar does not match foo type URL is DiscoveryResponse", e->what()));
     }));
 
-    expectSendMessage("foo", {"x", "y"}, "", Grpc::Status::GrpcStatus::Internal,
+    expectSendMessage("foo", {"x", "y"}, "", "", Grpc::Status::GrpcStatus::Internal,
                       fmt::format("bar does not match foo type URL is DiscoveryResponse {}",
                                   invalid_response->DebugString()));
     grpc_mux_->onReceiveMessage(std::move(invalid_response));
@@ -334,6 +335,68 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
   // Without waiting full 5s, no rate limit log is expected.
   EXPECT_LOG_NOT_CONTAINS("warning", "Too many sendDiscoveryRequest calls for foo",
                           onReceiveMessage(1));
+}
+
+//  Verifies that a messsage with no resources is accepted.
+TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  grpc_mux_->start();
+  {
+    // subscribe and unsubscribe to simulate a cluster added and removed
+    expectSendMessage(type_url, {"y"}, "");
+    auto temp_sub = grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
+    expectSendMessage(type_url, {}, "");
+  }
+
+  // simulate the server sending empty CLA message to notify envoy that the CLA was removed.
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_nonce("bar");
+  response->set_version_info("1");
+  response->set_type_url(type_url);
+
+  // This contains zero resources. No discovery request should be sent.
+  grpc_mux_->onReceiveMessage(std::move(response));
+
+  // when we add the new subscription version should be 1 and nonce should be bar
+  expectSendMessage(type_url, {"x"}, "1", "bar");
+
+  // simulate a new cluster x is added. add CLA subscription for it.
+  auto sub = grpc_mux_->subscribe(type_url, {"x"}, callbacks_);
+  expectSendMessage(type_url, {}, "1", "bar");
+}
+
+//  Verifies that a messsage with some resources is rejected when there are no watches.
+TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+
+  grpc_mux_->start();
+  // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
+  expectSendMessage(type_url, {"y"}, "");
+  expectSendMessage(type_url, {}, "");
+  grpc_mux_->subscribe(type_url, {"y"}, callbacks_);
+
+  // simulate the server sending CLA message to notify envoy that the CLA was added,
+  // even though envoy doesn't expect it. Envoy should reject this update.
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_nonce("bar");
+  response->set_version_info("1");
+  response->set_type_url(type_url);
+
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("x");
+  response->add_resources()->PackFrom(load_assignment);
+
+  // The message should be rejected.
+  expectSendMessage(type_url, {}, "", "bar");
+  EXPECT_LOG_CONTAINS("warning", "Ignoring unwatched type URL " + type_url,
+                      grpc_mux_->onReceiveMessage(std::move(response)));
 }
 
 } // namespace
