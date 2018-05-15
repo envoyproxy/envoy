@@ -928,9 +928,8 @@ void Filter::UpstreamRequest::setupPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPerTryTimeout() {
-  // If we've sent anything downstream but per try timeout occurred
-  // no need and not point to cancel it now
-  // we still have time to wait for full response up until GlobalTimeout
+  // If we've sent anything downstream, ignore the per try timeout and let the response continue up
+  // to the global timeout
   if (!parent_.downstream_response_started_) {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
     parent_.cluster_->stats().upstream_rq_per_try_timeout_.inc();
