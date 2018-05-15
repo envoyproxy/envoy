@@ -478,6 +478,14 @@ TEST(RawStatDataTest, Truncate) {
   alloc.free(*stat);
 }
 
+// Validate NULL-validation behavior of RawStatData.
+TEST(RawStatDataTest, NullName) {
+  HeapRawStatDataAllocator alloc;
+  const std::string null_embed_string("asdf\000dfsa", 9);
+  EXPECT_THROW_WITH_MESSAGE(alloc.alloc(null_embed_string), EnvoyException,
+                            "Stat names may not contain NULL (asdf\000dfsa)");
+}
+
 TEST(RawStatDataTest, HeapAlloc) {
   HeapRawStatDataAllocator alloc;
   RawStatData* stat_1 = alloc.alloc("ref_name");

@@ -152,7 +152,14 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-  data->initialize(name);
+  // Catch any failures in initialize() and free; we can't use unique_ptr due to the by-design C
+  // style allocation of RawStatData.
+  try {
+    data->initialize(name);
+  } catch (const EnvoyException&) {
+    ::free(data);
+    throw;
+  }
 
   // Because the RawStatData object is initialized with and contains a truncated
   // version of the std::string name, storing the stats in a map would require
@@ -290,6 +297,9 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
+  if (key.find('\0') != std::string::npos) {
+    throw EnvoyException(fmt::format("Stat names may not contain NULL ({})", key));
+  }
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
