@@ -132,7 +132,7 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
   EXPECT_CALL(factory, create_(_, _))
       .WillOnce(Invoke([&](std::function<void()> below_low,
                            std::function<void()> above_high) -> Buffer::Instance* {
-        client_write_buffer_ = new MockWatermarkBuffer(below_low, above_high);
+        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(below_low, above_high);
         return client_write_buffer_;
       }));
 
