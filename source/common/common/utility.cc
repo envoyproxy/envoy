@@ -20,51 +20,22 @@
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
-namespace {
-
-typedef std::unordered_map<std::string, std::function<std::string(const SystemTime& time)>>
-    FunctionMap;
-
-const FunctionMap& dateFormatterReplacers() {
-  CONSTRUCT_ON_FIRST_USE(
-      FunctionMap,
-      {{"%ms",
-        [](const SystemTime& time) -> std::string {
-          const std::chrono::milliseconds epoch_time_ms =
-              std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
-
-          uint32_t msec = epoch_time_ms.count() % 1000;
-          std::string msec_str;
-          msec_str.push_back('0' + (msec / 100));
-          msec %= 100;
-          msec_str.push_back('0' + (msec / 10));
-          msec %= 10;
-          msec_str.push_back('0' + msec);
-          return msec_str;
-        }},
-
-       {"%since_epoch_ms", [](const SystemTime& time) -> std::string {
-          return fmt::FormatInt(
-                     std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch())
-                         .count())
-              .str();
-        }}});
-}
-
-} // namespace
 
 std::string DateFormatter::fromTime(const SystemTime& time) const {
-  std::string new_format_string = format_string_;
-  for (const auto& replacer : dateFormatterReplacers()) {
-    // TODO(dio): The following is a hammer, need to optimize it since most of the time the
-    // occurrence of each pattern to be replaced is only once.
-    std::vector<std::string> pieces = absl::StrSplit(new_format_string, replacer.first);
-    if (!pieces.empty()) {
-      new_format_string = absl::StrJoin(pieces, replacer.second(time));
-    }
+  const std::string new_format_string = setCustomField(
+      // "%f" is the custom field for subsecond.
+      "f",
+      fmt::FormatInt(
+          std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count())
+          .str()
+          .substr(10));
+
+  const time_t current_time = std::chrono::system_clock::to_time_t(time);
+  if (new_format_string.empty()) {
+    return fromTime(current_time);
   }
 
-  return fromTime(std::chrono::system_clock::to_time_t(time), new_format_string);
+  return fromTime(current_time, new_format_string);
 }
 
 std::string DateFormatter::fromTime(time_t time, const std::string& new_format_string) const {
@@ -74,6 +45,52 @@ std::string DateFormatter::fromTime(time_t time, const std::string& new_format_s
   std::array<char, 1024> buf;
   strftime(&buf[0], buf.size(), new_format_string.c_str(), &current_tm);
   return std::string(&buf[0]);
+}
+
+std::string DateFormatter::setCustomField(const std::string& field,
+                                          const std::string& value) const {
+  size_t found = format_string_.find(field);
+  if (found == std::string::npos) {
+    // If no field specifier inside the current format string, return an empty string and quickly
+    // use the default formatter.
+    //
+    // TODO(dio): Use EMPTY_STRING in here.
+    return "";
+  }
+
+  size_t index = found;
+  std::string new_format_string = format_string_;
+
+  while (found != std::string::npos) {
+    index = found;
+
+    size_t start = found - 1;
+    if (start < new_format_string.size()) {
+      std::string sub = new_format_string.substr(start, 2);
+      if (sub.at(0) == '%' && sub.size() == 2) {
+        // This field definitely has no width specifier, e.g. %f.
+        new_format_string = new_format_string.replace(start, 2, value);
+      } else {
+        start = found - 2;
+
+        // This field probably has a valid width specifier, e.g. %3f.
+        if (start < new_format_string.size()) {
+          std::string sub = new_format_string.substr(start, 2);
+
+          if (sub.at(0) == '%' && sub.size() == 2) {
+            uint64_t width;
+            if (StringUtil::atoul(sub.substr(1, 1).c_str(), width)) {
+              new_format_string = new_format_string.replace(start, 3, value.substr(0, width));
+            }
+          }
+        }
+      }
+    }
+
+    found = new_format_string.find(field, ++index);
+  }
+
+  return new_format_string;
 }
 
 std::string DateFormatter::fromTime(time_t time) const {

@@ -20,6 +20,10 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+typedef std::unordered_map<std::string, std::function<std::string(const SystemTime& time)>>
+    CustomDateFormatterMap;
+
 /**
  * Utility class for formatting dates given a strftime style format string.
  */
@@ -49,7 +53,7 @@ public:
 
 private:
   std::string fromTime(time_t time, const std::string& new_format_string) const;
-
+  std::string setCustomField(const std::string& field, const std::string& value) const;
   std::string format_string_;
 };
 

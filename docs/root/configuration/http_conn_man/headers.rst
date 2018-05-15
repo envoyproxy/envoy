@@ -473,5 +473,17 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
-%START_TIME_SINCE_EPOCH%
-    The timestamp since epoch when the first byte of a request is received. The timestamp unit is in milliseconds.
+%START_TIME%
+    Request start time including milliseconds. START_TIME can be customized as mentioned in
+    :ref:`access log format rules<config_access_log_format_start_time>`. An example of setting a custom header with
+    timestamp since epoch in milliseconds is:
+
+.. code-block:: none
+
+  route:
+    cluster: www
+    request_headers_to_add:
+      - header:
+          key: "x-request-start"
+          value: "%START_TIME(%s%3f)%"
+        append: true

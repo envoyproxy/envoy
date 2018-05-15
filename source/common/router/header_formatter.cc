@@ -118,23 +118,18 @@ parseStartTimeField(absl::string_view params_str) {
   std::string format;
   if (!params_str.empty()) {
     if (params_str.front() != '(' || params_str.back() != ')') {
-      // TODO(dio): Build a better message.
-      throw EnvoyException("Invalid header configuration. Missing parens.");
+      throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
+                                       "START_TIME or START_TIME(%s ...), actual format "
+                                       "START_TIME{}",
+                                       params_str));
     }
-    // TODO(dio): What is the best way of converting absl::string_view to std::string?
     format = std::string(params_str.substr(1, params_str.size() - 2)); // trim parens
   }
 
   return [format](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
     if (format.empty()) {
-      // TODO(dio): Should the default is timestamp in milliseconds?
-      // Or should it be AccessLogDateTimeFormatter::fromTime(request_info.startTime())?
-      return AccessLog::AccessLogFormatUtils::durationToString(
-          request_info.startTime().time_since_epoch());
+      return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
     }
-    // TODO(dio): Extend date_formatter's format to accept more tokens, i.e.
-    // 1. Timestamp (in ms, us, and ns) since epoch
-    // 2. ms, us, and ns components.
     Envoy::DateFormatter date_formatter(format);
     return date_formatter.fromTime(request_info.startTime());
   };
@@ -165,7 +160,6 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
   } else if (field_name.find("START_TIME") == 0) {
     field_extractor_ = parseStartTimeField(field_name.substr(STATIC_STRLEN("START_TIME")));
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
-    // TODO(dio): Check the param in here since we don't check it in the parser anymore.
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else {

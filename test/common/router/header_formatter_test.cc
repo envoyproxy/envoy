@@ -249,11 +249,6 @@ TEST(HeaderParserTest, TestParseInternal) {
     absl::optional<std::string> expected_exception_;
   };
 
-  const time_t start_time_epoch = 1522280158;
-  SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
-  const std::string timestamp =
-      AccessLog::AccessLogFormatUtils::durationToString(start_time.time_since_epoch());
-
   static const TestCase test_cases[] = {
       // Valid inputs
       {"%PROTOCOL%", {"HTTP/1.1"}, {}},
@@ -273,7 +268,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
-      {"%START_TIME%", {timestamp}, {}},
+      {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -303,9 +298,19 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
-      // TODO(dio): Un-terminated variable expressions with arguments and argument errors are not
-      // checked anymore. Find a way to check it, either at UPSTREAM_METADATA site or somewhere
-      // else.
+      // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
+      // generic %VAR are not checked anymore. Find a way to get the same granularity as before for
+      // following cases.
+      {"%UPSTREAM_METADATA(no array)%",
+       {},
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA(no array), because JSON supplied is not valid. "
+        "Error(offset 1, line 1): Invalid value.\n"}},
+      {"%UPSTREAM_METADATA( no array)%",
+       {},
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
+        "Error(offset 2, line 1): Invalid value.\n"}},
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -335,6 +340,8 @@ TEST(HeaderParserTest, TestParseInternal) {
       )EOF");
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
 
+  // "2018-04-03T23:06:09.123Z".
+  const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
 
   for (const auto& test_case : test_cases) {
@@ -531,7 +538,15 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       },
       {
         "key": "x-request-start",
-        "value": "%START_TIME(%since_epoch_ms)%"
+        "value": "%START_TIME(%s%3f)%"
+      },
+      {
+        "key": "x-request-start-default",
+        "value": "%START_TIME%"
+      },
+      {
+        "key": "x-request-start-range",
+        "value": "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
       }
     ]
   }
@@ -549,17 +564,21 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  const time_t start_time_epoch = 1522280158;
-  SystemTime start_time = std::chrono::system_clock::from_time_t(start_time_epoch);
-  EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
+  const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+  EXPECT_CALL(request_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_EQ("127.0.0.1", headerMap.get_("x-client-ip"));
-  EXPECT_EQ(headerMap.get_("x-request-start").c_str(),
-            AccessLog::AccessLogFormatUtils::durationToString(start_time.time_since_epoch()));
+  EXPECT_TRUE(headerMap.has("x-request-start"));
+  EXPECT_EQ("1522796769123", headerMap.get_("x-request-start"));
+  EXPECT_TRUE(headerMap.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
+  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+  EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
+            headerMap.get_("x-request-start-range"));
 
   typedef std::map<std::string, int> CountMap;
   CountMap counts;
@@ -594,7 +613,19 @@ route:
       append: true
     - header:
         key: "x-request-start"
-        value: "%START_TIME(%ms and %since_epoch_ms)%"
+        value: "%START_TIME(%s%3f)%"
+      append: true
+    - header:
+        key: "x-request-start-f"
+        value: "%START_TIME(f)%"
+      append: true
+    - header:
+        key: "x-request-start-range"
+        value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
+      append: true
+    - header:
+        key: "x-request-start-default"
+        value: "%START_TIME%"
       append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -604,11 +635,24 @@ route:
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
+  const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+  EXPECT_CALL(request_info, startTime()).Times(4).WillRepeatedly(Return(start_time));
+
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
-  EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
+  EXPECT_TRUE(headerMap.has("x-request-start"));
+  EXPECT_EQ("1522796769123", headerMap.get_("x-request-start"));
+  EXPECT_TRUE(headerMap.has("x-request-start-f"));
+  EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
+  EXPECT_TRUE(headerMap.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
+  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+  EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
+            headerMap.get_("x-request-start-range"));
 }
 
 } // namespace Router
