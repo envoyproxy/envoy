@@ -86,10 +86,9 @@ public:
    * Helper for flushing counters, gauges and hisograms to sinks. This takes care of calling
    * flush() on each sink and clearing the cache afterward.
    * @param sinks supplies the list of sinks.
-   * @param stats_source provides the metrics being flushed.
+   * @param source provides the metrics being flushed.
    */
-  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                  Stats::StatsSource& stats_source);
+  static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Source& source);
 
   /**
    * Load a bootstrap config from either v1 or v2 and perform validation.

@@ -105,10 +105,10 @@ public:
       std::make_shared<HistogramStatisticsImpl>();
 };
 
-class MockStatsSource : public StatsSource {
+class MockSource : public Source {
 public:
-  MockStatsSource();
-  ~MockStatsSource();
+  MockSource();
+  ~MockSource();
 
   MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
   MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
@@ -125,7 +125,7 @@ public:
   MockSink();
   ~MockSink();
 
-  MOCK_METHOD1(flush, void(StatsSource& stats_source));
+  MOCK_METHOD1(flush, void(Source& source));
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 

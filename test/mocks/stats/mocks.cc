@@ -59,13 +59,13 @@ MockParentHistogram::MockParentHistogram() {
 
 MockParentHistogram::~MockParentHistogram() {}
 
-MockStatsSource::MockStatsSource() {
+MockSource::MockSource() {
   ON_CALL(*this, cachedCounters()).WillByDefault(ReturnRef(counters_));
   ON_CALL(*this, cachedGauges()).WillByDefault(ReturnRef(gauges_));
   ON_CALL(*this, cachedHistograms()).WillByDefault(ReturnRef(histograms_));
 }
 
-MockStatsSource::~MockStatsSource() {}
+MockSource::~MockSource() {}
 
 MockSink::MockSink() {}
 MockSink::~MockSink() {}

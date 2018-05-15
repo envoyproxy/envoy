@@ -109,7 +109,7 @@ class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
-  void flush(Stats::StatsSource& stats_source) override;
+  void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   void flushCounter(const Stats::Counter& counter);

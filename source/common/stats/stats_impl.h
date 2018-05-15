@@ -408,11 +408,11 @@ private:
   Store& parent_;
 };
 
-class StatsSourceImpl : public StatsSource {
+class SourceImpl : public Source {
 public:
-  StatsSourceImpl(Store& store) : store_(store){};
+  SourceImpl(Store& store) : store_(store){};
 
-  // Stats::StatsSource
+  // Stats::Source
   std::vector<CounterSharedPtr>& cachedCounters() override;
   std::vector<GaugeSharedPtr>& cachedGauges() override;
   std::vector<ParentHistogramSharedPtr>& cachedHistograms() override;

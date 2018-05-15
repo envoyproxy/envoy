@@ -192,7 +192,7 @@ public:
 
   void mergeHistograms(PostMergeCb mergeCb) override;
 
-  StatsSource& statsSource() override { return stats_source_; }
+  Source& source() override { return source_; }
 
 private:
   struct TlsCacheEntry {
@@ -266,7 +266,7 @@ private:
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
-  StatsSourceImpl stats_source_;
+  SourceImpl source_;
 };
 
 } // namespace Stats

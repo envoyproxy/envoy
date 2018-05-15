@@ -227,9 +227,9 @@ typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
 /**
  * Provides cached access to a particular store's stats.
  */
-class StatsSource {
+class Source {
 public:
-  virtual ~StatsSource() {}
+  virtual ~Source() {}
 
   /**
    * Returns all known counters. Will use cached values if already accessed and clearCache() hasn't
@@ -270,9 +270,9 @@ public:
 
   /**
    * Periodic metric flush to the sink.
-   * @param stats_source interface through which the sink can access all metrics being flushed.
+   * @param source interface through which the sink can access all metrics being flushed.
    */
-  virtual void flush(StatsSource& stats_source) PURE;
+  virtual void flush(Source& source) PURE;
 
   /**
    * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
@@ -392,10 +392,10 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Returns the StatsSource to provide cached metrics.
-   * @return StatsSource& the stats source.
+   * Returns the Source to provide cached metrics.
+   * @return Source& the source.
    */
-  virtual StatsSource& statsSource() PURE;
+  virtual Source& source() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;
