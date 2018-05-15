@@ -245,7 +245,7 @@ message RequirementRule {
 // .. code-block:: yaml
 //
 //    - providers:
-//        issuer: remote-issuer
+//        issuer: issuer1
 //        audiences:
 //        - audience1
 //          audience2
@@ -254,7 +254,7 @@ message RequirementRule {
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
 //    - providers:
-//        issuer: inline-issuer
+//        issuer: issuer2
 //        audiences:
 //        local_jwks:
 //          inline_string: jwks_string
