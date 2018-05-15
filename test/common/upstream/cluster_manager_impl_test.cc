@@ -106,7 +106,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 class ClusterManagerImplTest : public testing::Test {
@@ -171,7 +171,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
       http_protocol_options: {}
       protocol_selection: USE_DOWNSTREAM_PROTOCOL
   )EOF";
-  EXPECT_CALL(factory_.local_info_, node());
+
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
@@ -219,7 +219,7 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
   }
   )EOF",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2")}));
-  EXPECT_CALL(factory_.local_info_, node()).Times(2);
+
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -248,7 +248,6 @@ TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_2"),
                     defaultStaticClusterJson("new_cluster")}));
 
-  EXPECT_CALL(factory_.local_info_, node()).Times(3);
   create(parseBootstrapFromJson(json));
   checkStats(3 /*added*/, 0 /*modified*/, 0 /*removed*/, 3 /*active*/, 0 /*warming*/);
 
@@ -259,7 +258,7 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
       "{%s}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
-  EXPECT_CALL(factory_.local_info_, node()).Times(2);
+
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -297,7 +296,6 @@ TEST_F(ClusterManagerImplTest, ValidClusterName) {
   }
   )EOF";
 
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   cluster_manager_->clusters()
       .find("cluster:name")
@@ -366,7 +364,6 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerInitialization) {
   subset_config->set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT);
   subset_config->add_subset_selectors()->add_keys("x");
 
-  EXPECT_CALL(factory_.local_info_, node());
   create(bootstrap);
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
@@ -413,7 +410,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
     }]
   }
   )EOF";
-  EXPECT_CALL(factory_.local_info_, node());
+
   create(parseBootstrapFromJson(json));
 }
 
@@ -437,7 +434,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
         deprecated_v1:
           use_std_hash: true
   )EOF";
-  EXPECT_CALL(factory_.local_info_, node());
+
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
@@ -525,7 +522,6 @@ TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
 }
@@ -557,7 +553,6 @@ TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
               createClientConnection_(
                   PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:11001")), _, _, _))
       .WillOnce(Return(connection));
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   factory_.tls_.shutdownThread();
 }
@@ -566,7 +561,6 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
 
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   EXPECT_EQ(nullptr, cluster_manager_->get("hello"));
   EXPECT_EQ(nullptr, cluster_manager_->httpConnPoolForCluster("hello", ResourcePriority::Default,
@@ -593,7 +587,6 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
     }]
   }
   )EOF";
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
@@ -607,7 +600,6 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
 TEST_F(ClusterManagerImplTest, ShutdownOrder) {
   const std::string json =
       fmt::sprintf("{%s}", clustersJson({defaultStaticClusterJson("cluster_1")}));
-  EXPECT_CALL(factory_.local_info_, node());
   create(parseBootstrapFromJson(json));
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   EXPECT_EQ("cluster_1", cluster.info()->name());
@@ -1119,8 +1111,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   }
   )EOF";
 
-  EXPECT_CALL(factory_.local_info_, node());
-
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
 
@@ -1222,8 +1212,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
     }]
   }
   )EOF";
-
-  EXPECT_CALL(factory_.local_info_, node());
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
@@ -1426,7 +1414,6 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
 class FreebindTest : public ClusterManagerImplTest {
 public:
   void initialize(const std::string& yaml) {
-    EXPECT_CALL(factory_.local_info_, node());
     create(parseBootstrapFromV2Yaml(yaml));
   }
 
@@ -1578,7 +1565,6 @@ TEST_F(FreebindTest, FreebindClusterOverride) {
 class TcpKeepaliveTest : public ClusterManagerImplTest {
 public:
   void initialize(const std::string& yaml) {
-    EXPECT_CALL(factory_.local_info_, node());
     create(parseBootstrapFromV2Yaml(yaml));
   }
 
