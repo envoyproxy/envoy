@@ -1227,6 +1227,7 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   per_try_timeout_->callback_();
+  EXPECT_CALL(callbacks_, encodeData(_, true));
   response_decoder->decodeData(body, true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
