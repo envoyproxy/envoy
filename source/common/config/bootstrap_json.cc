@@ -135,8 +135,6 @@ void BootstrapJson::translateStaticSecretsBootstrap(
     const Json::Object& json_secrets, envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
 
   for (const Json::ObjectSharedPtr& secret : json_secrets.getObjectArray("secrets")) {
-    secret->validateSchema(Json::Schema::SECRET_SCHEMA);
-
     auto secret_object = bootstrap.mutable_static_resources()->mutable_secrets()->Add();
     secret_object->set_name(secret->getString("name"));
 

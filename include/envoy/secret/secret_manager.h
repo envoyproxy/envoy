@@ -26,12 +26,12 @@ public:
    * @param secret Updated Secret
    * @return true when successful, otherwise returns false
    */
-  virtual bool addOrUpdateStaticSecret(const SecretPtr secret) PURE;
+  virtual bool addOrUpdateStaticSecret(const SecretSharedPtr secret) PURE;
 
   /**
    * @return the static secret for the given name
    */
-  virtual SecretPtr getStaticSecret(const std::string& name) PURE;
+  virtual SecretSharedPtr getStaticSecret(const std::string& name) PURE;
 };
 
 } // namespace Secret

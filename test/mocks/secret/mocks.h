@@ -21,8 +21,8 @@ public:
   MockSecretManager();
   ~MockSecretManager();
 
-  MOCK_METHOD1(addOrUpdateStaticSecret, bool(const SecretPtr secret));
-  MOCK_METHOD1(getStaticSecret, SecretPtr(const std::string& name));
+  MOCK_METHOD1(addOrUpdateStaticSecret, bool(const SecretSharedPtr secret));
+  MOCK_METHOD1(getStaticSecret, SecretSharedPtr(const std::string& name));
 };
 
 } // namespace Secret

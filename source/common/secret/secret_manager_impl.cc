@@ -6,12 +6,12 @@
 namespace Envoy {
 namespace Secret {
 
-bool SecretManagerImpl::addOrUpdateStaticSecret(const SecretPtr secret) {
+bool SecretManagerImpl::addOrUpdateStaticSecret(const SecretSharedPtr secret) {
   static_secrets_[secret->getName()] = secret;
   return true;
 }
 
-SecretPtr SecretManagerImpl::getStaticSecret(const std::string& name) {
+SecretSharedPtr SecretManagerImpl::getStaticSecret(const std::string& name) {
   return (static_secrets_.find(name) != static_secrets_.end()) ? static_secrets_[name] : nullptr;
 }
 

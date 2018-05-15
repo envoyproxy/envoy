@@ -19,11 +19,11 @@ public:
 
   virtual ~SecretManagerImpl() {}
 
-  bool addOrUpdateStaticSecret(const SecretPtr secret) override;
-  SecretPtr getStaticSecret(const std::string& name) override;
+  bool addOrUpdateStaticSecret(const SecretSharedPtr secret) override;
+  SecretSharedPtr getStaticSecret(const std::string& name) override;
 
 private:
-  SecretPtrMap static_secrets_;
+  SecretSharedPtrMap static_secrets_;
 };
 
 } // namespace Secret

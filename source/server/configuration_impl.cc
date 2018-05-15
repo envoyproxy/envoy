@@ -52,7 +52,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
     server.secretManager().addOrUpdateStaticSecret(
-        Secret::SecretPtr(new Secret::SecretImpl(secrets[i])));
+        Secret::SecretSharedPtr(new Secret::SecretImpl(secrets[i])));
   }
 
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(

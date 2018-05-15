@@ -1679,18 +1679,4 @@ const std::string Json::Schema::SDS_SCHEMA(R"EOF(
   }
   )EOF");
 
-const std::string Json::Schema::SECRET_SCHEMA(R"EOF(
-  {
-    "$schema": "http://json-schema.org/schema#",
-    "type": "object",
-    "properties": {
-      "name": {"type": "string"}
-    },
-    "required": [
-      "name"
-    ],
-    "additionalProperties": true
-  }
-  )EOF");
-
 } // namespace Envoy

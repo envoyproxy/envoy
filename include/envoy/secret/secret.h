@@ -33,11 +33,11 @@ public:
   virtual const std::string& getPrivateKey() PURE;
 };
 
-typedef std::shared_ptr<Secret> SecretPtr;
+typedef std::shared_ptr<Secret> SecretSharedPtr;
 
-typedef std::unordered_map<std::string, SecretPtr> SecretPtrMap;
+typedef std::unordered_map<std::string, SecretSharedPtr> SecretSharedPtrMap;
 
-typedef std::vector<SecretPtr> SecretPtrVector;
+typedef std::vector<SecretSharedPtr> SecretSharedPtrVector;
 
 /**
  * Throws when the requested static secret is not available

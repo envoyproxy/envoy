@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["secret_impl.h"],
     deps = [
         "//include/envoy/secret:secret_interface",
-        "//source/common/filesystem:filesystem_lib",
+        "//source/common/config:datasource_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
