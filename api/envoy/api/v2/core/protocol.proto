@@ -76,6 +76,11 @@ message Http2ProtocolOptions {
   // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
+
+  // `SETTINGS_MAX_HEADER_LIST_SIZE <https://httpwg.org/specs/rfc7540.html#SettingValues>`_
+  //  This option informs upstream peers the maximum size of header list the sender is ready to accept
+  //  in octets. Initial value of this setting is unlimited.
+  google.protobuf.UInt32Value max_header_list_size = 5;
 }
 
 // [#not-implemented-hide:]

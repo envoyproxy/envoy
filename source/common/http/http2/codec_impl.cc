@@ -635,6 +635,10 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
                    http2_settings.initial_stream_window_size_);
   }
 
+  if (http2_settings.max_header_list_size_ != Http2Settings::DEFAULT_MAX_HEADER_LIST_SIZE) {
+    iv.push_back({NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE, http2_settings.max_header_list_size_});
+  }
+
   if (disable_push) {
     // Universally disable receiving push promise frames as we don't currently support them. nghttp2
     // will fail the connection if the other side still sends them.

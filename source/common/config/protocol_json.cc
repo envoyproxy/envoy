@@ -19,6 +19,7 @@ void ProtocolJson::translateHttp2ProtocolOptions(
   JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options, initial_stream_window_size);
   JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options,
                         initial_connection_window_size);
+  JSON_UTIL_SET_INTEGER(json_http2_settings, http2_protocol_options, max_header_list_size);
 }
 
 } // namespace Config
