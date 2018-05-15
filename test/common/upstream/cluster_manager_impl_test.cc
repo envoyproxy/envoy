@@ -207,6 +207,7 @@ TEST_F(ClusterManagerImplTest, UnknownClusterType) {
     }]
   }
   )EOF";
+
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -258,7 +259,6 @@ TEST_F(ClusterManagerImplTest, DuplicateCluster) {
   const std::string json = fmt::sprintf(
       "{%s}",
       clustersJson({defaultStaticClusterJson("cluster_1"), defaultStaticClusterJson("cluster_1")}));
-
   EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
 }
 
@@ -410,7 +410,6 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
     }]
   }
   )EOF";
-
   create(parseBootstrapFromJson(json));
 }
 
@@ -434,7 +433,6 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
         deprecated_v1:
           use_std_hash: true
   )EOF";
-
   create(parseBootstrapFromV2Yaml(yaml));
 }
 
@@ -587,6 +585,7 @@ TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
     }]
   }
   )EOF";
+
   create(parseBootstrapFromJson(json));
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(8192));
