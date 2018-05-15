@@ -221,8 +221,6 @@ public:
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
-  MOCK_METHOD3(sendLocalReply_, void(Code code, const std::string& body,
-                                     std::function<void(HeaderMap& headers)> modify_headers));
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
   MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
