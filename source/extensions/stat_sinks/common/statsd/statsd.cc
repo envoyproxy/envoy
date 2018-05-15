@@ -114,8 +114,7 @@ void TcpStatsdSink::flush(Stats::StatsSource& stats_source) {
   tls_sink.beginFlush(true);
   for (const Stats::CounterSharedPtr& counter : stats_source.cachedCounters()) {
     if (counter->used()) {
-      uint64_t delta = counter->latch();
-      tls_sink.flushCounter(counter->name(), delta);
+      tls_sink.flushCounter(counter->name(), counter->latch());
     }
   }
 

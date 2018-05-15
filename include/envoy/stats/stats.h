@@ -242,7 +242,7 @@ public:
   /**
    * Returns all known gauges. Will use cached values if already accessed and clearCache() hasn't
    * been called since.
-   * @return std::vector<GaugeSharedPtr>& all known counters. Note: reference may not be valid after
+   * @return std::vector<GaugeSharedPtr>& all known gauges. Note: reference may not be valid after
    * clearCache() is called.
    */
   virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
@@ -250,7 +250,7 @@ public:
   /**
    * Returns all known parent histograms. Will use cached values if already accessed and
    * clearCache() hasn't been called since.
-   * @return std::vector<ParentHistogramSharedPtr>& all known counters. Note: reference may not be
+   * @return std::vector<ParentHistogramSharedPtr>& all known histograms. Note: reference may not be
    * valid after clearCache() is called.
    */
   virtual const std::vector<ParentHistogramSharedPtr>& cachedHistograms() PURE;
