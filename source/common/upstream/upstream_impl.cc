@@ -736,7 +736,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
       priority_state_manager_(new PriorityStateManager(*this, local_info)) {
-  const auto& cluster_load_assignment(
+  // TODO(dio): Use by-reference when cluster.hosts() is removed.
+  const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
