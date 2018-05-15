@@ -255,10 +255,8 @@ public:
   // AdminStream
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
-  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override {
-    return *callbacks_;
-  }
-  const Http::HeaderMap& getRequestHeaders() const override { return *request_headers_; }
+  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
+  const Http::HeaderMap& getRequestHeaders() const override;
 
 private:
   /**

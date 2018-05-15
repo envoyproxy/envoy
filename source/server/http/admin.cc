@@ -160,6 +160,16 @@ void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
   on_destroy_callbacks_.push_back(std::move(cb));
 }
 
+const Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
+  ASSERT(callbacks_ != nullptr);
+  return *callbacks_;
+}
+
+const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
+  ASSERT(request_headers_ != nullptr);
+  return *request_headers_;
+}
+
 bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
   if (params.size() != 1) {
     return false;

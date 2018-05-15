@@ -27,7 +27,7 @@ public:
   virtual void setEndStreamOnComplete(bool end_stream) PURE;
 
   /**
-   * @param cb callback to be added to the list of callbacks invoked by onDestroy() when connection
+   * @param cb callback to be added to the list of callbacks invoked by onDestroy() when stream
    * is closed.
    */
   virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
