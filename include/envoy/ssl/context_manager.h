@@ -2,10 +2,10 @@
 
 #include <functional>
 
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/stats.h"
-#include "envoy/secret/secret_manager.h"
 
 namespace Envoy {
 namespace Ssl {

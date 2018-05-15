@@ -470,7 +470,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/test_common:utility_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

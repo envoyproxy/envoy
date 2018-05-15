@@ -25,8 +25,7 @@ envoy_cc_library(
     hdrs = ["secret_manager_impl.h"],
     deps = [
         ":secret_impl_lib",
-        "//include/envoy/server:instance_interface",
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/server:instance_interface",
     ],
 )
-

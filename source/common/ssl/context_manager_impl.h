@@ -6,8 +6,8 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -22,9 +22,7 @@ namespace Ssl {
 class ContextManagerImpl final : public ContextManager {
 public:
   ContextManagerImpl(Runtime::Loader& runtime, Secret::SecretManager& secret_manager)
-      : runtime_(runtime),
-        secret_manager_(secret_manager) {
-  }
+      : runtime_(runtime), secret_manager_(secret_manager) {}
   ~ContextManagerImpl();
 
   /**

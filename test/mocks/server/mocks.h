@@ -17,8 +17,8 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread/thread.h"
 
-#include "common/ssl/context_manager_impl.h"
 #include "common/secret/secret_manager_impl.h"
+#include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -275,7 +275,7 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
-  Secret::SecretManager& secretManager() { return *(secret_manager_.get()); }
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
 
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());

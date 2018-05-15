@@ -17,8 +17,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
-
-
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -33,7 +31,7 @@ namespace Configuration {
 
 namespace {
 
-std::string kExpectedCertificateChain =R"EOF(-----BEGIN CERTIFICATE-----
+std::string kExpectedCertificateChain = R"EOF(-----BEGIN CERTIFICATE-----
 MIIDXDCCAsWgAwIBAgIJAPF6WtmgmqziMA0GCSqGSIb3DQEBCwUAMHYxCzAJBgNV
 BAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRYwFAYDVQQHDA1TYW4gRnJhbmNp
 c2NvMQ0wCwYDVQQKDARMeWZ0MRkwFwYDVQQLDBBMeWZ0IEVuZ2luZWVyaW5nMRAw
@@ -55,7 +53,7 @@ TSufsKqBICwwJ47yp+NV7RsPhe8AO/GehXhTlJBBwHSX6gfvjapkUG43AmdbY19L
 -----END CERTIFICATE-----
 )EOF";
 
-std::string kExpectedPrivateKey =R"EOF(-----BEGIN RSA PRIVATE KEY-----
+std::string kExpectedPrivateKey = R"EOF(-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQCqtS9bbVbo4ZpO1uSBCDortIibXKByL1fgl7s2uJc77+vzJnqC
 9uLFYygU1Z198X6jaAjc/vUkLFVXZhOU8607Zex8X+CdZBjQqsN90X2Ste1wqJ7G
 5SAGhptd/nOfb1IdGa6YtwPTlVitnMTfRgG4fh+3DA51UulCGTfJXCaC3wIDAQAB
@@ -72,7 +70,7 @@ t+uGq75okt7lfCeocT3Brt50w43WwPbmvQyeaC0qawU=
 -----END RSA PRIVATE KEY-----
 )EOF";
 
-} // namespace anonymous
+} // namespace
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;

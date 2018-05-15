@@ -20,5 +20,5 @@ envoy_cc_library(
         ":secret_interface",
         "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
-    ]
+    ],
 )

@@ -17,8 +17,7 @@
 namespace Envoy {
 namespace Ssl {
 
-class SslContextImplTest : public SslCertsTest {
-};
+class SslContextImplTest : public SslCertsTest {};
 
 TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_TRUE(ContextImpl::dNSNameMatch("lyft.com", "lyft.com"));
@@ -170,7 +169,6 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_EQ("", context->getCaCertInformation());
   EXPECT_EQ("", context->getCertChainInformation());
 }
-
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
@@ -337,8 +335,7 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
                           "^Failed to load CRL from .* without trusted CA certificates$");
 }
 
-class ClientContextConfigImplTest : public SslCertsTest {
-};
+class ClientContextConfigImplTest : public SslCertsTest {};
 
 // Validate that empty SNI (according to C string rules) fails config validation.
 TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
@@ -346,11 +343,13 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
   Secret::MockSecretManager secret_manager;
 
   tls_context.set_sni(std::string("\000", 1));
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException, "SNI names containing NULL-byte are not allowed");
+  EXPECT_THROW_WITH_MESSAGE(
+      ClientContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "SNI names containing NULL-byte are not allowed");
   tls_context.set_sni(std::string("a\000b", 3));
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException, "SNI names containing NULL-byte are not allowed");
+  EXPECT_THROW_WITH_MESSAGE(
+      ClientContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "SNI names containing NULL-byte are not allowed");
 }
 
 // Multiple certificate hashes are not yet supported.
@@ -364,9 +363,9 @@ TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->add_verify_certificate_hash();
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException,
-                            "Multiple TLS certificate verification hashes are not supported");
+  EXPECT_THROW_WITH_MESSAGE(
+      ClientContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "Multiple TLS certificate verification hashes are not supported");
 }
 
 // Multiple TLS certificates are not yet supported.
@@ -376,9 +375,9 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
   Secret::MockSecretManager secret_manager;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException,
-                            "Multiple TLS certificates are not supported for client contexts");
+  EXPECT_THROW_WITH_MESSAGE(
+      ClientContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "Multiple TLS certificates are not supported for client contexts");
 }
 
 // Multiple TLS certificates are not yet supported, but one is expected for
@@ -387,14 +386,14 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
 TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   Secret::MockSecretManager secret_manager;
-  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException,
-                            "A single TLS certificate is required for server contexts");
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "A single TLS certificate is required for server contexts");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl client_context_config(tls_context, secret_manager),
-                            EnvoyException,
-                            "A single TLS certificate is required for server contexts");
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
+      "A single TLS certificate is required for server contexts");
 }
 
 // TlsCertificate messages must have a cert for servers.

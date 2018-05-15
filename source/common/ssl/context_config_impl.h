@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/ssl/context_config.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/ssl/context_config.h"
 
 #include "common/json/json_loader.h"
 
@@ -76,8 +76,6 @@ private:
   const std::string verify_certificate_hash_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
-
-  Secret::SecretManager& secret_manager_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {

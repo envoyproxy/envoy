@@ -54,7 +54,6 @@ public:
   static const std::string CDS_SCHEMA;
   static const std::string SDS_SCHEMA;
 
-
   static const std::string SECRET_SCHEMA;
 
   // Redis Schemas

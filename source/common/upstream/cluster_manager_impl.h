@@ -13,10 +13,10 @@
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
-#include "envoy/secret/secret_manager.h"
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
@@ -151,8 +151,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     Secret::SecretManager& secret_manager);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -362,7 +361,6 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Upstream

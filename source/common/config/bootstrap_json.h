@@ -30,7 +30,7 @@ public:
    * @param bootstrap destination v2 envoy::config::bootstrap::v2::Bootstrap.
    */
   static void translateStaticSecretsBootstrap(const Json::Object& json_secrets,
-                                               envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+                                              envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 };
 
 } // namespace Config

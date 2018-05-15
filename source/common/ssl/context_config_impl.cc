@@ -43,14 +43,15 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.validation_context().crl())),
       cert_chain_([&config, &secret_manager] {
-        if(!config.tls_certificates().empty()) {
+        if (!config.tls_certificates().empty()) {
           return Config::DataSource::read(config.tls_certificates()[0].certificate_chain(), true);
-        } else if(!config.tls_certificate_sds_secret_configs().empty()) {
-          auto static_secret = secret_manager.getStaticSecret(
-              config.tls_certificate_sds_secret_configs()[0].name());
-          if(static_secret == nullptr) {
-            throw EnvoyException(fmt::format("Static secret is not defined: {}",
-                                 config.tls_certificate_sds_secret_configs()[0].name()));
+        } else if (!config.tls_certificate_sds_secret_configs().empty()) {
+          auto static_secret =
+              secret_manager.getStaticSecret(config.tls_certificate_sds_secret_configs()[0].name());
+          if (static_secret == nullptr) {
+            throw EnvoyException(
+                fmt::format("Static secret is not defined: {}",
+                            config.tls_certificate_sds_secret_configs()[0].name()));
           }
           return static_secret->getCertificateChain();
         } else {
@@ -62,15 +63,16 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
               ? ""
               : Config::DataSource::getPath(config.tls_certificates()[0].certificate_chain())),
       private_key_([&config, &secret_manager] {
-        if(!config.tls_certificates().empty()) {
+        if (!config.tls_certificates().empty()) {
           return Config::DataSource::read(config.tls_certificates()[0].private_key(), true);
-        } else if(!config.tls_certificate_sds_secret_configs().empty()) {
+        } else if (!config.tls_certificate_sds_secret_configs().empty()) {
           // static SDS secret
-          auto static_secret = secret_manager.getStaticSecret(
-              config.tls_certificate_sds_secret_configs()[0].name());
-          if(static_secret == nullptr) {
-            throw EnvoyException(fmt::format("Static secret is not defined: {}",
-                                 config.tls_certificate_sds_secret_configs()[0].name()));
+          auto static_secret =
+              secret_manager.getStaticSecret(config.tls_certificate_sds_secret_configs()[0].name());
+          if (static_secret == nullptr) {
+            throw EnvoyException(
+                fmt::format("Static secret is not defined: {}",
+                            config.tls_certificate_sds_secret_configs()[0].name()));
           }
           return static_secret->getPrivateKey();
         } else {
@@ -89,8 +91,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
-          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)),
-      secret_manager_(secret_manager) {
+          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
 
   // TODO(htuch): Support multiple hashes.
   if (config.validation_context().verify_certificate_hash().size() > 1) {
@@ -139,15 +140,17 @@ ClientContextConfigImpl::ClientContextConfigImpl(
 
 ClientContextConfigImpl::ClientContextConfigImpl(const Json::Object& config,
                                                  Secret::SecretManager& secret_manager)
-    : ClientContextConfigImpl([&config] {
-        envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context;
-        Config::TlsContextJson::translateUpstreamTlsContext(config, upstream_tls_context);
-        return upstream_tls_context;
-      }(), secret_manager) {}
+    : ClientContextConfigImpl(
+          [&config] {
+            envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context;
+            Config::TlsContextJson::translateUpstreamTlsContext(config, upstream_tls_context);
+            return upstream_tls_context;
+          }(),
+          secret_manager) {}
 
 ServerContextConfigImpl::ServerContextConfigImpl(
     const envoy::api::v2::auth::DownstreamTlsContext& config, Secret::SecretManager& secret_manager)
-    : ContextConfigImpl(config.common_tls_context(),  secret_manager),
+    : ContextConfigImpl(config.common_tls_context(), secret_manager),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       session_ticket_keys_([&config] {
@@ -172,19 +175,21 @@ ServerContextConfigImpl::ServerContextConfigImpl(
         return ret;
       }()) {
   // TODO(PiotrSikora): Support multiple TLS certificates.
-  if (config.common_tls_context().tls_certificates().size() != 1
-      && config.common_tls_context().tls_certificate_sds_secret_configs().size() != 1) {
+  if (config.common_tls_context().tls_certificates().size() != 1 &&
+      config.common_tls_context().tls_certificate_sds_secret_configs().size() != 1) {
     throw EnvoyException("A single TLS certificate is required for server contexts");
   }
 }
 
 ServerContextConfigImpl::ServerContextConfigImpl(const Json::Object& config,
                                                  Secret::SecretManager& secret_manager)
-    : ServerContextConfigImpl([&config] {
-        envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context;
-        Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
-        return downstream_tls_context;
-      }(), secret_manager) {}
+    : ServerContextConfigImpl(
+          [&config] {
+            envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context;
+            Config::TlsContextJson::translateDownstreamTlsContext(config, downstream_tls_context);
+            return downstream_tls_context;
+          }(),
+          secret_manager) {}
 
 // Append a SessionTicketKey to keys, initializing it with key_data.
 // Throws if key_data is invalid.

@@ -17,7 +17,7 @@ namespace Envoy {
 namespace Secret {
 
 class MockSecretManager : public SecretManager {
- public:
+public:
   MockSecretManager();
   ~MockSecretManager();
 
@@ -25,6 +25,6 @@ class MockSecretManager : public SecretManager {
   MOCK_METHOD1(getStaticSecret, SecretPtr(const std::string& name));
 };
 
-}
+} // namespace Secret
   // namespace Secret
 } // namespace Envoy

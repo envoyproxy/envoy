@@ -112,7 +112,8 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
 
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-                           bool workers_started, uint64_t hash, Secret::SecretManager& secret_manager)
+                           bool workers_started, uint64_t hash,
+                           Secret::SecretManager& secret_manager)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -379,9 +380,8 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     return false;
   }
 
-  ListenerImplPtr new_listener(
-      new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash,
-                      server_.secretManager()));
+  ListenerImplPtr new_listener(new ListenerImpl(config, version_info, *this, name, modifiable,
+                                                workers_started_, hash, server_.secretManager()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This

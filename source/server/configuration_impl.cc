@@ -18,8 +18,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/ratelimit/ratelimit_impl.h"
-#include "common/tracing/http_tracer_impl.h"
 #include "common/secret/secret_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Server {

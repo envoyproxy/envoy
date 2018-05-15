@@ -5,8 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/ssl/context.h"
 #include "envoy/common/exception.h"
+#include "envoy/ssl/context.h"
 
 namespace Envoy {
 namespace Secret {
@@ -15,9 +15,8 @@ namespace Secret {
  * Secret contains certificate chain and private key
  */
 class Secret {
- public:
-  virtual ~Secret() {
-  }
+public:
+  virtual ~Secret() {}
 
   /**
    * @return a name of the SDS secret
@@ -44,21 +43,17 @@ typedef std::vector<SecretPtr> SecretPtrVector;
  * Throws when the requested static secret is not available
  */
 class EnvoyStaticSecretException : public EnvoyException {
- public:
-  EnvoyStaticSecretException(const std::string& message)
-      : EnvoyException(message) {
-  }
+public:
+  EnvoyStaticSecretException(const std::string& message) : EnvoyException(message) {}
 };
 
 /**
  * Throws when the requested dynamic secret is not available
  */
 class EnvoyDynamicSecretNotReadyException : public EnvoyException {
- public:
-  EnvoyDynamicSecretNotReadyException(const std::string& message)
-      : EnvoyException(message) {
-  }
+public:
+  EnvoyDynamicSecretNotReadyException(const std::string& message) : EnvoyException(message) {}
 };
 
-}  // namespace Secret
-}  // namespace Envoy
+} // namespace Secret
+} // namespace Envoy

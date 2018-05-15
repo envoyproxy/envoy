@@ -1,7 +1,7 @@
 #pragma once
 
-#include "test/test_common/environment.h"
 #include "test/mocks/secret/mocks.h"
+#include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
 
