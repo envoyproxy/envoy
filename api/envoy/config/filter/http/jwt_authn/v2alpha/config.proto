@@ -30,7 +30,7 @@ import "validate/validate.proto";
 //       - seconds: 300
 //
 // [#not-implemented-hide:]
-message JwtRule {
+message JwtProvider {
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
   //
@@ -184,19 +184,23 @@ message JwtHeader {
 }
 
 // This message specifies a Jwt requirement.
-//
-// .. code-block:: yaml
-//
-//    required_issuers: [jwt_issuer1, jwt_issuer2]
-//
-// PerRouteConfig for jwt_authn filter uses this message.
 message JwtRequirement {
-  // Specify list of required Jwt issuers. If list is empty,  Jwt is NOT required.
-  // If any of required issuers is missing, or its verification fails, the request will
+  // Specify the required issuer for the JwtProvider.
+  string issuer = 1;
+
+  // This audiences field overrides the one in JwtProvider if not empty.
+  repeated string audiences = 2;
+}
+
+// This message specifies a per route based Jwt config.
+// Route.per_filter_config for jwt_authn filter uses this message.
+message PerRouteConfig {
+  // Specify list of required JwtProviders. If list is empty,  Jwt is NOT required.
+  // If any of required JwtProviders is missing, or its verification fails, the request will
   // be rejected.
-  // If a Jwt issuer is not required and is in the config, it will be verified.
+  // If a Jwt is not required, but it is in the providers list, it will be verified.
   // But it will not fail the request if its verification fails.
-  repeated string required_issuers = 1;
+  repeated JwtRequirement requires = 1;
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -206,15 +210,15 @@ message JwtRequirement {
 //
 //    - match:
 //         prefix: "/healthz"
-//      requirement:
-//         required_issuers: []
 //    - match:
 //         prefix: "/"
-//      requirement:
-//         required_issuers: [jwt_issuer1]
-//         allow_missing_or_failed: true
+//      - requires:
+//          issuer: jwt_issuer1
+//      - requires:
+//          issuer: jwt_issuer2
+//          audiences: [audience1, audience2]
 //
-message RouteRequirement {
+message RequirementRule {
   // The route matching parameter.  Only match is satisfied, the other fields will apply.
   //
   // For example: following match will match all requests.
@@ -226,15 +230,56 @@ message RouteRequirement {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specifies the Jwt requiement for matched routes.
-  JwtRequirement requirement = 2;
+  // Specify list of required JwtProviders. If list is empty,  Jwt is NOT required.
+  // If any of required JwtProviders is missing, or its verification fails, the request will
+  // be rejected.
+  // If a Jwt is not required, but it is in the providers list, it will be verified.
+  // But it will not fail the request if its verification fails.
+  repeated JwtRequirement requires = 1;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
-// [#not-implemented-hide:]
+//
+// For example:
+//
+// .. code-block:: yaml
+//
+//    - providers:
+//        issuer: remote-issuer
+//        audiences:
+//        - audience1
+//          audience2
+//        remote_jwks:
+//          http_uri:
+//            uri: https://example.com/.well-known/jwks.json
+//            cluster: example_jwks_cluster
+//    - providers:
+//        issuer: inline-issuer
+//        audiences:
+//        local_jwks:
+//          inline_string: jwks_string
+//    # Not jwt verification is required for /health path
+//    - rules:
+//        match:
+//          prefix: "/health"
+//    # Jwt verification for issuer1 is required for path prefixed with "prefix"
+//    - rules:
+//        match:
+//          prefix: "/prefix"
+//        - requires:
+//            issuer: issuer1
+//            audiences: [audience_override]
+//    # Jwt verification for issuer2 is required for all other requests.
+//    - rules:
+//        match:
+//          prefix: "/"
+//        - requires:
+//            issuer: issuer2
+//
+//// [#not-implemented-hide:]
 message JwtAuthentication {
-  // List of JWT rules to valide.
-  repeated JwtRule rules = 1;
+  // List of JWT providers.
+  repeated JwtProvider providers = 1;
 
   // DEPRECATED: Please use "routes" field. if "routes" field is not empty,
   // this field will not be used.
@@ -250,15 +295,14 @@ message JwtAuthentication {
   //
   // .. code-block:: yaml
   //
-  //    routes:
-  //    - match:
+  //    - rules:
+  //      match:
   //         prefix: "/healthz"
-  //      requirement:
-  //        required_issuers: []
-  //    - match:
+  //    - rules:
+  //      match:
   //         prefix: "/"
-  //      requirement:
-  //         required_issuers: [jwt_issuer1]
+  //      - requires:
+  //         issuer: issuer1
   //
-  repeated RouteRequirement routes = 3;
+  repeated RequirementRule rules = 3;
 }
