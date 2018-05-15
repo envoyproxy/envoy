@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -139,6 +140,8 @@ private:
   bool changeLogLevel(const Http::Utility::QueryParams& params);
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                           Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
+  void addCircuitSettings(envoy::admin::v2alpha::CircuitSettings& circuit_settings,
+                          Upstream::ResourceManager& resource_manager);
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);

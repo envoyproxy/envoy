@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package envoy.admin.v2alpha;
+
+import "envoy/api/v2/core/base.proto";
+
+// [#protodoc-title: Clusters]
+
+// Admin endpoint uses this wrapper for `/clusters` to display cluster status information.
+// See :ref:`/clusters <operations_admin_interface_clusters>` for more information.
+message Clusters {
+  // Aapping from cluster name to each cluster's status.
+  map<string, ClusterStatus> cluster_statuses = 1;
+}
+
+// Details an individual cluster's current status.
+message ClusterStatus {
+  // General outlier statistics if installed for this cluster.
+  OutlierInfo outlier_info = 1;
+  // Mapping from priority to circuit breaker settings for that priority.
+  map<string, CircuitSettings> circuit_settings = 2;
+  // Denotes whether this cluster was added via API or configured statically.
+  bool added_via_api = 3;
+  // Mapping from host address to the host's current status.
+  map<string, HostStatus> host_statuses = 4;
+}
+
+// Cluster outlier detection statistics. -1 for any of these statistics denotes that there was not
+// enough data to compute it.
+message OutlierInfo {
+  // The average success rate of the hosts in the Detector for the last aggregation interval.
+  double success_rate_average = 1;
+  // The success rate threshold used in the last interval. The threshold is used to eject hosts
+  // based on their success rate.
+  double success_rate_ejection_threshold = 2;
+}
+
+// Circuit settings for a particular priority setting.
+message CircuitSettings {
+  // Total TCP connection limit.
+  int64 max_connections = 1;
+  // Pending request limit. A request is pending if it is waiting to be attached to a connection
+  // pool connection.
+  int64 max_pending_requests = 2;
+  // Active request limit. A request is active if it is bound to a connection pool connection and
+  // awaiting a response.
+  int64 max_requests = 3;
+  // Per-request retry limit.
+  int64 max_retries = 4;
+}
+
+message HostStatus {
+  // Mapping from the name of the statistic to the current value.
+  map<string, int64> stats = 1;
+  // A string representation of the host's current health status.
+  string health_flags = 2;
+  // Configured load balancing weight for this host.
+  int64 weight = 3;
+  // Configured locality for the host.
+  envoy.api.v2.core.Locality locality = 4;
+  // Denotes whether this is configured as a canary host or not.
+  bool canary = 5;
+  // Request success rate for this host over the last calculated interval.
+  double success_rate = 6;
+}

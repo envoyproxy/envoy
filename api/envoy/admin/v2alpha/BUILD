@@ -13,3 +13,12 @@ api_proto_library(
         "//envoy/config/bootstrap/v2:bootstrap",
     ],
 )
+
+api_proto_library(
+    name = "clusters",
+    srcs = ["clusters.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/api/v2/core:base",
+    ],
+)
