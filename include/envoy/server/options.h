@@ -52,70 +52,70 @@ public:
    *         base ID to a different value will allow the server to run multiple times on the same
    *         host if desired.
    */
-  virtual uint64_t baseId() PURE;
+  virtual uint64_t baseId() const PURE;
 
   /**
    * @return the number of worker threads to run in the server.
    */
-  virtual uint32_t concurrency() PURE;
+  virtual uint32_t concurrency() const PURE;
 
   /**
    * @return the number of seconds that envoy will perform draining during a hot restart.
    */
-  virtual std::chrono::seconds drainTime() PURE;
+  virtual std::chrono::seconds drainTime() const PURE;
 
   /**
    * @return const std::string& the path to the configuration file.
    */
-  virtual const std::string& configPath() PURE;
+  virtual const std::string& configPath() const PURE;
 
   /**
    * @return const std::string& an inline YAML bootstrap config that merges
    *                            into the config loaded in configPath().
    */
-  virtual const std::string& configYaml() PURE;
+  virtual const std::string& configYaml() const PURE;
 
   /**
    * @return bool whether the config should only be parsed as v2. If false, when a v2 parse fails,
    *              a second attempt to parse the config as v1 will be made.
    */
-  virtual bool v2ConfigOnly() PURE;
+  virtual bool v2ConfigOnly() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
    */
-  virtual const std::string& adminAddressPath() PURE;
+  virtual const std::string& adminAddressPath() const PURE;
 
   /**
    * @return Network::Address::IpVersion the local address IP version.
    */
-  virtual Network::Address::IpVersion localAddressIpVersion() PURE;
+  virtual Network::Address::IpVersion localAddressIpVersion() const PURE;
 
   /**
    * @return spdlog::level::level_enum the default log level for the server.
    */
-  virtual spdlog::level::level_enum logLevel() PURE;
+  virtual spdlog::level::level_enum logLevel() const PURE;
 
   /**
    * @return const std::string& the log format string.
    */
-  virtual const std::string& logFormat() PURE;
+  virtual const std::string& logFormat() const PURE;
 
   /**
    * @return const std::string& the log file path.
    */
-  virtual const std::string& logPath() PURE;
+  virtual const std::string& logPath() const PURE;
 
   /**
    * @return the number of seconds that envoy will wait before shutting down the parent envoy during
    *         a host restart. Generally this will be longer than the drainTime() option.
    */
-  virtual std::chrono::seconds parentShutdownTime() PURE;
+  virtual std::chrono::seconds parentShutdownTime() const PURE;
 
   /**
    * @return the restart epoch. 0 indicates the first server start, 1 the second, and so on.
    */
-  virtual uint64_t restartEpoch() PURE;
+  virtual uint64_t restartEpoch() const PURE;
 
   /**
    * @return whether to verify the configuration file is valid, print any errors, and exit
@@ -126,38 +126,38 @@ public:
   /**
    * @return std::chrono::milliseconds the duration in msec between log flushes.
    */
-  virtual std::chrono::milliseconds fileFlushIntervalMsec() PURE;
+  virtual std::chrono::milliseconds fileFlushIntervalMsec() const PURE;
 
   /**
    * @return const std::string& the server's cluster.
    */
-  virtual const std::string& serviceClusterName() PURE;
+  virtual const std::string& serviceClusterName() const PURE;
 
   /**
    * @return const std::string& the server's node identification.
    */
-  virtual const std::string& serviceNodeName() PURE;
+  virtual const std::string& serviceNodeName() const PURE;
 
   /**
    * @return const std::string& the server's zone.
    */
-  virtual const std::string& serviceZone() PURE;
+  virtual const std::string& serviceZone() const PURE;
 
   /**
    * @return uint64_t the maximum number of stats gauges and counters.
    */
-  virtual uint64_t maxStats() PURE;
+  virtual uint64_t maxStats() const PURE;
 
   /**
    * @return uint64_t the maximum name length of the name field in
    * router/cluster/listener.
    */
-  virtual uint64_t maxObjNameLength() PURE;
+  virtual uint64_t maxObjNameLength() const PURE;
 
   /**
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
    */
-  virtual bool hotRestartDisabled() PURE;
+  virtual bool hotRestartDisabled() const PURE;
 };
 
 } // namespace Server
