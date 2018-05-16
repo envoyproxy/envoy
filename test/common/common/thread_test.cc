@@ -31,8 +31,16 @@ TEST_F(ThreadTest, TestReleasableLockGuard) {
 
 TEST_F(ThreadTest, TestTryLockGuard) {
   TryLockGuard lock(a_mutex_);
-  if (lock.isLocked()) {
-    EXPECT_EQ(1, ++a_);
+
+  // This test doesn't work, because a_mutex_ is guarded, and thread annotations
+  // don't work with TryLockGuard.
+  // if (lock.tryLock()) {
+  //   EXPECT_EQ(1, ++a_);
+  // }
+
+  // TryLockGuard does functionally work with unguarded variables.
+  if (lock.tryLock()) {
+    EXPECT_EQ(1, ++b_);
   }
 }
 

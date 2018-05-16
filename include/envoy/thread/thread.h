@@ -50,8 +50,11 @@ private:
 };
 
 /**
- * Like LockGuard, but uses a tryLock() on construction rather than a lock().
+ * Like LockGuard, but uses a tryLock() on construction rather than a lock(). This
+ * class lacks thread annotations, as clang currently does appear to be able to handle
+ * conditional thread annotations. So the ones we'd like are commented out.
  */
+#define DISABLE_TRYLOCK_ANNOTATION(annoation)
 class SCOPED_LOCKABLE TryLockGuard {
 public:
   /**
@@ -61,25 +64,28 @@ public:
    *
    * @param lock the mutex.
    */
-  TryLockGuard(BasicLockable& lock) EXCLUSIVE_LOCK_FUNCTION(lock)
-      : lock_(lock.tryLock() ? &lock : nullptr) {}
+  TryLockGuard(BasicLockable& lock) : lock_(lock) {}
 
   /**
    * Destruction of the DeferredLockGuard unlocks the lock, if it was locked.
    */
-  ~TryLockGuard() UNLOCK_FUNCTION() {
-    if (isLocked()) {
-      lock_->unlock();
+  ~TryLockGuard() DISABLE_TRYLOCK_ANNOTATION(UNLOCK_FUNCTION()) {
+    if (is_locked_) {
+      lock_.unlock();
     }
   }
 
   /**
    * @return bool whether the lock was successfully acquired.
    */
-  bool isLocked() const { return lock_ != nullptr; }
+  bool tryLock() DISABLE_TRYLOCK_ANNOTATION(EXCLUSIVE_TRYLOCK_FUNCTION(true)) {
+    is_locked_ = lock_.tryLock();
+    return is_locked_;
+  }
 
 private:
-  BasicLockable* const lock_;
+  BasicLockable& lock_;
+  bool is_locked_{false};
 };
 
 /**
