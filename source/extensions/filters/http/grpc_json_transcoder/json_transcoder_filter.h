@@ -113,7 +113,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { stream_reset_ = true; }
+  void onDestroy() override {}
 
 private:
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
@@ -128,7 +128,6 @@ private:
   Http::HeaderMap* response_headers_{nullptr};
 
   bool error_{false};
-  bool stream_reset_{false};
 };
 
 } // namespace GrpcJsonTranscoder

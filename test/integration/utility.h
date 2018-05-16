@@ -96,13 +96,14 @@ public:
    * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
    * @param host supplies the host header to use for the request.
+   * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
                     const std::string& url, const std::string& body, Http::CodecClient::Type type,
-                    const std::string& host = "host");
+                    const std::string& host = "host", const std::string& content_type = "");
 
   /**
    * Make a new connection, issues a request, and then disconnect when the request is complete.
@@ -113,13 +114,15 @@ public:
    * @param type supplies the codec to use for the request.
    * @param version the IP addess version of the client and server.
    * @param host supplies the host header to use for the request.
+   * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote easly disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
-                    Network::Address::IpVersion ip_version, const std::string& host = "host");
+                    Network::Address::IpVersion ip_version, const std::string& host = "host",
+                    const std::string& content_type = "");
 };
 
 // A set of connection callbacks which tracks connection state.

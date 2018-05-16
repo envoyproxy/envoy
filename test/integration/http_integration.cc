@@ -630,6 +630,21 @@ void HttpIntegrationTest::testRetry() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+// Change the default route to be restrictive, and send a request to an alternate route.
+void HttpIntegrationTest::testGrpcRouterNotFound() {
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_, "host",
+      Http::Headers::get().ContentTypeValues.Grpc);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            response->headers().ContentType()->value().c_str());
+  EXPECT_STREQ("12", response->headers().GrpcStatus()->value().c_str());
+}
+
 void HttpIntegrationTest::testGrpcRetry() {
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"grpc-status", "0"}};
   initialize();

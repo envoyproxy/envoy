@@ -191,6 +191,21 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Create a locally generated response using the provided response_code and body_text parameters.
+   * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
+   * HTTP response code and grpc-status and grpc-message headers mapped from the provided
+   * parameters.
+   *
+   * @param response_code supplies the HTTP response code.
+   * @param body_text supplies the optional body text which is sent using the text/plain content
+   *                  type, or encoded in the grpc-message header.
+   * @param modify_headers supplies an optional callback function that can modify the
+   *                       response headers.
+   */
+  virtual void sendLocalReply(Code response_code, const std::string& body_text,
+                              std::function<void(HeaderMap& headers)> modify_headers) PURE;
+
+  /**
    * Called with 100-Continue headers to be encoded.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
