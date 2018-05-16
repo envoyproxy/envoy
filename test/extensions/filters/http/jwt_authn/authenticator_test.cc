@@ -48,101 +48,21 @@ const std::string PublicKey =
     "  \"kid\": \"b3319a147514df7ee5e4bcdee51350cc890cc89e\""
     "}]}";
 
-// A good JSON config.
+// A good config.
 const char ExampleConfig[] = R"(
-{
-   "rules": [
-      {
-         "issuer": "https://example.com",
-         "audiences": [
-            "example_service",
-            "http://example_service1",
-            "https://example_service2/"
-          ],
-          "remote_jwks": {
-            "http_uri": {
-              "uri": "https://pubkey_server/pubkey_path",
-              "cluster": "pubkey_cluster"
-            },
-            "cache_duration": {
-              "seconds": 600
-            }
-         },
-         "forward_payload_header": "sec-istio-auth-userinfo"
-      }
-   ]
-}
-)";
-
-// A JSON config without forward_payload_header configured.
-const char ExampleConfigWithoutForwardPayloadHeader[] = R"(
-{
-   "rules": [
-      {
-         "issuer": "https://example.com",
-         "audiences": [
-            "example_service",
-            "http://example_service1",
-            "https://example_service2/"
-          ],
-          "remote_jwks": {
-            "http_uri": {
-              "uri": "https://pubkey_server/pubkey_path",
-              "cluster": "pubkey_cluster"
-            },
-            "cache_duration": {
-              "seconds": 600
-            }
-         },
-      }
-   ]
-}
-)";
-
-// An example JSON config with a good JWT config and allow_missing_or_failed
-// option enabled
-const char ExampleConfigWithJwtAndAllowMissingOrFailed[] = R"(
-{
-   "rules": [
-      {
-         "issuer": "https://example.com",
-         "audiences": [
-            "example_service",
-            "http://example_service1",
-            "https://example_service2/"
-          ],
-          "remote_jwks": {
-            "http_uri": {
-              "uri": "https://pubkey_server/pubkey_path",
-              "cluster": "pubkey_cluster"
-            },
-            "cache_duration": {
-              "seconds": 600
-            }
-         }
-      }
-   ],
-  "allow_missing_or_failed": true
-}
-)";
-
-// A JSON config for "other_issuer"
-const char OtherIssuerConfig[] = R"(
-{
-   "rules": [
-      {
-         "issuer": "other_issuer"
-      }
-   ]
-}
-)";
-
-// A config with bypass
-const char BypassConfig[] = R"(
-{
-  "bypass": [
-  ]
-}
+rules:
+  - issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      cache_duration:
+        seconds: 600
+    forward_payload_header: sec-istio-auth-userinfo
 )";
 
 // expired token
@@ -227,10 +147,12 @@ public:
 
 class AuthenticatorTest : public ::testing::Test {
 public:
-  void SetUp() { SetupConfig(ExampleConfig); }
+  void SetUp() {
+    MessageUtil::loadFromYaml(ExampleConfig, config_);
+    CreateAuthenticator();
+  }
 
-  void SetupConfig(const std::string& json_str) {
-    MessageUtil::loadFromJson(json_str, config_);
+  void CreateAuthenticator() {
     store_factory_ = ::std::make_shared<DataStoreFactory>(config_, mock_factory_ctx_);
     auth_ = Authenticator::create(store_factory_);
   }
@@ -433,9 +355,7 @@ TEST_F(AuthenticatorTest, TestOkJWTAudService2) {
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Confit forward_jwt flag
   config_.mutable_rules(0)->set_forward(true);
-  // Re-create store and auth objects.
-  store_factory_ = ::std::make_shared<DataStoreFactory>(config_, mock_factory_ctx_);
-  auth_ = Authenticator::create(store_factory_);
+  CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
@@ -467,7 +387,9 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is missing, the status should still be OK
   // because allow_missing_or_failed is true.
-  SetupConfig(ExampleConfigWithJwtAndAllowMissingOrFailed);
+  config_.set_allow_missing_or_failed(true);
+  CreateAuthenticator();
+
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
@@ -481,7 +403,9 @@ TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
 TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is invalid, the status should still be OK
   // because allow_missing_or_failed is true.
-  SetupConfig(ExampleConfigWithJwtAndAllowMissingOrFailed);
+  config_.set_allow_missing_or_failed(true);
+  CreateAuthenticator();
+
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
@@ -490,37 +414,6 @@ TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
   std::string token = "invalidToken";
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + token}};
   auth_->verify(headers, &mock_cb_);
-}
-
-TEST_F(AuthenticatorTest, TestBypassJWT) {
-  SetupConfig(BypassConfig);
-
-  // TODO: enable Bypass test
-  return;
-
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
-  EXPECT_CALL(mock_cb_, onComplete(_))
-      .WillOnce(Invoke(
-          // Empty header, rejected.
-          [](const Status& status) { ASSERT_EQ(status, Status::JwtMissed); }))
-      .WillOnce(Invoke(
-          // CORS header, OK
-          [](const Status& status) { ASSERT_EQ(status, Status::Ok); }))
-      .WillOnce(Invoke(
-          // healthz header, OK
-          [](const Status& status) { ASSERT_EQ(status, Status::Ok); }));
-
-  // Empty headers.
-  auto empty_headers = Http::TestHeaderMapImpl{};
-  auth_->verify(empty_headers, &mock_cb_);
-
-  // CORS headers
-  auto cors_headers = Http::TestHeaderMapImpl{{":method", "OPTIONS"}, {":path", "/any/path"}};
-  auth_->verify(cors_headers, &mock_cb_);
-
-  // healthz headers
-  auto healthz_headers = Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/healthz"}};
-  auth_->verify(healthz_headers, &mock_cb_);
 }
 
 TEST_F(AuthenticatorTest, TestInvalidJWT) {
@@ -583,7 +476,8 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
 
 TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   // Create a config with an other issuer.
-  SetupConfig(OtherIssuerConfig);
+  config_.mutable_rules(0)->set_issuer("other_issuer");
+  CreateAuthenticator();
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -706,7 +600,10 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
 
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
-  SetupConfig(ExampleConfigWithoutForwardPayloadHeader);
+  auto rule0 = config_.mutable_rules(0);
+  rule0->clear_forward_payload_header();
+  CreateAuthenticator();
+
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
   MockAuthenticatorCallbacks mock_cb;
@@ -726,10 +623,7 @@ TEST_F(AuthenticatorTest, TestInlineJwks) {
   rule0->clear_remote_jwks();
   auto local_jwks = rule0->mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
-
-  // recreate store and auth with modified config.
-  store_factory_ = ::std::make_shared<DataStoreFactory>(config_, mock_factory_ctx_);
-  auth_ = Authenticator::create(store_factory_);
+  CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "");
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
