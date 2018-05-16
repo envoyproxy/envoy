@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/ratelimit/ratelimit_impl.h"
@@ -51,6 +52,12 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
       server.localInfo(), server.accessLogManager(), server.admin());
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
+
+  // Immediately pause RDS to ensure that we don't send any requests until we've
+  // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
+  // so we pause RDS until we've completed all the callbacks.
+  cluster_manager_->adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
+
   for (ssize_t i = 0; i < listeners.size(); i++) {
     ENVOY_LOG(debug, "listener #{}:", i);
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
