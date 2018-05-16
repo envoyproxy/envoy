@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.validate.h"
-#include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/filter_json.h"
@@ -17,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
 
-Network::FilterFactoryCb RateLimitConfigFactory::createFilter(
+Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -39,15 +38,7 @@ RateLimitConfigFactory::createFilterFactory(const Json::Object& json_config,
                                             Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::rate_limit::v2::RateLimit proto_config;
   Envoy::Config::FilterJson::translateTcpRateLimitFilter(json_config, proto_config);
-  return createFilter(proto_config, context);
-}
-
-Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::network::rate_limit::v2::RateLimit&>(proto_config),
-      context);
+  return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
 /**
