@@ -53,7 +53,11 @@ TEST(StatsIsolatedStoreImplTest, All) {
   ScopePtr scope2 = scope1->createScope("foo.");
   EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
 
-  EXPECT_EQ(3UL, store.counters().size());
+  // Validate that we sanitize away bad characters in the stats prefix.
+  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
+
+  EXPECT_EQ(4UL, store.counters().size());
   EXPECT_EQ(2UL, store.gauges().size());
 }
 
@@ -476,14 +480,6 @@ TEST(RawStatDataTest, Truncate) {
   RawStatData* stat{};
   EXPECT_LOG_CONTAINS("warning", "is too long with", stat = alloc.alloc(long_string));
   alloc.free(*stat);
-}
-
-// Validate NULL-validation behavior of RawStatData.
-TEST(RawStatDataTest, NullName) {
-  HeapRawStatDataAllocator alloc;
-  const std::string null_embed_string("asdf\000dfsa", 9);
-  EXPECT_THROW_WITH_MESSAGE(alloc.alloc(null_embed_string), EnvoyException,
-                            "Stat names may not contain NULL (asdf\000dfsa)");
 }
 
 TEST(RawStatDataTest, HeapAlloc) {

@@ -266,6 +266,23 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
+// Validate that we sanitize away bad characters in the stats prefix.
+TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
+  EXPECT_CALL(*this, alloc(_));
+  Counter& c1 = scope1->counter("c1");
+  EXPECT_EQ("scope1___foo.c1", c1.name());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_)).Times(2);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
