@@ -21,7 +21,6 @@ proto_library(
         "//envoy/api/v2/cluster:circuit_breaker",
         "//envoy/api/v2/cluster:outlier_detection",
         "//envoy/api/v2/core:protocol",
-        "//envoy/api/v2/core:health_check",
         "//envoy/api/v2/core:health_check_logging",
         "//envoy/api/v2/listener",
         "//envoy/api/v2/ratelimit",
