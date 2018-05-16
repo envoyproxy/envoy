@@ -8,15 +8,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace TcpProxyFilter {
+namespace TcpProxy {
 
 /**
  * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class TcpProxyConfigFactory
+class ConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
 public:
-  TcpProxyConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
+  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
@@ -29,7 +29,7 @@ private:
       Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace TcpProxyFilter
+} // namespace TcpProxy
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
