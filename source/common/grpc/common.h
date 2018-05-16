@@ -10,6 +10,7 @@
 #include "envoy/http/message.h"
 #include "envoy/stats/stats.h"
 
+#include "common/grpc/status.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
@@ -55,21 +56,6 @@ public:
    *         trailers.
    */
   static std::string getGrpcMessage(const Http::HeaderMap& trailers);
-
-  /**
-   * Returns the gRPC status code from a given HTTP response status code. Ordinarily, it is expected
-   * that a 200 response is provided, but gRPC defines a mapping for intermediaries that are not
-   * gRPC aware, see https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md.
-   * @param http_response_status HTTP status code.
-   * @return Status::GrpcStatus corresponding gRPC status code.
-   */
-  static Status::GrpcStatus httpToGrpcStatus(uint64_t http_response_status);
-
-  /**
-   * @param grpc_status gRPC status from grpc-status header.
-   * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
-   */
-  static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
 
   /**
    * Charge a success/failure stat to a cluster/service/method.

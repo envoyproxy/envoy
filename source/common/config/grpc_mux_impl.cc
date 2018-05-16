@@ -160,10 +160,26 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
     ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
+    // TODO(yuval-k): This should never happen. consider dropping the stream as this is a protocol
+    // violation
     return;
   }
   if (api_state_[type_url].watches_.empty()) {
-    ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+    // update the nonce as we are processing this response.
+    api_state_[type_url].request_.set_response_nonce(message->nonce());
+    if (message->resources().empty()) {
+      // No watches and no resources. This can happen when envoy unregisters from a resource
+      // that's removed from the server as well. For example, a deleted cluster triggers un-watching
+      // the ClusterLoadAssignment watch, and at the same time the xDS server sends an empty list of
+      // ClusterLoadAssignment resources. we'll accept this update. no need to send a discovery
+      // request, as we don't watch for anything.
+      api_state_[type_url].request_.set_version_info(message->version_info());
+    } else {
+      // No watches and we have resources - this should not happen. send a NACK (by not updating
+      // the version).
+      ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
+      sendDiscoveryRequest(type_url);
+    }
     return;
   }
   try {

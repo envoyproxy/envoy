@@ -31,11 +31,9 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/config:filter_json_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
     ],
 )

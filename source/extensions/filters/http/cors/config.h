@@ -15,10 +15,10 @@ namespace Cors {
  */
 class CorsFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
+  CorsFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().CORS) {}
+
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;
-
-  std::string name() override { return HttpFilterNames::get().CORS; }
 };
 
 } // namespace Cors

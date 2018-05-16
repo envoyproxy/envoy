@@ -47,12 +47,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "status_lib",
+    srcs = ["status.cc"],
+    hdrs = ["status.h"],
+    deps = [
+        "//include/envoy/grpc:status",
+    ],
+)
+
+envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/grpc:status",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
         "//include/envoy/stats:stats_interface",
@@ -64,6 +72,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:status_lib",
         "//source/common/http:filter_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -81,20 +90,25 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
-        ":google_async_site_lib",
-        "//include/envoy/grpc:async_client_interface",
+        ":google_grpc_creds_lib",
+        "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
-        "//source/common/config:datasource_lib",
         "//source/common/tracing:http_tracer_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "google_async_site_lib",
-    srcs = ["google_async_site_impl.cc"],
-    deps = ["//include/envoy/grpc:google_async_site_interface"],
+    name = "google_grpc_creds_lib",
+    srcs = ["google_grpc_creds_impl.cc"],
+    hdrs = ["google_grpc_creds_impl.h"],
+    external_deps = ["grpc"],
+    deps = [
+        "//include/envoy/grpc:google_grpc_creds_interface",
+        "//include/envoy/registry",
+        "//source/common/config:datasource_lib",
+    ],
 )

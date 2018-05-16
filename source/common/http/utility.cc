@@ -12,6 +12,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/grpc/status.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -210,30 +211,48 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
-void Utility::sendLocalReply(StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                             Code response_code, const std::string& body_text) {
-  sendLocalReply(
-      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-        callbacks.encodeHeaders(std::move(headers), end_stream);
-      },
-      [&](Buffer::Instance& data, bool end_stream) -> void {
-        callbacks.encodeData(data, end_stream);
-      },
-      is_reset, response_code, body_text);
+void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
+                             const bool& is_reset, Code response_code,
+                             const std::string& body_text) {
+  sendLocalReply(is_grpc,
+                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+                   callbacks.encodeHeaders(std::move(headers), end_stream);
+                 },
+                 [&](Buffer::Instance& data, bool end_stream) -> void {
+                   callbacks.encodeData(data, end_stream);
+                 },
+                 is_reset, response_code, body_text);
 }
 
 void Utility::sendLocalReply(
-    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, const std::string& body_text) {
+  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
+  ASSERT(!is_reset);
+  // Respond with a gRPC trailers-only response if the request is gRPC
+  if (is_grpc) {
+    HeaderMapPtr response_headers{new HeaderMapImpl{
+        {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
+        {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
+        {Headers::get().GrpcStatus,
+         std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
+    if (!body_text.empty()) {
+      // TODO: GrpcMessage should be percent-encoded
+      response_headers->insertGrpcMessage().value(body_text);
+    }
+    encode_headers(std::move(response_headers), true); // Trailers only response
+    return;
+  }
+
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
     response_headers->insertContentLength().value(body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
-
   encode_headers(std::move(response_headers), body_text.empty());
+  // encode_headers()) may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
     Buffer::OwnedImpl buffer(body_text);
     encode_data(buffer, true);

@@ -62,12 +62,13 @@ public:
     cds_->initialize();
   }
 
-  void expectAdd(const std::string& cluster_name) {
-    EXPECT_CALL(cm_, addOrUpdateCluster(_))
-        .WillOnce(Invoke([cluster_name](const envoy::api::v2::Cluster& cluster) -> bool {
-          EXPECT_EQ(cluster_name, cluster.name());
-          return true;
-        }));
+  void expectAdd(const std::string& cluster_name, const std::string& version) {
+    EXPECT_CALL(cm_, addOrUpdateCluster(_, version))
+        .WillOnce(Invoke(
+            [cluster_name](const envoy::api::v2::Cluster& cluster, const std::string&) -> bool {
+              EXPECT_EQ(cluster_name, cluster.name());
+              return true;
+            }));
   }
 
   void expectRequest() {
@@ -157,8 +158,8 @@ TEST_F(CdsApiImplTest, Basic) {
   message->body().reset(new Buffer::OwnedImpl(response1_json));
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(ClusterManager::ClusterInfoMap{}));
-  expectAdd("cluster1");
-  expectAdd("cluster2");
+  expectAdd("cluster1", "hash_3845eb3523492899");
+  expectAdd("cluster2", "hash_3845eb3523492899");
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_EQ("", cds_->versionInfo());
@@ -179,8 +180,8 @@ TEST_F(CdsApiImplTest, Basic) {
   message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterMap({"cluster1", "cluster2"})));
-  expectAdd("cluster1");
-  expectAdd("cluster3");
+  expectAdd("cluster1", "hash_19fd657104a2cd34");
+  expectAdd("cluster3", "hash_19fd657104a2cd34");
   EXPECT_CALL(cm_, removeCluster("cluster2"));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));

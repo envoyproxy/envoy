@@ -1,10 +1,8 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/config/filter/http/lua/v2/lua.pb.h"
-#include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -15,27 +13,19 @@ namespace Lua {
 /**
  * Config registration for the Lua filter. @see NamedHttpFilterConfigFactory.
  */
-class LuaFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+class LuaFilterConfig : public Common::FactoryBase<envoy::config::filter::http::lua::v2::Lua> {
 public:
+  LuaFilterConfig() : FactoryBase(HttpFilterNames::get().LUA) {}
+
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
                       Server::Configuration::FactoryContext& context) override;
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stat_prefix,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::lua::v2::Lua()};
-  }
-
-  std::string name() override { return HttpFilterNames::get().LUA; }
-
 private:
-  Http::FilterFactoryCb createFilter(const envoy::config::filter::http::lua::v2::Lua& proto_config,
-                                     const std::string&,
-                                     Server::Configuration::FactoryContext& context);
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::lua::v2::Lua& proto_config,
+                                    const std::string&,
+                                    Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Lua

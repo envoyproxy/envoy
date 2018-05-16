@@ -147,13 +147,15 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are sent, this will be translated into a 500 from Envoy.
+  // limits are exceeded, this will be translated into a 500 from Envoy.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024 * 65, false);
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_NE(response->headers().GrpcStatus(), nullptr);
+  EXPECT_STREQ("2", response->headers().GrpcStatus()->value().c_str()); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }

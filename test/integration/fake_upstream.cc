@@ -382,14 +382,16 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   }
 }
 
-FakeRawConnectionPtr FakeUpstream::waitForRawConnection() {
+FakeRawConnectionPtr FakeUpstream::waitForRawConnection(std::chrono::milliseconds wait_for_ms) {
   std::unique_lock<std::mutex> lock(lock_);
   if (new_connections_.empty()) {
     ENVOY_LOG(debug, "waiting for raw connection");
-    new_connection_event_.wait(lock);
+    new_connection_event_.wait_for(lock, wait_for_ms);
   }
 
-  ASSERT(!new_connections_.empty());
+  if (new_connections_.empty()) {
+    return nullptr;
+  }
   FakeRawConnectionPtr connection(new FakeRawConnection(std::move(new_connections_.front())));
   connection->initialize();
   new_connections_.pop_front();
@@ -408,7 +410,11 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
 }
 
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
+  std::unique_lock<std::mutex> lock(lock_);
+  ASSERT_FALSE(disconnected_);
   connection_.dispatcher().post([data, end_stream, this]() -> void {
+    std::unique_lock<std::mutex> lock(lock_);
+    ASSERT_FALSE(disconnected_);
     Buffer::OwnedImpl to_write(data);
     connection_.write(to_write, end_stream);
   });

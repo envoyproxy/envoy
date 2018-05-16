@@ -168,7 +168,6 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
 
-  // of the client connection as the origin client address if *use_remote_address* is true
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
   // true. Generating a random UUID4 is expensive so in high throughput scenarios where this feature
