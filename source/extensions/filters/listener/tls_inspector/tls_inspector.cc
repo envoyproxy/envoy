@@ -115,7 +115,6 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
-  // Note: we're setting only the most preferred protocol that was advertised by the client.
   cb_->socket().setRequestedApplicationProtocols(protocols);
   alpn_found_ = true;
 }
