@@ -54,6 +54,11 @@ public:
 private:
   std::string fromTime(time_t time, const std::string& new_format_string) const;
   std::string setCustomField(const std::string& field, const std::string& value) const;
+
+  struct CustomFields {
+    static const std::string& f() { CONSTRUCT_ON_FIRST_USE(std::string, "f"); }
+  };
+
   std::string format_string_;
 };
 

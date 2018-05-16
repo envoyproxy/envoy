@@ -10,6 +10,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 
@@ -24,8 +25,9 @@ namespace Envoy {
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::string new_format_string = setCustomField(
       // "%f" is the custom field for subsecond.
-      "f",
+      CustomFields::f(),
       fmt::FormatInt(
+          // By default we want nanoseconds.
           std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count())
           .str()
           .substr(10));
@@ -35,6 +37,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     return fromTime(current_time);
   }
 
+  // Send the newly formatted format string to stftime.
   return fromTime(current_time, new_format_string);
 }
 
@@ -51,11 +54,9 @@ std::string DateFormatter::setCustomField(const std::string& field,
                                           const std::string& value) const {
   size_t found = format_string_.find(field);
   if (found == std::string::npos) {
-    // If no field specifier inside the current format string, return an empty string and quickly
-    // use the default formatter.
-    //
-    // TODO(dio): Use EMPTY_STRING in here.
-    return "";
+    // If no field specifier inside the current format string, return an empty string and
+    // subsequently use the default formatter.
+    return EMPTY_STRING;
   }
 
   size_t index = found;
@@ -73,7 +74,7 @@ std::string DateFormatter::setCustomField(const std::string& field,
       } else {
         start = found - 2;
 
-        // This field probably has a valid width specifier, e.g. %3f.
+        // This field potentially has a valid width specifier, e.g. %3f.
         if (start < new_format_string.size()) {
           std::string sub = new_format_string.substr(start, 2);
 

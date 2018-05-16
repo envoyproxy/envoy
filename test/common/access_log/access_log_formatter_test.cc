@@ -395,7 +395,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
-                               "%START_TIME%";
+                               "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -407,7 +407,18 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     gmtime_r(&test_epoch, &time_val);
     time_t expected_time_t = mktime(&time_val);
 
-    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z", expected_time_t),
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                          expected_time_t),
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
+    const std::string format =
+        "%START_TIME(%s%3f)%|%START_TIME(%s%4f)%|%START_TIME(%s%5f)%|%START_TIME(%s%6f)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("1522796769123|15227967691234|152279676912345|1522796769123456",
               formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }
