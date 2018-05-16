@@ -160,10 +160,10 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // storing the name twice. Performing a lookup on the set is similarly
   // expensive to performing a map lookup, since both require copying a truncated version of the
   // string before doing the hash lookup.
-  absl::ReleasableMutexLock lock(&mutex_);
+  Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
-  lock.Release();
+  lock.release();
 
   if (!ret.second) {
     ::free(data);
@@ -280,7 +280,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
   size_t key_removed;
   {
-    absl::MutexLock lock(&mutex_);
+    Thread::LockGuard lock(mutex_);
     key_removed = stats_.erase(&data);
   }
 

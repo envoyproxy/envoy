@@ -39,12 +39,12 @@ SinkDelegate::~SinkDelegate() {
 StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkPtr log_sink) : SinkDelegate(log_sink) {}
 
 void StderrSinkDelegate::log(absl::string_view msg) {
-  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+  Thread::OptionalLockGuard guard(lock_);
   std::cerr << msg;
 }
 
 void StderrSinkDelegate::flush() {
-  Thread::OptionalLockGuard<Thread::BasicLockable> guard(lock_);
+  Thread::OptionalLockGuard guard(lock_);
   std::cerr << std::flush;
 }
 
