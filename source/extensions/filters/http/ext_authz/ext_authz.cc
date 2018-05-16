@@ -116,8 +116,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::CheckStatus status) {
   // if there is an error contacting the service.
   if (status == CheckStatus::Denied ||
       (status == CheckStatus::Error && !config_->failureModeAllow())) {
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getDeniedHeader())};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    Http::Utility::sendLocalReply(
+        [this](Http::HeaderMapPtr&&, bool) -> void {
+          Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getDeniedHeader())};
+          callbacks_->encodeHeaders(std::move(response_headers), true);
+        },
+        [this](Buffer::Instance&, bool) -> void {}, true, Http::Code::Forbidden, "");
     callbacks_->requestInfo().setResponseFlag(
         RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
