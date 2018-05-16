@@ -23,22 +23,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "address_range_impl_test",
-    srcs = ["address_range_impl_test.cc"],
-    deps = [
-        "//source/common/network:address_lib",
-        "//source/common/network:address_range_lib",
-        "//source/common/network:resolver_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/runtime:runtime_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:network_utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
     deps = [
