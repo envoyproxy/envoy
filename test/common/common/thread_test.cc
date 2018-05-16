@@ -32,14 +32,13 @@ TEST_F(ThreadTest, TestReleasableLockGuard) {
 TEST_F(ThreadTest, TestTryLockGuard) {
   TryLockGuard lock(a_mutex_);
 
-  // This test doesn't work, because a_mutex_ is guarded, and thread annotations
-  // don't work with TryLockGuard.
-  // if (lock.tryLock()) {
-  //   EXPECT_EQ(1, ++a_);
-  // }
-
-  // TryLockGuard does functionally work with unguarded variables.
   if (lock.tryLock()) {
+    // This test doesn't work, because a_mutex_ is guarded, and thread
+    // annotations don't work with TryLockGuard. The Macro is defined in
+    // include/envoy/thread/thread.h.
+    DISABLE_TRYLOCKGUARD_ANNOTATION(EXPECT_EQ(1, ++a_));
+
+    // TryLockGuard does functionally work with unguarded variables.
     EXPECT_EQ(1, ++b_);
   }
 }

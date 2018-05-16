@@ -251,8 +251,8 @@ void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
   // Instead, we guard this condition with a lock. However, to avoid deadlock, we must tryLock()
   // in this path, since this call runs in the same thread as the event loop that is receiving
   // messages. If tryLock() fails it is sufficient to not return any parent stats.
-  memset(&info, 0, sizeof(info));
   Thread::TryLockGuard lock(init_lock_);
+  memset(&info, 0, sizeof(info));
   if (options_.restartEpoch() == 0 || parent_terminated_ || !lock.tryLock()) {
     return;
   }

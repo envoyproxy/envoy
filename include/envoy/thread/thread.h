@@ -49,12 +49,19 @@ private:
   BasicLockable* const lock_;
 };
 
+// At the moment, TryLockGuard is very hard to annotate correctly, I
+// believe due to limitations in clang. At the moment there are no
+// GUARDED_BY variables for any tryLocks in the codebase, so it's
+// easies just to leave it out. In a future clang release it's
+// possible we can enable this. See also the commented-out block
+// in ThreadTest.TestTryLockGuard in test/common/common/thread_test.cc.
+#define DISABLE_TRYLOCKGUARD_ANNOTATION(annotation)
+
 /**
  * Like LockGuard, but uses a tryLock() on construction rather than a lock(). This
  * class lacks thread annotations, as clang currently does appear to be able to handle
  * conditional thread annotations. So the ones we'd like are commented out.
  */
-#define DISABLE_TRYLOCK_ANNOTATION(annoation)
 class SCOPED_LOCKABLE TryLockGuard {
 public:
   /**
@@ -69,7 +76,7 @@ public:
   /**
    * Destruction of the DeferredLockGuard unlocks the lock, if it was locked.
    */
-  ~TryLockGuard() DISABLE_TRYLOCK_ANNOTATION(UNLOCK_FUNCTION()) {
+  ~TryLockGuard() DISABLE_TRYLOCKGUARD_ANNOTATION(UNLOCK_FUNCTION()) {
     if (is_locked_) {
       lock_.unlock();
     }
@@ -78,7 +85,7 @@ public:
   /**
    * @return bool whether the lock was successfully acquired.
    */
-  bool tryLock() DISABLE_TRYLOCK_ANNOTATION(EXCLUSIVE_TRYLOCK_FUNCTION(true)) {
+  bool tryLock() DISABLE_TRYLOCKGUARD_ANNOTATION(EXCLUSIVE_TRYLOCK_FUNCTION(true)) {
     is_locked_ = lock_.tryLock();
     return is_locked_;
   }
