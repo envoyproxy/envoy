@@ -23,8 +23,7 @@
 #include "common/router/header_parser.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/router/router_ratelimit.h"
-
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 
 #include "absl/types/optional.h"
 
@@ -486,7 +485,7 @@ private:
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
   const bool auto_host_rewrite_;
-  const Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr websocket_config_;
+  const TcpProxy::ConfigSharedPtr websocket_config_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
