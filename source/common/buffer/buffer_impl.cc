@@ -94,7 +94,33 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {
-  return evbuffer_read(buffer_.get(), fd, max_length);
+  constexpr uint64_t MaxSlices = 2;
+  RawSlice slices[MaxSlices];
+  uint64_t num_slices = reserve(max_length, slices, MaxSlices);
+  struct iovec iov[num_slices];
+  int num_iov = 0;
+  for (uint64_t i = 0; i < num_slices && max_length != 0; i++) {
+    num_iov++;
+    iov[i].iov_base = slices[i].mem_;
+    iov[i].iov_len = std::min(slices[i].len_, size_t(max_length));
+    max_length -= slices[i].len_;
+  }
+  const ssize_t rc = readv(fd, iov, num_iov);
+  if (rc < 0) {
+    return rc;
+  }
+  uint64_t num_slices_to_commit = 0;
+  uint64_t bytes_to_commit = rc;
+  while (bytes_to_commit != 0) {
+    if (slices[num_slices_to_commit].len_ > bytes_to_commit) {
+      slices[num_slices_to_commit].len_ = bytes_to_commit;
+    }
+    bytes_to_commit -= slices[num_slices_to_commit].len_;
+    num_slices_to_commit++;
+  }
+  ASSERT(num_slices_to_commit <= num_slices);
+  commit(slices, num_slices_to_commit);
+  return rc;
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -115,7 +141,31 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-int OwnedImpl::write(int fd) { return evbuffer_write(buffer_.get(), fd); }
+int OwnedImpl::write(int fd) {
+  constexpr uint64_t MaxSlices = 16;
+  RawSlice slices[MaxSlices];
+  uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
+  if (num_slices == 0) {
+    return 0;
+  }
+  struct iovec iov[num_slices];
+  uint64_t j = 0;
+  for (uint64_t i = 0; i < num_slices; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      iov[j].iov_base = slices[i].mem_;
+      iov[j].iov_len = slices[i].len_;
+      j++;
+    }
+  }
+  if (j == 0) {
+    return 0;
+  }
+  ssize_t rc = writev(fd, iov, j);
+  if (rc > 0) {
+    drain(uint64_t(rc));
+  }
+  return int(rc);
+}
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
 
