@@ -3,6 +3,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#ifndef __APPLE__
+#include <experimental/filesystem>
+#endif
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -25,6 +28,19 @@
 
 namespace Envoy {
 namespace {
+
+// Create the parent directory of a given filesystem path.
+void createParentPath(const std::string& path) {
+#ifdef __APPLE__
+  // No support in Clang OS X libc++ today for std::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0);
+#else
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::create_directories(
+      std::experimental::filesystem::path(path).parent_path());
+#endif
+}
 
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = ::getenv("TEST_UDSDIR");
@@ -201,7 +217,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string extension = StringUtil::endsWith(path, ".yaml") ? ".yaml" : ".json";
   const std::string out_json_path =
       TestEnvironment::temporaryPath(path + ".with.ports" + extension);
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_json_path + ")").c_str()) == 0);
+  createParentPath(out_json_path);
   {
     std::ofstream out_json_file(out_json_path);
     out_json_file << out_json_string;
@@ -231,7 +247,7 @@ void TestEnvironment::exec(const std::vector<std::string>& args) {
 std::string TestEnvironment::writeStringToFileForTest(const std::string& filename,
                                                       const std::string& contents) {
   const std::string out_path = TestEnvironment::temporaryPath(filename);
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + out_path + ")").c_str()) == 0);
+  createParentPath(out_path);
   unlink(out_path.c_str());
   {
     std::ofstream out_file(out_path);

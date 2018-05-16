@@ -77,7 +77,7 @@ public:
     EXPECT_CALL(*this, free(_));
   }
 
-  NameHistogramMap makeHistogramMap(const std::list<ParentHistogramSharedPtr>& hist_list) {
+  NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
     for (const Stats::ParentHistogramSharedPtr& histogram : hist_list) {
       // Exclude the scope part of the name.
@@ -97,7 +97,7 @@ public:
 
     EXPECT_TRUE(merge_called);
 
-    std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
+    std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
     histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
     histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
@@ -276,11 +276,15 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(2UL, store_->counters().size());
   CounterSharedPtr c1 = store_->counters().front();
   EXPECT_EQ("scope1.c1", c1->name());
+  EXPECT_EQ(store_->source().cachedCounters().front(), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
+  EXPECT_EQ(2UL, store_->source().cachedCounters().size());
+  store_->source().clearCache();
+  EXPECT_EQ(1UL, store_->source().cachedCounters().size());
 
   EXPECT_CALL(*this, free(_));
   EXPECT_EQ(1L, c1.use_count());

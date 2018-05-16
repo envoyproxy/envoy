@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -10,27 +10,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-class HealthCheckFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+class HealthCheckFilterConfig
+    : public Common::FactoryBase<envoy::config::filter::http::health_check::v2::HealthCheck> {
 public:
+  HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HEALTH_CHECK) {}
+
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,
                       Server::Configuration::FactoryContext& context) override;
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new envoy::config::filter::http::health_check::v2::HealthCheck()};
-  }
-
-  std::string name() override { return HttpFilterNames::get().HEALTH_CHECK; }
 
 private:
-  Http::FilterFactoryCb
-  createFilter(const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
-               const std::string& stats_prefix, Server::Configuration::FactoryContext& context);
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace HealthCheck

@@ -13,6 +13,7 @@ import "gogoproto/gogo.proto";
 option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: Health check logging]
+// :ref:`Health check logging <arch_overview_health_check_logging>`.
 // [#proto-status: draft]
 
 message HealthCheckEvent {

@@ -30,7 +30,7 @@ public:
       }
       switch (event.event_selector_case()) {
       case test::integration::Event::kDownstreamSendBytes:
-        tcp_client->write(event.downstream_send_bytes());
+        tcp_client->write(event.downstream_send_bytes(), false, false);
         break;
       case test::integration::Event::kDownstreamRecvBytes:
         // TODO(htuch): Should we wait for some data?
@@ -40,10 +40,14 @@ public:
           fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(max_wait_ms_);
           // If we timed out, we fail out.
           if (fake_upstream_connection == nullptr) {
-            EXPECT_NE(nullptr, fake_upstream_connection);
             tcp_client->close();
             return;
           }
+        }
+        // If we're no longer connected, we're done.
+        if (!fake_upstream_connection->connected()) {
+          tcp_client->close();
+          return;
         }
         fake_upstream_connection->write(event.upstream_send_bytes());
         break;
@@ -55,7 +59,7 @@ public:
         break;
       }
     }
-    if (fake_upstream_connection != nullptr) {
+    if (fake_upstream_connection != nullptr && fake_upstream_connection->connected()) {
       fake_upstream_connection->close();
       fake_upstream_connection->waitForDisconnect(true);
     }

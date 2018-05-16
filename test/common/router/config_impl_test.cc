@@ -4230,6 +4230,8 @@ public:
   };
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
+    TestFilterConfig() : EmptyHttpFilterConfig("test.filter") {}
+
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED;
@@ -4244,7 +4246,6 @@ public:
       obj->config_.MergeFrom(message);
       return obj;
     }
-    std::string name() override { return "test.filter"; }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,

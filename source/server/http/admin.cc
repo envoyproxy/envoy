@@ -278,7 +278,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
 }
 
 // TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
-Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
+Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response) const {
   envoy::admin::v2alpha::ConfigDump dump;
   auto& config_dump_map = *(dump.mutable_configs());
@@ -290,6 +290,8 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap&,
     config_dump_map[key_callback_pair.first] = any_message;
   }
 
+  response_headers.insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
@@ -475,8 +477,8 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
 
 // TODO(ramaraochavali): Add summary histogram output for Prometheus.
 uint64_t
-PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterSharedPtr>& counters,
-                                            const std::list<Stats::GaugeSharedPtr>& gauges,
+PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
+                                            const std::vector<Stats::GaugeSharedPtr>& gauges,
                                             Buffer::Instance& response) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
@@ -501,9 +503,10 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::list<Stats::CounterShared
   return metric_type_tracker.size();
 }
 
-std::string AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                   const std::list<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                   const bool pretty_print) {
+std::string
+AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
+                       const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                       const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);

@@ -35,7 +35,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
-  // UDP statsd server address.
+  NiceMock<Stats::MockSource> source; // UDP statsd server address.
   Network::Address::InstanceConstSharedPtr server_address =
       Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:8125", Network::Test::getLoopbackAddressUrlString(GetParam())));
@@ -44,13 +44,19 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   EXPECT_NE(fd, -1);
 
   // Check that fd has not changed.
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
-  sink.flushCounter(counter, 1);
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->used_ = true;
+  counter->latch_ = 1;
+  source.counters_.push_back(counter);
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  sink.flushGauge(gauge, 1);
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  source.gauges_.push_back(gauge);
+
+  sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
@@ -73,6 +79,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkWithTagsTest,
 
 TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Stats::MockSource> source;
   // UDP statsd server address.
   Network::Address::InstanceConstSharedPtr server_address =
       Network::Utility::parseInternetAddressAndPort(
@@ -83,16 +90,21 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
 
   // Check that fd has not changed.
   std::vector<Stats::Tag> tags = {Stats::Tag{"node", "test"}};
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
-  counter.tags_ = tags;
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->used_ = true;
+  counter->latch_ = 1;
+  counter->tags_ = tags;
+  source.counters_.push_back(counter);
 
-  sink.flushCounter(counter, 1);
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  gauge->tags_ = tags;
+  source.gauges_.push_back(gauge);
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  gauge.tags_ = tags;
-  sink.flushGauge(gauge, 1);
+  sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
@@ -110,21 +122,31 @@ TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
 }
 
 TEST(UdpStatsdSinkTest, CheckActualStats) {
+  NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, writer_ptr, false);
 
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->used_ = true;
+  counter->latch_ = 1;
+  source.counters_.push_back(counter);
+
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c"));
-  sink.flushCounter(counter, 1);
+  sink.flush(source);
+  counter->used_ = false;
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  source.gauges_.push_back(gauge);
+
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g"));
-  sink.flushGauge(gauge, 1);
+  sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";
@@ -136,24 +158,34 @@ TEST(UdpStatsdSinkTest, CheckActualStats) {
 }
 
 TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
+  NiceMock<Stats::MockSource> source;
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   NiceMock<ThreadLocal::MockInstance> tls_;
   UdpStatsdSink sink(tls_, writer_ptr, true);
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
-  counter.tags_ = tags;
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->used_ = true;
+  counter->latch_ = 1;
+  counter->tags_ = tags;
+  source.counters_.push_back(counter);
+
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_counter:1|c|#key1:value1,key2:value2"));
-  sink.flushCounter(counter, 1);
+  sink.flush(source);
+  counter->used_ = false;
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  gauge.tags_ = tags;
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  gauge->tags_ = tags;
+  source.gauges_.push_back(gauge);
+
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.test_gauge:1|g|#key1:value1,key2:value2"));
-  sink.flushGauge(gauge, 1);
+  sink.flush(source);
 
   NiceMock<Stats::MockHistogram> timer;
   timer.name_ = "test_timer";

@@ -2,16 +2,15 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "router_check_tool",
-    testonly = 1,
     srcs = ["router_check.cc"],
     deps = [":router_check_main_lib"],
 )

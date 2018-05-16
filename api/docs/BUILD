@@ -12,6 +12,7 @@ package_group(
 proto_library(
     name = "protos",
     deps = [
+        "//envoy/admin/v2alpha:config_dump",
         "//envoy/api/v2:cds",
         "//envoy/api/v2:discovery",
         "//envoy/api/v2:eds",
@@ -20,6 +21,8 @@ proto_library(
         "//envoy/api/v2/cluster:circuit_breaker",
         "//envoy/api/v2/cluster:outlier_detection",
         "//envoy/api/v2/core:protocol",
+        "//envoy/api/v2/core:health_check",
+        "//envoy/api/v2/core:health_check_logging",
         "//envoy/api/v2/listener",
         "//envoy/api/v2/ratelimit",
         "//envoy/api/v2/route",

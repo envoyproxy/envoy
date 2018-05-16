@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["stats_impl_test.cc"],
     deps = [
         "//source/common/stats:stats_lib",
+        "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",

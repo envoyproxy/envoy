@@ -1,5 +1,6 @@
 #include "server/listener_manager_impl.h"
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -109,9 +110,9 @@ ProdListenerComponentFactory::createDrainManager(envoy::api::v2::Listener::Drain
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-                           const std::string& name, bool modifiable, bool workers_started,
-                           uint64_t hash)
+ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
+                           ListenerManagerImpl& parent, const std::string& name, bool modifiable,
+                           bool workers_started, uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -124,8 +125,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, ListenerManag
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
-      metadata_(config.has_metadata() ? config.metadata()
-                                      : envoy::api::v2::core::Metadata::default_instance()) {
+      config_(config), version_info_(version_info) {
   // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
   // filter chain #1308.
   ASSERT(config.filter_chains().size() >= 1);
@@ -313,10 +313,40 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())) {
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
+      config_tracker_entry_(server.admin().getConfigTracker().add(
+          "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
     workers_.emplace_back(worker_factory.createWorker());
   }
+}
+
+ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+  config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
+  for (const auto& listener : active_listeners_) {
+    if (listener->blockRemove()) {
+      config_dump->mutable_static_listeners()->Add()->MergeFrom(listener->config());
+    } else {
+      auto& dynamic_listener = *config_dump->mutable_dynamic_active_listeners()->Add();
+      dynamic_listener.set_version_info(listener->versionInfo());
+      dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+    }
+  }
+
+  for (const auto& listener : warming_listeners_) {
+    auto& dynamic_listener = *config_dump->mutable_dynamic_warming_listeners()->Add();
+    dynamic_listener.set_version_info(listener->versionInfo());
+    dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+  }
+
+  for (const auto& listener : draining_listeners_) {
+    auto& dynamic_listener = *config_dump->mutable_dynamic_draining_listeners()->Add();
+    dynamic_listener.set_version_info(listener.listener_->versionInfo());
+    dynamic_listener.mutable_listener()->MergeFrom(listener.listener_->config());
+  }
+
+  return config_dump;
 }
 
 ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
@@ -326,7 +356,7 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
-                                              bool modifiable) {
+                                              const std::string& version_info, bool modifiable) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -350,7 +380,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   }
 
   ListenerImplPtr new_listener(
-      new ListenerImpl(config, *this, name, modifiable, workers_started_, hash));
+      new ListenerImpl(config, version_info, *this, name, modifiable, workers_started_, hash));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
