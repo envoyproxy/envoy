@@ -102,42 +102,6 @@ const std::string GoodToken =
     "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
     "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
 
-// Payload:
-// {"iss":"https://example.com","sub":"test@example.com","aud":"http://example_service/","exp":2001001001}
-const std::string GoodTokenAudHasProtocolScheme =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
-    "XVkIjoiaHR0cDovL2V4YW1wbGVfc2VydmljZS8ifQ.gHqO8m3hUZZ8m7EajMQy8vB"
-    "RL5o3njwU5Pg2NxU4z3AwUP6P_7MoB_ChiByjg_LQ92GjHXbHn1gAQHVOn0hERVwm"
-    "VYGmNsZHm4k5pmD6orPcYV1i3DdLqqxEVyw2R1XD8bC9zK7Tc8mKTRIJYC4T1QSo8"
-    "mKTzZ8M-EwAuDYa0CsWGhIfA4o3xChXKPLM2hxA4uM1A6s4AQ4ipNQ5FTgLDabgsC"
-    "EpfDR3lAXSaug1NE22zX_tm0d9JnC5ZrIk3kwmPJPrnAS2_9RKTQW2e2skpAT8dUV"
-    "T5aSpQxJmWIkyp4PKWmH6h4H2INS7hWyASZdX4oW-R0PMy3FAd8D6Y8740A";
-
-// Payload:
-// {"iss":"https://example.com","sub":"test@example.com","aud":"https://example_service1/","exp":2001001001}
-const std::string GoodTokenAudService1 =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
-    "XVkIjoiaHR0cHM6Ly9leGFtcGxlX3NlcnZpY2UxLyJ9.JJq_-fzbNWykI2npW13hJ"
-    "F_2_IK9JAlodt_T_kO_kSCb7ngAJvmbDhnIUKp7PX-UCEx_6sehNnLZzZeazGeDgw"
-    "xcjI4zM7E1bzus_sY_Kl7MSYBx7UyW0rgbEvjJOg681Uwn8MkQh9wfQ-SuzPfe07Y"
-    "O4bFMuNBiZsxS0j3_agJrbmpEPycNBSIZ0ez3aQpnDyUgZ1ZGBoVOgzXUJDXptb71"
-    "nzvwse8DINafa5kOhBmQcrIADiOyTVC1IqcOvaftVcS4MTkTeCyzfsqcNQ-VeNPKY"
-    "3e6wTe9brxbii-IPZFNY-1osQNnfCtYpEDjfvMjwHTielF-b55xq_tUwuqaaQ";
-
-// Payload:
-// {"iss":"https://example.com","sub":"test@example.com","aud":"http://example_service2","exp":2001001001}
-const std::string GoodTokenAudService2 =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUu"
-    "Y29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiY"
-    "XVkIjoiaHR0cDovL2V4YW1wbGVfc2VydmljZTIifQ.XFPQHdA5A2rpoQgMMcCBRcW"
-    "t8QrwVJAhdTgNqBjga_ebnoWZdzj9C6t-8mYYoCQ6t7bulLFbPzO8iJREo7zxN7Rn"
-    "F0-15ur16LV7AYeDnH0istAiti9uy3POW3telcN374hbBVdA6sBafGqzeQ8cDpb4o"
-    "0T_BIy6-kaz3ne4-UEdl8kLrR7UaA_LYrdXGomYKqwH3Q4q4mnV7mpE0YUm98AyI6"
-    "Thwt7f3DTmHOMBeO_3xrLOOZgNtuXipqupkp9sb-DcCRdSokoFpGSTibvV_8RwkQo"
-    "W2fdqw_ZD7WOe4sTcK27Uma9exclisHVxzJJbQOW82WdPQGicYaR_EajYzA";
-
 } // namespace
 
 class MockAuthenticatorCallbacks : public Authenticator::Callbacks {
@@ -270,82 +234,6 @@ TEST_F(AuthenticatorTest, TestOkJWTPubkeyNoKid) {
             "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
             "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
             "aWNlIn0");
-  // Verify the token is removed.
-  EXPECT_FALSE(headers.Authorization());
-
-  EXPECT_EQ(mock_pubkey.called_count(), 1);
-}
-
-// Verifies that a JWT with aud: http://example_service/ is matched to
-// example_service in config.
-TEST_F(AuthenticatorTest, TestOkJWTAudService) {
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  // Test OK pubkey and its cache
-  auto headers =
-      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodTokenAudHasProtocolScheme}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-
-  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"),
-            "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGx"
-            "lLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiaHR0cDovL2V4YW1wbG"
-            "Vfc2VydmljZS8ifQ");
-  // Verify the token is removed.
-  EXPECT_FALSE(headers.Authorization());
-
-  EXPECT_EQ(mock_pubkey.called_count(), 1);
-}
-
-// Verifies that a JWT with aud: https://example_service1/ is matched to
-// a JWT with aud: http://example_service1 in config.
-TEST_F(AuthenticatorTest, TestOkJWTAudService1) {
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodTokenAudService1}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-
-  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"),
-            "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGx"
-            "lLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiaHR0cHM6Ly9leGFtcG"
-            "xlX3NlcnZpY2UxLyJ9");
-  // Verify the token is removed.
-  EXPECT_FALSE(headers.Authorization());
-
-  EXPECT_EQ(mock_pubkey.called_count(), 1);
-}
-
-// Verifies that a JWT with aud: http://example_service2 is matched to
-// a JWT with aud: https://example_service2/ in config.
-TEST_F(AuthenticatorTest, TestOkJWTAudService2) {
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodTokenAudService2}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-
-  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"),
-            "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGx"
-            "lLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiaHR0cDovL2V4YW1wbG"
-            "Vfc2VydmljZTIifQ");
   // Verify the token is removed.
   EXPECT_FALSE(headers.Authorization());
 
@@ -615,26 +503,6 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // Test when forward_payload_header is not set, the output should NOT
   // contain the sec-istio-auth-userinfo header.
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
-}
-
-TEST_F(AuthenticatorTest, TestInlineJwks) {
-  // Change the config to use local_jwks.inline_string
-  auto rule0 = config_.mutable_rules(0);
-  rule0->clear_remote_jwks();
-  auto local_jwks = rule0->mutable_local_jwks();
-  local_jwks->set_inline_string(PublicKey);
-  CreateAuthenticator();
-
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "");
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-  EXPECT_EQ(mock_pubkey.called_count(), 0);
 }
 
 } // namespace JwtAuthn
