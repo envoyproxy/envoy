@@ -11,17 +11,14 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace DynamicRouter {
+namespace DynamicCluster {
 
-/**
- * See docs/configuration/http_filters/grpc_web_filter.rst
- */
-class DynamicRouter : public Http::StreamDecoderFilter, NonCopyable {
+class DynamicCluster : public Http::StreamDecoderFilter, NonCopyable {
 public:
-  DynamicRouter(Upstream::ClusterManager& cm,Event::Dispatcher& dispatcher) : cm_(cm),dispatcher_(dispatcher) {}
-  virtual ~DynamicRouter(){};
+  DynamicCluster(Upstream::ClusterManager& cm) : cm_(cm) {}
+  virtual ~DynamicCluster(){};
 
-   // Http::StreamFilterBase
+  // Http::StreamFilterBase
   void onDestroy() override{};
 
   // Http::StreamDecoderFilter
@@ -39,10 +36,9 @@ public:
 private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Upstream::ClusterManager& cm_;
-  Event::Dispatcher& dispatcher_;
 };
 
-} // namespace GrpcWeb
+} // namespace DynamicCluster
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

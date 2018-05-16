@@ -10,9 +10,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "dynamic_router",
-    srcs = ["dynamic_router.cc"],
-    hdrs = ["dynamic_router.h"],
+    name = "dynamic_cluster",
+    srcs = ["dynamic_cluster.cc"],
+    hdrs = ["dynamic_cluster.h"],
     deps = [
         "//include/envoy/http:codes_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -29,7 +29,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":dynamic_router",
+        ":dynamic_cluster",
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",

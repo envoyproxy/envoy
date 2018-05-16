@@ -330,6 +330,7 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
+  void createOrUpdateThreadLocalClusterInternal(std::function<void()> thread_local_clustercb);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
@@ -337,6 +338,7 @@ private:
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const HostVector& hosts_added, const HostVector& hosts_removed);
+  void postThreadLocalClusterUpdateInternal(std::function<void()> thread_local_cluster_updatecb);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateGauges();
 
@@ -344,6 +346,7 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
+  Event::Dispatcher& main_thread_dispatcher_;
   Runtime::RandomGenerator& random_;
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;

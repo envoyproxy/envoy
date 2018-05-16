@@ -8,15 +8,15 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace DynamicRouter {
+namespace DynamicCluster {
 
 /**
- * Config registration for the dynamic filter. @see NamedHttpFilterConfigFactory.
+ * Config registration for the dynamic cluster filter. @see NamedHttpFilterConfigFactory.
  */
-class DynamicRouterFilterConfig : public Common::EmptyHttpFilterConfig {
+class DynamicClusterFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
 
-  DynamicRouterFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().DYNAMIC_ROUTER) {}
+  DynamicClusterFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().DYNAMIC_CLUSTER) {}
 
 private:
   Http::FilterFactoryCb createFilter(const std::string&,
