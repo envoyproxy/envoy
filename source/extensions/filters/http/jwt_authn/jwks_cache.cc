@@ -65,8 +65,8 @@ public:
     const auto inline_jwks = Config::DataSource::read(jwt_rule_.local_jwks(), true);
     if (!inline_jwks.empty()) {
       const Status status = setKey(inline_jwks,
-                             // inline jwks never expires.
-                             std::chrono::steady_clock::time_point::max());
+                                   // inline jwks never expires.
+                                   std::chrono::steady_clock::time_point::max());
       if (status != Status::Ok) {
         ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_rule_.issuer(),
                   inline_jwks);

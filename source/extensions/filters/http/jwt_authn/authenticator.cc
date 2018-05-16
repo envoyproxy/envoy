@@ -6,8 +6,8 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "include/jwt_verify_lib/jwt.h"
-#include "include/jwt_verify_lib/verify.h"
+#include "jwt_verify_lib/jwt.h"
+#include "jwt_verify_lib/verify.h"
 
 using ::google::jwt_verify::Status;
 

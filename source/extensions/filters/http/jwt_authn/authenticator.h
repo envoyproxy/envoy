@@ -3,7 +3,7 @@
 
 #include "extensions/filters/http/jwt_authn/data_store.h"
 
-#include "include/jwt_verify_lib/status.h"
+#include "jwt_verify_lib/status.h"
 
 namespace Envoy {
 namespace Extensions {
