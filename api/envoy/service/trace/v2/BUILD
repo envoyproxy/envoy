@@ -17,7 +17,7 @@ api_go_grpc_library(
     name = "trace_service",
     proto = ":trace_service",
     deps = [
-         "//envoy/api/v2/core:base_go_proto",
-         "@io_opencensus_trace//:trace_model_go_proto",
+        "//envoy/api/v2/core:base_go_proto",
+        "@io_opencensus_trace//:trace_model_go_proto",
     ],
 )

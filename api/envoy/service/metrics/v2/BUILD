@@ -18,7 +18,7 @@ api_go_grpc_library(
     name = "metrics_service",
     proto = ":metrics_service",
     deps = [
-         "//envoy/api/v2/core:base_go_proto",
-         "@promotheus_metrics_model//:client_model_go_proto",
+        "//envoy/api/v2/core:base_go_proto",
+        "@promotheus_metrics_model//:client_model_go_proto",
     ],
 )
