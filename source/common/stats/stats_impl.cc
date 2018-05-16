@@ -173,8 +173,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   }
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
-    : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
   std::unordered_set<std::string> names = addDefaultExtractors(config);
@@ -335,6 +334,31 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   ASSERT(supportedQuantiles().size() == computed_quantiles_.size());
   hist_approx_quantile(new_histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
+}
+
+std::vector<CounterSharedPtr>& SourceImpl::cachedCounters() {
+  if (!counters_) {
+    counters_ = store_.counters();
+  }
+  return *counters_;
+}
+std::vector<GaugeSharedPtr>& SourceImpl::cachedGauges() {
+  if (!gauges_) {
+    gauges_ = store_.gauges();
+  }
+  return *gauges_;
+}
+std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
+  if (!histograms_) {
+    histograms_ = store_.histograms();
+  }
+  return *histograms_;
+}
+
+void SourceImpl::clearCache() {
+  counters_.reset();
+  gauges_.reset();
+  histograms_.reset();
 }
 
 } // namespace Stats

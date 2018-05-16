@@ -26,6 +26,7 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -407,6 +408,23 @@ private:
   Store& parent_;
 };
 
+class SourceImpl : public Source {
+public:
+  SourceImpl(Store& store) : store_(store){};
+
+  // Stats::Source
+  std::vector<CounterSharedPtr>& cachedCounters() override;
+  std::vector<GaugeSharedPtr>& cachedGauges() override;
+  std::vector<ParentHistogramSharedPtr>& cachedHistograms() override;
+  void clearCache() override;
+
+private:
+  Store& store_;
+  absl::optional<std::vector<CounterSharedPtr>> counters_;
+  absl::optional<std::vector<GaugeSharedPtr>> gauges_;
+  absl::optional<std::vector<ParentHistogramSharedPtr>> histograms_;
+};
+
 /**
  * Implementation of RawStatDataAllocator that uses an unordered set to store
  * RawStatData pointers.
@@ -458,13 +476,14 @@ public:
     return *new_stat;
   }
 
-  std::list<std::shared_ptr<Base>> toList() const {
-    std::list<std::shared_ptr<Base>> list;
+  std::vector<std::shared_ptr<Base>> toVector() const {
+    std::vector<std::shared_ptr<Base>> vec;
+    vec.reserve(stats_.size());
     for (auto& stat : stats_) {
-      list.push_back(stat.second);
+      vec.push_back(stat.second);
     }
 
-    return list;
+    return vec;
   }
 
 private:
@@ -502,10 +521,10 @@ public:
   }
 
   // Stats::Store
-  std::list<CounterSharedPtr> counters() const override { return counters_.toList(); }
-  std::list<GaugeSharedPtr> gauges() const override { return gauges_.toList(); }
-  std::list<ParentHistogramSharedPtr> histograms() const override {
-    return std::list<ParentHistogramSharedPtr>{};
+  std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
+  std::vector<GaugeSharedPtr> gauges() const override { return gauges_.toVector(); }
+  std::vector<ParentHistogramSharedPtr> histograms() const override {
+    return std::vector<ParentHistogramSharedPtr>{};
   }
 
 private:
