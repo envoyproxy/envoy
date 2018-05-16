@@ -8,6 +8,7 @@ import "envoy/api/v2/core/http_uri.proto";
 
 // [#protodoc-title: HTTP External Authorization ]
 // The external authorization HTTP service configuration :ref:`configuration overview <config_http_filters_ext_authz>`.
+// NOTE: The HttpService is under development and will be supported soon.
 
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
@@ -25,6 +26,7 @@ message ExtAuthz {
 
   oneof services {
     // The external authorization gRPC service configuration.
+    // The default timeout is set to 200ms by this filter.
     envoy.api.v2.core.GrpcService grpc_service = 1;
 
     // The external authorization HTTP service configuration.

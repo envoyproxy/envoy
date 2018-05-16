@@ -9,13 +9,14 @@ External Authorization
 The external authorization network filter calls an external authorization service to check if the incoming request is authorized or not.
 If the request is deemed unauthorized by the network filter then the connection will be closed.
 
-It is recommended that this filter is configured first in the filter chain so that requests are authorized prior to rest of the  filters running through the request.
+.. tip::
+  It is recommended that this filter is configured first in the filter chain so that requests are authorized prior to rest of the filters running through the request.
 
 The content of the request that are passed to an authorization service is specified by :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`
 
 .. _config_network_filters_ext_authz_network_configuration:
 
-The network filter can be configured as follows. You can see all the configuration options at :ref:`Network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
+The network filter, gRPC service, can be configured as follows. You can see all the configuration options at :ref:`Network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
 
 Example
 -------

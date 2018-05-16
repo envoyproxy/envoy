@@ -19,6 +19,7 @@ message ExtAuthz {
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
 
   // The external authorization gRPC service configuration.
+  // The default timeout is set to 200ms by this filter.
   envoy.api.v2.core.GrpcService grpc_service = 2;
 
   // The filter's behaviour in case the external authorization service does
