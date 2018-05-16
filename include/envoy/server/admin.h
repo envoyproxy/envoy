@@ -33,13 +33,13 @@ public:
   virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
 
   /**
-   * @return Http::StreamDecoderFilterCallbacks* to be used by the handler to get HTTP request data
+   * @return Http::StreamDecoderFilterCallbacks& to be used by the handler to get HTTP request data
    * for streaming.
    */
   virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
-   * @return Http::HeaderMap* to be used by handler to parse header information sent with the
+   * @return Http::HeaderMap& to be used by handler to parse header information sent with the
    * request.
    */
   virtual const Http::HeaderMap& getRequestHeaders() const PURE;
