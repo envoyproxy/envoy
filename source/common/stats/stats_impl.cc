@@ -67,6 +67,7 @@ void RawStatData::configureForTestsOnly(Server::Options& options) {
 std::string Utility::sanitizeStatsName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
   return stats_name;
 }
 
