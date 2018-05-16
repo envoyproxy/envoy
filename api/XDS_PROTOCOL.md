@@ -266,7 +266,9 @@ dynamic_resources:
   lds_config: {ads: {}}
   ads_config:
     api_type: GRPC
-    cluster_name: [ads_cluster]
+    grpc_services:
+      envoy_grpc:
+        cluster_name: ads_cluster
 static_resources:
   clusters:
   - name: ads_cluster
