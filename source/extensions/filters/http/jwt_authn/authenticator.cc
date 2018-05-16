@@ -29,7 +29,7 @@ public:
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
   void onDestroy() override;
-  void sanitizePayloadHeaders(Http::HeaderMap& headers) override;
+  void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
 private:
   // Fetch a remote public key.
@@ -74,7 +74,7 @@ private:
   Http::AsyncClient::Request* request_{};
 };
 
-void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) {
+void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
   for (const auto& rule : store_.config().rules()) {
     if (!rule.forward_payload_header().empty()) {
       headers.remove(Http::LowerCaseString(rule.forward_payload_header()));
@@ -88,7 +88,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 
   ENVOY_LOG(debug, "Jwt authentication starts");
   auto tokens = store_.getExtractor().extract(headers);
-  if (tokens.size() == 0) {
+  if (tokens.empty()) {
     if (okToBypass()) {
       doneWithStatus(Status::Ok);
     } else {
@@ -97,11 +97,11 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
-  // TODO, add supports for multiple tokens.
+  // TODO(qiwzhang), add supports for multiple tokens.
   // Only process the first token for now.
   token_.swap(tokens[0]);
 
-  Status status = jwt_.parseFromString(token_->token());
+  const Status status = jwt_.parseFromString(token_->token());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -167,7 +167,7 @@ void AuthenticatorImpl::fetchRemoteJwks() {
 
 void AuthenticatorImpl::onSuccess(Http::MessagePtr&& response) {
   request_ = nullptr;
-  uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
+  const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == 200) {
     ENVOY_LOG(debug, "fetch pubkey [uri = {}]: success", uri_);
     std::string body;
@@ -201,7 +201,7 @@ void AuthenticatorImpl::onDestroy() {
 
 // Handle the public key fetch done event.
 void AuthenticatorImpl::onFetchRemoteJwksDone(const std::string& jwks_str) {
-  Status status = jwks_data_->setRemoteJwks(jwks_str);
+  const Status status = jwks_data_->setRemoteJwks(jwks_str);
   if (status != Status::Ok) {
     doneWithStatus(status);
   } else {
@@ -211,7 +211,7 @@ void AuthenticatorImpl::onFetchRemoteJwksDone(const std::string& jwks_str) {
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
-  Status status = ::google::jwt_verify::verifyJwt(jwt_, *jwks_data_->getJwksObj());
+  const Status status = ::google::jwt_verify::verifyJwt(jwt_, *jwks_data_->getJwksObj());
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -237,7 +237,7 @@ bool AuthenticatorImpl::okToBypass() {
     return true;
   }
 
-  // TODO: use bypass field
+  // TODO(qiwzhang): use requirement field
   return false;
 }
 

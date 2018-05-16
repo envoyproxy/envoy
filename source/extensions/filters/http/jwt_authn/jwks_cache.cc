@@ -62,9 +62,9 @@ public:
       audiences_.insert(sanitizeAudience(aud));
     }
 
-    auto inline_jwks = Config::DataSource::read(jwt_rule_.local_jwks(), true);
+    const auto inline_jwks = Config::DataSource::read(jwt_rule_.local_jwks(), true);
     if (!inline_jwks.empty()) {
-      Status status = setKey(inline_jwks,
+      const Status status = setKey(inline_jwks,
                              // inline jwks never expires.
                              std::chrono::steady_clock::time_point::max());
       if (status != Status::Ok) {

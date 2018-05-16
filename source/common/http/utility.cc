@@ -354,21 +354,24 @@ void Utility::extractHostPathFromUri(const std::string& uri, std::string& host, 
    *
    *  Example:
    *  uri  = "https://example.com/certs"
-   *  pos  :          ^
-   *  pos1 :                     ^
+   *  pos:          ^
+   *  host_pos:       ^
+   *  path_pos:                  ^
    *  host = "example.com"
    *  path = "/certs"
    */
-  auto pos = uri.find("://");
-  pos = pos == std::string::npos ? 0 : pos + 3; // Start position of host
-  auto pos1 = uri.find("/", pos);
-  if (pos1 == std::string::npos) {
+  const auto pos = uri.find("://");
+  // Start position of the host
+  const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
+  // Start position of the path
+  const auto path_pos = uri.find("/", host_pos);
+  if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
-    host = uri.substr(pos);
+    host = uri.substr(host_pos);
     path = "/";
   } else {
-    host = uri.substr(pos, pos1 - pos);
-    path = "/" + uri.substr(pos1 + 1);
+    host = uri.substr(host_pos, path_pos - host_pos);
+    path = uri.substr(path_pos);
   }
 }
 

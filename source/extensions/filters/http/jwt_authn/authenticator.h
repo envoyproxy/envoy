@@ -33,7 +33,7 @@ public:
   virtual void onDestroy() PURE;
 
   // Remove headers that configured to send JWT payloads
-  virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) PURE;
+  virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
   static AuthenticatorPtr create(DataStoreFactorySharedPtr store_factory);

@@ -343,5 +343,54 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
+TEST(HttpUtility, TestAppendHeader) {
+  // Test appending to a string with a value.
+  {
+    HeaderString value1;
+    value1.setCopy("some;", 5);
+    Utility::appendToHeader(value1, "test");
+    EXPECT_EQ(value1, "some;,test");
+  }
+
+  // Test appending to an empty string.
+  {
+    HeaderString value2;
+    Utility::appendToHeader(value2, "my tag data");
+    EXPECT_EQ(value2, "my tag data");
+  }
+
+  // Test empty data case.
+  {
+    HeaderString value3;
+    value3.setCopy("empty", 5);
+    Utility::appendToHeader(value3, "");
+    EXPECT_EQ(value3, "empty");
+  }
+}
+
+TEST(HttpUtility, TestExtractHostPathFromUri) {
+  std::string host, path;
+
+  // FQDN
+  Utility::extractHostPathFromUri("scheme://dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the host part
+  Utility::extractHostPathFromUri("dns.name", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/");
+
+  // Just host and path
+  Utility::extractHostPathFromUri("dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the path
+  Utility::extractHostPathFromUri("/x/y/z", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/x/y/z");
+}
+
 } // namespace Http
 } // namespace Envoy
