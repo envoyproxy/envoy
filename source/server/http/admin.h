@@ -155,6 +155,8 @@ private:
                                Buffer::Instance& response) const;
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response);
+  Http::Code handlerGracefulShutdown(absl::string_view path_and_query,
+                                     Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response);
   Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
@@ -228,6 +230,7 @@ private:
   AdminListener listener_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
+  Event::TimerPtr graceful_shutdown_timer_;
 };
 
 /**

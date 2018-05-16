@@ -652,6 +652,20 @@ void ListenerManagerImpl::stopListeners() {
   }
 }
 
+void ListenerManagerImpl::closeListeners() {
+  for (auto& listener : active_listeners_) {
+    listener->closeSocket();
+  }
+
+  for (auto& listener : warming_listeners_) {
+    listener->closeSocket();
+  }
+
+  for (auto& draining_listener : draining_listeners_) {
+    draining_listener.listener_->closeSocket();
+  }
+}
+
 void ListenerManagerImpl::stopWorkers() {
   if (!workers_started_) {
     return;

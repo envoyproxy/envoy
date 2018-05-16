@@ -112,6 +112,7 @@ public:
   bool removeListener(const std::string& listener_name) override;
   void startWorkers(GuardDog& guard_dog) override;
   void stopListeners() override;
+  void closeListeners() override;
   void stopWorkers() override;
 
   Instance& server_;
@@ -217,6 +218,11 @@ public:
     saw_listener_create_failure_ = true;
     return ret;
   }
+
+  /**
+   * Close the listening socket.
+   */
+  void closeSocket() { socket_->close(); }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const envoy::api::v2::Listener& config() { return config_; }
