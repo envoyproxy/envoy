@@ -52,7 +52,7 @@ private:
 // At the moment, TryLockGuard is very hard to annotate correctly, I
 // believe due to limitations in clang. At the moment there are no
 // GUARDED_BY variables for any tryLocks in the codebase, so it's
-// easies just to leave it out. In a future clang release it's
+// easiest just to leave it out. In a future clang release it's
 // possible we can enable this. See also the commented-out block
 // in ThreadTest.TestTryLockGuard in test/common/common/thread_test.cc.
 #define DISABLE_TRYLOCKGUARD_ANNOTATION(annotation)
@@ -121,7 +121,7 @@ public:
   ~LockGuard() UNLOCK_FUNCTION() { lock_.unlock(); }
 
 private:
-  BasicLockable& lock_; // Set to nullptr on unlock, to prevent double-unlocking.
+  BasicLockable& lock_;
 };
 
 /**
