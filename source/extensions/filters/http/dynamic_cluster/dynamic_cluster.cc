@@ -17,9 +17,20 @@ namespace HttpFilters {
 namespace DynamicCluster {
 // Implements StreamDecoderFilter.
 
-Http::FilterHeadersStatus DynamicCluster::decodeHeaders(Http::HeaderMap&, bool) {
-  // TODO: read these values from headers.
-  std::string cluster_yaml = fmt::sprintf(R"EOF(
+Http::FilterHeadersStatus DynamicCluster::decodeHeaders(Http::HeaderMap& headers, bool) {
+
+  const Http::LowerCaseString ClusterName{"x-envoy-cluster"};
+  const Http::LowerCaseString ClusterHosts{"x-envoy-cluster-hosts"};
+  const std::string cluster_name = headers.get(ClusterName)->value().c_str();
+  const std::string cluster_hosts = headers.get(ClusterHosts)->value().c_str();
+  std::istringstream ss(cluster_hosts);
+  std::string host, port;
+  std::getline(ss, host, ':');
+  std::getline(ss, port, ':');
+
+  // TODO: Make this part of filter config - possibly multiple templates for each type http1, http2
+  // and select the cluster template based on request header.
+  std::string cluster_template_yaml = fmt::sprintf(R"EOF(
     name: %s
     connect_timeout: 0.25s
     type: STATIC
@@ -28,12 +39,13 @@ Http::FilterHeadersStatus DynamicCluster::decodeHeaders(Http::HeaderMap&, bool) 
     http2_protocol_options: {} 
     hosts:
       socket_address:
-        address: 127.0.0.1
-        port_value: 5555
+        address: %s
+        port_value: %s
   )EOF",
-                                          "time");
+                                                   cluster_name, host, port);
+
   envoy::api::v2::Cluster cluster;
-  MessageUtil::loadFromYaml(cluster_yaml, cluster);
+  MessageUtil::loadFromYaml(cluster_template_yaml, cluster);
   cm_.addOrUpdateCluster(cluster, "1");
   return Http::FilterHeadersStatus::Continue;
 }
