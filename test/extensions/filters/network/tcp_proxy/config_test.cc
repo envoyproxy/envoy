@@ -55,7 +55,7 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  TcpProxyConfigFactory factory;
+  ConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
@@ -64,17 +64,17 @@ TEST_P(RouteIpListConfigTest, TcpProxy) {
   factory.createFilterFactory(*json_config, context);
 }
 
-TEST(TcpProxyConfigTest, ValidateFail) {
+TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(TcpProxyConfigFactory().createFilterFactoryFromProto(
+  EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), context),
                ProtoValidationException);
 }
 
 // Test that a minimal TcpProxy v2 config works.
-TEST(TcpProxyConfigTest, TcpProxyConfigTest) {
+TEST(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  TcpProxyConfigFactory factory;
+  ConfigFactory factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
       *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
           factory.createEmptyConfigProto().get());

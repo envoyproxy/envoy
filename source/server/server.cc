@@ -104,39 +104,13 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
-                                       Stats::Store& store) {
+                                       Stats::Source& source) {
   for (const auto& sink : sinks) {
-    sink->beginFlush();
+    sink->flush(source);
   }
-
-  for (const Stats::CounterSharedPtr& counter : store.counters()) {
-    uint64_t delta = counter->latch();
-    if (counter->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushCounter(*counter, delta);
-      }
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : store.gauges()) {
-    if (gauge->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushGauge(*gauge, gauge->value());
-      }
-    }
-  }
-
-  for (const Stats::ParentHistogramSharedPtr& histogram : store.histograms()) {
-    if (histogram->used()) {
-      for (const auto& sink : sinks) {
-        sink->flushHistogram(*histogram);
-      }
-    }
-  }
-
-  for (const auto& sink : sinks) {
-    sink->endFlush();
-  }
+  // TODO(mrice32): this reset should be called by the StoreRoot on stat construction/destruction so
+  // that it doesn't need to be reset when the set of stats isn't changing.
+  source.clearCache();
 }
 
 void InstanceImpl::flushStats() {
@@ -154,7 +128,7 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_);
+    InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
       stat_flush_timer_->enableTimer(config_->statsFlushInterval());

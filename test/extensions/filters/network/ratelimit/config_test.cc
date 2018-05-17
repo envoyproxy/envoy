@@ -1,3 +1,5 @@
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.validate.h"
+
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/network/ratelimit/config.h"

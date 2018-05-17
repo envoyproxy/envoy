@@ -135,7 +135,7 @@ private:
   // Maps {category, description} to DurationStats.
 #if PERF_THREAD_SAFE
   DurationStatsMap duration_stats_map_ GUARDED_BY(mutex_);
-  absl::Mutex mutex_;
+  Thread::MutexBasicLockable mutex_;
 #else
   DurationStatsMap duration_stats_map_;
 #endif

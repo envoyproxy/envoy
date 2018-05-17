@@ -43,13 +43,12 @@ typedef std::unique_ptr<Thread> ThreadPtr;
  */
 class MutexBasicLockable : public BasicLockable {
 public:
-  void lock() override { mutex_.lock(); }
-  bool try_lock() override { return mutex_.try_lock(); }
-  void unlock() override { mutex_.unlock(); }
+  void lock() EXCLUSIVE_LOCK_FUNCTION() override { mutex_.Lock(); }
+  bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
+  void unlock() UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
 private:
-  // TODO(jmarantz): change to absl::Mutex and add thread annotations.
-  std::mutex mutex_;
+  absl::Mutex mutex_;
 };
 
 } // namespace Thread

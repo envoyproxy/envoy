@@ -1,6 +1,7 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
+#include "common/http/utility.h"
 
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -121,7 +122,7 @@ TEST(GrpcCommonTest, GrpcToHttpStatus) {
       {Status::GrpcStatus::InvalidCode, 500},
   };
   for (const auto& test_case : test_set) {
-    EXPECT_EQ(test_case.second, Common::grpcToHttpStatus(test_case.first));
+    EXPECT_EQ(test_case.second, Grpc::Utility::grpcToHttpStatus(test_case.first));
   }
 }
 
@@ -134,7 +135,7 @@ TEST(GrpcCommonTest, HttpToGrpcStatus) {
       {500, Status::GrpcStatus::Unknown},
   };
   for (const auto& test_case : test_set) {
-    EXPECT_EQ(test_case.second, Common::httpToGrpcStatus(test_case.first));
+    EXPECT_EQ(test_case.second, Grpc::Utility::httpToGrpcStatus(test_case.first));
   }
 }
 

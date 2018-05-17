@@ -37,7 +37,7 @@ void PerfAnnotationContext::record(std::chrono::nanoseconds duration, absl::stri
   CategoryDescription key((std::string(category)), (std::string(description)));
   {
 #if PERF_THREAD_SAFE
-    absl::MutexLock lock(&mutex_);
+    Thread::LockGuard lock(mutex_);
 #endif
     DurationStats& stats = duration_stats_map_[key];
     stats.stddev_.update(static_cast<double>(duration.count()));
@@ -57,7 +57,7 @@ std::string PerfAnnotationContext::toString() {
   PerfAnnotationContext* context = getOrCreate();
   std::string out;
 #if PERF_THREAD_SAFE
-  absl::MutexLock lock(&context->mutex_);
+  Thread::LockGuard lock(context->mutex_);
 #endif
 
   // The map is from category/description -> [duration, time]. Reverse-sort by duration.
@@ -140,7 +140,7 @@ std::string PerfAnnotationContext::toString() {
 void PerfAnnotationContext::clear() {
   PerfAnnotationContext* context = getOrCreate();
 #if PERF_THREAD_SAFE
-  absl::MutexLock lock(&context->mutex_);
+  Thread::LockGuard lock(context->mutex_);
 #endif
   context->duration_stats_map_.clear();
 }

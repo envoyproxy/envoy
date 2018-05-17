@@ -7,10 +7,10 @@
 #include "common/network/address_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 #include "common/stats/stats_impl.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/well_known_names.h"
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -33,20 +33,18 @@ using testing::SaveArg;
 using testing::_;
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
 namespace TcpProxy {
 
 namespace {
-TcpProxyConfig constructTcpProxyConfigFromJson(const Json::Object& json,
-                                               Server::Configuration::FactoryContext& context) {
+Config constructConfigFromJson(const Json::Object& json,
+                               Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
-  Config::FilterJson::translateTcpProxy(json, tcp_proxy);
-  return TcpProxyConfig(tcp_proxy, context);
+  Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
+  return Config(tcp_proxy, context);
 }
 } // namespace
 
-TEST(TcpProxyConfigTest, NoRouteConfig) {
+TEST(ConfigTest, NoRouteConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name"
@@ -55,10 +53,10 @@ TEST(TcpProxyConfigTest, NoRouteConfig) {
 
   Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructTcpProxyConfigFromJson(*config, factory_context), EnvoyException);
+  EXPECT_THROW(constructConfigFromJson(*config, factory_context), EnvoyException);
 }
 
-TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
+TEST(ConfigTest, BadConfig) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": 1,
@@ -74,10 +72,10 @@ TEST(TcpProxyConfigTest, BadTcpProxyConfig) {
 
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructTcpProxyConfigFromJson(*json_config, factory_context), Json::Exception);
+  EXPECT_THROW(constructConfigFromJson(*json_config, factory_context), Json::Exception);
 }
 
-TEST(TcpProxyConfigTest, Routes) {
+TEST(ConfigTest, Routes) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name",
@@ -139,7 +137,7 @@ TEST(TcpProxyConfigTest, Routes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
-  TcpProxyConfig config_obj(constructTcpProxyConfigFromJson(*json_config, factory_context_));
+  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
 
   {
     // hit route with destination_ip (10.10.10.10/32)
@@ -292,7 +290,7 @@ TEST(TcpProxyConfigTest, Routes) {
   }
 }
 
-TEST(TcpProxyConfigTest, EmptyRouteConfig) {
+TEST(ConfigTest, EmptyRouteConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name",
@@ -306,16 +304,16 @@ TEST(TcpProxyConfigTest, EmptyRouteConfig) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
-  TcpProxyConfig config_obj(constructTcpProxyConfigFromJson(*json_config, factory_context_));
+  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
 
   NiceMock<Network::MockConnection> connection;
   EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
 }
 
-TEST(TcpProxyConfigTest, AccessLogConfig) {
+TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
-  log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
@@ -325,7 +323,7 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   }
 
   log = config.mutable_access_log()->Add();
-  log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
@@ -334,7 +332,7 @@ TEST(TcpProxyConfigTest, AccessLogConfig) {
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  TcpProxyConfig config_obj(config, factory_context_);
+  Config config_obj(config, factory_context_);
 
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
@@ -347,7 +345,7 @@ public:
   }
 
   void configure(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
-    config_.reset(new TcpProxyConfig(config, factory_context_));
+    config_.reset(new Config(config, factory_context_));
   }
 
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy defaultConfig() {
@@ -365,7 +363,7 @@ public:
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
     envoy::config::filter::accesslog::v2::AccessLog* access_log =
         config.mutable_access_log()->Add();
-    access_log->set_name(AccessLoggers::AccessLogNames::get().FILE);
+    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
     envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
@@ -420,7 +418,7 @@ public:
           .WillRepeatedly(Return(Upstream::MockHost::MockCreateConnectionData()));
     }
 
-    filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
+    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
     EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -441,7 +439,7 @@ public:
     upstream_connections_.at(conn_index)->raiseEvent(Network::ConnectionEvent::Connected);
   }
 
-  TcpProxyConfigSharedPtr config_;
+  ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
@@ -449,7 +447,7 @@ public:
   std::vector<Upstream::MockHost::MockCreateConnectionData> conn_infos_;
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::vector<NiceMock<Event::MockTimer>*> connect_timers_;
-  std::unique_ptr<TcpProxyFilter> filter_;
+  std::unique_ptr<Filter> filter_;
   StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
@@ -723,7 +721,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
 
   const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
 
@@ -736,7 +734,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -765,7 +763,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
       new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1006,21 +1004,21 @@ public:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new TcpProxyConfig(constructTcpProxyConfigFromJson(*config, factory_context_)));
+    config_.reset(new Config(constructConfigFromJson(*config, factory_context_)));
   }
 
   void setup() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_.reset(new TcpProxyFilter(config_, factory_context_.cluster_manager_));
+    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
-  TcpProxyConfigSharedPtr config_;
+  ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<TcpProxyFilter> filter_;
+  std::unique_ptr<Filter> filter_;
 };
 
 TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
@@ -1059,6 +1057,4 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 }
 
 } // namespace TcpProxy
-} // namespace NetworkFilters
-} // namespace Extensions
 } // namespace Envoy

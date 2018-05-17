@@ -177,11 +177,9 @@ public:
   };
 
   // Stats::Store
-  // TODO(ramaraochavali): Consider changing the implementation of these methods to use vectors and
-  // use std::sort, rather than inserting into a map and pulling it out for better performance.
-  std::list<CounterSharedPtr> counters() const override;
-  std::list<GaugeSharedPtr> gauges() const override;
-  std::list<ParentHistogramSharedPtr> histograms() const override;
+  std::vector<CounterSharedPtr> counters() const override;
+  std::vector<GaugeSharedPtr> gauges() const override;
+  std::vector<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -193,6 +191,8 @@ public:
   void shutdownThreading() override;
 
   void mergeHistograms(PostMergeCb mergeCb) override;
+
+  Source& source() override { return source_; }
 
 private:
   struct TlsCacheEntry {
@@ -266,6 +266,7 @@ private:
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
   HeapRawStatDataAllocator heap_allocator_;
+  SourceImpl source_;
 };
 
 } // namespace Stats

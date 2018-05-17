@@ -80,7 +80,7 @@ public:
   void waitForDisconnect();
   void waitForHalfClose();
   void readDisable(bool disabled);
-  void write(const std::string& data, bool end_stream = false);
+  void write(const std::string& data, bool end_stream = false, bool verify = true);
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
 

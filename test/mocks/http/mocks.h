@@ -14,6 +14,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/ssl/connection.h"
 
+#include "common/http/utility.h"
+
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/request_info/mocks.h"
@@ -195,6 +197,19 @@ public:
   MOCK_METHOD0(decoderBufferLimit, uint32_t());
 
   // Http::StreamDecoderFilterCallbacks
+  void sendLocalReply(Code code, const std::string& body,
+                      std::function<void(HeaderMap& headers)> modify_headers) override {
+    Utility::sendLocalReply(
+        is_grpc_request_,
+        [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+          if (modify_headers != nullptr) {
+            modify_headers(*headers);
+          }
+          encodeHeaders(std::move(headers), end_stream);
+        },
+        [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
+        stream_destroyed_, code, body);
+  }
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
   }
@@ -215,6 +230,8 @@ public:
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
+  bool is_grpc_request_{};
+  bool stream_destroyed_{};
 };
 
 class MockStreamEncoderFilterCallbacks : public StreamEncoderFilterCallbacks,

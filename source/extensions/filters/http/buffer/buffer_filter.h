@@ -92,7 +92,6 @@ private:
   const BufferFilterSettings* settings_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Event::TimerPtr request_timeout_;
-  bool stream_destroyed_{};
   bool config_initialized_{};
 };
 

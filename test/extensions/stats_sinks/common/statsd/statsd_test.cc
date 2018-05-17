@@ -55,33 +55,34 @@ public:
   std::unique_ptr<TcpStatsdSink> sink_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Network::MockClientConnection* connection_{};
+  NiceMock<Stats::MockSource> source_;
 };
 
 TEST_F(TcpStatsdSinkTest, EmptyFlush) {
   InSequence s;
-
-  sink_->beginFlush();
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual(""), _));
-  sink_->endFlush();
+  sink_->flush(source_);
 }
 
 TEST_F(TcpStatsdSinkTest, BasicFlow) {
   InSequence s;
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source_.counters_.push_back(counter);
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-
-  sink_->beginFlush();
-  sink_->flushCounter(counter, 1);
-  sink_->flushGauge(gauge, 2);
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 2;
+  gauge->used_ = true;
+  source_.gauges_.push_back(gauge);
 
   expectCreateConnection();
   EXPECT_CALL(*connection_,
               write(BufferStringEqual("envoy.test_counter:1|c\nenvoy.test_gauge:2|g\n"), _));
-  sink_->endFlush();
+  sink_->flush(source_);
 
   connection_->runHighWatermarkCallbacks();
   connection_->runLowWatermarkCallbacks();
@@ -103,13 +104,12 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
 TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   InSequence s;
 
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
 
-  sink_->beginFlush();
-  for (int i = 0; i < 2000; i++) {
-    sink_->flushCounter(counter, 1);
-  }
+  source_.counters_.resize(2000, counter);
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(_, _))
@@ -120,38 +120,35 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
         }
         EXPECT_EQ(compare, TestUtility::bufferToString(buffer));
       }));
-  sink_->endFlush();
+  sink_->flush(source_);
 }
 
 TEST_F(TcpStatsdSinkTest, Overflow) {
   InSequence s;
 
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source_.counters_.push_back(counter);
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 17);
-  sink_->beginFlush();
-  sink_->flushCounter(counter, 1);
-  sink_->endFlush();
+  sink_->flush(source_);
 
   // Lower and make sure we write.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 15);
-  sink_->beginFlush();
-  sink_->flushCounter(counter, 1);
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"), _));
-  sink_->endFlush();
+  sink_->flush(source_);
 
   // Raise and make sure we don't write and kill connection.
   cluster_manager_.thread_local_cluster_.cluster_.info_->stats().upstream_cx_tx_bytes_buffered_.set(
       1024 * 1024 * 17);
-  sink_->beginFlush();
-  sink_->flushCounter(counter, 1);
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
-  sink_->endFlush();
+  sink_->flush(source_);
 
   EXPECT_EQ(2UL, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("statsd.cx_overflow")

@@ -197,6 +197,10 @@ public:
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
   void enableHalfClose(bool enabled);
+  bool connected() const {
+    std::unique_lock<std::mutex> lock(lock_);
+    return !disconnected_;
+  }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
@@ -204,7 +208,7 @@ protected:
         connection_wrapper_(std::move(connection_wrapper)) {}
 
   Network::Connection& connection_;
-  std::mutex lock_;
+  mutable std::mutex lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
   bool half_closed_{};
