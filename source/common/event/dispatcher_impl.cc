@@ -162,14 +162,14 @@ void DispatcherImpl::run(RunType type) {
 }
 
 void DispatcherImpl::runPostCallbacks() {
-  Thread::LockGuard lock(post_lock_);
+  std::unique_lock<Thread::BasicLockable> lock(post_lock_);
   while (!post_callbacks_.empty()) {
     std::function<void()> callback = post_callbacks_.front();
     post_callbacks_.pop_front();
 
-    post_lock_.unlock();
+    lock.unlock();
     callback();
-    post_lock_.lock();
+    lock.lock();
   }
 }
 

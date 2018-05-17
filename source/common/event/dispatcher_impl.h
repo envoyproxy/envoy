@@ -76,7 +76,8 @@ private:
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
   Thread::MutexBasicLockable post_lock_;
-  std::list<std::function<void()>> post_callbacks_ GUARDED_BY(post_lock_);
+  std::list<std::function<void()>> post_callbacks_; // GUARDED_BY(post_lock_) fails
+                                                    // due to limitations in clang's analysis.
   bool deferred_deleting_{};
 };
 
