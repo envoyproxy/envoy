@@ -34,6 +34,16 @@ public:
   virtual ssize_t write(int fd, const void* buffer, size_t num_bytes) PURE;
 
   /**
+   * @see writev (man 2 writev)
+   */
+  virtual ssize_t writev(int fd, const iovec* iovec, int num_iovec) PURE;
+
+  /**
+   * @see readv (man 2 readv)
+   */
+  virtual ssize_t readv(int fd, const iovec* iovec, int num_iovec) PURE;
+
+  /**
    * @see recv (man 2 recv)
    */
   virtual ssize_t recv(int socket, void* buffer, size_t length, int flags) PURE;

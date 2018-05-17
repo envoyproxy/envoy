@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 
 #include "event2/buffer.h"
@@ -94,6 +95,9 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {
+  if (max_length == 0) {
+    return 0;
+  }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
   uint64_t num_slices = reserve(max_length, slices, MaxSlices);
@@ -105,7 +109,8 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
     iov[i].iov_len = std::min(slices[i].len_, size_t(max_length));
     max_length -= slices[i].len_;
   }
-  const ssize_t rc = readv(fd, iov, num_iov);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const ssize_t rc = os_syscalls.readv(fd, iov, num_iov);
   if (rc < 0) {
     return rc;
   }
@@ -160,7 +165,8 @@ int OwnedImpl::write(int fd) {
   if (j == 0) {
     return 0;
   }
-  ssize_t rc = writev(fd, iov, j);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  ssize_t rc = os_syscalls.writev(fd, iov, j);
   if (rc > 0) {
     drain(uint64_t(rc));
   }

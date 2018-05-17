@@ -24,6 +24,7 @@ envoy_cc_library(
     hdrs = ["buffer_impl.h"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:non_copyable",
         "//source/common/event:libevent_lib",
     ],
