@@ -122,6 +122,14 @@ public:
 
 class MessageUtil {
 public:
+  // std::hash
+  std::size_t operator()(const Protobuf::Message& message) const { return hash(message); }
+
+  // std::equals_to
+  bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
+    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+  }
+
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.

@@ -33,9 +33,8 @@ Network::TransportSocketFactoryPtr UpstreamCaptureSocketConfigFactory::createTra
 
 Network::TransportSocketFactoryPtr
 DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
-    const std::string& name, const std::vector<std::string>& server_names,
-    bool skip_ssl_context_update, const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
+    const std::vector<std::string>& server_names) {
   const auto& outer_config = MessageUtil::downcastAndValidate<
       const envoy::config::transport_socket::capture::v2alpha::Capture&>(message);
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
@@ -44,7 +43,7 @@ DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
-      name, server_names, skip_ssl_context_update, *inner_factory_config, context);
+      *inner_factory_config, context, server_names);
   return std::make_unique<CaptureSocketFactory>(outer_config.file_sink().path_prefix(),
                                                 outer_config.file_sink().format(),
                                                 std::move(inner_transport_factory));

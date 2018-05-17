@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/http/filter.h"
+#include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
@@ -36,6 +37,7 @@ namespace Server {
  * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
+                  public Network::FilterChainManager,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
                   public Http::ConnectionManagerConfig,
@@ -59,8 +61,15 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
+  // Network::FilterChainManager
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+    return admin_filter_chain_.get();
+  }
+
   // Network::FilterChainFactory
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
@@ -198,11 +207,9 @@ private:
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
 
     // Network::ListenerConfig
+    Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
-    Network::TransportSocketFactory& transportSocketFactory() override {
-      return parent_.transport_socket_factory_;
-    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -216,11 +223,28 @@ private:
     Http::ConnectionManagerListenerStats stats_;
   };
 
+  class AdminFilterChain : public Network::FilterChain {
+  public:
+    AdminFilterChain() {}
+
+    // Network::FilterChain
+    const Network::TransportSocketFactory& transportSocketFactory() const override {
+      return transport_socket_factory_;
+    }
+
+    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+      return empty_network_filter_factory_;
+    }
+
+  private:
+    const Network::RawBufferSocketFactory transport_socket_factory_;
+    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
+  };
+
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Network::SocketPtr socket_;
-  Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
@@ -235,6 +259,7 @@ private:
   AdminListener listener_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
+  const Network::FilterChainSharedPtr admin_filter_chain_;
 };
 
 /**
