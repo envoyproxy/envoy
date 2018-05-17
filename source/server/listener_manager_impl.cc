@@ -181,9 +181,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     std::vector<std::string> server_names(filter_chain_match.sni_domains().begin(),
                                           filter_chain_match.sni_domains().end());
 
-    // If the cluster doesn't have transport socke configured, override with default transport
-    // socket implementation based on tls_context. We copy by value first then override if
-    // neccessary.
+    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+    // We copy by value first then override if necessary.
     auto transport_socket = filter_chain.transport_socket();
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
