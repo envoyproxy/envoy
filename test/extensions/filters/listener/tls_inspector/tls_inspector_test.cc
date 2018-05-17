@@ -126,7 +126,7 @@ TEST_F(TlsInspectorTest, AlpnRegistered) {
       }));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
-  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
