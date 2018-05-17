@@ -102,6 +102,16 @@ public:
   }
   absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
 
+  void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
+    application_protocols_.clear();
+    for (const auto& protocol : protocols) {
+      application_protocols_.emplace_back(protocol);
+    }
+  }
+  const std::vector<std::string>& requestedApplicationProtocols() const override {
+    return application_protocols_;
+  }
+
   void setRequestedServerName(absl::string_view server_name) override {
     server_name_ = std::string(server_name);
   }
@@ -111,6 +121,7 @@ protected:
   Address::InstanceConstSharedPtr remote_address_;
   bool local_address_restored_{false};
   std::string transport_protocol_;
+  std::vector<std::string> application_protocols_;
   std::string server_name_;
 };
 
