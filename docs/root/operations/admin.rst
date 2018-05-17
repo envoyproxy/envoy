@@ -184,15 +184,24 @@ The fields are:
   Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
   The output for each quantile will be in the form of (interval,cumulative) where interval value
   represents the summary since last flush interval and cumulative value represents the
-  summary since the start of envoy instance.
+  summary since the start of envoy instance. "No recorded values" in the histogram output indicates
+  that it has not been updated with a value.
   See :ref:`here <operations_stats>` for more information.
+
+  .. http:get:: /stats?usedonly
+
+  Outputs statistics that have been updated with values on demand.
+
+  .. http:get:: /stats?format=json&usedonly
+
+  Outputs statistics that have been updated with values in JSON format on demand.
 
   .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
   will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
-  that has the computed quantile for each histogram. Only histograms with recorded values will be exported.
+  that has the computed quantile for each histogram.
 
   If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
   

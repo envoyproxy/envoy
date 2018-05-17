@@ -411,13 +411,23 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
                                    Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+
+  bool used_only = !(params.find("usedonly") == params.end());
+  bool has_format = !(params.find("format") == params.end());
+
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    all_stats.emplace(counter->name(), counter->value());
+    bool add_counter = used_only ? counter->used() : true;
+    if (add_counter) {
+      all_stats.emplace(counter->name(), counter->value());
+    }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    all_stats.emplace(gauge->name(), gauge->value());
+    bool add_gauge = used_only ? gauge->used() : true;
+    if (add_gauge) {
+      all_stats.emplace(gauge->name(), gauge->value());
+    }
   }
 
   // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
@@ -425,23 +435,28 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   // implemented this can be switched back to a normal map.
   std::multimap<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-    if (histogram->used()) {
-      std::vector<std::string> summary;
-      const std::vector<double>& supported_quantiles_ref =
-          histogram->intervalStatistics().supportedQuantiles();
-      summary.reserve(supported_quantiles_ref.size());
-      for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-        summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                                      histogram->intervalStatistics().computedQuantiles()[i],
-                                      histogram->cumulativeStatistics().computedQuantiles()[i]));
-      }
+    bool add_histogram = used_only ? histogram->used() : true;
+    if (add_histogram) {
+      if (histogram->used()) {
 
-      all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+        std::vector<std::string> summary;
+        const std::vector<double>& supported_quantiles_ref =
+            histogram->intervalStatistics().supportedQuantiles();
+        summary.reserve(supported_quantiles_ref.size());
+        for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+          summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                        histogram->intervalStatistics().computedQuantiles()[i],
+                                        histogram->cumulativeStatistics().computedQuantiles()[i]));
+        }
+
+        all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
+      } else {
+        all_histograms.emplace(histogram->name(), "No recorded values");
+      }
     }
   }
 
-  if (params.size() == 0) {
-    // No Arguments so use the standard.
+  if (!has_format) { // Display plain stats if format query param is not there.
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
@@ -449,16 +464,15 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
       response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
     }
   } else {
-    const std::string format_key = params.begin()->first;
-    const std::string format_value = params.begin()->second;
-    if (format_key == "format" && format_value == "json") {
+    const std::string format_value = params.at("format");
+    if (format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms()));
-    } else if (format_key == "format" && format_value == "prometheus") {
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only));
+    } else if (format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
-      response.add("usage: /stats?format=json \n");
+      response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
       response.add("\n");
       rc = Http::Code::NotFound;
     }
@@ -526,7 +540,7 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                       const bool pretty_print) {
+                       const bool used_only, const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -562,7 +576,8 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (histogram->used()) {
+    bool add_histogram = used_only ? histogram->used() : true;
+    if (add_histogram) {
       Value histogram_obj;
       histogram_obj.SetObject();
       Value histogram_name;

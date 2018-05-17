@@ -152,6 +152,19 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json&usedonly",
+                                         "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -314,7 +327,6 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
     // Add the on_destroy_callback to the admin_filter list of callbacks.
     admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
     return Http::Code::OK;
-
   };
 
   EXPECT_TRUE(
