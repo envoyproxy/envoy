@@ -34,9 +34,8 @@ message ExtAuthz {
   }
 
   // The filter's behaviour in case the external authorization service does
-  // not respond back. If set to true then in case of failure to get a
-  // response back or a response that is NOT denied then traffic will be
-  // permitted.
+  // not respond back. When it is set to true, Envoy will also allow traffic in case of
+  // communication failure between authorization service and the proxy.
   // Defaults to false.
   bool failure_mode_allow = 2;
 }
