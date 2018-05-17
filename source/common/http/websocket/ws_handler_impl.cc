@@ -13,9 +13,8 @@ namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
-Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr
-tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
-               Server::Configuration::FactoryContext& factory_context) {
+TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route_config,
+                                 Server::Configuration::FactoryContext& factory_context) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_config;
 
   // Set the default value. This may be overwritten below.
@@ -40,8 +39,7 @@ tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
       *tcp_config.mutable_max_connect_attempts() = ws_config.max_connect_attempts();
     }
   }
-  return std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyConfig>(tcp_config,
-                                                                                factory_context);
+  return std::make_shared<TcpProxy::Config>(tcp_config, factory_context);
 }
 
 WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
@@ -50,10 +48,9 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
                              WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks,
-                             Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config)
-    : Extensions::NetworkFilters::TcpProxy::TcpProxyFilter(config, cluster_manager),
-      request_headers_(request_headers), request_info_(request_info), route_entry_(route_entry),
-      ws_callbacks_(callbacks) {
+                             TcpProxy::ConfigSharedPtr config)
+    : TcpProxy::Filter(config, cluster_manager), request_headers_(request_headers),
+      request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
 
   // set_connection_stats == false because the http connection manager has already set them
   // and they will be inaccurate if we change them now.
@@ -101,7 +98,7 @@ Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_str
     ASSERT(queued_data_.length() == 0);
 
     ENVOY_LOG(trace, "WsHandlerImpl::onData is connected");
-    return Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(data, end_stream);
+    return TcpProxy::Filter::onData(data, end_stream);
   case ConnectState::Failed:
     ENVOY_LOG(trace, "WsHandlerImpl::onData state_ == Failed; discarding");
     break;
@@ -142,7 +139,7 @@ void WsHandlerImpl::onConnectionSuccess() {
   state_ = ConnectState::Connected;
   if (queued_data_.length() > 0 || queued_end_stream_) {
     ENVOY_LOG(trace, "WsHandlerImpl::onConnectionSuccess calling TcpProxy::onData");
-    Extensions::NetworkFilters::TcpProxy::TcpProxyFilter::onData(queued_data_, queued_end_stream_);
+    TcpProxy::Filter::onData(queued_data_, queued_end_stream_);
     ASSERT(queued_data_.length() == 0);
   }
 }

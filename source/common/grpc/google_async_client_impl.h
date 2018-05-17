@@ -293,7 +293,7 @@ private:
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
       completed_ops_ GUARDED_BY(completed_ops_lock_);
-  absl::Mutex completed_ops_lock_;
+  Thread::MutexBasicLockable completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
   friend class GoogleAsyncClientThreadLocal;

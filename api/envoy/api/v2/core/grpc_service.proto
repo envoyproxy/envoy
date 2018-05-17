@@ -14,7 +14,6 @@ import "gogoproto/gogo.proto";
 option (gogoproto.equal_all) = true;
 
 // [#protodoc-title: gRPC services]
-// [#proto-status: draft]
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_api_msg_core.ApiConfigSource>` and filter configurations.
@@ -26,6 +25,7 @@ message GrpcService {
     string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
   }
 
+  // [#proto-status: draft]
   message GoogleGrpc {
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in

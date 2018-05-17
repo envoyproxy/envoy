@@ -453,7 +453,7 @@ private:
   // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
-  absl::Mutex mutex_;
+  Thread::MutexBasicLockable mutex_;
 };
 
 /**

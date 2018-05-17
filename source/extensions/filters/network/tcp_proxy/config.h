@@ -13,10 +13,10 @@ namespace TcpProxy {
 /**
  * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-class TcpProxyConfigFactory
+class ConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::tcp_proxy::v2::TcpProxy> {
 public:
-  TcpProxyConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
+  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TCP_PROXY) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

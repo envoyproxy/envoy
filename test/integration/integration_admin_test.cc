@@ -302,6 +302,37 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
 }
 
+TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
+  initialize();
+  bool test = true;
+
+  // add an handler which adds a callback to the list of callback called when connection is dropped.
+  auto callback = [&test](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                          Server::AdminStream& admin_stream) -> Http::Code {
+    auto on_destroy_callback = [&test]() { test = false; };
+
+    // Add the on_destroy_callback to the admin_filter list of callbacks.
+    admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
+    return Http::Code::OK;
+
+  };
+
+  EXPECT_TRUE(
+      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+
+  // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/foo/bar", "", downstreamProtocol(), version_);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  // Check that the added callback was invoked.
+  EXPECT_EQ(test, false);
+
+  // Small test to cover new statsFlushInterval() on Instance.h.
+  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
+}
+
 // Successful call to startProfiler requires tcmalloc.
 #ifdef TCMALLOC
 
