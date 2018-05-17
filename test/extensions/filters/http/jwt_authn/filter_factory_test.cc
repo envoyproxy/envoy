@@ -2,6 +2,7 @@
 
 #include "extensions/filters/http/jwt_authn/filter_factory.h"
 
+#include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -16,27 +17,9 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 TEST(HttpJwtAuthnFilterFactoryTest, CorrectProto) {
-  std::string yaml = R"(
-rules:
-  - issuer: https://example.com
-    audiences:
-    - example_service
-    - http://example_service1
-    - https://example_service2/
-    remote_jwks:
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-        timeout:
-          seconds: 5 
-      cache_duration:
-        seconds: 600
-    forward_payload_header: sec-istio-auth-userinfo
-)";
-
   FilterFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  MessageUtil::loadFromYaml(ExampleConfig, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

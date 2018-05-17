@@ -5,6 +5,7 @@
 
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
+#include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
@@ -15,48 +16,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
-
-const char ExampleConfig[] = R"(
-rules:
-  - issuer: issuer1
-    audiences:
-    - example_service
-    - http://example_service1
-    - https://example_service2/
-    remote_jwks:
-      http_uri:
-        uri: https://pubkey_server/pubkey_path
-        cluster: pubkey_cluster
-      cache_duration:
-        seconds: 1
-)";
-
-// A good public key
-const std::string PublicKey =
-    "{\"keys\": [{"
-    "  \"kty\": \"RSA\","
-    "  \"n\": "
-    "\"up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1q"
-    "mUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrk"
-    "U7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaE"
-    "WopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_Zdb"
-    "oY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw\","
-    "  \"e\": \"AQAB\","
-    "  \"alg\": \"RS256\","
-    "  \"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\""
-    "},"
-    "{"
-    "  \"kty\": \"RSA\","
-    "  \"n\": "
-    "\"up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1q"
-    "mUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrk"
-    "U7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaE"
-    "WopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_Zdb"
-    "oY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw\","
-    "  \"e\": \"AQAB\","
-    "  \"alg\": \"RS256\","
-    "  \"kid\": \"b3319a147514df7ee5e4bcdee51350cc890cc89e\""
-    "}]}";
 
 class JwksCacheTest : public ::testing::Test {
 public:
@@ -71,13 +30,18 @@ public:
 
 // Test findByIssuer
 TEST_F(JwksCacheTest, TestFindByIssuer) {
-  EXPECT_TRUE(cache_->findByIssuer("issuer1") != nullptr);
-  EXPECT_TRUE(cache_->findByIssuer("issuer2") == nullptr);
+  EXPECT_TRUE(cache_->findByIssuer("https://example.com") != nullptr);
+  EXPECT_TRUE(cache_->findByIssuer("other-issuer") == nullptr);
 }
 
 // Test setRemoteJwks and its expiration
 TEST_F(JwksCacheTest, TestSetRemoteJwks) {
-  auto jwks = cache_->findByIssuer("issuer1");
+  auto rule0 = config_.mutable_rules(0);
+  // Set cache_duration to 1 second to test expiration
+  rule0->mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
+  cache_ = JwksCache::create(config_);
+
+  auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
   EXPECT_EQ(jwks->setRemoteJwks(PublicKey), Status::Ok);
@@ -98,7 +62,7 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
 
   cache_ = JwksCache::create(config_);
 
-  auto jwks = cache_->findByIssuer("issuer1");
+  auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 }
@@ -112,13 +76,13 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
 
   cache_ = JwksCache::create(config_);
 
-  auto jwks = cache_->findByIssuer("issuer1");
+  auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 }
 
 // Test audiences with different formats
 TEST_F(JwksCacheTest, TestAudiences) {
-  auto jwks = cache_->findByIssuer("issuer1");
+  auto jwks = cache_->findByIssuer("https://example.com");
 
   /**
    * when comparing audiences, protocol scheme and trailing slash

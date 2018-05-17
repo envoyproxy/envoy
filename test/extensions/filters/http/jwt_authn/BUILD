@@ -2,11 +2,17 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_library(
+    name = "test_common_lib",
+    hdrs = ["test_common.h"],
+)
 
 envoy_cc_test(
     name = "extractor_test",
@@ -26,6 +32,7 @@ envoy_cc_test(
         "filter_factory_test.cc",
     ],
     deps = [
+        ":test_common_lib",
         "//source/exe:envoy_common_lib",
         "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//test/mocks/server:server_mocks",
@@ -39,6 +46,7 @@ envoy_cc_test(
         "jwks_cache_test.cc",
     ],
     deps = [
+        ":test_common_lib",
         "//source/exe:envoy_common_lib",
         "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//test/test_common:utility_lib",
@@ -51,6 +59,7 @@ envoy_cc_test(
         "authenticator_test.cc",
     ],
     deps = [
+        ":test_common_lib",
         "//source/exe:envoy_common_lib",
         "//source/extensions/filters/http/jwt_authn:jwt_lib",
         "//test/mocks/server:server_mocks",
