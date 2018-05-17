@@ -39,6 +39,7 @@ envoy_cc_test_library(
     hdrs = ["network_utility.h"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
         "//source/common/network:raw_buffer_socket_lib",

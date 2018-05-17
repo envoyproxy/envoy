@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library")
+load("//bazel:api_build_system.bzl", "api_proto_library", "api_go_grpc_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -10,5 +10,14 @@ api_proto_library(
     deps = [
         "//envoy/api/v2/core:base",
         "@io_opencensus_trace//:trace_model",
+    ],
+)
+
+api_go_grpc_library(
+    name = "trace_service",
+    proto = ":trace_service",
+    deps = [
+        "//envoy/api/v2/core:base_go_proto",
+        "@io_opencensus_trace//:trace_model_go_proto",
     ],
 )

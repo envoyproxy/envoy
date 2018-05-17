@@ -29,18 +29,17 @@ int ContextImpl::sslContextIndex() {
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                          const ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
-      min_protocol_version_(config.minProtocolVersion()),
-      max_protocol_version_(config.maxProtocolVersion()), ecdh_curves_(config.ecdhCurves()) {
+    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
+      stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_min_proto_version(ctx_.get(), min_protocol_version_);
+  rc = SSL_CTX_set_min_proto_version(ctx_.get(), config.minProtocolVersion());
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_max_proto_version(ctx_.get(), max_protocol_version_);
+  rc = SSL_CTX_set_max_proto_version(ctx_.get(), config.maxProtocolVersion());
   RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
@@ -48,8 +47,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
         fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
   }
 
-  if (!SSL_CTX_set1_curves_list(ctx_.get(), ecdh_curves_.c_str())) {
-    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", ecdh_curves_));
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
   }
 
   int verify_mode = SSL_VERIFY_NONE;
@@ -418,23 +417,15 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
+ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                                     const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Stats::Scope& scope, const ServerContextConfig& config,
-                                     bool skip_context_update, Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), listener_name_(listener_name),
-      server_names_(server_names), skip_context_update_(skip_context_update), runtime_(runtime),
+                                     Runtime::Loader& runtime)
+    : ContextImpl(parent, scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.certChain().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
-  SSL_CTX_set_select_certificate_cb(
-      ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-        ContextImpl* context_impl = static_cast<ContextImpl*>(
-            SSL_CTX_get_ex_data(SSL_get_SSL_CTX(client_hello->ssl), sslContextIndex()));
-        return dynamic_cast<ServerContextImpl*>(context_impl)->processClientHello(client_hello);
-      });
-
   if (!config.caCert().empty()) {
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
@@ -575,7 +566,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
-  for (const auto& name : server_names_) {
+  for (const auto& name : server_names) {
     rc = EVP_DigestUpdate(&md, name.data(), name.size());
     RELEASE_ASSERT(rc == 1);
   }
@@ -584,73 +575,6 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   RELEASE_ASSERT(rc == 1);
   rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
   RELEASE_ASSERT(rc == 1);
-}
-
-ssl_select_cert_result_t
-ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
-  if (skip_context_update_) {
-    return ssl_select_cert_success;
-  }
-
-  std::string server_name;
-  const uint8_t* data;
-  size_t len;
-
-  if (SSL_early_callback_ctx_extension_get(client_hello, TLSEXT_TYPE_server_name, &data, &len)) {
-    // Based on BoringSSL's ext_sni_parse_clienthello().
-    // Match on empty SNI instead of rejecting connection in case we cannot process the extension.
-    // TODO(PiotrSikora): figure out if we can upstream this to BoringSSL.
-    CBS extension;
-    CBS_init(&extension, data, len);
-    CBS server_name_list, host_name;
-    uint8_t name_type;
-    if (CBS_get_u16_length_prefixed(&extension, &server_name_list) &&
-        CBS_get_u8(&server_name_list, &name_type) &&
-        CBS_get_u16_length_prefixed(&server_name_list, &host_name) &&
-        CBS_len(&server_name_list) == 0 && CBS_len(&extension) == 0 &&
-        name_type == TLSEXT_NAMETYPE_host_name && CBS_len(&host_name) != 0 &&
-        CBS_len(&host_name) <= TLSEXT_MAXLEN_host_name && !CBS_contains_zero_byte(&host_name)) {
-      server_name.assign(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
-    }
-  }
-
-  ServerContext* new_ctx = parent_.findSslServerContext(listener_name_, server_name);
-
-  // Reject connection if we didn't find a match.
-  if (new_ctx == nullptr) {
-    stats_.fail_no_sni_match_.inc();
-    return ssl_select_cert_error;
-  }
-
-  // Update context if it changed.
-  if (new_ctx != this) {
-    ServerContextImpl* new_impl = dynamic_cast<ServerContextImpl*>(new_ctx);
-    new_impl->updateConnectionContext(client_hello->ssl);
-  }
-
-  return ssl_select_cert_success;
-}
-
-void ServerContextImpl::updateConnectionContext(SSL* ssl) {
-  ASSERT(ctx_);
-
-  SSL_set_SSL_CTX(ssl, ctx_.get());
-  ASSERT(SSL_CTX_get_ex_data(ctx_.get(), sslContextIndex()) == this);
-
-  // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
-  // TODO(PiotrSikora): add SSL_early_set_SSL_CTX() to BoringSSL.
-
-  // TODO(PiotrSikora): add getters to BoringSSL.
-  int rc = SSL_set_min_proto_version(ssl, min_protocol_version_);
-  ASSERT(rc == 1);
-  rc = SSL_set_max_proto_version(ssl, max_protocol_version_);
-  ASSERT(rc == 1);
-
-  SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
-
-  // TODO(PiotrSikora): add getters to BoringSSL.
-  rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
-  ASSERT(rc == 1);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,

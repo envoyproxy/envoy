@@ -6,6 +6,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/network/listen_socket_impl.h"
@@ -18,7 +19,10 @@
 #include "server/drain_manager_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
+#include "extensions/filters/network/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Server {
@@ -126,10 +130,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       workers_started_(workers_started), hash_(hash),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info) {
-  // TODO(htuch): Support multiple filter chains #1280, add constraint to ensure we have at least on
-  // filter chain #1308.
-  ASSERT(config.filter_chains().size() >= 1);
-
   if (config.has_transparent()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
@@ -165,41 +165,30 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
   }
 
-  // Skip lookup and update of the SSL Context if there is only one filter chain
-  // and it doesn't enforce any SNI restrictions.
-  const bool skip_context_update =
-      (config.filter_chains().size() == 1 &&
-       config.filter_chains()[0].filter_chain_match().sni_domains().empty());
+  bool need_tls_inspector = false;
+  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
+      filter_chains;
 
-  absl::optional<uint64_t> filters_hash;
-  uint32_t has_tls = 0;
-  uint32_t has_stk = 0;
   for (const auto& filter_chain : config.filter_chains()) {
-    std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
-                                         filter_chain.filter_chain_match().sni_domains().end());
-    if (!filters_hash) {
-      filters_hash = RepeatedPtrUtil::hash(filter_chain.filters());
-      filter_factories_ =
-          parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this);
-    } else if (filters_hash.value() != RepeatedPtrUtil::hash(filter_chain.filters())) {
-      throw EnvoyException(fmt::format("error adding listener '{}': use of different filter chains "
-                                       "is currently not supported",
+    const auto& filter_chain_match = filter_chain.filter_chain_match();
+    if (filter_chains.find(filter_chain_match) != filter_chains.end()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                       "the same matching rules are defined",
                                        address_->asString()));
     }
+    filter_chains.insert(filter_chain_match);
 
-    // If the cluster doesn't have transport socke configured, override with default transport
-    // socket implementation based on tls_context. We copy by value first then override if
-    // neccessary.
+    std::vector<std::string> server_names(filter_chain_match.sni_domains().begin(),
+                                          filter_chain_match.sni_domains().end());
+
+    // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
+    // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
+    // We copy by value first then override if necessary.
     auto transport_socket = filter_chain.transport_socket();
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
-        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().SSL);
+        transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().TLS);
         MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
-
-        has_tls++;
-        if (filter_chain.tls_context().has_session_ticket_keys()) {
-          has_stk++;
-        }
       } else {
         transport_socket.set_name(
             Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
@@ -211,27 +200,28 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
 
-    // Each transport socket factory owns one SslServerContext, we need to store them all in a
-    // vector since Ssl::ContextManager doesn't own SslServerContext. While transportSocketFacotry()
-    // always returns the first element of transport_socket_factories_, other transport socket
-    // factories are needed when the default Ssl::ServerContext updates SSL context based on
-    // ClientHello. This behavior is a workaround for initial SNI support before the full SNI based
-    // filter chain match is implemented.
-    transport_socket_factories_.emplace_back(config_factory.createTransportSocketFactory(
-        name_, sni_domains, skip_context_update, *message, *this));
-    ASSERT(transport_socket_factories_.back() != nullptr);
-  }
-  ASSERT(!transport_socket_factories_.empty());
+    addFilterChain(server_names, filter_chain_match.transport_protocol(),
+                   config_factory.createTransportSocketFactory(*message, *this, server_names),
+                   parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
-  // TODO(PiotrSikora): allow filter chains with mixed use of Session Ticket Keys.
-  // This doesn't work right now, because BoringSSL uses "session context" (initial SSL_CTX that
-  // accepted connection, before SNI update) for session related stuff, including Session Ticket
-  // callback, which is going to be called iff it's set on the initial SSL_CTX, even if it's not
-  // set on the current SSL_CTX that doesn't have any Session Ticket Keys configured.
-  if (has_stk != 0 && has_stk != has_tls) {
-    throw EnvoyException(fmt::format("error adding listener '{}': filter chains with mixed use of "
-                                     "Session Ticket Keys are currently not supported",
-                                     address_->asString()));
+    need_tls_inspector = filter_chain_match.transport_protocol() == "tls" ||
+                         (filter_chain_match.transport_protocol().empty() && !server_names.empty());
+  }
+
+  // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
+  if (need_tls_inspector) {
+    for (const auto& filter : config.listener_filters()) {
+      if (filter.name() == Extensions::ListenerFilters::ListenerFilterNames::get().TLS_INSPECTOR) {
+        need_tls_inspector = false;
+        break;
+      }
+    }
+    if (need_tls_inspector) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': filter chain match rules require TLS Inspector "
+                      "listener filter, but it isn't configured",
+                      address_->asString()));
+    }
   }
 }
 
@@ -242,11 +232,87 @@ ListenerImpl::~ListenerImpl() {
   // active. This is done here explicitly by setting a boolean and then clearing the factory
   // vector for clarity.
   initialize_canceled_ = true;
-  filter_factories_.clear();
+  filter_chains_.clear();
 }
 
-bool ListenerImpl::createNetworkFilterChain(Network::Connection& connection) {
-  return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
+bool ListenerImpl::isWildcardServerName(const std::string& name) {
+  return absl::StartsWith(name, "*.");
+}
+
+void ListenerImpl::addFilterChain(const std::vector<std::string>& server_names,
+                                  const std::string& transport_protocol,
+                                  Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                                  std::vector<Network::FilterFactoryCb> filters_factory) {
+  const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
+                                                              std::move(filters_factory));
+  // Save mappings.
+  if (server_names.empty()) {
+    filter_chains_[EMPTY_STRING][transport_protocol] = filter_chain;
+  } else {
+    for (const auto& server_name : server_names) {
+      if (isWildcardServerName(server_name)) {
+        // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
+        filter_chains_[server_name.substr(1)][transport_protocol] = filter_chain;
+      } else {
+        filter_chains_[server_name][transport_protocol] = filter_chain;
+      }
+    }
+  }
+}
+
+const Network::FilterChain*
+ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+  const std::string server_name(socket.requestedServerName());
+
+  // Match on exact server name, i.e. "www.example.com" for "www.example.com".
+  const auto server_name_exact_match = filter_chains_.find(server_name);
+  if (server_name_exact_match != filter_chains_.end()) {
+    return findFilterChainForServerName(server_name_exact_match->second, socket);
+  }
+
+  // Match on the wildcard domain, i.e. ".example.com" for "www.example.com".
+  const size_t pos = server_name.find('.');
+  if (pos > 0 && pos < server_name.size() - 1) {
+    const std::string wildcard = server_name.substr(pos);
+    const auto server_name_wildcard_match = filter_chains_.find(wildcard);
+    if (server_name_wildcard_match != filter_chains_.end()) {
+      return findFilterChainForServerName(server_name_wildcard_match->second, socket);
+    }
+  }
+
+  // Match on a filter chain without server name requirements.
+  const auto server_name_catchall_match = filter_chains_.find(EMPTY_STRING);
+  if (server_name_catchall_match != filter_chains_.end()) {
+    return findFilterChainForServerName(server_name_catchall_match->second, socket);
+  }
+
+  return nullptr;
+}
+
+const Network::FilterChain* ListenerImpl::findFilterChainForServerName(
+    const std::unordered_map<std::string, Network::FilterChainSharedPtr>& server_name_match,
+    const Network::ConnectionSocket& socket) const {
+  const std::string transport_protocol(socket.detectedTransportProtocol());
+
+  // Match on exact transport protocol, e.g. "tls".
+  const auto transport_protocol_match = server_name_match.find(transport_protocol);
+  if (transport_protocol_match != server_name_match.end()) {
+    return transport_protocol_match->second.get();
+  }
+
+  // Match on a filter chain without transport protocol requirements.
+  const auto any_protocol_match = server_name_match.find(EMPTY_STRING);
+  if (any_protocol_match != server_name_match.end()) {
+    return any_protocol_match->second.get();
+  }
+
+  return nullptr;
+}
+
+bool ListenerImpl::createNetworkFilterChain(
+    Network::Connection& connection,
+    const std::vector<Network::FilterFactoryCb>& filter_factories) {
+  return Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
 }
 
 bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& manager) {
