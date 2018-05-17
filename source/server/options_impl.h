@@ -51,9 +51,6 @@ public:
   }
   void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
   void setMode(Server::Mode mode) { mode_ = mode; }
-  std::chrono::milliseconds fileFlushIntervalMsec() const override {
-    return file_flush_interval_msec_;
-  }
   void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
     file_flush_interval_msec_ = file_flush_interval_msec;
   }
@@ -87,6 +84,9 @@ public:
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
+  std::chrono::milliseconds fileFlushIntervalMsec() const override {
+    return file_flush_interval_msec_;
+  }
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
