@@ -90,7 +90,7 @@ private:
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
-  mutable std::mutex merge_lock_;
+  mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_;
 };
 
@@ -257,8 +257,8 @@ private:
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
-  mutable std::mutex lock_;
-  std::unordered_set<ScopeImpl*> scopes_;
+  mutable Thread::MutexBasicLockable lock_;
+  std::unordered_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
