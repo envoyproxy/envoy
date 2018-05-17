@@ -132,9 +132,15 @@ private:
   std::condition_variable_any flush_event_;
   std::atomic<bool> flush_thread_exit_{};
   std::atomic<bool> reopen_file_{};
+  // TODO(jmarantz): this should be GUARDED_BY(write_lock_) but this will have to wait until
+  // absl::CondVar is integrated into the abstraction layer, so we can use an annoated mutex
+  // class.
   Buffer::OwnedImpl flush_buffer_; // This buffer is used by multiple threads. It gets filled and
                                    // then flushed either when max size is reached or when a timer
                                    // fires.
+  // TODO(jmarantz): this should be GUARDED_BY(flush_lock_) but the analysis cannot poke through
+  // the std::make_unique assignment. I do not believe it's possible to annotate this properly now
+  // due to limitations in the clang thread annotation analysis.
   Buffer::OwnedImpl about_to_write_buffer_; // This buffer is used only by the flush thread. Data
                                             // is moved from flush_buffer_ under lock, and then
                                             // the lock is released so that flush_buffer_ can
