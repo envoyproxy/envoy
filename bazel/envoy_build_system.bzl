@@ -32,11 +32,20 @@ def envoy_copts(repository, test = False):
         envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
         envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
 
+def envoy_static_link_libstdcpp_linkopts():
+    return select({
+        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
+        "@bazel_tools//tools/osx:darwin": [],
+        "//conditions:default": [
+            "-static-libstdc++",
+            "-static-libgcc",
+        ],
+    })
+
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
     return select({
-        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
-        # Further, the system library transitively links common libraries (e.g., pthread).
+        # The OSX system library transitively links common libraries (e.g., pthread).
         "@bazel_tools//tools/osx:darwin": [
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000", "-image_base 100000000",
@@ -46,11 +55,10 @@ def envoy_linkopts():
             "-lrt",
             "-ldl",
             '-Wl,--hash-style=gnu',
-            "-static-libstdc++",
-            "-static-libgcc",
         ],
-    }) + envoy_select_force_libcpp(["--stdlib=libc++"],
-                                   ["-static-libstdc++", "-static-libgcc"]) \
+    }) + envoy_static_link_libstdcpp_linkopts() \
+    + envoy_select_force_libcpp(["--stdlib=libc++"],
+                                ["-static-libstdc++", "-static-libgcc"]) \
     + envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_linkopts():
@@ -304,7 +312,7 @@ def envoy_cc_test_binary(name,
                          **kargs):
     envoy_cc_binary(name,
                     testonly = 1,
-                    linkopts = envoy_test_linkopts(),
+                    linkopts = envoy_test_linkopts() + envoy_static_link_libstdcpp_linkopts(),
                     **kargs)
 
 # Envoy Python test binaries should be specified with this function.
