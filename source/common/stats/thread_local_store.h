@@ -82,7 +82,7 @@ public:
   }
 
 private:
-  bool usedLockHeld() const;
+  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Store& parent_;
   TlsScope& tls_scope_;
@@ -91,7 +91,7 @@ private:
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
