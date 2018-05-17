@@ -75,8 +75,8 @@ protected:
 
   std::unique_ptr<Thread::Thread> dispatcher_thread_;
   DispatcherPtr dispatcher_;
-  std::mutex mu_;
-  std::condition_variable cv_;
+  absl::Mutex mu_;
+  absl::CondVar cv_;
 
   bool work_finished_;
   TimerPtr keepalive_timer_;
@@ -85,34 +85,35 @@ protected:
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      absl::MutexLock lock(&mu_);
       work_finished_ = true;
     }
-    cv_.notify_one();
+    cv_.Signal();
   });
 
-  std::unique_lock<std::mutex> lock(mu_);
+  absl::MutexLock lock(&mu_);
 
-  cv_.wait(lock, [this]() { return work_finished_; });
+  mu_.Await(absl::Condition(&work_finished_));
+  //cv_.wait(lock, [this]() { return work_finished_; });
 }
 
 TEST_F(DispatcherImplTest, Timer) {
   TimerPtr timer;
   dispatcher_->post([this, &timer]() {
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      absl::MutexLock lock(&mu_);
       timer = dispatcher_->createTimer([this]() {
         {
-          std::lock_guard<std::mutex> lock(mu_);
+          absl::MutexLock lock(&mu_);
           work_finished_ = true;
         }
-        cv_.notify_one();
+        cv_.Signal();
       });
     }
-    cv_.notify_one();
+    cv_.Signal();
   });
 
-  std::unique_lock<std::mutex> lock(mu_);
+  Thread::LockGuard lock(mu_);
   cv_.wait(lock, [&timer]() { return timer != nullptr; });
   timer->enableTimer(std::chrono::milliseconds(50));
 

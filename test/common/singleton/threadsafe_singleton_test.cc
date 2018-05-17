@@ -14,17 +14,17 @@ public:
   virtual ~TestSingleton() {}
 
   virtual void addOne() {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     ++value_;
   }
 
   virtual int value() {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return value_;
   }
 
 protected:
-  std::mutex lock_;
+  Thread::MutexBasicLockable lock_;
   int value_{0};
 };
 
@@ -32,7 +32,7 @@ class EvilMathSingleton : public TestSingleton {
 public:
   EvilMathSingleton() { value_ = -50; }
   virtual void addOne() {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     ++value_;
     ++value_;
   }

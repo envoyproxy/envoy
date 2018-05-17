@@ -85,13 +85,13 @@ public:
     }
     waitForData(client_dispatcher, 5);
     {
-      std::unique_lock<std::mutex> lock(lock_);
+      Thread::LockGuard lock(lock_);
       EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
     }
     if (decoded_grpc_frames_.size() < 1) {
       waitForData(client_dispatcher, grpc_decoder_.length());
       {
-        std::unique_lock<std::mutex> lock(lock_);
+        Thread::LockGuard lock(lock_);
         EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
       }
     }
@@ -118,8 +118,8 @@ protected:
 private:
   FakeHttpConnection& parent_;
   Http::StreamEncoder& encoder_;
-  std::mutex lock_;
-  std::condition_variable decoder_event_;
+  absl::Mutex lock_;
+  absl::CondVar decoder_event_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
@@ -148,14 +148,14 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
   void set_parented() {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     parented_ = true;
   }
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_ ||
                    (event != Network::ConnectionEvent::RemoteClose &&
                     event != Network::ConnectionEvent::LocalClose));
@@ -166,7 +166,7 @@ public:
 private:
   Network::Connection& connection_;
   bool parented_;
-  std::mutex lock_;
+  Thread::MutexBasicLockable lock_;
   bool allow_unexpected_disconnects_;
 };
 
@@ -198,7 +198,7 @@ public:
   }
   void enableHalfClose(bool enabled);
   bool connected() const {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return !disconnected_;
   }
 
@@ -208,7 +208,7 @@ protected:
         connection_wrapper_(std::move(connection_wrapper)) {}
 
   Network::Connection& connection_;
-  mutable std::mutex lock_;
+  mutable Thread::MutexBasicLockable lock_;
   std::condition_variable connection_event_;
   bool disconnected_{};
   bool half_closed_{};
@@ -353,7 +353,7 @@ private:
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.
-  std::mutex lock_;
+  Thread::MutexBasicLockable lock_;
   Thread::ThreadPtr thread_;
   std::condition_variable new_connection_event_;
   Api::ApiPtr api_;

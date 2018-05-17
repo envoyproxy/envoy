@@ -173,20 +173,20 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void ConditionalInitializer::setReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
-  cv_.notify_all();
+  cv_.SignalAll();
 }
 
 void ConditionalInitializer::waitReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  absl::MutexLock lock(&mutex_);
   if (ready_) {
     ready_ = false;
     return;
   }
 
-  cv_.wait(lock);
+  cv_.Wait(&mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
 }

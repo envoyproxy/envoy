@@ -293,8 +293,8 @@ public:
   void waitReady();
 
 private:
-  std::condition_variable cv_;
-  std::mutex mutex_;
+  absl::CondVar cv_;
+  absl::Mutex mutex_;
   bool ready_{false};
 };
 
