@@ -40,7 +40,8 @@ def envoy_static_link_libstdcpp_linkopts():
             "-static-libstdc++",
             "-static-libgcc",
         ],
-    })
+    }) + envoy_select_force_libcpp(["--stdlib=libc++"],
+                                   ["-static-libstdc++", "-static-libgcc"])
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
@@ -57,8 +58,6 @@ def envoy_linkopts():
             '-Wl,--hash-style=gnu',
         ],
     }) + envoy_static_link_libstdcpp_linkopts() \
-    + envoy_select_force_libcpp(["--stdlib=libc++"],
-                                ["-static-libstdc++", "-static-libgcc"]) \
     + envoy_select_exported_symbols(["-Wl,-E"])
 
 def _envoy_stamped_linkopts():
