@@ -7,36 +7,45 @@
       protocol: {{protocol}}
       address: {{address}}
       port_value: {{port_value}}
-  filter_chain:
+  filter_chains:
   #tls context is also matched in the filter chain
-    filters:
-      name: envoy.http_connection_manager
-      config:
-        codec_type: AUTO
-        stat_prefix: router
-        {% if proxy_proto -%}
-        use_remote_address: true
-        {%endif-%}
-        router_config:
-          {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
-        http_filters:
-          - name: envoy.health_check
-            config:
-              pass_through_mode: false
-              endpoint: "/healthcheck"
-          - name: envoy.buffer
-            config:
-              max_request_bytes: 5242880
-              max_request_time: 120
-          - name: envoy.rate_limit
-            config:
-              domain: envoy_front
-              request_type: external
-          - name: envoy.router
-            config: {}
-    {% if proxy_proto -%}
-    use_proxy_proto: true
-    {%endif -%}
+    - filters:
+        name: envoy.http_connection_manager
+        config:
+          codec_type: AUTO
+          stat_prefix: router
+          {% if proxy_proto -%}
+          use_remote_address: true
+          {%endif-%}
+          router_config:
+            {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
+          http_filters:
+            - name: envoy.health_check
+              config:
+                pass_through_mode: false
+                endpoint: "/healthcheck"
+            - name: envoy.buffer
+              config:
+                max_request_bytes: 5242880
+                max_request_time: 120
+            - name: envoy.rate_limit
+              config:
+                domain: envoy_front
+                request_type: external
+            - name: envoy.router
+              config: {}
+      tls_context:
+        common_tls_context:
+          alpn_protocols: h2,http/1.1
+          tls_certificates:
+            certificate_chain:
+              filename: certs/servercert.pem
+            private_key:
+              filename: certs/serverkey.pem
+
+      {% if proxy_proto -%}
+      use_proxy_proto: true
+      {%endif -%}
 {% endmacro -%}
 admin:
   access_log_path: /var/log/envoy/admin_access.log

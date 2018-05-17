@@ -8,6 +8,13 @@
   filter_chains:
     - filter_chain_match:
         sni_domains: example.com
+      tls_context:
+        common_tls_context:
+          alpn_protocols: h2,http/1.1
+          tls_certificates:
+            certificate_chain:
+              filename: certs/servercert.pem
+            private_key: certs/serverkey.pem
       filters:
         name: envoy.http_connection_manager
         config:
@@ -89,6 +96,16 @@ static_resources:
             address: front-proxy.yourcompany.net
             port: 9400
       max_requests_per_connection: 25000
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            certificate_chain:
+              filename: certs/clientcert.pem
+            private_key:
+              filename: certs/clientkey.pem
+          validation_context:
+            verify_subject_alt_name:
+              - front-proxy.yourcompany.net
     - name: lightstep_saas
       type: LOGICAL_DNS
       connect_timeout: 1s
@@ -98,6 +115,12 @@ static_resources:
             protocol: TCP
             address: collector-grpc.lightstep.com
             port: 443
+      tls_context:
+        validation_context:
+          trusted_ca:
+            filename: certs/cacert.pem
+          verify_subject_alt_name:
+            - collector-grpc.lightstep.com
   listeners:
     {{ listener("TCP", "0.0.0.0",9300,True)|indent(4) }}
     {{ listener("TCP", "0.0.0.0",9301,True)|indent(4) }}    
