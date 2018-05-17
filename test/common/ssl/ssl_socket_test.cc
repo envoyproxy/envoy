@@ -148,18 +148,12 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
 
   // SNI-based selection logic isn't happening in Ssl::SslSocket anymore.
   ASSERT(server_proto.filter_chains().size() == 1);
-
-  std::vector<Network::TransportSocketFactoryPtr> server_transport_socket_factories;
-  for (const auto& filter_chain : server_proto.filter_chains()) {
-    if (filter_chain.has_tls_context()) {
-      std::vector<std::string> sni_domains(filter_chain.filter_chain_match().sni_domains().begin(),
-                                           filter_chain.filter_chain_match().sni_domains().end());
-      Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context());
-      server_transport_socket_factories.emplace_back(
-          new Ssl::ServerSslSocketFactory(server_ctx_config, manager, stats_store, sni_domains));
-    }
-  }
-  ASSERT(server_transport_socket_factories.size() >= 1);
+  const auto& filter_chain = server_proto.filter_chains(0);
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().sni_domains().begin(),
+                                        filter_chain.filter_chain_match().sni_domains().end());
+  Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context());
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
+                                                        server_names);
 
   Event::DispatcherImpl dispatcher;
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
@@ -192,7 +186,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   EXPECT_CALL(callbacks, onAccept_(_, _))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket, bool) -> void {
         Network::ConnectionPtr new_connection = dispatcher.createServerConnection(
-            std::move(socket), server_transport_socket_factories[0]->createTransportSocket());
+            std::move(socket), server_ssl_socket_factory.createTransportSocket());
         callbacks.onNewConnection(std::move(new_connection));
       }));
   EXPECT_CALL(callbacks, onNewConnection_(_))
