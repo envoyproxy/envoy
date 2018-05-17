@@ -14,23 +14,9 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 Http::FilterFactoryCb
-FilterFactory::createFilterFactory(const Json::Object& config, const std::string&,
-                                   Server::Configuration::FactoryContext& context) {
-  JwtAuthentication proto_config;
-  MessageUtil::loadFromJson(config.asJsonString(), proto_config);
-  return createFilter(proto_config, context);
-}
-
-Http::FilterFactoryCb
-FilterFactory::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                            const std::string&,
-                                            Server::Configuration::FactoryContext& context) {
-  return createFilter(MessageUtil::downcastAndValidate<const JwtAuthentication&>(proto_config),
-                      context);
-}
-
-Http::FilterFactoryCb FilterFactory::createFilter(const JwtAuthentication& proto_config,
-                                                  Server::Configuration::FactoryContext& context) {
+FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
+                                                 const std::string&,
+                                                 Server::Configuration::FactoryContext& context) {
   auto store_factory = std::make_shared<DataStoreFactory>(proto_config, context);
   return [store_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(store_factory));
@@ -38,7 +24,7 @@ Http::FilterFactoryCb FilterFactory::createFilter(const JwtAuthentication& proto
 }
 
 /**
- * Static registration for this JWT verification filter. @see RegisterFactory.
+ * Static registration for this jwt_authn filter. @see RegisterFactory.
  */
 static Registry::RegisterFactory<FilterFactory, Server::Configuration::NamedHttpFilterConfigFactory>
     register_;

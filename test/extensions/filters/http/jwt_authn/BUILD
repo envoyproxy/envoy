@@ -21,6 +21,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "filter_factory_test",
+    srcs = [
+        "filter_factory_test.cc",
+    ],
+    deps = [
+        "//source/exe:envoy_common_lib",
+        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "jwks_cache_test",
     srcs = [
         "jwks_cache_test.cc",

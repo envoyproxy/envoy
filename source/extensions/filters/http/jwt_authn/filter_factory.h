@@ -3,6 +3,7 @@
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 #include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -10,27 +11,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class FilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+/**
+ * Config registration for jwt_authn filter.
+ */
+class FilterFactory : public Common::FactoryBase<
+                          ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication> {
 public:
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
-
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication};
-  }
-
-  std::string name() override { return HttpFilterNames::get().JWT_AUTHN; }
+  FilterFactory() : FactoryBase(HttpFilterNames::get().JWT_AUTHN) {}
 
 private:
-  Http::FilterFactoryCb createFilter(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
-      Server::Configuration::FactoryContext& context);
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace JwtAuthn
