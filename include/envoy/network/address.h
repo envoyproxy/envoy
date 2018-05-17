@@ -80,7 +80,7 @@ public:
   /**
    * @return the port associated with the address. Port may be zero if not specified, not
    * determinable before socket creation, or not applicable.
-   *         The port is in host byte order.
+   * The port is in host byte order.
    */
   virtual uint32_t port() const PURE;
 
