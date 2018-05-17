@@ -47,9 +47,9 @@ DnsResolverImpl::DnsResolverImpl(
       }
       // Note that the ip()->port() may be zero if the port is not fully specified by the
       // Address::Instance.
-      resolver_addrs.push_back(fmt::format(
-          resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}",
-          resolver->ip()->addressAsString(), resolver->ip()->port()));
+      resolver_addrs.push_back(fmt::format(resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}",
+                                           resolver->ip()->addressAsString(),
+                                           resolver->ip()->port()));
     }
     const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
