@@ -16,39 +16,50 @@ namespace JwtAuthn {
 namespace {
 
 // Default cache expiration time in 5 minutes.
-const int kPubkeyCacheExpirationSec = 600;
+constexpr int PubkeyCacheExpirationSec = 600;
 
 // HTTP Protocol scheme prefix in JWT aud claim.
-const std::string kHTTPSchemePrefix("http://");
+constexpr char HTTPSchemePrefix[] = "http://";
+constexpr size_t HTTPSchemePrefixLen = strlen(HTTPSchemePrefix);
 
 // HTTPS Protocol scheme prefix in JWT aud claim.
-const std::string kHTTPSSchemePrefix("https://");
+constexpr char HTTPSSchemePrefix[] = "https://";
+constexpr size_t HTTPSSchemePrefixLen = strlen(HTTPSSchemePrefix);
 
 /**
- * Searches protocol scheme prefix and trailing slash from an audience string.
- * returns one without these prefix and suffix for consistent comparison.
+ * RFC for JWT `aud <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ only
+ * specifies case sensitive comparison. But experiences showed that users
+ * easily add wrong scheme and tailing slash to cause mis-match.
+ * In this implemeation, scheme portion of URI and tailing slash is removed
+ * before comparison.
+ *
  * @param input audience string.
  * @return sanitized audience string without scheme prefix and tailing slash.
  */
 std::string sanitizeAudience(const std::string& aud) {
-  int beg = 0;
-  int end = aud.length() - 1;
-  bool sanitize_aud = false;
+  if (aud.empty()) {
+    return aud;
+  }
+
+  size_t beg_pos = 0;
+  bool sanitized = false;
   // Point beg to first character after protocol scheme prefix in audience.
-  if (aud.compare(0, kHTTPSchemePrefix.length(), kHTTPSchemePrefix) == 0) {
-    beg = kHTTPSchemePrefix.length();
-    sanitize_aud = true;
-  } else if (aud.compare(0, kHTTPSSchemePrefix.length(), kHTTPSSchemePrefix) == 0) {
-    beg = kHTTPSSchemePrefix.length();
-    sanitize_aud = true;
+  if (aud.compare(0, HTTPSchemePrefixLen, HTTPSchemePrefix) == 0) {
+    beg_pos = HTTPSchemePrefixLen;
+    sanitized = true;
+  } else if (aud.compare(0, HTTPSSchemePrefixLen, HTTPSSchemePrefix) == 0) {
+    beg_pos = HTTPSSchemePrefixLen;
+    sanitized = true;
   }
+
   // Point end to trailing slash in aud.
-  if (end >= 0 && aud[end] == '/') {
-    --end;
-    sanitize_aud = true;
+  size_t end_pos = aud.length();
+  if (aud[end_pos - 1] == '/') {
+    --end_pos;
+    sanitized = true;
   }
-  if (sanitize_aud) {
-    return aud.substr(beg, end - beg + 1);
+  if (sanitized) {
+    return aud.substr(beg_pos, end_pos - beg_pos);
   }
   return aud;
 }
@@ -107,7 +118,7 @@ private:
       expire +=
           std::chrono::seconds(duration.seconds()) + std::chrono::nanoseconds(duration.nanos());
     } else {
-      expire += std::chrono::seconds(kPubkeyCacheExpirationSec);
+      expire += std::chrono::seconds(PubkeyCacheExpirationSec);
     }
     return expire;
   }

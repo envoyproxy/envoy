@@ -141,6 +141,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
+  // TODO(qiwzhang): check in progress fetching, not to issue second remote call.
   fetchRemoteJwks();
 }
 
@@ -170,10 +171,9 @@ void AuthenticatorImpl::onSuccess(Http::MessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == 200) {
     ENVOY_LOG(debug, "fetch pubkey [uri = {}]: success", uri_);
-    std::string body;
     if (response->body()) {
       auto len = response->body()->length();
-      body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
+      const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
       onFetchRemoteJwksDone(body);
       return;
     } else {
