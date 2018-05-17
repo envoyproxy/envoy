@@ -235,7 +235,7 @@ message RequirementRule {
   // be rejected.
   // If a Jwt is not required, but it is in the providers list, it will be verified.
   // But it will not fail the request if its verification fails.
-  repeated JwtRequirement requires = 1;
+  repeated JwtRequirement requires = 2;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
@@ -289,7 +289,7 @@ message JwtAuthentication {
 
   // Specifies requirements based on the route matches. The first matched requirement will be
   // applied. If there are overlapped match conditions, please put the most specific match first.
-  // If PerRouteConfig is specified for the route, this field will not be uesd.
+  // If PerRouteConfig is specified for the selected route, this field will not be uesd.
   //
   // Examples
   //
