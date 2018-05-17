@@ -102,15 +102,14 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   RawSlice slices[MaxSlices];
   uint64_t num_slices = reserve(max_length, slices, MaxSlices);
   struct iovec iov[num_slices];
-  int num_iov = 0;
-  for (uint64_t i = 0; i < num_slices && max_length != 0; i++) {
-    num_iov++;
-    iov[i].iov_base = slices[i].mem_;
-    iov[i].iov_len = std::min(slices[i].len_, size_t(max_length));
-    max_length -= slices[i].len_;
+  uint64_t num_iov = 0;
+  for (; num_iov < num_slices && max_length != 0; num_iov++) {
+    iov[num_iov].iov_base = slices[num_iov].mem_;
+    iov[num_iov].iov_len = std::min(slices[num_iov].len_, size_t(max_length));
+    max_length -= slices[num_iov].len_;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const ssize_t rc = os_syscalls.readv(fd, iov, num_iov);
+  const ssize_t rc = os_syscalls.readv(fd, iov, int(num_iov));
   if (rc < 0) {
     return rc;
   }
