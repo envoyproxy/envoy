@@ -217,10 +217,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       }
     }
     if (need_tls_inspector) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': filter chain match rules require TLS Inspector "
-                      "listener filter, but it isn't configured",
-                      address_->asString()));
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+              Extensions::ListenerFilters::ListenerFilterNames::get().TLS_INSPECTOR);
+      listener_filter_factories_.push_back(
+          factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
     }
   }
 }
