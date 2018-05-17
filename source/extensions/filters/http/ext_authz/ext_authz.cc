@@ -45,6 +45,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 
   state_ = State::Calling;
   initiating_call_ = true;
+  ENVOY_STREAM_LOG(trace, "Ext_authz calling authorization server", *callbacks_);
   client_->check(*this, check_request_, callbacks_->activeSpan());
   initiating_call_ = false;
 }
@@ -99,10 +100,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
 
+  ENVOY_STREAM_LOG(trace, "Ext_authz received status code {}", *callbacks_, response->status_code);
+
   // We fail open/fail close based of filter config
   // if there is an error contacting the service.
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
+
+    ENVOY_STREAM_LOG(debug, "Ext_authz rejected the request", *callbacks_);
 
     if (response->body && response->body->length()) {
       callbacks_->encodeHeaders(getHeaderMap(response), false);
@@ -119,29 +124,39 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
     }
 
+    ENVOY_STREAM_LOG(debug, "Ext_authz accepted the request", *callbacks_);
+
+    // This is needed because of failureModeAllow.
+    if (response->status == CheckStatus::OK) {
+      for (const auto& header : response->headers) {
+        request_headers_->setReferenceKey(header.first, header.second);
+        ENVOY_STREAM_LOG(trace, "Ext_authz dispatched header '{}':'{}'", *callbacks_,
+                         header.first.get(), header.second);
+      }
+    }
+
     // We can get completion inline, so only call continue if that isn't happening.
     if (!initiating_call_) {
-      if (response->status == CheckStatus::OK) {
-        for (const auto& header : response->headers) {
-          request_headers_->setReferenceKey(header.first, header.second);
-        }
-      }
       callbacks_->continueDecoding();
     }
   }
 }
 
-Http::HeaderMapPtr Filter::getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse) {
+Http::HeaderMapPtr Filter::getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response) {
   Http::HeaderMapPtr header_map;
-  if (reponse->status_code != enumToInt(Http::Code::Forbidden)) {
+  if (response->status_code != enumToInt(Http::Code::Forbidden)) {
     header_map = std::make_unique<Http::HeaderMapImpl>(
-        Http::HeaderMapImpl{{Http::Headers::get().Status, std::to_string(reponse->status_code)}});
+        Http::HeaderMapImpl{{Http::Headers::get().Status, std::to_string(response->status_code)}});
   } else {
     header_map = std::make_unique<Http::HeaderMapImpl>(*getDeniedHeader());
   }
-  for (const auto& header : reponse->headers) {
+
+  for (const auto& header : response->headers) {
+    ENVOY_STREAM_LOG(trace, "Ext_authz dispatched header '{}':'{}'", *callbacks_,
+                     header.first.get(), header.second);
     header_map->addReferenceKey(header.first, header.second);
   }
+
   return header_map;
 }
 

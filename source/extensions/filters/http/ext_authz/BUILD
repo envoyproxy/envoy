@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_lib",
@@ -37,5 +38,6 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
     ],
 )

@@ -19,53 +19,13 @@
 #include "common/http/async_client_impl.h"
 #include "common/singleton/const_singleton.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
-
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2alpha::CheckResponse>
-    ExtAuthzAsyncCallbacks;
-
-struct ConstantValues {
-  const std::string TraceStatus = "ext_authz_status";
-  const std::string TraceUnauthz = "ext_authz_unauthorized";
-  const std::string TraceOk = "ext_authz_ok";
-};
-
-typedef ConstSingleton<ConstantValues> Constants;
-
-// NOTE: We create gRPC client for each filter stack instead of a client per thread.
-// That is ok since this is unary RPC and the cost of doing this is minimal.
-class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
-public:
-  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GrpcClientImpl();
-
-  // ExtAuthz::Client
-  void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request,
-             Tracing::Span& parent_span) override;
-
-  // Grpc::AsyncRequestCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response,
-                 Tracing::Span& span) override;
-  void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
-                 Tracing::Span& span) override;
-
-private:
-  const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncRequest* request_{};
-  absl::optional<std::chrono::milliseconds> timeout_;
-  RequestCallbacks* callbacks_{};
-};
 
 /**
  * For creating ext_authz.proto (authorization) request.

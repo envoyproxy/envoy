@@ -12,6 +12,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -61,7 +62,8 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global
  * ext_authz service before allowing further filter iteration.
  */
-class Filter : public Http::StreamDecoderFilter,
+class Filter : public Logger::Loggable<Logger::Id::filter>,
+               public Http::StreamDecoderFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
@@ -83,6 +85,7 @@ private:
   enum class State { NotStarted, Calling, Complete };
   void initiateCall(const Http::HeaderMap& headers);
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& reponse);
+  // void logHeaders(const HeaderMap& headers, std::string&& what);
 
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
