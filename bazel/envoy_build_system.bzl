@@ -33,15 +33,8 @@ def envoy_copts(repository, test = False):
         envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
 
 def envoy_static_link_libstdcpp_linkopts():
-    return select({
-        # OSX provides system and stdc++ libraries dynamically, so they can't be linked statically.
-        "@bazel_tools//tools/osx:darwin": [],
-        "//conditions:default": [
-            "-static-libstdc++",
-            "-static-libgcc",
-        ],
-    }) + envoy_select_force_libcpp(["--stdlib=libc++"],
-                                   ["-static-libstdc++", "-static-libgcc"])
+    return envoy_select_force_libcpp(["--stdlib=libc++"],
+                                     ["-static-libstdc++", "-static-libgcc"])
 
 # Compute the final linkopts based on various options.
 def envoy_linkopts():
