@@ -100,16 +100,19 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
-  uint64_t num_slices = reserve(max_length, slices, MaxSlices);
+  const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
   struct iovec iov[num_slices];
-  uint64_t num_iov = 0;
-  for (; num_iov < num_slices && max_length != 0; num_iov++) {
-    iov[num_iov].iov_base = slices[num_iov].mem_;
-    iov[num_iov].iov_len = std::min(slices[num_iov].len_, size_t(max_length));
-    max_length -= slices[num_iov].len_;
+  uint64_t num_slices_to_read = 0;
+  for (; num_slices_to_read < num_slices && max_length != 0; num_slices_to_read++) {
+    iov[num_slices_to_read].iov_base = slices[num_slices_to_read].mem_;
+    const size_t slice_length =
+        std::min(slices[num_slices_to_read].len_, static_cast<size_t>(max_length));
+    iov[num_slices_to_read].iov_len = slice_length;
+    ASSERT(max_length >= slice_length);
+    max_length -= slice_length;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const ssize_t rc = os_syscalls.readv(fd, iov, int(num_iov));
+  const ssize_t rc = os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
   if (rc < 0) {
     return rc;
   }
@@ -119,6 +122,7 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
     if (slices[num_slices_to_commit].len_ > bytes_to_commit) {
       slices[num_slices_to_commit].len_ = bytes_to_commit;
     }
+    ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
     bytes_to_commit -= slices[num_slices_to_commit].len_;
     num_slices_to_commit++;
   }
@@ -148,28 +152,28 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
 int OwnedImpl::write(int fd) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
-  uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
+  const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
   if (num_slices == 0) {
     return 0;
   }
   struct iovec iov[num_slices];
-  uint64_t j = 0;
+  uint64_t slices_to_write = 0;
   for (uint64_t i = 0; i < num_slices; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      iov[j].iov_base = slices[i].mem_;
-      iov[j].iov_len = slices[i].len_;
-      j++;
+      iov[slices_to_write].iov_base = slices[i].mem_;
+      iov[slices_to_write].iov_len = slices[i].len_;
+      slices_to_write++;
     }
   }
-  if (j == 0) {
+  if (slices_to_write == 0) {
     return 0;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  ssize_t rc = os_syscalls.writev(fd, iov, j);
+  const ssize_t rc = os_syscalls.writev(fd, iov, slices_to_write);
   if (rc > 0) {
-    drain(uint64_t(rc));
+    drain(static_cast<uint64_t>(rc));
   }
-  return int(rc);
+  return static_cast<int>(rc);
 }
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
