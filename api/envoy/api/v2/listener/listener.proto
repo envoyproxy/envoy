@@ -113,7 +113,7 @@ message FilterChainMatch {
 
   // If non-empty, a transport protocol to consider when determining a filter chain match.
   // This value will be compared against the transport protocol of a new connection, when
-  // it's detected by one of the listener filters (this needs to be configured separately).
+  // it's detected by one of the listener filters.
   //
   // Valid values include:
   //
@@ -124,7 +124,7 @@ message FilterChainMatch {
 
   // If non-empty, a list of application protocols to consider when determining a filter chain
   // match. Those values will be compared against the application protocols of a new connection,
-  // when detected by one of the listener filters (this needs to be configured separately).
+  // when detected by one of the listener filters.
   //
   // Valid values include:
   //

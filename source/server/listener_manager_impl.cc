@@ -209,7 +209,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                    parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
     need_tls_inspector = filter_chain_match.transport_protocol() == "tls" ||
-                         (filter_chain_match.transport_protocol().empty() && !server_names.empty());
+                         (filter_chain_match.transport_protocol().empty() &&
+                          (!server_names.empty() || !application_protocols.empty()));
   }
 
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
