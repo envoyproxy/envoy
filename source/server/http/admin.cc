@@ -451,21 +451,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (show_unused || histogram->used()) {
-        if (histogram->used()) {
-          std::vector<std::string> summary;
-          const std::vector<double>& supported_quantiles_ref =
-              histogram->intervalStatistics().supportedQuantiles();
-          summary.reserve(supported_quantiles_ref.size());
-          for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-            summary.push_back(
-                fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                            histogram->intervalStatistics().computedQuantiles()[i],
-                            histogram->cumulativeStatistics().computedQuantiles()[i]));
-          }
-          all_histograms.emplace(histogram->name(), absl::StrJoin(summary, " "));
-        } else {
-          all_histograms.emplace(histogram->name(), "No recorded values");
-        }
+        all_histograms.emplace(histogram->name(), histogram->summary());
       }
     }
     for (auto histogram : all_histograms) {

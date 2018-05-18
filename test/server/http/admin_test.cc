@@ -254,7 +254,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true);
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
