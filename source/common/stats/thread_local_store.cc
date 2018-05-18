@@ -26,7 +26,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
   std::unordered_set<std::string> names;
-  std::unique_lock<std::mutex> lock(lock_);
+  Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
       if (names.insert(counter.first).second) {
@@ -40,7 +40,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
-  std::unique_lock<std::mutex> lock(lock_);
+  Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return std::move(new_scope);
 }
@@ -49,7 +49,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   std::unordered_set<std::string> names;
-  std::unique_lock<std::mutex> lock(lock_);
+  Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
       if (names.insert(gauge.first).second) {
@@ -65,7 +65,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<ParentHistogramSharedPtr> ret;
   std::unordered_set<std::string> names;
-  std::unique_lock<std::mutex> lock(lock_);
+  Thread::LockGuard lock(lock_);
   // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
   // here. We need to create global storage for histograms similar to how we have a central storage
   // in shared memory for counters/gauges. In the interim, no de-dup is done here. This may result
@@ -127,7 +127,7 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
-  std::unique_lock<std::mutex> lock(lock_);
+  Thread::LockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
@@ -191,7 +191,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
-  std::unique_lock<std::mutex> lock(parent_.lock_);
+  Thread::LockGuard lock(parent_.lock_);
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
@@ -239,7 +239,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     return **tls_ref;
   }
 
-  std::unique_lock<std::mutex> lock(parent_.lock_);
+  Thread::LockGuard lock(parent_.lock_);
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
     SafeAllocData alloc = parent_.safeAlloc(final_name);
@@ -272,7 +272,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     return **tls_ref;
   }
 
-  std::unique_lock<std::mutex> lock(parent_.lock_);
+  Thread::LockGuard lock(parent_.lock_);
   ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
   if (!central_ref) {
     std::vector<Tag> tags;
@@ -360,12 +360,12 @@ void ParentHistogramImpl::recordValue(uint64_t value) {
 }
 
 bool ParentHistogramImpl::used() const {
-  std::unique_lock<std::mutex> lock(merge_lock_);
+  Thread::LockGuard lock(merge_lock_);
   return usedLockHeld();
 }
 
 void ParentHistogramImpl::merge() {
-  std::unique_lock<std::mutex> lock(merge_lock_);
+  Thread::ReleasableLockGuard lock(merge_lock_);
   if (usedLockHeld()) {
     hist_clear(interval_histogram_);
     // Here we could copy all the pointers to TLS histograms in the tls_histogram_ list,
@@ -376,7 +376,7 @@ void ParentHistogramImpl::merge() {
       tls_histogram->merge(interval_histogram_);
     }
     // Since TLS merge is done, we can release the lock here.
-    lock.unlock();
+    lock.release();
     hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
     cumulative_statistics_.refresh(cumulative_histogram_);
     interval_statistics_.refresh(interval_histogram_);
@@ -384,7 +384,7 @@ void ParentHistogramImpl::merge() {
 }
 
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
-  std::unique_lock<std::mutex> lock(merge_lock_);
+  Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
 }
 

@@ -74,7 +74,7 @@ public:
   TryLockGuard(BasicLockable& lock) : lock_(lock) {}
 
   /**
-   * Destruction of the DeferredLockGuard unlocks the lock, if it was locked.
+   * Destruction of the TryLockGuard unlocks the lock, if it was locked.
    */
   ~TryLockGuard() DISABLE_TRYLOCKGUARD_ANNOTATION(UNLOCK_FUNCTION()) {
     if (is_locked_) {

@@ -139,7 +139,7 @@ SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
 void DispatcherImpl::post(std::function<void()> callback) {
   bool do_post;
   {
-    std::unique_lock<std::mutex> lock(post_lock_);
+    Thread::LockGuard lock(post_lock_);
     do_post = post_callbacks_.empty();
     post_callbacks_.push_back(callback);
   }
@@ -162,14 +162,17 @@ void DispatcherImpl::run(RunType type) {
 }
 
 void DispatcherImpl::runPostCallbacks() {
-  std::unique_lock<std::mutex> lock(post_lock_);
-  while (!post_callbacks_.empty()) {
-    std::function<void()> callback = post_callbacks_.front();
-    post_callbacks_.pop_front();
-
-    lock.unlock();
+  std::function<void()> callback;
+  while (true) {
+    {
+      Thread::LockGuard lock(post_lock_);
+      if (post_callbacks_.empty()) {
+        return;
+      }
+      callback = post_callbacks_.front();
+      post_callbacks_.pop_front();
+    }
     callback();
-    lock.lock();
   }
 }
 

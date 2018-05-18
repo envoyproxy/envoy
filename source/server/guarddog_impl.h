@@ -47,7 +47,7 @@ public:
   int loopIntervalForTest() const { return loop_interval_.count(); }
   void forceCheckForTest() {
     exit_event_.notify_all();
-    std::lock_guard<std::mutex> guard(exit_lock_);
+    std::lock_guard<Thread::MutexBasicLockable> guard(exit_lock_);
     force_checked_event_.wait(exit_lock_);
   }
 
@@ -83,10 +83,10 @@ private:
   const std::chrono::milliseconds loop_interval_;
   Stats::Counter& watchdog_miss_counter_;
   Stats::Counter& watchdog_megamiss_counter_;
-  std::vector<WatchedDog> watched_dogs_;
-  std::mutex wd_lock_;
+  std::vector<WatchedDog> watched_dogs_ GUARDED_BY(wd_lock_);
+  Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
-  std::mutex exit_lock_;
+  Thread::MutexBasicLockable exit_lock_;
   std::condition_variable_any exit_event_;
   bool run_thread_;
   std::condition_variable_any force_checked_event_;
