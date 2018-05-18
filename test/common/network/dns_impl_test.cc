@@ -384,6 +384,7 @@ TEST(DnsImplConstructor, SupportCustomAddressInstances) {
   EXPECT_EQ(resolvers->udp_port, 45);
   char addr4str[INET_ADDRSTRLEN];
   EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  ares_free_data(resolvers);
 }
 
 TEST(DnsImplConstructor, BadCustomResolvers) {
