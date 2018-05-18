@@ -130,7 +130,7 @@ message CertificateValidationContext {
   // An optional list of hex-encoded SHA-256 certificate hashes. If specified, Envoy will verify
   // that the hash of the presented certificate matches one of the specified values.
   //
-  // For example, ``openssl`` can produce a SHA-256 fingerprint of an x509 certificate
+  // For example, ``openssl`` can produce a SHA-256 fingerprint of a certificate
   // with either of the following commands:
   //
   // .. code-block:: bash

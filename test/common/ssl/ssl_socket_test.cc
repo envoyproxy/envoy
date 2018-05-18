@@ -709,8 +709,9 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
   server_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
   envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()
-       ->mutable_validation_context();
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
