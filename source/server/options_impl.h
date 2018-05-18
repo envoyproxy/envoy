@@ -30,6 +30,43 @@ public:
   OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
+  // Setters for option fields. These are not part of the Options interface.
+  void setBaseId(uint64_t base_id) { base_id_ = base_id; };
+  void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
+  void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
+  void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
+  void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
+  void setAdminAddressPath(const std::string& admin_address_path) {
+    admin_address_path_ = admin_address_path;
+  }
+  void setLocalAddressIpVersion(Network::Address::IpVersion local_address_ip_version) {
+    local_address_ip_version_ = local_address_ip_version;
+  }
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
+  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
+  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogPath(const std::string& log_path) { log_path_ = log_path; }
+  void setParentShutdownTime(std::chrono::seconds parent_shutdown_time) {
+    parent_shutdown_time_ = parent_shutdown_time;
+  }
+  void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
+  void setMode(Server::Mode mode) { mode_ = mode; }
+  void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
+    file_flush_interval_msec_ = file_flush_interval_msec;
+  }
+  void setServiceClusterName(const std::string& service_cluster) {
+    service_cluster_ = service_cluster;
+  }
+  void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
+  void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
+  void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
+  void setMaxObjNameLength(uint64_t max_obj_name_length) {
+    max_obj_name_length_ = max_obj_name_length;
+  }
+  void setHotRestartDisabled(bool hot_restart_disabled) {
+    hot_restart_disabled_ = hot_restart_disabled;
+  }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   uint32_t concurrency() const override { return concurrency_; }
