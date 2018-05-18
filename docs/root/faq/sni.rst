@@ -6,12 +6,20 @@ How do I setup SNI?
 `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v2
 configuration/API <config_overview_v2>`.
 
+.. attention::
+
+  :ref:`TLS Inspector <config_listener_filters_tls_inspector>` listener filter must be configured
+  in order to detect requested SNI.
+
 The following is a YAML example of the above requirement.
 
 .. code-block:: yaml
 
   address:
     socket_address: { address: 127.0.0.1, port_value: 1234 }
+  listener_filters:
+  - name: "envoy.listener.tls_inspector"
+    config: {}
   filter_chains:
   - filter_chain_match:
       sni_domains: "example.com"
