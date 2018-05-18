@@ -127,15 +127,19 @@ message CertificateValidationContext {
   // system CA locations.
   core.DataSource trusted_ca = 1;
 
-  // If specified, Envoy will verify (pin) the hex-encoded SHA-256 fingerprint of
-  // the presented certificate.
+  // An optional list of hex-encoded SHA-256 certificate hashes. If specified, Envoy will verify
+  // that the hash of the presented certificate matches one of the specified values.
   //
   // For example, ``openssl`` can produce a SHA-256 fingerprint of an x509 certificate
-  // with the following command:
+  // with either of the following commands:
   //
   // .. code-block:: bash
   //
   //   $ openssl x509 -in path/to/client.crt -noout -fingerprint -sha256
+  //
+  // .. code-block:: bash
+  //
+  //   $ openssl x509 -in path/to/client.crt -outform DER | sha256sum
   repeated string verify_certificate_hash = 2;
 
   // If specified, Envoy will verify (pin) base64-encoded SHA-256 hash of
@@ -144,8 +148,8 @@ message CertificateValidationContext {
   // [#not-implemented-hide:]
   repeated string verify_spki_sha256 = 3;
 
-  // An optional list of subject alternative names. If specified, Envoy will verify that
-  // the certificate’s subject alternative name matches one of the specified values.
+  // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified values.
   repeated string verify_subject_alt_name = 4;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.

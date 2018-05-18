@@ -11,7 +11,7 @@
       "ca_cert_file": "certs/cacert.pem",
       {# This should be the hash of the /etc/envoy/envoy-double-proxy.pem cert used in the
          double proxy configuration. #}
-      "verify_certificate_hash": "fill me in",
+      "verify_certificate_hash": "0000000000000000000000000000000000000000000000000000000000000000",
       {% endif -%}
       "cert_chain_file": "certs/servercert.pem",
       "private_key_file": "certs/serverkey.pem"

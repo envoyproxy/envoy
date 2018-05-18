@@ -343,19 +343,14 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
                             EnvoyException, "SNI names containing NULL-byte are not allowed");
 }
 
-// Multiple certificate hashes are not yet supported.
-// TODO(htuch): Support multiple hashes.
-TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
+// Validate hex-encoded SHA-256.
+TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
-      ->add_verify_certificate_hash();
-  tls_context.mutable_common_tls_context()
-      ->mutable_validation_context()
-      ->add_verify_certificate_hash();
+      ->add_verify_certificate_hash("dummy");
   EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
-                            EnvoyException,
-                            "Multiple TLS certificate verification hashes are not supported");
+                            EnvoyException, "Invalid hex-encoded SHA-256 provided: dummy");
 }
 
 // Multiple TLS certificates are not yet supported.
