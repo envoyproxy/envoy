@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -182,6 +183,7 @@ private:
 class ListenerImpl : public Network::ListenerConfig,
                      public Configuration::ListenerFactoryContext,
                      public Network::DrainDecision,
+                     public Network::FilterChainManager,
                      public Network::FilterChainFactory,
                      public Configuration::TransportSocketFactoryContext,
                      Logger::Loggable<Logger::Id::config> {
@@ -230,14 +232,12 @@ public:
   const std::string& versionInfo() { return version_info_; }
 
   // Network::ListenerConfig
+  Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::Socket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
-  }
-  Network::TransportSocketFactory& transportSocketFactory() override {
-    return *transport_socket_factories_[0];
   }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
@@ -286,8 +286,13 @@ public:
   // Network::DrainDecision
   bool drainClose() const override;
 
+  // Network::FilterChainManager
+  const Network::FilterChain*
+  findFilterChain(const Network::ConnectionSocket& socket) const override;
+
   // Network::FilterChainFactory
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool createNetworkFilterChain(Network::Connection& connection,
+                                const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
 
   // Configuration::TransportSocketFactoryContext
@@ -295,13 +300,29 @@ public:
   Stats::Scope& statsScope() const override { return *listener_scope_; }
 
 private:
+  void addFilterChain(const std::vector<std::string>& server_names,
+                      const std::string& transport_protocol,
+                      Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                      std::vector<Network::FilterFactoryCb> filters_factory);
+  const Network::FilterChain* findFilterChainForServerName(
+      const std::unordered_map<std::string, Network::FilterChainSharedPtr>& server_name_match,
+      const Network::ConnectionSocket& socket) const;
+  static bool isWildcardServerName(const std::string& name);
+
+  // Mapping of FilterChain's configured server name and transport protocol, i.e.
+  //   map[server_name][transport_protocol] => FilterChain
+  //
+  // For the server_name lookups, both exact server names and wildcard domains are part of the same
+  // map, in which wildcard domains are prefixed with "." (i.e. ".example.com" for "*.example.com")
+  // to differentiate between exact and wildcard entries.
+  std::unordered_map<std::string, std::unordered_map<std::string, Network::FilterChainSharedPtr>>
+      filter_chains_;
+
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
-  std::vector<Ssl::ServerContextPtr> tls_contexts_;
-  std::vector<Network::TransportSocketFactoryPtr> transport_socket_factories_;
   const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
@@ -312,13 +333,33 @@ private:
   const uint64_t hash_;
   InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
-  std::vector<Network::FilterFactoryCb> filter_factories_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
+};
+
+class FilterChainImpl : public Network::FilterChain {
+public:
+  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                  std::vector<Network::FilterFactoryCb> filters_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)),
+        filters_factory_(std::move(filters_factory)) {}
+
+  // Network::FilterChain
+  const Network::TransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+
+  const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+    return filters_factory_;
+  }
+
+private:
+  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const std::vector<Network::FilterFactoryCb> filters_factory_;
 };
 
 } // namespace Server

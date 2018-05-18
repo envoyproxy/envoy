@@ -6,12 +6,10 @@ How do I setup SNI?
 `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ is only supported in the :ref:`v2
 configuration/API <config_overview_v2>`.
 
-The current implementation has the requirement that the :ref:`filters
-<envoy_api_field_listener.FilterChain.filters>` in every :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` must
-be identical. In a future release, this requirement will be relaxed so that SNI can be used to
-choose between completely different filter chains. :ref:`Domain name matching
-<envoy_api_field_route.VirtualHost.domains>` can still be used within the HTTP connection manager to
-choose different routes. This is by far the most common use case for SNI.
+.. attention::
+
+  :ref:`TLS Inspector <config_listener_filters_tls_inspector>` listener filter must be configured
+  in order to detect requested SNI.
 
 The following is a YAML example of the above requirement.
 
@@ -19,6 +17,9 @@ The following is a YAML example of the above requirement.
 
   address:
     socket_address: { address: 127.0.0.1, port_value: 1234 }
+  listener_filters:
+  - name: "envoy.listener.tls_inspector"
+    config: {}
   filter_chains:
   - filter_chain_match:
       sni_domains: "example.com"

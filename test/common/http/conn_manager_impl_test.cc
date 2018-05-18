@@ -206,7 +206,7 @@ public:
                                                    Http::WebSocketProxyCallbacks& callbacks,
                                                    Upstream::ClusterManager& cluster_manager,
                                                    Network::ReadFilterCallbacks* read_callbacks) {
-          auto config(std::make_shared<Extensions::NetworkFilters::TcpProxy::TcpProxyConfig>(
+          auto config(std::make_shared<TcpProxy::Config>(
               envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), factory_context_));
           auto ret = std::make_unique<Http::WebSocket::WsHandlerImpl>(
               request_headers, request_info, route_entry, callbacks, cluster_manager,

@@ -135,3 +135,11 @@ envoy_cc_binary(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "thread_test",
+    srcs = ["thread_test.cc"],
+    deps = [
+        "//source/common/common:thread_lib",
+    ],
+)

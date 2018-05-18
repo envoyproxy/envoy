@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/config_tracker.h"
@@ -15,6 +16,34 @@
 namespace Envoy {
 namespace Server {
 
+class AdminStream {
+public:
+  virtual ~AdminStream() {}
+
+  /**
+   * @param end_stream set to false for streaming response. Default is true, which will
+   * end the response when the initial handler completes.
+   */
+  virtual void setEndStreamOnComplete(bool end_stream) PURE;
+
+  /**
+   * @param cb callback to be added to the list of callbacks invoked by onDestroy() when stream
+   * is closed.
+   */
+  virtual void addOnDestroyCallback(std::function<void()> cb) PURE;
+
+  /**
+   * @return Http::StreamDecoderFilterCallbacks& to be used by the handler to get HTTP request data
+   * for streaming.
+   */
+  virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
+
+  /**
+   * @return Http::HeaderMap& to be used by handler to parse header information sent with the
+   * request.
+   */
+  virtual const Http::HeaderMap& getRequestHeaders() const PURE;
+};
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
  * a callback that executes X when the specified admin handler is hit. This macro can be
@@ -23,8 +52,8 @@ namespace Server {
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
-         Buffer::Instance& data) -> Http::Code {                                                   \
-    return X(path_and_query, response_headers, data);                                              \
+         Buffer::Instance& data, AdminStream& admin_stream) -> Http::Code {                        \
+    return X(path_and_query, response_headers, data, admin_stream);                                \
   }
 
 /**
@@ -36,14 +65,18 @@ public:
 
   /**
    * Callback for admin URL handlers.
-   * @param url supplies the URL prefix to install the handler for.
+   * @param path_and_query supplies the the path and query of the request URL.
    * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
    * handler.
    * @param response supplies the buffer to fill in with the response body.
+   * @param admin_stream supplies the filter which invoked the handler, enables the handler to use
+   * its data.
    * @return Http::Code the response code.
    */
   typedef std::function<Http::Code(absl::string_view path_and_query,
-                                   Http::HeaderMap& response_headers, Buffer::Instance& response)>
+                                   Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                   AdminStream& admin_stream)>
+
       HandlerCb;
 
   /**

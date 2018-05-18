@@ -37,7 +37,7 @@ void GuardDogImpl::threadRoutine() {
   do {
     const auto now = time_source_.currentTime();
     bool seen_one_multi_timeout(false);
-    std::lock_guard<std::mutex> guard(wd_lock_);
+    Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog.dog_->lastTouchTime();
       const auto delta = now - ltt;
@@ -88,7 +88,7 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {
-    std::lock_guard<std::mutex> guard(wd_lock_);
+    Thread::LockGuard guard(wd_lock_);
     watched_dogs_.push_back(watched_dog);
   }
   new_watchdog->touch();
@@ -96,7 +96,7 @@ WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
 }
 
 void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
-  std::lock_guard<std::mutex> guard(wd_lock_);
+  Thread::LockGuard guard(wd_lock_);
   auto found_wd = std::find_if(watched_dogs_.begin(), watched_dogs_.end(),
                                [&wd](const WatchedDog& d) -> bool { return d.dog_ == wd; });
   if (found_wd != watched_dogs_.end()) {
@@ -108,7 +108,7 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 bool GuardDogImpl::waitOrDetectStop() {
   force_checked_event_.notify_all();
-  std::lock_guard<std::mutex> guard(exit_lock_);
+  Thread::LockGuard guard(exit_lock_);
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
   exit_event_.wait_for(exit_lock_, std::chrono::milliseconds(loop_interval_));
@@ -122,7 +122,7 @@ void GuardDogImpl::start() {
 
 void GuardDogImpl::stop() {
   {
-    std::lock_guard<std::mutex> guard(exit_lock_);
+    Thread::LockGuard guard(exit_lock_);
     run_thread_ = false;
     exit_event_.notify_all();
   }

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/common/logger.h"
@@ -76,9 +77,8 @@ private:
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
-  ServerSslSocketFactory(const ServerContextConfig& config, const std::string& listener_name,
-                         const std::vector<std::string>& server_names, bool skip_context_update,
-                         Ssl::ContextManager& manager, Stats::Scope& stats_scope);
+  ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
+                         Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 

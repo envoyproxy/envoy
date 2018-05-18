@@ -24,6 +24,6 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/extensions/filters/network/tcp_proxy",
+        "//source/common/tcp_proxy",
     ],
 )

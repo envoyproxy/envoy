@@ -1,3 +1,5 @@
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/http/date_provider_impl.h"

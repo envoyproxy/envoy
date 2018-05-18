@@ -53,7 +53,7 @@ public:
 
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     const std::list<Stats::ParentHistogramSharedPtr>& all_histograms) {
+                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms) {
     return AdminImpl::statsAsJson(all_stats, all_histograms, true);
   }
 
@@ -259,7 +259,7 @@ public:
         admin_("/dev/null", cpu_profile_path_, address_out_path_,
                Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
                listener_scope_.createScope("listener.admin.")),
-        request_headers_{{":path", "/"}} {
+        request_headers_{{":path", "/"}}, admin_filter_(admin_) {
 
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
@@ -269,7 +269,8 @@ public:
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, absl::string_view method) {
     request_headers_.insertMethod().value(method.data(), method.size());
-    return admin_.runCallback(path_and_query, request_headers_, response_headers, response);
+    admin_filter_.decodeHeaders(request_headers_, false);
+    return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
   }
 
   Http::Code getCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
@@ -290,6 +291,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   AdminImpl admin_;
   Http::TestHeaderMapImpl request_headers_;
+  Server::AdminFilter admin_filter_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
@@ -331,9 +333,10 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
+  admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
-                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y",
-                                                              request_headers_, header_map, data)));
+                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
+                                                              data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
@@ -357,9 +360,8 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -385,9 +387,8 @@ TEST_P(AdminInstanceTest, CustomHandler) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -395,9 +396,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
@@ -405,9 +405,8 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&) -> Http::Code {
-    return Http::Code::Accepted;
-  };
+  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
@@ -418,7 +417,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
   Http::HeaderString& content_type = header_map.ContentType()->value();
-  EXPECT_TRUE(content_type.find("text/html")) << content_type.c_str();
+  EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
   EXPECT_NE(-1, response.search(escaped_planets.data(), escaped_planets.size(), 0));
@@ -580,8 +579,8 @@ TEST(PrometheusStatsFormatter, MetricNameCollison) {
   //`statsAsPrometheus()` should return two implying it found two unique stat names
 
   Stats::HeapRawStatDataAllocator alloc;
-  std::list<Stats::CounterSharedPtr> counters;
-  std::list<Stats::GaugeSharedPtr> gauges;
+  std::vector<Stats::CounterSharedPtr> counters;
+  std::vector<Stats::GaugeSharedPtr> gauges;
 
   {
     std::string name = "cluster.test_cluster_1.upstream_cx_total";
@@ -638,8 +637,8 @@ TEST(PrometheusStatsFormatter, UniqueMetricName) {
   // four unique stat names.
 
   Stats::HeapRawStatDataAllocator alloc;
-  std::list<Stats::CounterSharedPtr> counters;
-  std::list<Stats::GaugeSharedPtr> gauges;
+  std::vector<Stats::CounterSharedPtr> counters;
+  std::vector<Stats::GaugeSharedPtr> gauges;
 
   {
     std::string name = "cluster.test_cluster_1.upstream_cx_total";

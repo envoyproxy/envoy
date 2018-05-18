@@ -77,14 +77,8 @@ class DownstreamTransportSocketConfigFactory : public virtual TransportSocketCon
 public:
   /**
    * Create a particular downstream transport socket factory implementation.
-   * TODO(lizan): Revisit the parameters for SNI below when TLS sniffing and filter chain match are
-   * implemented.
-   * @param listener_name const std::string& the name of the listener.
    * @param server_names const std::vector<std::string>& the names of the server. This parameter is
    *        currently used by SNI implementation to know the expected server names.
-   * @param skip_ssl_context_update bool indicates whether the ssl context update should be skipped.
-   *        This parameter is currently used by SNI implementation to know whether it should perform
-   *        certificate selection.
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
@@ -95,10 +89,9 @@ public:
    *        parameters.
    */
   virtual Network::TransportSocketFactoryPtr
-  createTransportSocketFactory(const std::string& listener_name,
-                               const std::vector<std::string>& server_names,
-                               bool skip_ssl_context_update, const Protobuf::Message& config,
-                               TransportSocketFactoryContext& context) PURE;
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               TransportSocketFactoryContext& context,
+                               const std::vector<std::string>& server_names) PURE;
 };
 
 } // namespace Configuration

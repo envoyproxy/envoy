@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/network/address.h"
+#include "envoy/network/filter.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -113,6 +114,43 @@ TransportSocketPtr createRawBufferSocket();
  * listener.
  */
 TransportSocketFactoryPtr createRawBufferSocketFactory();
+
+/**
+ * Implementation of Network::FilterChain with empty filter chain, but pluggable transport socket
+ * factory.
+ */
+class EmptyFilterChain : public FilterChain {
+public:
+  EmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)) {}
+
+  // Network::FilterChain
+  const Network::TransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+
+  const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
+    return empty_network_filter_factory_;
+  }
+
+private:
+  const TransportSocketFactoryPtr transport_socket_factory_;
+  const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
+};
+
+/**
+ * Create an empty filter chain for testing purposes.
+ * @param transport_socket_factory transport socket factory to use when creating transport sockets.
+ * @return const Network::FilterChainSharedPtr filter chain.
+ */
+const Network::FilterChainSharedPtr
+createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory);
+
+/**
+ * Create an empty filter chain creating raw buffer sockets for testing purposes.
+ * @return const Network::FilterChainSharedPtr filter chain.
+ */
+const Network::FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
 
 } // namespace Test
 } // namespace Network

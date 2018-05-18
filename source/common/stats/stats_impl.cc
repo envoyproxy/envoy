@@ -67,6 +67,7 @@ void RawStatData::configureForTestsOnly(Server::Options& options) {
 std::string Utility::sanitizeStatsName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
   return stats_name;
 }
 
@@ -159,10 +160,10 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // storing the name twice. Performing a lookup on the set is similarly
   // expensive to performing a map lookup, since both require copying a truncated version of the
   // string before doing the hash lookup.
-  absl::ReleasableMutexLock lock(&mutex_);
+  Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
-  lock.Release();
+  lock.release();
 
   if (!ret.second) {
     ::free(data);
@@ -173,8 +174,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   }
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
-    : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
   std::unordered_set<std::string> names = addDefaultExtractors(config);
@@ -280,7 +280,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
   size_t key_removed;
   {
-    absl::MutexLock lock(&mutex_);
+    Thread::LockGuard lock(mutex_);
     key_removed = stats_.erase(&data);
   }
 
@@ -335,6 +335,31 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   ASSERT(supportedQuantiles().size() == computed_quantiles_.size());
   hist_approx_quantile(new_histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
+}
+
+std::vector<CounterSharedPtr>& SourceImpl::cachedCounters() {
+  if (!counters_) {
+    counters_ = store_.counters();
+  }
+  return *counters_;
+}
+std::vector<GaugeSharedPtr>& SourceImpl::cachedGauges() {
+  if (!gauges_) {
+    gauges_ = store_.gauges();
+  }
+  return *gauges_;
+}
+std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
+  if (!histograms_) {
+    histograms_ = store_.histograms();
+  }
+  return *histograms_;
+}
+
+void SourceImpl::clearCache() {
+  counters_.reset();
+  gauges_.reset();
+  histograms_.reset();
 }
 
 } // namespace Stats
