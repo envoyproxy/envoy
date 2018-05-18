@@ -3,6 +3,7 @@
 #include <sys/mman.h>   // for mode_t
 #include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
+#include <sys/uio.h> // for iovec
 
 #include <memory>
 #include <string>
