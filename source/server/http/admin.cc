@@ -412,19 +412,19 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
-  bool used_only = !(params.find("usedonly") == params.end());
-  bool has_format = !(params.find("format") == params.end());
+  const bool used_only = !(params.find("usedonly") == params.end());
+  const bool has_format = !(params.find("format") == params.end());
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    bool add_counter = used_only ? counter->used() : true;
+    const bool add_counter = used_only ? counter->used() : true;
     if (add_counter) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    bool add_gauge = used_only ? gauge->used() : true;
+    const bool add_gauge = used_only ? gauge->used() : true;
     if (add_gauge) {
       all_stats.emplace(gauge->name(), gauge->value());
     }
@@ -435,10 +435,9 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   // implemented this can be switched back to a normal map.
   std::multimap<std::string, std::string> all_histograms;
   for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-    bool add_histogram = used_only ? histogram->used() : true;
+    const bool add_histogram = used_only ? histogram->used() : true;
     if (add_histogram) {
       if (histogram->used()) {
-
         std::vector<std::string> summary;
         const std::vector<double>& supported_quantiles_ref =
             histogram->intervalStatistics().supportedQuantiles();
@@ -576,7 +575,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    bool add_histogram = used_only ? histogram->used() : true;
+    const bool add_histogram = used_only ? histogram->used() : true;
     if (add_histogram) {
       Value histogram_obj;
       histogram_obj.SetObject();

@@ -190,13 +190,10 @@ The fields are:
 
   .. http:get:: /stats?usedonly
 
-  Outputs statistics that have been updated with values on demand.
+  Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
+  least once, and histograms added to at least once).
 
-  .. http:get:: /stats?format=json&usedonly
-
-  Outputs statistics that have been updated with values in JSON format on demand.
-
-  .. http:get:: /stats?format=json
+.. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
   will be in the form of a set of (name,value) pairs. Histograms will be under the element "histograms",
@@ -207,45 +204,50 @@ The fields are:
   
   Example histogram output:
 
-.. code-block:: json
+  .. code-block:: json
 
-  {
-    "histograms": {
-      "supported_quantiles": [
-        0, 25, 50, 75, 90, 95, 99, 99.9, 100
-      ],
-      "computed_quantiles": [
-        {
-          "name": "cluster.external_auth_cluster.upstream_cx_length_ms",
-          "values": [
-            {"interval": 0, "cumulative": 0},
-            {"interval": 0, "cumulative": 0},
-            {"interval": 1.0435787, "cumulative": 1.0435787},
-            {"interval": 1.0941565, "cumulative": 1.0941565},
-            {"interval": 2.0860023, "cumulative": 2.0860023},
-            {"interval": 3.0665233, "cumulative": 3.0665233},
-            {"interval": 6.046609, "cumulative": 6.046609},
-            {"interval": 229.57333,"cumulative": 229.57333},
-            {"interval": 260,"cumulative": 260}
-          ]
-        },
-        {
-          "name": "http.admin.downstream_rq_time",
-          "values": [
-            {"interval": null, "cumulative": 0},
-            {"interval": null, "cumulative": 0},
-            {"interval": null, "cumulative": 1.0435787},
-            {"interval": null, "cumulative": 1.0941565},
-            {"interval": null, "cumulative": 2.0860023},
-            {"interval": null, "cumulative": 3.0665233},
-            {"interval": null, "cumulative": 6.046609},
-            {"interval": null, "cumulative": 229.57333},
-            {"interval": null, "cumulative": 260}
-          ]
-        }
-      ]
+    {
+      "histograms": {
+        "supported_quantiles": [
+          0, 25, 50, 75, 90, 95, 99, 99.9, 100
+        ],
+        "computed_quantiles": [
+          {
+            "name": "cluster.external_auth_cluster.upstream_cx_length_ms",
+            "values": [
+              {"interval": 0, "cumulative": 0},
+              {"interval": 0, "cumulative": 0},
+              {"interval": 1.0435787, "cumulative": 1.0435787},
+              {"interval": 1.0941565, "cumulative": 1.0941565},
+              {"interval": 2.0860023, "cumulative": 2.0860023},
+              {"interval": 3.0665233, "cumulative": 3.0665233},
+              {"interval": 6.046609, "cumulative": 6.046609},
+              {"interval": 229.57333,"cumulative": 229.57333},
+              {"interval": 260,"cumulative": 260}
+            ]
+          },
+          {
+            "name": "http.admin.downstream_rq_time",
+            "values": [
+              {"interval": null, "cumulative": 0},
+              {"interval": null, "cumulative": 0},
+              {"interval": null, "cumulative": 1.0435787},
+              {"interval": null, "cumulative": 1.0941565},
+              {"interval": null, "cumulative": 2.0860023},
+              {"interval": null, "cumulative": 3.0665233},
+              {"interval": null, "cumulative": 6.046609},
+              {"interval": null, "cumulative": 229.57333},
+              {"interval": null, "cumulative": 260}
+            ]
+          }
+        ]
+      }
     }
-  }
+ 
+  .. http:get:: /stats?format=json&usedonly
+
+  Outputs statistics that Envoy has updated (counters incremented at least once, 
+  gauges changed at least once, and histograms added to at least once) in JSON format.
 
 .. http:get:: /stats?format=prometheus
 
