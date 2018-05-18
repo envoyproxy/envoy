@@ -347,7 +347,7 @@ TEST(DnsImplConstructor, SupportsCustomResolvers) {
 // Custom instance that dispatches everything to a regular instance except for asString(), where
 // it borks the port.
 class CustomInstance : public Address::Instance {
- public:
+public:
   CustomInstance(const std::string& address, uint32_t port) : instance_(address, port) {
     antagonistic_name_ = fmt::format("{}:borked_port_{}", address, port);
   }
@@ -365,7 +365,7 @@ class CustomInstance : public Address::Instance {
   int socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }
 
- private:
+private:
   std::string antagonistic_name_;
   Address::Ipv4Instance instance_;
 };
@@ -384,7 +384,7 @@ TEST(DnsImplConstructor, SupportCustomAddressInstances) {
   EXPECT_EQ(resolvers->udp_port, 45);
   char addr4str[INET_ADDRSTRLEN];
   EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
-}  
+}
 
 TEST(DnsImplConstructor, BadCustomResolvers) {
   Event::DispatcherImpl dispatcher;
