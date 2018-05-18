@@ -996,7 +996,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSniMatch) {
       config: {}
     filter_chains:
     - filter_chain_match:
-        sni_domains: "server1.example.com"
+        server_names: "server1.example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1124,7 +1124,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSniMatch)
           keys:
           - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
     - filter_chain_match:
-        sni_domains: "server1.example.com"
+        server_names: "server1.example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1134,7 +1134,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSniMatch)
           keys:
           - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
     - filter_chain_match:
-        sni_domains: "*.example.com"
+        server_names: "*.example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1274,7 +1274,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
     - filter_chain_match:
         # empty
     - filter_chain_match:
-        sni_domains: ["www.example.com", "server1.example.com"]
+        server_names: ["www.example.com", "server1.example.com"]
         transport_protocol: "tls"
         application_protocols: ["dummy", "h2"]
       tls_context:
@@ -1324,7 +1324,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
       config: {}
     filter_chains:
     - filter_chain_match:
-        sni_domains: "example.com"
+        server_names: "example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1334,7 +1334,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
           keys:
           - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
     - filter_chain_match:
-        sni_domains: "www.example.com"
+        server_names: "www.example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1362,7 +1362,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       config: {}
     filter_chains:
     - filter_chain_match:
-        sni_domains: "example.com"
+        server_names: "example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1372,7 +1372,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
           keys:
           - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
     - filter_chain_match:
-        sni_domains: "www.example.com"
+        server_names: "www.example.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1439,7 +1439,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - filter_chain_match:
-        sni_domains: "example.com"
+        server_names: "example.com"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1489,7 +1489,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     filter_chains:
     - filter_chain_match:
-        sni_domains: "example.com"
+        server_names: "example.com"
         transport_protocol: "custom"
   )EOF",
                                                        Network::Address::IpVersion::v4);

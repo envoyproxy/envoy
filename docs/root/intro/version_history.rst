@@ -56,6 +56,7 @@ Version history
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
   (e.g. ALPN for TLS protocol).
+* listeners: sni_domains has been renamed to :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
 * listeners: removed restriction on all filter chains having identical filters.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin

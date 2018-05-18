@@ -197,8 +197,14 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
 
-    std::vector<std::string> server_names(filter_chain_match.sni_domains().begin(),
-                                          filter_chain_match.sni_domains().end());
+    std::vector<std::string> server_names;
+    if (filter_chain_match.server_names().size() != 0) {
+      server_names.assign(filter_chain_match.server_names().begin(),
+                          filter_chain_match.server_names().end());
+    } else if (filter_chain_match.sni_domains().size() != 0) {
+      server_names.assign(filter_chain_match.sni_domains().begin(),
+                          filter_chain_match.sni_domains().end());
+    }
 
     std::vector<std::string> application_protocols(
         filter_chain_match.application_protocols().begin(),
