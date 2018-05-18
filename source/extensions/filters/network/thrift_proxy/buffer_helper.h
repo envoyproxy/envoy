@@ -17,109 +17,11 @@ namespace ThriftProxy {
 class BufferHelper {
 public:
   /**
-   * Reads an int8_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the int8_t at offset in buffer
-   */
-  static int8_t peekI8(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an int16_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the int16_t at offset in buffer
-   */
-  static int16_t peekI16(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an int32_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the int32_t at offset in buffer
-   */
-  static int32_t peekI32(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an int64_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the int64_t at offset in buffer
-   */
-  static int64_t peekI64(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an uint16_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the uint16_t at offset in buffer
-   */
-  static uint16_t peekU16(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an uint32_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the uint32_t at offset in buffer
-   */
-  static uint32_t peekU32(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads an uint64_t from the buffer at the given offset.
-   * @param buffer Buffer::Instance containing data to decode
-   * @param offset offset into buffer to peek at
-   * @return the uint64_t at offset in buffer
-   */
-  static uint64_t peekU64(Buffer::Instance& buffer, uint64_t offset = 0);
-
-  /**
-   * Reads and drains an int8_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the int8_t at the start of buffer
-   */
-  static int8_t drainI8(Buffer::Instance& buffer);
-
-  /**
-   * Reads and drains an int16_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the int16_t at the start of buffer
-   */
-  static int16_t drainI16(Buffer::Instance& buffer);
-
-  /**
-   * Reads and drains an int32_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the int32_t at the start of buffer
-   */
-  static int32_t drainI32(Buffer::Instance& buffer);
-
-  /**
-   * Reads and drains an int64_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the int64_t at the start of buffer
-   */
-  static int64_t drainI64(Buffer::Instance& buffer);
-
-  /**
-   * Reads and drains an uint32_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the uint32_t at the start of buffer
-   */
-  static uint32_t drainU32(Buffer::Instance& buffer);
-
-  /**
-   * Reads and drains an uint64_t from a buffer.
-   * @param buffer Buffer::Instance containing data to decode
-   * @return the uint64_t at the start of buffer
-   */
-  static uint64_t drainU64(Buffer::Instance& buffer);
-
-  /**
    * Reads and drains a double from a buffer.
    * @param buffer Buffer::Instance containing data to decode
    * @return the double at the start of buffer
    */
-  static double drainDouble(Buffer::Instance& buffer);
+  static double drainBEDouble(Buffer::Instance& buffer);
 
   /**
    * Peeks at a variable-length int32_t at offset. Updates size to the number of bytes used to
@@ -166,53 +68,11 @@ public:
   static int32_t peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, int& size);
 
   /**
-   * Writes an int8_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the int8_t to write
-   */
-  static void writeI8(Buffer::Instance& buffer, int8_t value);
-
-  /**
-   * Writes an int16_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the int16_t to write
-   */
-  static void writeI16(Buffer::Instance& buffer, int16_t value);
-
-  /**
-   * Writes an uint16_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the uint16_t to write
-   */
-  static void writeU16(Buffer::Instance& buffer, uint16_t value);
-
-  /**
-   * Writes an int32_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the int32_t to write
-   */
-  static void writeI32(Buffer::Instance& buffer, int32_t value);
-
-  /**
-   * Writes an uint32_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the uint32_t to write
-   */
-  static void writeU32(Buffer::Instance& buffer, uint32_t value);
-
-  /**
-   * Writes an int64_t to the buffer.
-   * @param buffer Buffer::Instance written to
-   * @param value the int64_t to write
-   */
-  static void writeI64(Buffer::Instance& buffer, int64_t value);
-
-  /**
    * Writes a double to the buffer.
    * @param buffer Buffer::Instance written to
    * @param value the double to write
    */
-  static void writeDouble(Buffer::Instance& buffer, double value);
+  static void writeBEDouble(Buffer::Instance& buffer, double value);
 
   /**
    * Writes a var-int encoded int32_t to the buffer.

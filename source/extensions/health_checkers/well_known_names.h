@@ -14,6 +14,9 @@ class HealthCheckerNameValues {
 public:
   // Redis health checker.
   const std::string RedisHealthChecker = "envoy.health_checkers.redis";
+
+  // MySQL health checker
+  const std::string MysqlHealthChecker = "envoy.health_checkers.mysql";
 };
 
 typedef ConstSingleton<HealthCheckerNameValues> HealthCheckerNames;

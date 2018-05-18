@@ -37,6 +37,7 @@ envoy_extension_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_lib",
+        "//test/common/buffer:utility_lib",
     ],
 )
 

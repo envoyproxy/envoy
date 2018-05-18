@@ -24,7 +24,7 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
       return false;
     }
 
-    uint16_t version = BufferHelper::peekU16(buffer);
+    uint16_t version = buffer.peekBEInt<uint16_t>();
     if (BinaryProtocolImpl::isMagic(version)) {
       setProtocol(std::make_unique<BinaryProtocolImpl>());
     } else if (CompactProtocolImpl::isMagic(version)) {

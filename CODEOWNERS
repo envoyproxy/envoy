@@ -10,3 +10,5 @@
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @lizan @yangminzhu
+# mysql health_checker extension
+/*/extensions/health_checkers/mysql @Jason-Jian
