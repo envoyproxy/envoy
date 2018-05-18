@@ -96,6 +96,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/example:config",
+        "//source/extensions/grpc_credentials/file_based_metadata:config",
         "//test/integration:integration_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
@@ -106,5 +107,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/extensions/grpc_credentials:file_based_metadata_cc",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )

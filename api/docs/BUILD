@@ -51,6 +51,7 @@ proto_library(
         "//envoy/config/trace/v2:trace",
         "//envoy/config/transport_socket/capture/v2alpha:capture",
         "//envoy/extensions/common/tap/v2alpha:capture",
+        "//envoy/extensions/grpc_credentials:file_based_metadata",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/load_stats/v2:lrs",
         "//envoy/service/metrics/v2:metrics_service",
