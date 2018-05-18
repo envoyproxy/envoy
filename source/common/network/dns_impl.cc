@@ -47,6 +47,9 @@ DnsResolverImpl::DnsResolverImpl(
       }
       // Note that the ip()->port() may be zero if the port is not fully specified by the
       // Address::Instance.
+      // resolver->asString() is avoided as that format may be modified by custom
+      // Address::Instance implementations in ways that make the <port> not a simple
+      // integer.  See https://github.com/envoyproxy/envoy/pull/3366.
       resolver_addrs.push_back(fmt::format(resolver->ip()->ipv6() ? "[{}]:{}" : "{}:{}",
                                            resolver->ip()->addressAsString(),
                                            resolver->ip()->port()));
