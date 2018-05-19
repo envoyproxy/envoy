@@ -130,6 +130,16 @@ message FilterChainMatch {
   //
   // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`,
   // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  //
+  // .. attention::
+  //
+  //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+  //   application protocol detection based on the requested
+  //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
+  //
+  //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
+  //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
+  //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
 }
 
