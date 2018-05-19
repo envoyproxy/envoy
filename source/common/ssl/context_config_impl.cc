@@ -69,11 +69,6 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
     throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
                                      certificateRevocationListPath()));
   }
-  for (const auto& hash : verify_certificate_hash_list_) {
-    if (hash.size() != 95 && hash.size() != 64) {
-      throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 provided: {}", hash));
-    }
-  }
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(

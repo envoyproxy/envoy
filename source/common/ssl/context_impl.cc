@@ -120,7 +120,11 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
       if (hash.size() == 95) {
         hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
       }
-      verify_certificate_hash_list_.push_back(Hex::decode(hash));
+      const auto& decoded = Hex::decode(hash);
+      if (decoded.size() != SHA256_DIGEST_LENGTH) {
+        throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
+      }
+      verify_certificate_hash_list_.push_back(decoded);
     }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
