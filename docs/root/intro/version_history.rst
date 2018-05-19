@@ -68,7 +68,9 @@ Version history
 * router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
   already been proxied downstream when the timeout occurs. Previously, the response would be reset 
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
-  timeout will be ignored and the response will continue to proxy up to the global request timeout. 
+  timeout will be ignored and the response will continue to proxy up to the global request timeout.
+* router: added an :ref:`inverse_match <envoy_api_field_route.HeaderMatcher.inverse_match>` config option
+  to support matching on missing headers or headers that do not have a desired value.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners

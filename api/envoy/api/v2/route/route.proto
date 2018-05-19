@@ -920,6 +920,10 @@ message HeaderMatcher {
     // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
     //   "-1somestring"
     envoy.type.Int64Range range_match = 6;
+
+    // If specified, header match will be performed based on if the header value is *not* the value
+    // specified or if the header is not present.
+    string inverse_match = 7;
   }
 }
 

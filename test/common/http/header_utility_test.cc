@@ -119,6 +119,20 @@ range_match:
   EXPECT_EQ(-10, header_data.range_.end());
 }
 
+TEST(HeaderDataConstructorTest, InverseMatchSpecifier) {
+  const std::string yaml = R"EOF(
+name: test-header
+inverse_match: value
+)EOF";
+
+  HeaderUtility::HeaderData header_data =
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+
+  EXPECT_EQ("test-header", header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Inverse, header_data.header_match_type_);
+  EXPECT_EQ("value", header_data.value_);
+}
+
 TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
   TestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
@@ -223,6 +237,41 @@ range_match:
   std::vector<HeaderUtility::HeaderData> header_data;
   header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderInverseMatch) {
+  TestHeaderMapImpl matching_headers_1{{"match-header", "other-value"},
+                                       {"match-header", "another-value"}};
+  TestHeaderMapImpl matching_headers_2{{"other-header", "match-value"}};
+  TestHeaderMapImpl unmatching_headers{{"match-header", "match-value"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+inverse_match: match-value
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderData> header_data;
+  header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_1, header_data));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_2, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderInverseMatchEmpty) {
+  TestHeaderMapImpl matching_headers_1{{"match-header", "1"}};
+  TestHeaderMapImpl matching_headers_2{{"other-header", "1"}};
+  TestHeaderMapImpl unmatching_headers{{"match-header", ""}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+inverse_match: ""
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderData> header_data;
+  header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_1, header_data));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_2, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
