@@ -65,12 +65,9 @@ FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
                                             std::multimap<grpc::string, grpc::string>* metadata) {
   std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true);
   std::string header_key = "authorization";
-  std::string header_prefix = "";
+  std::string header_prefix = config_.header_prefix();
   if (!config_.header_key().empty()) {
     header_key = config_.header_key();
-  }
-  if (!config_.header_prefix().empty()) {
-    header_prefix = config_.header_prefix();
   }
   metadata->insert(std::make_pair(header_key, header_prefix + header_value));
   return grpc::Status::OK;
