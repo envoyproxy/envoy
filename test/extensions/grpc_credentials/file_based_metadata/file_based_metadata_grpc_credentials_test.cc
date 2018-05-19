@@ -38,8 +38,6 @@ public:
     auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
-    plugin_config->set_name(credentials_factory_name_);
     if (header_value_1_ != "") {
       std::string yaml1 = fmt::sprintf(R"EOF(
 secret_data:
@@ -48,6 +46,8 @@ header_key: %s
 header_prefix: %s
 )EOF",
                                        header_value_1_, header_key_1_, header_prefix_1_);
+      auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
+      plugin_config->set_name(credentials_factory_name_);
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config;
       MessageUtil::loadFromYaml(yaml1, *plugin_config->mutable_config());
     }
