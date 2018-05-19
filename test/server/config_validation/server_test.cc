@@ -39,7 +39,7 @@ public:
     SetupTestDirectory();
 
     std::string all_file_names =
-        TestEnvironment::readFileToStringForTest(directory_ + "all_config_files.txt");
+        TestEnvironment::readFileToStringForTest(directory_ + "test_out/all_config_files.txt");
     std::vector<std::string> files;
     // all_config_files.txt contains a list of all config files from tar file created by
     // example_configs_test_setup.sh Names of the files are separated by EOL. Tokenize those  names
