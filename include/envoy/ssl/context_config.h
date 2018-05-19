@@ -93,6 +93,11 @@ public:
   virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;
 
   /**
+   * @return A list of a hex-encoded SHA-256 SPKI hashes to be verified.
+   */
+  virtual const std::vector<std::string>& verifyCertificateSpkiList() const PURE;
+
+  /**
    * @return The minimum TLS protocol version to negotiate.
    */
   virtual unsigned minProtocolVersion() const PURE;
