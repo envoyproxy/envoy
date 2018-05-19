@@ -115,7 +115,7 @@ message FilterChainMatch {
   // This value will be compared against the transport protocol of a new connection, when
   // it's detected by one of the listener filters.
   //
-  // Valid values include:
+  // Suggested values include:
   //
   // * ``raw_buffer`` - default, used when no transport protocol is detected,
   // * ``tls`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
@@ -126,7 +126,7 @@ message FilterChainMatch {
   // match. Those values will be compared against the application protocols of a new connection,
   // when detected by one of the listener filters.
   //
-  // Valid values include:
+  // Suggested values include:
   //
   // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`,
   // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
