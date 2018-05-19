@@ -412,18 +412,18 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
-  const bool show_unused = params.find("usedonly") == params.end();
+  const bool show_all = params.find("usedonly") == params.end();
   const bool has_format = !(params.find("format") == params.end());
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (show_unused || counter->used()) {
+    if (show_all || counter->used()) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (show_unused || gauge->used()) {
+    if (show_all || gauge->used()) {
       all_stats.emplace(gauge->name(), gauge->value());
     }
   }
@@ -433,7 +433,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), show_unused));
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), show_all));
     } else if (format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -450,7 +450,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     // implemented this can be switched back to a normal map.
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-      if (show_unused || histogram->used()) {
+      if (show_all || histogram->used()) {
         all_histograms.emplace(histogram->name(), histogram->summary());
       }
     }
@@ -521,7 +521,7 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                       const bool show_unused, const bool pretty_print) {
+                       const bool show_all, const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -557,7 +557,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (show_unused || histogram->used()) {
+    if (show_all || histogram->used()) {
       Value histogram_obj;
       histogram_obj.SetObject();
       Value histogram_name;
