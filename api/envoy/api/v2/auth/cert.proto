@@ -130,16 +130,20 @@ message CertificateValidationContext {
   // An optional list of hex-encoded SHA-256 certificate hashes. If specified, Envoy will verify
   // that the hash of the presented certificate matches one of the specified values.
   //
-  // For example, ``openssl`` can produce a SHA-256 fingerprint of a certificate
-  // with either of the following commands:
+  // A long hex-encoded and colon-separated SHA-256 (a.k.a. "fingerprint") of the certificate
+  // can be generated with the following command:
   //
   // .. code-block:: bash
   //
   //   $ openssl x509 -in path/to/client.crt -noout -fingerprint -sha256
   //
+  // A hex-encoded SHA-256 of the certificate can be generated with the following command:
+  //
   // .. code-block:: bash
   //
   //   $ openssl x509 -in path/to/client.crt -outform DER | sha256sum
+  //
+  // Both of those formats are acceptable.
   repeated string verify_certificate_hash = 2;
 
   // If specified, Envoy will verify (pin) base64-encoded SHA-256 hash of
