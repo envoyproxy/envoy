@@ -827,7 +827,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       },
 
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
-      listener_(*this, std::move(listener_scope)) {
+      listener_(*this, std::move(listener_scope)),
+      admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
 
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -853,7 +854,8 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
       new Http::Http1::ServerConnectionImpl(connection, callbacks, Http::Http1Settings())};
 }
 
-bool AdminImpl::createNetworkFilterChain(Network::Connection& connection) {
+bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
+                                         const std::vector<Network::FilterFactoryCb>&) {
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       *this, server_.drainManager(), server_.random(), server_.httpTracer(), server_.runtime(),
       server_.localInfo(), server_.clusterManager())});

@@ -95,7 +95,7 @@ TEST_F(TlsInspectorTest, ReadError) {
 TEST_F(TlsInspectorTest, SniRegistered) {
   init();
   const std::string servername("example.com");
-  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
         ASSERT(length >= client_hello.size());
@@ -103,18 +103,43 @@ TEST_F(TlsInspectorTest, SniRegistered) {
         return client_hello.size();
       }));
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
-  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_found_.value());
+  EXPECT_EQ(1, cfg_->stats().alpn_not_found_.value());
+}
+
+// Test that a ClientHello with an ALPN value causes the correct name notification.
+TEST_F(TlsInspectorTest, AlpnRegistered) {
+  init();
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2"),
+                                                      absl::string_view("http/1.1")};
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("", "\x02h2\x08http/1.1");
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
+        ASSERT(length >= client_hello.size());
+        memcpy(buffer, client_hello.data(), client_hello.size());
+        return client_hello.size();
+      }));
+  EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_CALL(cb_, continueFilterChain(true));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().tls_found_.value());
+  EXPECT_EQ(1, cfg_->stats().sni_not_found_.value());
+  EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
 }
 
 // Test with the ClientHello spread over multiple socket reads.
 TEST_F(TlsInspectorTest, MultipleReads) {
   init();
+  const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2")};
   const std::string servername("example.com");
-  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "\x02h2");
   {
     InSequence s;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() -> int {
@@ -133,7 +158,8 @@ TEST_F(TlsInspectorTest, MultipleReads) {
 
   bool got_continue = false;
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
-  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(cb_, continueFilterChain(true)).WillOnce(InvokeWithoutArgs([&got_continue]() {
     got_continue = true;
   }));
@@ -142,12 +168,13 @@ TEST_F(TlsInspectorTest, MultipleReads) {
   }
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_found_.value());
+  EXPECT_EQ(1, cfg_->stats().alpn_found_.value());
 }
 
-// Test that the filter correctly handles a ClientHello with no SNI present
-TEST_F(TlsInspectorTest, NoSni) {
+// Test that the filter correctly handles a ClientHello with no extensions present.
+TEST_F(TlsInspectorTest, NoExtensions) {
   init();
-  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("", "");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
         ASSERT(length >= client_hello.size());
@@ -155,11 +182,13 @@ TEST_F(TlsInspectorTest, NoSni) {
         return client_hello.size();
       }));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
-  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("ssl")));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   EXPECT_EQ(1, cfg_->stats().sni_not_found_.value());
+  EXPECT_EQ(1, cfg_->stats().alpn_not_found_.value());
 }
 
 // Test that the filter fails if the ClientHello is larger than the
@@ -167,7 +196,7 @@ TEST_F(TlsInspectorTest, NoSni) {
 TEST_F(TlsInspectorTest, ClientHelloTooBig) {
   const size_t max_size = 50;
   cfg_ = std::make_shared<Config>(store_, max_size);
-  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("example.com", "");
   ASSERT(client_hello.size() > max_size);
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))

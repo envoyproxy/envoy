@@ -14,7 +14,7 @@ class TransportSocketNameValues {
 public:
   const std::string CAPTURE = "envoy.transport_sockets.capture";
   const std::string RAW_BUFFER = "raw_buffer";
-  const std::string SSL = "ssl";
+  const std::string TLS = "tls";
 };
 
 typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;

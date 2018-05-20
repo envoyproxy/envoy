@@ -53,7 +53,9 @@ public:
                      Network::Address::IpVersion version)
       : FakeUpstream(port, type, version) {}
   ~AutonomousUpstream();
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);

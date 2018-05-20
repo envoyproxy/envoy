@@ -121,7 +121,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
   {
     // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
-    std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+    Thread::LockGuard lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
                                         shmem_.stats_set_data_));
   }

@@ -40,7 +40,7 @@ protected:
 
 class MainCommon {
 public:
-  MainCommon(int argc, char** argv);
+  MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
 
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
