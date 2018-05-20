@@ -21,6 +21,7 @@ TEST(ExampleConfigsTest, All) {
 #else
   EXPECT_EQ(28UL, ConfigTest::run(directory));
 #endif
+
   ConfigTest::testMerge();
   ConfigTest::testIncompatibleMerge();
 

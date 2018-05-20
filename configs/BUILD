@@ -16,7 +16,10 @@ envoy_py_test_binary(
         "*.yaml",
         "*.json",
     ]),
-    external_deps = ["jinja2", "yaml"],
+    external_deps = [
+        "jinja2",
+        "yaml",
+    ],
 )
 
 filegroup(
