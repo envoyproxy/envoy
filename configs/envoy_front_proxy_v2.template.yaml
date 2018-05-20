@@ -26,19 +26,7 @@
         {%endif-%}
         stat_prefix: ingress_http
         route_config:
-          name: local_route
-          virtual_hosts:
-          - name: www
-            domains:
-            - www.yourcompany.com
-            routes:
-            - match:
-                prefix: "/foo/bar"
-              route:
-                cluster: main_website
-            rate_limits:
-              actions:
-                remote_address: {}
+          {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
         http_filters:
         - name: envoy.router
           config: {}

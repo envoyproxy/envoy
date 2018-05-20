@@ -1,11 +1,11 @@
 {%- macro make_route_internal(cluster, options) -%}  
+  cluster: {{ cluster }}
   {%- if 'timeout' in options -%}
   timeout: {{ options['timeout'] }},
-  {%- endif -%}
+  {% endif %}
   retry_policy:
-    retry_on: {{ options.get('retry_on', 'connect-failure') }}
-  cluster: {{ cluster }}
-{%- endmacro -%}
+    retry_on: 5xx
+{%- endmacro %}
 {%- macro make_route(cluster) -%}
   {{ make_route_internal(cluster, clusters.get(cluster, {})) }}
 {%- endmacro -%}

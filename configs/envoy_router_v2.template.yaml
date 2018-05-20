@@ -1,39 +1,47 @@
 {% import 'routing_helper_v2.template.yaml' as helper with context -%}
+name: local_route
 virtual_hosts:
 - name: www
-  require_ssl: all
   domains:
-  - www.yourcompany.net
-  rate_limits:
-  - actions:
-    - type: remote_address
+  - www.yourcompany.com
   routes:
-  - prefix: "/foo/bar"
-    runtime:
-      key: routing.www.use_service_2
-      default: 0
-    {{ helper.make_route('service2')|indent(2) }}
-  - prefix: "/"
-    {{ helper.make_route('service1')|indent(2) }}  
+  - match:
+      prefix: "/foo/bar"
+      runtime:
+        default_value: 0
+        runtime_key: routing.www.use_service_2
+    route:
+      {{ helper.make_route('main_website')|indent(4) }}
+  - match:
+      prefix: "/"
+    route:
+      {{ helper.make_route('main_website')|indent(4) }}
+  rate_limits:
+    actions:
+      remote_address: {}
 - name: www_redirect
-  require_ssl: all
   domains:
   - wwww.yourcompany.net
+  routes:
+  - match:
+      prefix: "/"
+    redirect:
+      host_redirect: www.yourcompany.net
   rate_limits:
   - actions:
-    - type: remote_address
-  routes:
-  - prefix: "/"
-    host_redirect: www.yourcompany.net
+      remote_address: {}
 - name: api
-  require_ssl: external_only
   domains:
   - api.yourcompany.net
+  routes:
+  - match:
+      path: "/foo/bar"
+    route:
+      {{ helper.make_route('main_website')|indent(4) }}
+  - match:
+      prefix: "/"
+    route:
+      {{ helper.make_route('main_website')|indent(4) }}
   rate_limits:
   - actions:
-    - type: remote_address
-  routes:
-  - path: "/foo/bar"
-    {{ helper.make_route('service3')|indent(2) }}  
-  - prefix: "/"
-    {{ helper.make_route('service1')|indent(2) }}
+      remote_address: {}
