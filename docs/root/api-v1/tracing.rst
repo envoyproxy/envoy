@@ -55,8 +55,7 @@ Zipkin driver
     "type": "zipkin",
     "config": {
       "collector_cluster": "...",
-      "collector_endpoint": "...",
-      "trace_id_128bit": true
+      "collector_endpoint": "..."
     }
   }
 
@@ -68,7 +67,3 @@ collector_endpoint
   *(optional, string)* The API endpoint of the Zipkin service where the
   spans will be sent. When using a standard Zipkin installation, the
   API endpoint is typically `/api/v1/spans`, which is the default value.
-
-trace_id_128bit
-  *(optional, boolean)* Determines whether a 128bit trace id will be used when creating a new
-  trace instance. The default value is false, which will result in a 64 bit trace id being used.
