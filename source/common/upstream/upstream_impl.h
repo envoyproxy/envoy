@@ -403,6 +403,11 @@ private:
   const bool drain_connections_on_host_removal_;
 };
 
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+
 /**
  * Base class all primary clusters.
  */
@@ -450,14 +455,14 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
 
+  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
+  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
+
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                   bool added_via_api);
-
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -472,9 +477,8 @@ protected:
   void onPreInitComplete();
 
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr
-      info_; // This cluster info stores the stats scope so it must be initialized first
-             // and destroyed last.
+  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
+                                   // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
@@ -491,6 +495,37 @@ private:
 };
 
 /**
+ * Manage priority state of a cluster.
+ */
+class PriorityStateManager {
+public:
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
+
+  void
+  initializePerPriority(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
+  void
+  registerHostPerPriority(const std::string& hostname,
+                          Network::Address::InstanceConstSharedPtr address,
+                          const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
+  void registerHostPerPriority(const HostSharedPtr& host, const uint32_t priority);
+
+  void updateClusterPrioritySet(const uint32_t priority,
+                                const absl::optional<HostVector>& hosts_added,
+                                const absl::optional<HostVector>& hosts_removed,
+                                const bool health_checker_flag);
+
+  size_t size() const { return priority_state_.size(); }
+
+private:
+  ClusterImplBase& parent_;
+  const envoy::api::v2::core::Node& local_info_node_;
+  PriorityState priority_state_;
+};
+
+typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
+
+/**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
  * hosts with resolved IP addresses).
  */
@@ -498,7 +533,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api);
+                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -507,7 +542,7 @@ private:
   // ClusterImplBase
   void startPreInit() override;
 
-  HostVectorSharedPtr initial_hosts_;
+  PriorityStateManagerPtr priority_state_manager_;
 };
 
 /**
@@ -529,6 +564,7 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                       const LocalInfo::LocalInfo& local_info,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
                        Event::Dispatcher& dispatcher, bool added_via_api);
 
@@ -538,7 +574,9 @@ public:
 private:
   struct ResolveTarget {
     ResolveTarget(StrictDnsClusterImpl& parent, Event::Dispatcher& dispatcher,
-                  const std::string& url);
+                  const std::string& url,
+                  const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                  const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
     void startResolve();
 
@@ -548,11 +586,14 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
   };
 
   typedef std::unique_ptr<ResolveTarget> ResolveTargetPtr;
 
-  void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed);
+  void updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
+                      uint32_t priority);
 
   // ClusterImplBase
   void startPreInit() override;
@@ -561,6 +602,8 @@ private:
   std::list<ResolveTargetPtr> resolve_targets_;
   const std::chrono::milliseconds dns_refresh_rate_ms_;
   Network::DnsLookupFamily dns_lookup_family_;
+  PriorityStateManagerPtr priority_state_manager_;
+  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
 };
 
 } // namespace Upstream

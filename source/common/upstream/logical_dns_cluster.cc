@@ -18,6 +18,7 @@ namespace Upstream {
 LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager,
+                                     const LocalInfo::LocalInfo& local_info,
                                      Network::DnsResolverSharedPtr dns_resolver,
                                      ThreadLocal::SlotAllocator& tls, ClusterManager& cm,
                                      Event::Dispatcher& dispatcher, bool added_via_api)
@@ -26,10 +27,15 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
-      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })) {
-  const auto& hosts = cluster.hosts();
-  if (hosts.size() != 1) {
-    throw EnvoyException("logical_dns clusters must have a single host");
+      resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
+      priority_state_manager_(new PriorityStateManager(*this, local_info)),
+      load_assignment_(cluster.has_load_assignment()
+                           ? cluster.load_assignment()
+                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
+  const auto& locality_lb_endpoints = load_assignment_.endpoints();
+  if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
+    throw EnvoyException(
+        "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
   }
 
   switch (cluster.dns_lookup_family()) {
@@ -46,10 +52,12 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     NOT_REACHED;
   }
 
-  const auto& socket_address = hosts[0].socket_address();
+  const envoy::api::v2::core::SocketAddress& socket_address =
+      lbEndpoint().endpoint().address().socket_address();
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
+  priority_state_manager_->initializePerPriority(localityLbEndpoint());
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();
@@ -87,7 +95,8 @@ void LogicalDnsCluster::startResolve() {
             current_resolved_address_ = new_address;
             // Capture URL to avoid a race with another update.
             tls_->runOnAllThreads([this, new_address]() -> void {
-              tls_->getTyped<PerThreadCurrentHostData>().current_resolved_address_ = new_address;
+              PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
+              data.current_resolved_address_ = new_address;
             });
           }
 
@@ -106,14 +115,11 @@ void LogicalDnsCluster::startResolve() {
                   new LogicalHost(info_, hostname_, Network::Utility::getIpv6AnyAddress(), *this));
               break;
             }
-            HostVectorSharedPtr new_hosts(new HostVector());
-            new_hosts->emplace_back(logical_host_);
-            // Given the current config, only EDS clusters support multiple priorities.
-            ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
-            auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-            first_host_set.updateHosts(new_hosts, createHealthyHostList(*new_hosts),
-                                       HostsPerLocalityImpl::empty(), HostsPerLocalityImpl::empty(),
-                                       {}, *new_hosts, {});
+
+            const uint32_t priority = localityLbEndpoint().priority();
+            priority_state_manager_->registerHostPerPriority(logical_host_, priority);
+            priority_state_manager_->updateClusterPrioritySet(priority, absl::nullopt,
+                                                              absl::nullopt, false);
           }
         }
 
@@ -130,7 +136,8 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
   return {HostImpl::createConnection(dispatcher, *parent_.info_, data.current_resolved_address_,
                                      options),
           HostDescriptionConstSharedPtr{
-              new RealHostDescription(data.current_resolved_address_, shared_from_this())}};
+              new RealHostDescription(data.current_resolved_address_, parent_.localityLbEndpoint(),
+                                      parent_.lbEndpoint(), shared_from_this())}};
 }
 
 } // namespace Upstream
