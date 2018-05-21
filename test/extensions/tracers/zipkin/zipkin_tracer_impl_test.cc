@@ -106,7 +106,8 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     std::string valid_config = R"EOF(
       {
        "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
+       "collector_endpoint": "/api/v1/spans",
+       "trace_id_128bit": false
        }
     )EOF";
     Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
@@ -122,7 +123,8 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     std::string valid_config = R"EOF(
       {
        "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
+       "collector_endpoint": "/api/v1/spans",
+       "trace_id_128bit": true
        }
     )EOF";
     Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);

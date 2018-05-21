@@ -1262,6 +1262,7 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
             "properties" : {
               "collector_cluster" : {"type" : "string"},
               "collector_endpoint": {"type": "string"}
+              "trace_id_128bit": {"type": "boolean"}
             },
             "required": ["collector_cluster"],
             "additionalProperties" : false

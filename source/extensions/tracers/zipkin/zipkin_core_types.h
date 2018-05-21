@@ -472,6 +472,11 @@ public:
   int64_t timestamp() const { return timestamp_.value(); }
 
   /**
+   * @return the higher 64 bits of a 128-bit trace id.
+   */
+  uint64_t traceIdHigh() const { return trace_id_high_.value(); }
+
+  /**
    * @return the span's trace id as an integer.
    */
   uint64_t traceId() const { return trace_id_; }
@@ -484,11 +489,6 @@ public:
                ? Hex::uint64ToHex(trace_id_high_.value()) + Hex::uint64ToHex(trace_id_)
                : Hex::uint64ToHex(trace_id_);
   }
-
-  /**
-   * @return the higher 64 bits of a 128-bit trace id.
-   */
-  uint64_t traceIdHigh() const { return trace_id_high_.value(); }
 
   /**
    * @return the span's start time (monotonic, used to calculate duration).

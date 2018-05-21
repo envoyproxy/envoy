@@ -107,11 +107,19 @@ public:
    */
   Runtime::RandomGenerator& randomGenerator() { return random_generator_; }
 
+  /**
+   * Determine whether the trace should use 128bit trace id when creating a root span.
+   *
+   * @param trace_id_128bit Whether 128bit ids should be used.
+   */
+  void setTraceId128Bit(bool trace_id_128bit) { trace_id_128bit_ = trace_id_128bit; }
+
 private:
   const std::string service_name_;
   Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
+  bool trace_id_128bit_;
 };
 
 typedef std::unique_ptr<Tracer> TracerPtr;

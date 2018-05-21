@@ -20,7 +20,8 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   std::string valid_config = R"EOF(
   {
     "collector_cluster": "fake_cluster",
-    "collector_endpoint": "/api/v1/spans"
+    "collector_endpoint": "/api/v1/spans",
+    "trace_id_128bit": true
   }
   )EOF";
   Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
