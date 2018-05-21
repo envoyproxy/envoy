@@ -47,20 +47,34 @@ public:
   void unlock() UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
 private:
+  friend class CondVar;
   absl::Mutex mutex_;
 };
 
 /**
- * Implementation of condvar, based on MutexLockable.
+ * Implementation of condvar, based on MutexLockable. This interface is a hybrid
+ * between std::condition_variable and absl::CondVar.
  */
 class CondVar {
-  virtual ~CondVar() {}
+public:
+  // Note that it is not necessary to be holding an associated mutex to call signal).
+  // See the discussion in
+  //     http://en.cppreference.com/w/cpp/thread/condition_variable_any/notify_one
+  // for more details.
+  void notifyOne() { condvar_.Signal(); }
+  void notifyAll() { condvar_.SignalAll(); };
+  void wait(MutexBasicLockable& mutex) EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    condvar_.Wait(&mutex.mutex_);
+  }
+  template <class Rep, class Period>
+  void waitFor(MutexBasicLockable& mutex, std::chrono::duration<Rep, Period> duration)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
+  }
 
-  virtual void notifyOne() PURE {};
-  virtual void notifyAll() PURE {};
-  virtual void wait() PURE {};
-  template<class Predicate> virtual void wait(Predicate) PURE {};
-  virtual void waitForMs(int64 durationMs) PURE {};
+private:
+  absl::CondVar condvar_;
+};
 
 } // namespace Thread
 } // namespace Envoy

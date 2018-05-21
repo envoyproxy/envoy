@@ -88,7 +88,10 @@ envoy_cc_library(
     name = "guarddog_lib",
     srcs = ["guarddog_impl.cc"],
     hdrs = ["guarddog_impl.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_base",
+        "abseil_optional",
+    ],
     deps = [
         ":watchdog_lib",
         "//include/envoy/event:dispatcher_interface",

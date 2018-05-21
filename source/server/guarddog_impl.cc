@@ -9,6 +9,8 @@
 
 #include "server/watchdog_impl.h"
 
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -108,11 +110,11 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 }
 
 bool GuardDogImpl::waitOrDetectStop() {
-  force_checked_event_.notify_all();
+  force_checked_event_.notifyAll();
   Thread::LockGuard guard(exit_lock_);
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
-  exit_event_.wait_for(exit_lock_, std::chrono::milliseconds(loop_interval_));
+  exit_event_.waitFor(exit_lock_, loop_interval_);
   return run_thread_;
 }
 
@@ -125,7 +127,7 @@ void GuardDogImpl::stop() {
   {
     Thread::LockGuard guard(exit_lock_);
     run_thread_ = false;
-    exit_event_.notify_all();
+    exit_event_.notifyAll();
   }
   if (thread_) {
     thread_->join();
