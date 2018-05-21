@@ -21,22 +21,22 @@ public:
    * Default constructor. Creates an empty context.
    */
   SpanContext()
-      : trace_id_(0), trace_id_high_(0), id_(0), parent_id_(0), is_initialized_(false),
+      : trace_id_high_(0), trace_id_(0), id_(0), parent_id_(0), is_initialized_(false),
         sampled_(false) {}
 
   /**
    * Constructor that creates a context object from the supplied trace, span and
    * parent ids, and sampled flag.
    *
-   * @param trace_id The low 64 bits of the trace id.
    * @param trace_id_high The high 64 bits of the trace id.
+   * @param trace_id The low 64 bits of the trace id.
    * @param id The span id.
    * @param parent_id The parent id.
    * @param sampled The sampled flag.
    */
-  SpanContext(const uint64_t trace_id, const uint64_t trace_id_high, const uint64_t id,
+  SpanContext(const uint64_t trace_id_high, const uint64_t trace_id, const uint64_t id,
               const uint64_t parent_id, bool sampled)
-      : trace_id_(trace_id), trace_id_high_(trace_id_high), id_(id), parent_id_(parent_id),
+      : trace_id_high_(trace_id_high), trace_id_(trace_id), id_(id), parent_id_(parent_id),
         is_initialized_(true), sampled_(sampled) {}
 
   /**
@@ -57,19 +57,19 @@ public:
   uint64_t parent_id() const { return parent_id_; }
 
   /**
-   * @return the low 64 bits of the trace id as an integer.
-   */
-  uint64_t trace_id() const { return trace_id_; }
-
-  /**
    * @return the high 64 bits of the trace id as an integer.
    */
   uint64_t trace_id_high() const { return trace_id_high_; }
 
   /**
+   * @return the low 64 bits of the trace id as an integer.
+   */
+  uint64_t trace_id() const { return trace_id_; }
+
+  /**
    * @return whether using 128 bit trace id.
    */
-  bool is128BitTraceId() const { return trace_id_high_ > 0; }
+  bool is128BitTraceId() const { return trace_id_high_ != 0; }
 
   /**
    * @return the sampled flag.
@@ -77,8 +77,8 @@ public:
   bool sampled() const { return sampled_; }
 
 private:
-  uint64_t trace_id_;
   uint64_t trace_id_high_;
+  uint64_t trace_id_;
   uint64_t id_;
   uint64_t parent_id_;
   bool is_initialized_;

@@ -120,7 +120,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
       return Tracing::SpanPtr(new Tracing::NullSpan());
     }
 
-    SpanContext context(trace_id, trace_id_high, span_id, parent_id, sampled);
+    SpanContext context(trace_id_high, trace_id, span_id, parent_id, sampled);
 
     new_zipkin_span =
         tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time, context);

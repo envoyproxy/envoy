@@ -469,8 +469,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   setupValidDriver();
 
-  const std::string trace_id =
-      Hex::uint64ToHex(Util::generateRandom64()) + Hex::uint64ToHex(Util::generateRandom64());
+  const uint64_t trace_id_high = Util::generateRandom64();
+  const uint64_t trace_id_low = Util::generateRandom64();
+  const std::string trace_id = Hex::uint64ToHex(trace_id_high) + Hex::uint64ToHex(trace_id_low);
   const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
   const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
 
@@ -485,6 +486,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
 
   ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
 
+  EXPECT_EQ(trace_id_high, zipkin_span->span().traceIdHigh());
+  EXPECT_EQ(trace_id_low, zipkin_span->span().traceId());
   EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
   EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
   EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());

@@ -480,8 +480,9 @@ public:
    * @return the span's trace id as a hexadecimal string.
    */
   const std::string traceIdAsHexString() const {
-    return (trace_id_high_.has_value() ? Hex::uint64ToHex(trace_id_high_.value()) : "") +
-           Hex::uint64ToHex(trace_id_);
+    return trace_id_high_.has_value()
+               ? Hex::uint64ToHex(trace_id_high_.value()) + Hex::uint64ToHex(trace_id_)
+               : Hex::uint64ToHex(trace_id_);
   }
 
   /**
