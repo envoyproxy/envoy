@@ -122,10 +122,8 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   uint64_t bytes_to_commit = rc;
   ASSERT(bytes_to_commit <= max_length);
   while (bytes_to_commit != 0) {
-    if (slices[num_slices_to_commit].len_ > bytes_to_commit) {
-      slices[num_slices_to_commit].len_ = bytes_to_commit;
-    }
-    ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
+    slices[num_slices_to_commit].len_ =
+        std::min(slices[num_slices_to_commit].len_, bytes_to_commit);
     bytes_to_commit -= slices[num_slices_to_commit].len_;
     num_slices_to_commit++;
   }
@@ -156,9 +154,6 @@ int OwnedImpl::write(int fd) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
-  if (num_slices == 0) {
-    return 0;
-  }
   struct iovec iov[num_slices];
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slices; i++) {
