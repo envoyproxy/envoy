@@ -145,6 +145,7 @@ envoy_cc_library(
     name = "lock_guard_lib",
     hdrs = ["lock_guard.h"],
     deps = [
+        ":thread_annotations",
         "//include/envoy/thread:thread_interface",
     ],
 )
