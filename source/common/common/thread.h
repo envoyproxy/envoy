@@ -50,5 +50,17 @@ private:
   absl::Mutex mutex_;
 };
 
+/**
+ * Implementation of condvar, based on MutexLockable.
+ */
+class CondVar {
+  virtual ~CondVar() {}
+
+  virtual void notifyOne() PURE {};
+  virtual void notifyAll() PURE {};
+  virtual void wait() PURE {};
+  template<class Predicate> virtual void wait(Predicate) PURE {};
+  virtual void waitForMs(int64 durationMs) PURE {};
+
 } // namespace Thread
 } // namespace Envoy
