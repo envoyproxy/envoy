@@ -80,9 +80,10 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
+  const std::string summary() const override;
 
 private:
-  bool usedLockHeld() const;
+  bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
   Store& parent_;
   TlsScope& tls_scope_;
@@ -90,8 +91,8 @@ private:
   histogram_t* cumulative_histogram_;
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
-  mutable std::mutex merge_lock_;
-  std::list<TlsHistogramSharedPtr> tls_histograms_;
+  mutable Thread::MutexBasicLockable merge_lock_;
+  std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
@@ -257,8 +258,8 @@ private:
   RawStatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
-  mutable std::mutex lock_;
-  std::unordered_set<ScopeImpl*> scopes_;
+  mutable Thread::MutexBasicLockable lock_;
+  std::unordered_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;

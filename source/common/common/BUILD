@@ -88,9 +88,9 @@ envoy_cc_library(
     srcs = ["logger.cc"],
     hdrs = ["logger.h"],
     deps = [
+        ":lock_guard_lib",
         ":macros",
         ":non_copyable",
-        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -137,6 +137,15 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":macros",
+        "//include/envoy/thread:thread_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "lock_guard_lib",
+    hdrs = ["lock_guard.h"],
+    deps = [
+        ":thread_annotations",
         "//include/envoy/thread:thread_interface",
     ],
 )

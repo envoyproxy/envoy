@@ -53,6 +53,9 @@ Version history
   Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
   header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
+  (e.g. ALPN for TLS protocol).
 * listeners: removed restriction on all filter chains having identical filters.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
