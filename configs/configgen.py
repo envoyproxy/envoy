@@ -112,11 +112,11 @@ generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
 # optional external service ports: built from external_virtual_hosts above. Each external host
 #                                  that Envoy proxies to listens on its own port.
 # optional mongo ports: built from mongos_servers above.
-# generate_config(SCRIPT_DIR, 'envoy_service_to_service_v2.template.yaml',
-                # '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
-                # internal_virtual_hosts=service_to_service_envoy_clusters,
-                # external_virtual_hosts=external_virtual_hosts,
-                # mongos_servers=mongos_servers)
+generate_config(SCRIPT_DIR, 'envoy_service_to_service_v2.template.yaml',
+                '{}/envoy_service_to_service.yaml'.format(OUT_DIR),
+                internal_virtual_hosts=service_to_service_envoy_clusters,
+                external_virtual_hosts=external_virtual_hosts,
+                mongos_servers=mongos_servers)
 
 for google_ext in ['yaml','json','v2.yaml']:
   shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)
