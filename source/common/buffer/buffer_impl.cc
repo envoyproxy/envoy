@@ -160,19 +160,19 @@ int OwnedImpl::write(int fd) {
     return 0;
   }
   struct iovec iov[num_slices];
-  uint64_t slices_to_write = 0;
+  uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slices; i++) {
     if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      iov[slices_to_write].iov_base = slices[i].mem_;
-      iov[slices_to_write].iov_len = slices[i].len_;
-      slices_to_write++;
+      iov[num_slices_to_write].iov_base = slices[i].mem_;
+      iov[num_slices_to_write].iov_len = slices[i].len_;
+      num_slices_to_write++;
     }
   }
-  if (slices_to_write == 0) {
+  if (num_slices_to_write == 0) {
     return 0;
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const ssize_t rc = os_syscalls.writev(fd, iov, slices_to_write);
+  const ssize_t rc = os_syscalls.writev(fd, iov, num_slices_to_write);
   if (rc > 0) {
     drain(static_cast<uint64_t>(rc));
   }
