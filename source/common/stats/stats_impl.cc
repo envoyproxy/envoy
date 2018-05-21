@@ -8,6 +8,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/lock_guard.h"
 #include "common/common/perf_annotation.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"

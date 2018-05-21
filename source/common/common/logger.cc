@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/thread/thread.h"
+#include "common/common/lock_guard.h"
 
 #include "spdlog/spdlog.h"
 
