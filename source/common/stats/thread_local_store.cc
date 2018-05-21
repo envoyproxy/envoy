@@ -383,6 +383,22 @@ void ParentHistogramImpl::merge() {
   }
 }
 
+const std::string ParentHistogramImpl::summary() const {
+  if (used()) {
+    std::vector<std::string> summary;
+    const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
+    summary.reserve(supported_quantiles_ref.size());
+    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                    interval_statistics_.computedQuantiles()[i],
+                                    cumulative_statistics_.computedQuantiles()[i]));
+    }
+    return absl::StrJoin(summary, " ");
+  } else {
+    return std::string("No recorded values");
+  }
+}
+
 void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
