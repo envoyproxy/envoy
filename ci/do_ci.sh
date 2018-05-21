@@ -108,7 +108,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # as possible for basic sanity testing.
 
   # Hack to avoid returning IPv6 DNS
-  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' etc/gai.conf
+  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
   # Debug IPv6 network issues
   apt-get update && apt-get install -y dnsutils net-tools curl && \
     ifconfig && \
