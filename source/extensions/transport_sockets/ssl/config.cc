@@ -38,7 +38,8 @@ Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSo
   return std::make_unique<Ssl::ServerSslSocketFactory>(
       Ssl::ServerContextConfigImpl(
           MessageUtil::downcastAndValidate<const envoy::api::v2::auth::DownstreamTlsContext&>(
-              message), context.secretManager()),
+              message),
+          context.secretManager()),
       context.sslContextManager(), context.statsScope(), server_names);
 }
 
