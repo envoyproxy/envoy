@@ -78,8 +78,9 @@ public:
   virtual const Ipv6* ipv6() const PURE;
 
   /**
-   * @return the port associated with the address. Port may be zero if not specified or applicable.
-   *         The port is in host byte order.
+   * @return the port associated with the address. Port may be zero if not specified, not
+   * determinable before socket creation, or not applicable.
+   * The port is in host byte order.
    */
   virtual uint32_t port() const PURE;
 
@@ -104,9 +105,10 @@ public:
 
   /**
    * @return a human readable string for the address that represents the
-   * physical/resolved address.
+   * physical/resolved address. (This will not necessarily include port
+   * information, if applicable, since that may not be resolved until bind()).
    *
-   * This string will be in the following format:
+   * This string will be compatible with the following example formats:
    * For IPv4 addresses: "1.2.3.4:80"
    * For IPv6 addresses: "[1234:5678::9]:443"
    * For pipe addresses: "/foo"
