@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package envoy.api.v2.core;
+package envoy.type;
 
 import "validate/validate.proto";
 
 enum StatusCode {
-  // `Empty` is not part of the HTTP response codes specification.
+  // `Empty` is not part of the HTTP response code specification.
   // http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
   Empty                         = 0;
-
+  
   Continue                      = 100;
 
   OK                            = 200;
