@@ -394,6 +394,11 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
       return;
     }
 
+    // Pause RDS to ensure that we don't send any requests until we've
+    // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
+    // so we pause RDS until we've completed all the callbacks.
+    cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
+
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize([this, workers_start_cb]() {
       if (shutdown_) {
