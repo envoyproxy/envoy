@@ -123,7 +123,7 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   ASSERT(bytes_to_commit <= max_length);
   while (bytes_to_commit != 0) {
     slices[num_slices_to_commit].len_ =
-        std::min(slices[num_slices_to_commit].len_, bytes_to_commit);
+        std::min(slices[num_slices_to_commit].len_, static_cast<size_t>(bytes_to_commit));
     bytes_to_commit -= slices[num_slices_to_commit].len_;
     num_slices_to_commit++;
   }
