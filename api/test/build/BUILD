@@ -30,9 +30,12 @@ api_go_test(
         "//envoy/api/v2:rds_go_grpc",
         "//envoy/api/v2/auth:cert_go_proto",
         "//envoy/config/bootstrap/v2:bootstrap_go_proto",
+        "//envoy/service/accesslog/v2:als_go_grpc",
         "//envoy/service/discovery/v2:ads_go_grpc",
         "//envoy/service/discovery/v2:hds_go_grpc",
         "//envoy/service/discovery/v2:sds_go_grpc",
+        "//envoy/service/metrics/v2:metrics_service_go_grpc",
         "//envoy/service/ratelimit/v2:rls_go_grpc",
+        "//envoy/service/trace/v2:trace_service_go_grpc",
     ],
 )

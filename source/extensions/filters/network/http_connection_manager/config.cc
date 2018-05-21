@@ -7,10 +7,8 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
-#include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/server/options.h"
 #include "envoy/stats/stats.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -35,7 +33,8 @@ namespace HttpConnectionManager {
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 
-Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilter(
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
@@ -70,16 +69,7 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
   Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
-  return createFilter(proto_config, context);
-}
-
-Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<const envoy::config::filter::network::
-                                           http_connection_manager::v2::HttpConnectionManager&>(
-          proto_config),
-      context);
+  return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
 /**

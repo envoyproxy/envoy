@@ -10,22 +10,17 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
-
-// TODO(mattklein123): Common code reaching into extensions is not right. Sort this out when the
-// HTTP connection manager is moved.
-#include "extensions/filters/network/tcp_proxy/tcp_proxy.h"
+#include "common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Http {
 namespace WebSocket {
 
 /**
- * @return Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr to use in creating
- * instances of WsHandlerImpl.
+ * @return TcpProxy::ConfigSharedPtr to use in creating instances of WsHandlerImpl.
  */
-Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr
-tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
-               Server::Configuration::FactoryContext& factory_context);
+TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route_config,
+                                 Server::Configuration::FactoryContext& factory_context);
 
 /**
  * An implementation of a WebSocket proxy based on TCP proxy. This will be used for
@@ -35,14 +30,12 @@ tcpProxyConfig(const envoy::api::v2::route::RouteAction& route_config,
  * All data will be proxied back and forth between the two connections, without any
  * knowledge of the underlying WebSocket protocol.
  */
-class WsHandlerImpl : public Extensions::NetworkFilters::TcpProxy::TcpProxyFilter,
-                      public Http::WebSocketProxy {
+class WsHandlerImpl : public TcpProxy::Filter, public Http::WebSocketProxy {
 public:
   WsHandlerImpl(HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
                 const Router::RouteEntry& route_entry, WebSocketProxyCallbacks& callbacks,
                 Upstream::ClusterManager& cluster_manager,
-                Network::ReadFilterCallbacks* read_callbacks,
-                Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr config);
+                Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -53,7 +46,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
 protected:
-  // Extensions::NetworkFilters::TcpProxy::TcpProxyFilter
+  // TcpProxy::Filter
   const std::string& getUpstreamCluster() override { return route_entry_.clusterName(); }
   void onInitFailure(UpstreamFailureReason failure_reason) override;
   void onConnectionSuccess() override;

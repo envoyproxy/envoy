@@ -3,7 +3,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
-#include "common/json/json_loader.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
@@ -152,6 +151,20 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json&usedonly",
+                                         "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+  validateStatsJson(response->body());
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -161,37 +174,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-
-  Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
-  EXPECT_TRUE(statsjson->hasObject("stats"));
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-
-  uint64_t histogram_count = 0;
-  for (Json::ObjectSharedPtr obj_ptr : statsjson->getObjectArray("stats")) {
-    if (obj_ptr->hasObject("histograms")) {
-      histogram_count++;
-      const Json::ObjectSharedPtr& histograms_ptr = obj_ptr->getObject("histograms");
-      // Validate that both supported_quantiles and computed_quantiles are present in JSON.
-      EXPECT_TRUE(histograms_ptr->hasObject("supported_quantiles"));
-      EXPECT_TRUE(histograms_ptr->hasObject("computed_quantiles"));
-
-      const std::vector<Json::ObjectSharedPtr>& computed_quantiles =
-          histograms_ptr->getObjectArray("computed_quantiles");
-      EXPECT_GT(computed_quantiles.size(), 0);
-
-      // Validate that each computed_quantile has name and value objects.
-      EXPECT_TRUE(computed_quantiles[0]->hasObject("name"));
-      EXPECT_TRUE(computed_quantiles[0]->hasObject("values"));
-
-      // Validate that supported and computed quantiles are of the same size.
-      EXPECT_EQ(histograms_ptr->getObjectArray("supported_quantiles").size(),
-                computed_quantiles[0]->getObjectArray("values").size());
-    }
-  }
-
-  // Validate that the stats JSON has exactly one histograms element.
-  EXPECT_EQ(1, histogram_count);
+  validateStatsJson(response->body());
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
@@ -300,6 +285,36 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
   EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
   EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
+}
+
+TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
+  initialize();
+  bool test = true;
+
+  // add an handler which adds a callback to the list of callback called when connection is dropped.
+  auto callback = [&test](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                          Server::AdminStream& admin_stream) -> Http::Code {
+    auto on_destroy_callback = [&test]() { test = false; };
+
+    // Add the on_destroy_callback to the admin_filter list of callbacks.
+    admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
+    return Http::Code::OK;
+  };
+
+  EXPECT_TRUE(
+      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+
+  // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/foo/bar", "", downstreamProtocol(), version_);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  // Check that the added callback was invoked.
+  EXPECT_EQ(test, false);
+
+  // Small test to cover new statsFlushInterval() on Instance.h.
+  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
 }
 
 // Successful call to startProfiler requires tcmalloc.

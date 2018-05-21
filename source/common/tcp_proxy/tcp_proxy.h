@@ -24,8 +24,6 @@
 #include "common/request_info/request_info_impl.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
 namespace TcpProxy {
 
 /**
@@ -53,8 +51,8 @@ struct TcpProxyStats {
   ALL_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class TcpProxyDrainer;
-class TcpProxyUpstreamDrainManager;
+class Drainer;
+class UpstreamDrainManager;
 
 /**
  * Filter configuration.
@@ -62,7 +60,7 @@ class TcpProxyUpstreamDrainManager;
  * This configuration holds a TLS slot, and therefore it must be destructed
  * on the main thread.
  */
-class TcpProxyConfig {
+class Config {
 public:
   /**
    * Configuration that can be shared and have an arbitrary lifetime safely.
@@ -78,7 +76,7 @@ public:
     static TcpProxyStats generateStats(Stats::Scope& scope);
 
     // Hold a Scope for the lifetime of the configuration because connections in
-    // the TcpProxyUpstreamDrainManager can live longer than the listener.
+    // the UpstreamDrainManager can live longer than the listener.
     const Stats::ScopePtr stats_scope_;
 
     const TcpProxyStats stats_;
@@ -87,8 +85,8 @@ public:
 
   typedef std::shared_ptr<SharedConfig> SharedConfigSharedPtr;
 
-  TcpProxyConfig(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
-                 Server::Configuration::FactoryContext& context);
+  Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+         Server::Configuration::FactoryContext& context);
 
   /**
    * Find out which cluster an upstream connection should be opened to based on the
@@ -106,7 +104,7 @@ public:
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
   }
-  TcpProxyUpstreamDrainManager& drainManager();
+  UpstreamDrainManager& drainManager();
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
     return cluster_metadata_match_criteria_.get();
@@ -132,19 +130,19 @@ private:
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
 };
 
-typedef std::shared_ptr<TcpProxyConfig> TcpProxyConfigSharedPtr;
+typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
  * An implementation of a TCP (L3/L4) proxy. This filter will instantiate a new outgoing TCP
  * connection using the defined load balancing proxy for the configured cluster. All data will
  * be proxied back and forth between the two connections.
  */
-class TcpProxyFilter : public Network::ReadFilter,
-                       Upstream::LoadBalancerContext,
-                       protected Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ReadFilter,
+               Upstream::LoadBalancerContext,
+               protected Logger::Loggable<Logger::Id::filter> {
 public:
-  TcpProxyFilter(TcpProxyConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
-  ~TcpProxyFilter();
+  Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
+  ~Filter();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -168,7 +166,7 @@ public:
 
   struct UpstreamCallbacks : public Network::ConnectionCallbacks,
                              public Network::ReadFilterBaseImpl {
-    UpstreamCallbacks(TcpProxyFilter* parent) : parent_(parent) {}
+    UpstreamCallbacks(Filter* parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -180,7 +178,7 @@ public:
 
     void onBytesSent();
     void onIdleTimeout();
-    void drain(TcpProxyDrainer& drainer);
+    void drain(Drainer& drainer);
 
     // Either parent_ or drainer_ will be non-NULL, but never both. This could be
     // logically be represented as a union, but saving one pointer of memory is
@@ -189,22 +187,22 @@ public:
     // Parent starts out as non-NULL. If the downstream connection is closed while
     // the upstream connection still has buffered data to flush, drainer_ becomes
     // non-NULL and parent_ is set to NULL.
-    TcpProxyFilter* parent_{};
-    TcpProxyDrainer* drainer_{};
+    Filter* parent_{};
+    Drainer* drainer_{};
 
     bool on_high_watermark_called_{false};
   };
 
 protected:
   struct DownstreamCallbacks : public Network::ConnectionCallbacks {
-    DownstreamCallbacks(TcpProxyFilter& parent) : parent_(parent) {}
+    DownstreamCallbacks(Filter& parent) : parent_(parent) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override { parent_.onDownstreamEvent(event); }
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
-    TcpProxyFilter& parent_;
+    Filter& parent_;
     bool on_high_watermark_called_{false};
   };
 
@@ -237,7 +235,7 @@ protected:
   void resetIdleTimer();
   void disableIdleTimer();
 
-  const TcpProxyConfigSharedPtr config_;
+  const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_;
@@ -256,14 +254,13 @@ protected:
 // flushing, when the downstream connection has been closed. The TcpProxy is
 // destroyed when the downstream connection is closed, so moving the upstream
 // connection here allows it to finish draining or timeout.
-class TcpProxyDrainer : public Event::DeferredDeletable {
+class Drainer : public Event::DeferredDeletable {
 public:
-  TcpProxyDrainer(TcpProxyUpstreamDrainManager& parent,
-                  const TcpProxyConfig::SharedConfigSharedPtr& config,
-                  const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
-                  Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
-                  const Upstream::HostDescriptionConstSharedPtr& upstream_host,
-                  Stats::TimespanPtr&& connected_timespan);
+  Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
+          const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
+          Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
+          const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+          Stats::TimespanPtr&& connected_timespan);
 
   void onEvent(Network::ConnectionEvent event);
   void onData(Buffer::Instance& data, bool end_stream);
@@ -272,36 +269,34 @@ public:
   void cancelDrain();
 
 private:
-  TcpProxyUpstreamDrainManager& parent_;
-  std::shared_ptr<TcpProxyFilter::UpstreamCallbacks> callbacks_;
+  UpstreamDrainManager& parent_;
+  std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
   Network::ClientConnectionPtr upstream_connection_;
   Event::TimerPtr timer_;
   Stats::TimespanPtr connected_timespan_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
-  TcpProxyConfig::SharedConfigSharedPtr config_;
+  Config::SharedConfigSharedPtr config_;
 };
 
-typedef std::unique_ptr<TcpProxyDrainer> TcpProxyDrainerPtr;
+typedef std::unique_ptr<Drainer> DrainerPtr;
 
-class TcpProxyUpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
+class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
-  ~TcpProxyUpstreamDrainManager();
-  void add(const TcpProxyConfig::SharedConfigSharedPtr& config,
+  ~UpstreamDrainManager();
+  void add(const Config::SharedConfigSharedPtr& config,
            Network::ClientConnectionPtr&& upstream_connection,
-           const std::shared_ptr<TcpProxyFilter::UpstreamCallbacks>& callbacks,
+           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
            Event::TimerPtr&& idle_timer,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host,
            Stats::TimespanPtr&& connected_timespan);
-  void remove(TcpProxyDrainer& drainer, Event::Dispatcher& dispatcher);
+  void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 
 private:
   // This must be a map instead of set because there is no way to move elements
   // out of a set, and these elements get passed to deferredDelete() instead of
   // being deleted in-place. The key and value will always be equal.
-  std::unordered_map<TcpProxyDrainer*, TcpProxyDrainerPtr> drainers_;
+  std::unordered_map<Drainer*, DrainerPtr> drainers_;
 };
 
-} // Filter
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace TcpProxy
 } // namespace Envoy

@@ -27,31 +27,72 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(int argc, char** argv, const HotRestartVersionCb& hot_restart_version_cb,
+  OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
+  // Setters for option fields. These are not part of the Options interface.
+  void setBaseId(uint64_t base_id) { base_id_ = base_id; };
+  void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
+  void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
+  void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
+  void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
+  void setAdminAddressPath(const std::string& admin_address_path) {
+    admin_address_path_ = admin_address_path;
+  }
+  void setLocalAddressIpVersion(Network::Address::IpVersion local_address_ip_version) {
+    local_address_ip_version_ = local_address_ip_version;
+  }
+  void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
+  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
+  void setLogFormat(const std::string& log_format) { log_format_ = log_format; }
+  void setLogPath(const std::string& log_path) { log_path_ = log_path; }
+  void setParentShutdownTime(std::chrono::seconds parent_shutdown_time) {
+    parent_shutdown_time_ = parent_shutdown_time;
+  }
+  void setRestartEpoch(uint64_t restart_epoch) { restart_epoch_ = restart_epoch; }
+  void setMode(Server::Mode mode) { mode_ = mode; }
+  void setFileFlushIntervalMsec(std::chrono::milliseconds file_flush_interval_msec) {
+    file_flush_interval_msec_ = file_flush_interval_msec;
+  }
+  void setServiceClusterName(const std::string& service_cluster) {
+    service_cluster_ = service_cluster;
+  }
+  void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
+  void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
+  void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
+  void setMaxObjNameLength(uint64_t max_obj_name_length) {
+    max_obj_name_length_ = max_obj_name_length;
+  }
+  void setHotRestartDisabled(bool hot_restart_disabled) {
+    hot_restart_disabled_ = hot_restart_disabled;
+  }
+
   // Server::Options
-  uint64_t baseId() override { return base_id_; }
-  uint32_t concurrency() override { return concurrency_; }
-  const std::string& configPath() override { return config_path_; }
-  const std::string& configYaml() override { return config_yaml_; }
-  bool v2ConfigOnly() override { return v2_config_only_; }
-  const std::string& adminAddressPath() override { return admin_address_path_; }
-  Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
-  std::chrono::seconds drainTime() override { return drain_time_; }
-  spdlog::level::level_enum logLevel() override { return log_level_; }
-  const std::string& logFormat() override { return log_format_; }
-  const std::string& logPath() override { return log_path_; }
-  std::chrono::seconds parentShutdownTime() override { return parent_shutdown_time_; }
-  uint64_t restartEpoch() override { return restart_epoch_; }
+  uint64_t baseId() const override { return base_id_; }
+  uint32_t concurrency() const override { return concurrency_; }
+  const std::string& configPath() const override { return config_path_; }
+  const std::string& configYaml() const override { return config_yaml_; }
+  bool v2ConfigOnly() const override { return v2_config_only_; }
+  const std::string& adminAddressPath() const override { return admin_address_path_; }
+  Network::Address::IpVersion localAddressIpVersion() const override {
+    return local_address_ip_version_;
+  }
+  std::chrono::seconds drainTime() const override { return drain_time_; }
+  spdlog::level::level_enum logLevel() const override { return log_level_; }
+  const std::string& logFormat() const override { return log_format_; }
+  const std::string& logPath() const override { return log_path_; }
+  std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
+  uint64_t restartEpoch() const override { return restart_epoch_; }
   Server::Mode mode() const override { return mode_; }
-  std::chrono::milliseconds fileFlushIntervalMsec() override { return file_flush_interval_msec_; }
-  const std::string& serviceClusterName() override { return service_cluster_; }
-  const std::string& serviceNodeName() override { return service_node_; }
-  const std::string& serviceZone() override { return service_zone_; }
-  uint64_t maxStats() override { return max_stats_; }
-  uint64_t maxObjNameLength() override { return max_obj_name_length_; }
-  bool hotRestartDisabled() override { return hot_restart_disabled_; }
+  std::chrono::milliseconds fileFlushIntervalMsec() const override {
+    return file_flush_interval_msec_;
+  }
+  const std::string& serviceClusterName() const override { return service_cluster_; }
+  const std::string& serviceNodeName() const override { return service_node_; }
+  const std::string& serviceZone() const override { return service_zone_; }
+  uint64_t maxStats() const override { return max_stats_; }
+  uint64_t maxObjNameLength() const override { return max_obj_name_length_; }
+  bool hotRestartDisabled() const override { return hot_restart_disabled_; }
 
 private:
   uint64_t base_id_;

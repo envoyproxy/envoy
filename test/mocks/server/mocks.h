@@ -48,27 +48,27 @@ public:
   MockOptions(const std::string& config_path);
   ~MockOptions();
 
-  MOCK_METHOD0(baseId, uint64_t());
-  MOCK_METHOD0(concurrency, uint32_t());
-  MOCK_METHOD0(configPath, const std::string&());
-  MOCK_METHOD0(configYaml, const std::string&());
-  MOCK_METHOD0(v2ConfigOnly, bool());
-  MOCK_METHOD0(adminAddressPath, const std::string&());
-  MOCK_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
-  MOCK_METHOD0(drainTime, std::chrono::seconds());
-  MOCK_METHOD0(logLevel, spdlog::level::level_enum());
-  MOCK_METHOD0(logFormat, const std::string&());
-  MOCK_METHOD0(logPath, const std::string&());
-  MOCK_METHOD0(parentShutdownTime, std::chrono::seconds());
-  MOCK_METHOD0(restartEpoch, uint64_t());
-  MOCK_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(baseId, uint64_t());
+  MOCK_CONST_METHOD0(concurrency, uint32_t());
+  MOCK_CONST_METHOD0(configPath, const std::string&());
+  MOCK_CONST_METHOD0(configYaml, const std::string&());
+  MOCK_CONST_METHOD0(v2ConfigOnly, bool());
+  MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
+  MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
+  MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
+  MOCK_CONST_METHOD0(logLevel, spdlog::level::level_enum());
+  MOCK_CONST_METHOD0(logFormat, const std::string&());
+  MOCK_CONST_METHOD0(logPath, const std::string&());
+  MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
+  MOCK_CONST_METHOD0(restartEpoch, uint64_t());
+  MOCK_CONST_METHOD0(fileFlushIntervalMsec, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(mode, Mode());
-  MOCK_METHOD0(serviceClusterName, const std::string&());
-  MOCK_METHOD0(serviceNodeName, const std::string&());
-  MOCK_METHOD0(serviceZone, const std::string&());
-  MOCK_METHOD0(maxStats, uint64_t());
-  MOCK_METHOD0(maxObjNameLength, uint64_t());
-  MOCK_METHOD0(hotRestartDisabled, bool());
+  MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
+  MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
+  MOCK_CONST_METHOD0(serviceZone, const std::string&());
+  MOCK_CONST_METHOD0(maxStats, uint64_t());
+  MOCK_CONST_METHOD0(maxObjNameLength, uint64_t());
+  MOCK_CONST_METHOD0(hotRestartDisabled, bool());
 
   std::string config_path_;
   std::string config_yaml_;
@@ -305,6 +305,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -341,7 +342,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(rateLimitClientFactory, RateLimit::ClientFactory&());
   MOCK_METHOD0(statsSinks, std::list<Stats::SinkPtr>&());
-  MOCK_METHOD0(statsFlushInterval, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdMegaMissTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(wdKillTimeout, std::chrono::milliseconds());

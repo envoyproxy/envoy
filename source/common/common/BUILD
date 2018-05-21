@@ -89,6 +89,7 @@ envoy_cc_library(
     hdrs = ["logger.h"],
     deps = [
         ":macros",
+        ":non_copyable",
         "//include/envoy/thread:thread_interface",
     ],
 )

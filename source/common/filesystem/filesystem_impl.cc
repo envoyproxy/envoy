@@ -168,7 +168,7 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
 void FileImpl::flushThreadFunc() {
 
   while (true) {
-    std::unique_lock<std::mutex> flush_lock;
+    std::unique_lock<Thread::BasicLockable> flush_lock;
 
     {
       std::unique_lock<std::mutex> write_lock(write_lock_);
@@ -183,7 +183,7 @@ void FileImpl::flushThreadFunc() {
         return;
       }
 
-      flush_lock = std::unique_lock<std::mutex>(flush_lock_);
+      flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
       ASSERT(flush_buffer_.length() > 0);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
@@ -207,7 +207,7 @@ void FileImpl::flushThreadFunc() {
 }
 
 void FileImpl::flush() {
-  std::unique_lock<std::mutex> flush_buffer_lock;
+  std::unique_lock<Thread::BasicLockable> flush_buffer_lock;
 
   {
     std::lock_guard<std::mutex> write_lock(write_lock_);
@@ -217,7 +217,7 @@ void FileImpl::flush() {
     // flush_buffer_ to about_to_write_buffer_, has unlocked write_lock_,
     // but has not yet completed doWrite(). This would allow flush() to
     // return before the pending data has actually been written to disk.
-    flush_buffer_lock = std::unique_lock<std::mutex>(flush_lock_);
+    flush_buffer_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
 
     if (flush_buffer_.length() == 0) {
       return;

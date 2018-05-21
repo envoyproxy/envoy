@@ -73,7 +73,7 @@ public:
    * @return std::chrono::milliseconds the time interval between flushing to configured stat sinks.
    *         The server latches counters.
    */
-  virtual std::chrono::milliseconds statsFlushInterval() PURE;
+  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 
   /**
    * @return std::chrono::milliseconds the time interval after which we count a nonresponsive thread

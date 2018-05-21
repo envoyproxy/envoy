@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Tls {
 namespace Test {
 
-std::vector<uint8_t> generateClientHello(const std::string& sni_name) {
+std::vector<uint8_t> generateClientHello(const std::string& sni_name, const std::string& alpn) {
   bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_with_buffers_method()));
 
   const long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION;
@@ -26,6 +26,9 @@ std::vector<uint8_t> generateClientHello(const std::string& sni_name) {
   SSL_set_cipher_list(ssl.get(), PREFERRED_CIPHERS);
   if (!sni_name.empty()) {
     SSL_set_tlsext_host_name(ssl.get(), sni_name.c_str());
+  }
+  if (!alpn.empty()) {
+    SSL_set_alpn_protos(ssl.get(), reinterpret_cast<const uint8_t*>(alpn.data()), alpn.size());
   }
   SSL_do_handshake(ssl.get());
   const uint8_t* data = NULL;

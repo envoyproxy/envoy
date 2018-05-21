@@ -74,9 +74,8 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
   Ssl::ServerContextConfigImpl cfg(*loader, secret_manager_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
-                                                       std::vector<std::string>{}, true,
-                                                       *context_manager_, *upstream_stats_store);
+  return std::make_unique<Ssl::ServerSslSocketFactory>(
+      cfg, *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
@@ -385,7 +384,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 
   // std::cout << "tag_extracted_counter_map = {";
-  // std::list<Stats::CounterSharedPtr> counters = test_server_->counters();
+  // std::vector<Stats::CounterSharedPtr> counters = test_server_->counters();
   // for (auto it = counters.begin(); it != counters.end(); ++it) {
   //   if (it != counters.begin()) {
   //     std::cout << ",";
@@ -395,7 +394,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   // }
   // std::cout << "};" << std::endl;
   // std::cout << "tag_extracted_gauge_map = {";
-  // std::list<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
+  // std::vector<Stats::GaugeSharedPtr> gauges = test_server_->gauges();
   // for (auto it = gauges.begin(); it != gauges.end(); ++it) {
   //   if (it != gauges.begin()) {
   //     std::cout << ",";

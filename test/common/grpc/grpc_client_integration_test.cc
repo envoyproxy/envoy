@@ -490,7 +490,7 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
     stream->expectTrailingMetadata(empty_metadata_);
     // Technically this should be
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Common::httpToGrpcStatus(), but the Google gRPC client treats
+    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
     // this as GrpcStatus::Canceled.
     stream->expectGrpcStatus(Status::GrpcStatus::Canceled);
     stream->fake_stream_->encodeHeaders(reply_headers, true);
@@ -811,9 +811,8 @@ public:
     Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
-                                                         std::vector<std::string>{}, true,
-                                                         context_manager_, *upstream_stats_store);
+    return std::make_unique<Ssl::ServerSslSocketFactory>(
+        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   bool use_client_cert_{};

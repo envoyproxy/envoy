@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         ":context_config_lib",
         ":context_lib",
+        "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -62,7 +63,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
-        "//source/common/common:empty_string",
         "//source/common/common:hex_lib",
     ],
 )
