@@ -7,7 +7,7 @@
 #include "common/network/address_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"

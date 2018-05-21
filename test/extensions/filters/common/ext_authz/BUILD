@@ -16,7 +16,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:address_lib",
-        "//source/extensions/filters/common/ext_authz:ext_authz_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",

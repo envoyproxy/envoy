@@ -1,23 +1,14 @@
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
-#include <chrono>
-#include <cstdint>
-#include <string>
-#include <vector>
-
+#include "envoy/access_log/access_log.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
 #include "common/grpc/async_client_impl.h"
-#include "common/http/codes.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
-
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {

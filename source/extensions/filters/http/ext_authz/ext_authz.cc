@@ -8,7 +8,7 @@
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "fmt/format.h"
 

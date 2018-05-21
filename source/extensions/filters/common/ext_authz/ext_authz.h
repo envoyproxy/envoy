@@ -8,7 +8,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v2alpha/external_auth.pb.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.validate.h"
 #include "envoy/tracing/http_tracer.h"
 
 namespace Envoy {

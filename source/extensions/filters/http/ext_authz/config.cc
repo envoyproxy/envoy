@@ -8,8 +8,8 @@
 
 #include "common/protobuf/utility.h"
 
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
 #include "extensions/filters/http/ext_authz/ext_authz.h"
 
 namespace Envoy {

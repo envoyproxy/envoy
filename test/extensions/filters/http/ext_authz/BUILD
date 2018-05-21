@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/common/ext_authz:ext_authz_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/http/ext_authz",
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/http:http_mocks",

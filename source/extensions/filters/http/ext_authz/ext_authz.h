@@ -16,7 +16,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 namespace Envoy {
 namespace Extensions {
