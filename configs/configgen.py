@@ -101,8 +101,8 @@ generate_config(SCRIPT_DIR, 'envoy_front_proxy_v2.template.yaml',
 
 # Generate a demo config for the double proxy. This sets up both an HTTP and HTTPS listeners,
 # and backhauls the traffic to the main front proxy.
-# generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
-                # '{}/envoy_double_proxy.yaml'.format(OUT_DIR))
+generate_config(SCRIPT_DIR, 'envoy_double_proxy_v2.template.yaml',
+                '{}/envoy_double_proxy.v2.yaml'.format(OUT_DIR))
 
 # Generate a demo config for the service to service (local) proxy. This sets up several different
 # listeners:
