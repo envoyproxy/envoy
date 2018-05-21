@@ -8,6 +8,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "common/common/lock_guard.h"
+
 namespace Envoy {
 namespace Stats {
 
