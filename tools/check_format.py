@@ -13,8 +13,8 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-", "./bazel/external", "./.cache")
-SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst")
-DOCS_SUFFIX = (".md", ".rst")
+SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst", ".proto")
+DOCS_SUFFIX = (".md", ".rst", ".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
 GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf', 'api/test')
