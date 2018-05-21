@@ -60,7 +60,7 @@ public:
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Runtime::RandomGenerator& random_generator)
       : service_name_(service_name), address_(address), reporter_(nullptr),
-        random_generator_(random_generator) {}
+        random_generator_(random_generator), trace_id_128bit_(false) {}
 
   /**
    * Creates a "root" Zipkin span.
