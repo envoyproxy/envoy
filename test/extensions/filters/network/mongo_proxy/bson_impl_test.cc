@@ -53,14 +53,30 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
 }
 
 TEST(BufferHelperTest, InvalidSize) {
-  Buffer::OwnedImpl buffer;
-  EXPECT_THROW(BufferHelper::peakInt32(buffer), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeByte(buffer), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeBytes(buffer, nullptr, 1), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeCString(buffer), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeDouble(buffer), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeInt64(buffer), EnvoyException);
-  EXPECT_THROW(BufferHelper::removeString(buffer), EnvoyException);
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW(BufferHelper::peakInt32(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeByte(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeBytes(buffer, nullptr, 1), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeCString(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeDouble(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeInt64(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::removeString(buffer), EnvoyException);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    BufferHelper::writeInt32(buffer, 4);
+    EXPECT_THROW(BufferHelper::removeString(buffer), EnvoyException);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    BufferHelper::writeInt32(buffer, 4);
+    uint8_t dummy = 0;
+    buffer.add(&dummy, sizeof(dummy));
+    EXPECT_THROW(BufferHelper::removeBinary(buffer), EnvoyException);
+  }
 }
 
 } // namespace Bson
