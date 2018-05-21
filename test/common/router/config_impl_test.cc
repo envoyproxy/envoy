@@ -4135,13 +4135,6 @@ virtual_hosts:
           cluster: local_service_with_header_range_test5
       - match:
           prefix: "/"
-          headers:
-            - name: test_inverse_match
-              inverse_match: "10"
-        route:
-          cluster: local_service_inverse_match_test
-      - match:
-          prefix: "/"
         route:
           cluster: local_service_without_headers
   )EOF";
@@ -4150,7 +4143,7 @@ virtual_hosts:
   ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
   {
-    EXPECT_EQ("local_service_inverse_match_test",
+    EXPECT_EQ("local_service_without_headers",
               config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
   }
   {
@@ -4168,7 +4161,7 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("non_existent_header", "foo");
-    EXPECT_EQ("local_service_inverse_match_test",
+    EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
   {
@@ -4186,7 +4179,7 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_pattern", "customer=test-1223");
-    EXPECT_EQ("local_service_inverse_match_test",
+    EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
   {
@@ -4217,24 +4210,12 @@ virtual_hosts:
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_multiple_range", "-9");
-    EXPECT_EQ("local_service_inverse_match_test",
+    EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
     headers.addCopy("test_header_range", "19");
-    EXPECT_EQ("local_service_inverse_match_test",
-              config.route(headers, 0)->routeEntry()->clusterName());
-  }
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    headers.addCopy("test_inverse_match", "0");
-    EXPECT_EQ("local_service_inverse_match_test",
-              config.route(headers, 0)->routeEntry()->clusterName());
-  }
-  {
-    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
-    headers.addCopy("test_inverse_match", "10");
     EXPECT_EQ("local_service_without_headers",
               config.route(headers, 0)->routeEntry()->clusterName());
   }
