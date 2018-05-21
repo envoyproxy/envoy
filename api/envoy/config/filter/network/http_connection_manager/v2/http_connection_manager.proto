@@ -87,6 +87,7 @@ message HttpConnectionManager {
     // created if the specified header name is present in the request's headers.
     repeated string request_headers_for_tags = 2;
 
+    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be force
     // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
     // header is set. This field is a direct analog for the runtime variable
@@ -95,6 +96,7 @@ message HttpConnectionManager {
     // Default: 100%
     envoy.type.Percent client_sampling = 3;
 
+    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be randomly
     // selected for trace generation, if not requested by the client or not forced. This field is
     // a direct analog for the runtime variable 'tracing.random_sampling' in the
@@ -102,6 +104,7 @@ message HttpConnectionManager {
     // Default: 100%
     envoy.type.Percent random_sampling = 4;
 
+    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be traced
     // after all other sampling checks have been applied (client-directed, force tracing, random
     // sampling). This field functions as an upper limit on the total configured sampling rate. For
