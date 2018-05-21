@@ -56,7 +56,7 @@ Zipkin driver
     "config": {
       "collector_cluster": "...",
       "collector_endpoint": "...",
-      "trace_id_128bit": true|false
+      "trace_id_128bit": true
     }
   }
 
