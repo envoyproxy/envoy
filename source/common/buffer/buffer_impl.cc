@@ -103,14 +103,16 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
   struct iovec iov[num_slices];
   uint64_t num_slices_to_read = 0;
-  for (; num_slices_to_read < num_slices && max_length != 0; num_slices_to_read++) {
+  uint64_t num_bytes_to_read = 0;
+  for (; num_slices_to_read < num_slices && num_bytes_to_read < max_length; num_slices_to_read++) {
     iov[num_slices_to_read].iov_base = slices[num_slices_to_read].mem_;
-    const size_t slice_length =
-        std::min(slices[num_slices_to_read].len_, static_cast<size_t>(max_length));
+    const size_t slice_length = std::min(slices[num_slices_to_read].len_,
+                                         static_cast<size_t>(max_length - num_bytes_to_read));
     iov[num_slices_to_read].iov_len = slice_length;
-    ASSERT(max_length >= slice_length);
-    max_length -= slice_length;
+    num_bytes_to_read += slice_length;
   }
+  ASSERT(num_slices_to_read <= MaxSlices);
+  ASSERT(num_bytes_to_read <= max_length);
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const ssize_t rc = os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
   if (rc < 0) {
@@ -118,6 +120,7 @@ int OwnedImpl::read(int fd, uint64_t max_length) {
   }
   uint64_t num_slices_to_commit = 0;
   uint64_t bytes_to_commit = rc;
+  ASSERT(bytes_to_commit <= max_length);
   while (bytes_to_commit != 0) {
     if (slices[num_slices_to_commit].len_ > bytes_to_commit) {
       slices[num_slices_to_commit].len_ = bytes_to_commit;
