@@ -13,13 +13,12 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/async_client_impl.h"
 #include "common/singleton/const_singleton.h"
-
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
 
 namespace Envoy {
 namespace Extensions {

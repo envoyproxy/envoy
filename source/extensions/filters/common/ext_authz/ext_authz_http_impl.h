@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/common/ext_authz/ext_authz.h"
-
 #include "envoy/upstream/cluster_manager.h"
+
+#include "extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {

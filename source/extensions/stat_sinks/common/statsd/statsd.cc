@@ -47,16 +47,22 @@ UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
   });
 }
 
-void UdpStatsdSink::flushCounter(const Stats::Counter& counter, uint64_t delta) {
-  const std::string message(
-      fmt::format("{}.{}:{}|c{}", prefix_, getName(counter), delta, buildTagStr(counter.tags())));
-  tls_->getTyped<Writer>().write(message);
-}
+void UdpStatsdSink::flush(Stats::Source& source) {
+  Writer& writer = tls_->getTyped<Writer>();
+  for (const Stats::CounterSharedPtr& counter : source.cachedCounters()) {
+    if (counter->used()) {
+      uint64_t delta = counter->latch();
+      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(*counter), delta,
+                               buildTagStr(counter->tags())));
+    }
+  }
 
-void UdpStatsdSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
-  const std::string message(
-      fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge), value, buildTagStr(gauge.tags())));
-  tls_->getTyped<Writer>().write(message);
+  for (const Stats::GaugeSharedPtr& gauge : source.cachedGauges()) {
+    if (gauge->used()) {
+      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(*gauge), gauge->value(),
+                               buildTagStr(gauge->tags())));
+    }
+  }
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
@@ -101,6 +107,23 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
+}
+
+void TcpStatsdSink::flush(Stats::Source& source) {
+  TlsSink& tls_sink = tls_->getTyped<TlsSink>();
+  tls_sink.beginFlush(true);
+  for (const Stats::CounterSharedPtr& counter : source.cachedCounters()) {
+    if (counter->used()) {
+      tls_sink.flushCounter(counter->name(), counter->latch());
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : source.cachedGauges()) {
+    if (gauge->used()) {
+      tls_sink.flushGauge(gauge->name(), gauge->value());
+    }
+  }
+  tls_sink.endFlush(true);
 }
 
 TcpStatsdSink::TlsSink::TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher)

@@ -1,7 +1,8 @@
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/http/date_provider_impl.h"
-#include "common/router/rds_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
@@ -34,7 +35,7 @@ class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::SlowDateProviderImpl date_provider_;
-  Router::RouteConfigProviderManagerImpl route_config_provider_manager_{context_.admin()};
+  NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {

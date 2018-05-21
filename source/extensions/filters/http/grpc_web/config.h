@@ -12,10 +12,10 @@ namespace GrpcWeb {
 
 class GrpcWebFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
+  GrpcWebFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GRPC_WEB) {}
+
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext& context) override;
-
-  std::string name() override { return HttpFilterNames::get().GRPC_WEB; }
 };
 
 } // namespace GrpcWeb

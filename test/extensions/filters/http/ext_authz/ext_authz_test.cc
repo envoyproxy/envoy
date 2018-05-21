@@ -4,6 +4,7 @@
 
 #include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.h"
 #include "envoy/config/filter/http/ext_authz/v2alpha/ext_authz.pb.validate.h"
+#include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -64,7 +65,7 @@ protected:
   Filters::Common::ExtAuthz::ResponsePtr
   makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status,
                     Filters::Common::ExtAuthz::KeyValueHeaders&& headers = {},
-                    std::string&& body = std::string{}, uint32_t status_code = 0) {
+                    std::string&& body = std::string{}, Http::Code status_code = Http::Code::OK) {
     Filters::Common::ExtAuthz::ResponsePtr response =
         std::make_unique<Filters::Common::ExtAuthz::Response>();
     response->status = status;
@@ -75,7 +76,7 @@ protected:
     }
 
     if (!body.empty()) {
-      response->body = std::make_unique<Buffer::OwnedImpl>(body);
+      response->body = body;
     }
 
     return response;
@@ -210,8 +211,32 @@ TEST_P(HttpExtAuthzFilterParamTest, ImmediateOkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.ok").value());
 }
 
-// Test that a denied response results in the connection closing with a 403 response to the
-// client.
+// Test that an synchronous denied response from the authorization service, on the call stack,
+// results in request not continuing.
+TEST_P(HttpExtAuthzFilterParamTest, ImmediateDeniedResponse) {
+  InSequence s;
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+          })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
+}
+
+// Test that a denied response results in the connection closing with a 403 response to the client.
 TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
   InSequence s;
 
@@ -235,8 +260,8 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
 
-  request_callbacks_->onComplete(
-      makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied, {}, std::string{}, 403));
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied,
+                                                   {}, std::string{}, Http::Code::Forbidden));
 
   EXPECT_EQ(
       1U,

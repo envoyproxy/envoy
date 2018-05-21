@@ -9,7 +9,8 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
-* admin: added :http:get:`/config_dump` for dumping current configs
+* admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
+  version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
@@ -25,6 +26,9 @@ Version history
   representation of the bootstrap config and overrides --config-path.
 * cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
   to close tcp_proxy upstream connections when health checks fail.
+* cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
+  connections from hosts after they are removed from service discovery, regardless of health status.
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -45,6 +49,9 @@ Version history
   local configuration.
 * http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+* http: local responses to gRPC requests are now sent as trailers-only gRPC responses instead of plain HTTP responses.
+  Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
+  header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
@@ -57,6 +64,10 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
+* router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
+  already been proxied downstream when the timeout occurs. Previously, the response would be reset 
+  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
+  timeout will be ignored and the response will continue to proxy up to the global request timeout. 
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -69,9 +80,14 @@ Version history
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * stats: added support for histograms.
+* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
+* stats: updated stats sink interface to flush through a single call.
+* tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
+* websocket: support configuring
+  :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 
 1.6.0 (March 20, 2018)
 ======================

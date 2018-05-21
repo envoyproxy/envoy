@@ -52,8 +52,6 @@ public:
     stats_.update_attempt_.inc();
   }
 
-  const std::string versionInfo() const override { return version_info_; }
-
 private:
   void refresh() {
     ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
@@ -64,13 +62,11 @@ private:
       MessageUtil::loadFromFile(path_, message);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
-      callbacks_->onConfigUpdate(typed_resources);
-      version_info_ = message.version_info();
-      stats_.version_.set(HashUtil::xxHash64(version_info_));
+      callbacks_->onConfigUpdate(typed_resources, message.version_info());
+      stats_.version_.set(HashUtil::xxHash64(message.version_info()));
       stats_.update_success_.inc();
       ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
                 message.DebugString());
-      // TODO(htuch): Add some notion of current version for every API in stats/admin.
     } catch (const EnvoyException& e) {
       if (config_update_available) {
         ENVOY_LOG(warn, "Filesystem config update rejected: {}", e.what());
@@ -85,7 +81,6 @@ private:
 
   bool started_{};
   const std::string path_;
-  std::string version_info_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   SubscriptionStats stats_;

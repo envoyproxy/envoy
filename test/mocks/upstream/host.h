@@ -130,12 +130,12 @@ public:
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
-  MOCK_CONST_METHOD0(counters, std::list<Stats::CounterSharedPtr>());
+  MOCK_CONST_METHOD0(counters, std::vector<Stats::CounterSharedPtr>());
   MOCK_CONST_METHOD2(
       createConnection_,
       MockCreateConnectionData(Event::Dispatcher& dispatcher,
                                const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_CONST_METHOD0(gauges, std::list<Stats::GaugeSharedPtr>());
+  MOCK_CONST_METHOD0(gauges, std::vector<Stats::GaugeSharedPtr>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));

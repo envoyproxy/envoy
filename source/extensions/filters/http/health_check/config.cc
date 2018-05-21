@@ -13,7 +13,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
 
-Http::FilterFactoryCb HealthCheckFilterConfig::createFilter(
+Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::health_check::v2::HealthCheck& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   ASSERT(proto_config.has_pass_through_mode());
@@ -69,24 +69,13 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilter(
   };
 }
 
-/**
- * Config registration for the health check filter. @see NamedHttpFilterConfigFactory.
- */
 Http::FilterFactoryCb
 HealthCheckFilterConfig::createFilterFactory(const Json::Object& json_config,
                                              const std::string& stats_prefix,
                                              Server::Configuration::FactoryContext& context) {
   envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
   Config::FilterJson::translateHealthCheckFilter(json_config, proto_config);
-  return createFilter(proto_config, stats_prefix, context);
-}
-
-Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProto(
-    const Protobuf::Message& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      dynamic_cast<const envoy::config::filter::http::health_check::v2::HealthCheck&>(proto_config),
-      stats_prefix, context);
+  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 /**

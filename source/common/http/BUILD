@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_status_cc",
     ],
 )
 
@@ -115,7 +116,7 @@ envoy_cc_library(
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:wshandler_callback_interface",
+        "//include/envoy/http:websocket_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -137,7 +138,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/http/websocket:ws_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/runtime:uuid_util_lib",
@@ -248,6 +248,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:status_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",

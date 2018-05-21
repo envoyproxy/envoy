@@ -25,21 +25,21 @@ message CheckRequest {
   AttributeContext attributes = 1;
 }
 
-// Http attributes for denied responses.
+// Http attributes for a denied response.
 message DeniedHttpResponse {
   // Http status code.
-  envoy.api.v2.core.HttpStatus status = 1;
+  envoy.api.v2.core.HttpStatus status = 1 [(validate.rules).message.required = true];
 
   // Http entity headers.
   map<string, string> headers = 2;
-
+  
   // Http entity body.
   string body = 3;
 }
 
-// Http attributes for ok responses.
+// Http attributes for an ok response.
 message OkHttpResponse {
-  // Http entity headers.
+  // Http entity headers in addition to the original request headers.
   map<string, string> headers = 2;
 }
 

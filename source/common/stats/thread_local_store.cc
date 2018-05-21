@@ -14,7 +14,7 @@ namespace Stats {
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
-      num_last_resort_stats_(default_scope_->counter("stats.overflow")) {}
+      num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
@@ -22,13 +22,13 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(scopes_.empty());
 }
 
-std::list<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
+std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
-  std::list<CounterSharedPtr> ret;
+  std::vector<CounterSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto counter : scope->central_cache_.counters_) {
+    for (auto& counter : scope->central_cache_.counters_) {
       if (names.insert(counter.first).second) {
         ret.push_back(counter.second);
       }
@@ -45,13 +45,13 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   return std::move(new_scope);
 }
 
-std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
+std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
-  std::list<GaugeSharedPtr> ret;
+  std::vector<GaugeSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto gauge : scope->central_cache_.gauges_) {
+    for (auto& gauge : scope->central_cache_.gauges_) {
       if (names.insert(gauge.first).second) {
         ret.push_back(gauge.second);
       }
@@ -61,9 +61,9 @@ std::list<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   return ret;
 }
 
-std::list<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
+std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // Handle de-dup due to overlapping scopes.
-  std::list<ParentHistogramSharedPtr> ret;
+  std::vector<ParentHistogramSharedPtr> ret;
   std::unordered_set<std::string> names;
   std::unique_lock<std::mutex> lock(lock_);
   // TODO(ramaraochavali): As histograms don't share storage, there is a chance of duplicate names
@@ -101,8 +101,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
     merge_in_progress_ = true;
     tls_->runOnAllThreads(
         [this]() -> void {
-          for (const auto& scopes : tls_->getTyped<TlsCache>().scope_cache_) {
-            for (const auto& name_histogram_pair : scopes.second.histograms_) {
+          for (const auto& scope : tls_->getTyped<TlsCache>().scope_cache_) {
+            const TlsCacheEntry& tls_cache_entry = scope.second;
+            for (const auto& name_histogram_pair : tls_cache_entry.histograms_) {
               const TlsHistogramSharedPtr& tls_hist = name_histogram_pair.second;
               tls_hist->beginMerge();
             }
@@ -138,7 +139,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
-std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name, std::vector<Tag>& tags) {
+std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
+                                                 std::vector<Tag>& tags) const {
   return tag_producer_->produceTags(name, tags);
 }
 
@@ -300,7 +302,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
     return **tls_ref;
   }
 
-  std::unique_lock<std::mutex> lock(parent_.lock_);
   std::vector<Tag> tags;
   std::string tag_extracted_name = parent_.getTagsForName(name, tags);
   TlsHistogramSharedPtr hist_tls_ptr = std::make_shared<ThreadLocalHistogramImpl>(

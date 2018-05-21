@@ -233,12 +233,13 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   Http::TestHeaderMapImpl post_request_headers{
       {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-  sendRequestAndWaitForResponse(post_request_headers, 128, default_response_headers_, 256);
+  auto response =
+      sendRequestAndWaitForResponse(post_request_headers, 128, default_response_headers_, 256);
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(128, upstream_request_->bodyLength());
-  ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  EXPECT_EQ(256, response_->body().size());
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(256, response->body().size());
   checkStats();
   envoy::api::v2::core::Address expected_local_address;
   Network::Utility::addressToProtobufAddress(*codec_client_->connection()->remoteAddress(),
@@ -254,6 +255,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
   EXPECT_THAT(expected_remote_address, ProtoEq(trace.connection().remote_address()));
+  ASSERT_GE(trace.events().size(), 2);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 
@@ -263,18 +265,20 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   Http::TestHeaderMapImpl get_request_headers{
       {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-  sendRequestAndWaitForResponse(get_request_headers, 128, default_response_headers_, 256);
+  response =
+      sendRequestAndWaitForResponse(get_request_headers, 128, default_response_headers_, 256);
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(128, upstream_request_->bodyLength());
-  ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-  EXPECT_EQ(256, response_->body().size());
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(256, response->body().size());
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.connection().id());
+  ASSERT_GE(trace.events().size(), 2);
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "GET /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));
 }

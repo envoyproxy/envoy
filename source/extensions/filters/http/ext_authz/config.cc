@@ -17,17 +17,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
+Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  auto filter_config =
+  const auto filter_config =
       std::make_shared<FilterConfig>(proto_config, context.localInfo(), context.scope(),
                                      context.runtime(), context.clusterManager());
 
   if (proto_config.has_http_service()) {
-    const uint32_t timeout_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(), timeout, 200);
+    const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),
+                                                           timeout, DefaultTimeout);
     return [
       filter_config, timeout_ms, cluster_name = proto_config.http_service().server_uri().cluster(),
       path_prefix = proto_config.http_service().path_prefix()
@@ -39,10 +39,12 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
     };
   }
 
-  const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
+  const uint32_t timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
+
   return [ grpc_service = proto_config.grpc_service(), &context, filter_config,
            timeout_ms ](Http::FilterChainFactoryCallbacks & callbacks) {
-    auto async_client_factory =
+    const auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
             grpc_service, context.scope(), true);
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
@@ -51,22 +53,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilter(
         std::make_shared<Filter>(filter_config, std::move(client))});
   };
 };
-
-Http::FilterFactoryCb
-ExtAuthzFilterConfig::createFilterFactory(const Json::Object&, const std::string&,
-                                          Server::Configuration::FactoryContext&) {
-  NOT_IMPLEMENTED;
-}
-
-Http::FilterFactoryCb
-ExtAuthzFilterConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                                                   const std::string& stats_prefix,
-                                                   Server::Configuration::FactoryContext& context) {
-  return createFilter(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),
-      stats_prefix, context);
-}
 
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.

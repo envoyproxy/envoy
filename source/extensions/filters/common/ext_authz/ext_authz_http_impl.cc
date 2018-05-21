@@ -1,10 +1,9 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
-#include "absl/strings/str_cat.h"
-
 #include "common/common/enum_to_int.h"
 #include "common/http/async_client_impl.h"
 
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,21 +73,21 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
       response->headers().removeContentLength();
       response->headers().removeContentType();
       authz_response->status = CheckStatus::OK;
+      authz_response->status_code = Http::Code::OK;
     } else {
       authz_response->status = CheckStatus::Denied;
-      authz_response->body = std::move(response->body());
+      authz_response->body = response->bodyAsString();
+      authz_response->status_code = static_cast<Http::Code>(status_code);
     }
-    authz_response->status_code = enumToInt(status_code);
   } else {
-    authz_response->status_code = enumToInt(Http::Code::Forbidden);
+    authz_response->status_code = Http::Code::Forbidden;
     authz_response->status = CheckStatus::Denied;
   }
 
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        static_cast<KeyValueHeaders*>(context)->emplace_back(
-            std::make_pair(Http::LowerCaseString{header.key().c_str()},
-                           std::string{header.value().getStringView()}));
+        static_cast<KeyValueHeaders*>(context)->emplace_back(std::make_pair(
+            Http::LowerCaseString{header.key().c_str()}, std::string{header.value().c_str()}));
         return Http::HeaderMap::Iterate::Continue;
       },
       &authz_response->headers);

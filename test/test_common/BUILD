@@ -19,6 +19,7 @@ envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":network_utility_lib",
         "//include/envoy/server:options_interface",
@@ -83,6 +84,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

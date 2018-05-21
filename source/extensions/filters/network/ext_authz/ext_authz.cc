@@ -35,8 +35,8 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
     // sufficient information to fillout the checkRequest_.
     callCheck();
   }
-  return status_ == Status::Calling ? Network::FilterStatus::StopIteration
-                                    : Network::FilterStatus::Continue;
+  return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration
+                                              : Network::FilterStatus::Continue;
 }
 
 Network::FilterStatus Filter::onNewConnection() {
@@ -79,6 +79,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   } else {
+    // Let the filter chain continue.
+    filter_return_ = FilterReturn::Continue;
     if (config_->failureModeAllow() &&
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.

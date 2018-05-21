@@ -229,6 +229,12 @@ public:
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
   MOCK_CONST_METHOD0(useWebSocket, bool());
+  MOCK_CONST_METHOD5(createWebSocketProxy,
+                     Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
+                                             const RequestInfo::RequestInfo& request_info,
+                                             Http::WebSocketProxyCallbacks& callbacks,
+                                             Upstream::ClusterManager& cluster_manager,
+                                             Network::ReadFilterCallbacks* read_callbacks));
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
@@ -297,7 +303,6 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD0(routeConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
   MOCK_METHOD3(getRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
@@ -307,8 +312,8 @@ public:
       getStaticRouteConfigProvider,
       RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                    Server::Configuration::FactoryContext& factory_context));
-
-  MOCK_METHOD1(removeRouteConfigProvider, void(const std::string& identifier));
+  MOCK_METHOD0(getRdsRouteConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
+  MOCK_METHOD0(getStaticRouteConfigProviders, std::vector<RouteConfigProviderSharedPtr>());
 };
 
 } // namespace Router

@@ -25,46 +25,6 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-/**
- * This is a heap test allocator that works similar to how the shared memory allocator works in
- * terms of reference counting, etc.
- */
-class TestAllocator : public RawStatDataAllocator {
-public:
-  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
-
-  RawStatData* alloc(const std::string& name) override {
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
-    if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
-    } else {
-      stat_ref->ref_count_++;
-    }
-
-    return stat_ref.get();
-  }
-
-  void free(RawStatData& data) override {
-    if (--data.ref_count_ > 0) {
-      return;
-    }
-
-    for (auto i = stats_.begin(); i != stats_.end(); i++) {
-      if (i->second.get() == &data) {
-        stats_.erase(i);
-        return;
-      }
-    }
-
-    FAIL();
-  }
-
-private:
-  static void freeAdapter(RawStatData* data) { ::free(data); }
-  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
-};
-
 class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
 public:
   StatsThreadLocalStoreTest() {
@@ -117,7 +77,7 @@ public:
     EXPECT_CALL(*this, free(_));
   }
 
-  NameHistogramMap makeHistogramMap(const std::list<ParentHistogramSharedPtr>& hist_list) {
+  NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
     for (const Stats::ParentHistogramSharedPtr& histogram : hist_list) {
       // Exclude the scope part of the name.
@@ -137,7 +97,7 @@ public:
 
     EXPECT_TRUE(merge_called);
 
-    std::list<ParentHistogramSharedPtr> histogram_list = store_->histograms();
+    std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
     histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
     histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
@@ -306,6 +266,23 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
+// Validate that we sanitize away bad characters in the stats prefix.
+TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
+  EXPECT_CALL(*this, alloc(_));
+  Counter& c1 = scope1->counter("c1");
+  EXPECT_EQ("scope1___foo.c1", c1.name());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_)).Times(2);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -316,11 +293,15 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(2UL, store_->counters().size());
   CounterSharedPtr c1 = store_->counters().front();
   EXPECT_EQ("scope1.c1", c1->name());
+  EXPECT_EQ(store_->source().cachedCounters().front(), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
+  EXPECT_EQ(2UL, store_->source().cachedCounters().size());
+  store_->source().clearCache();
+  EXPECT_EQ(1UL, store_->source().cachedCounters().size());
 
   EXPECT_CALL(*this, free(_));
   EXPECT_EQ(1L, c1.use_count());

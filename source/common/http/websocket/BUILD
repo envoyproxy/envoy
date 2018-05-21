@@ -15,7 +15,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:wshandler_callback_interface",
+        "//include/envoy/http:websocket_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/router:router_interface",
@@ -24,6 +24,6 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
-        "//source/extensions/filters/network/tcp_proxy",
+        "//source/common/tcp_proxy",
     ],
 )

@@ -89,7 +89,15 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
 
+  std::chrono::milliseconds statsFlushInterval() const override {
+    return config_->statsFlushInterval();
+  }
+
   // Server::ListenerComponentFactory
+  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+    return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
+                                        initManager(), localInfo(), stats(), listenerManager());
+  }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
       Configuration::FactoryContext& context) override {

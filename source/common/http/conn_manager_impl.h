@@ -25,9 +25,10 @@
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
+#include "common/grpc/common.h"
 #include "common/http/conn_manager_config.h"
 #include "common/http/user_agent.h"
-#include "common/http/websocket/ws_handler_impl.h"
+#include "common/http/utility.h"
 #include "common/request_info/request_info_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -165,6 +166,10 @@ private:
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
+    void sendLocalReply(Code code, const std::string& body,
+                        std::function<void(HeaderMap& headers)> modify_headers) override {
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers);
+    }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -178,10 +183,19 @@ private:
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
 
+    // Each decoder filter instance checks if the request passed to the filter is gRPC
+    // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
+    // called here may change the content type, so we must check it before the call.
+    FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
+      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+      return handle_->decodeHeaders(headers, end_stream);
+    }
+
     void requestDataTooLarge();
     void requestDataDrained();
 
     StreamDecoderFilterSharedPtr handle_;
+    bool is_grpc_request_{};
   };
 
   typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
@@ -241,7 +255,7 @@ private:
                         public StreamCallbacks,
                         public StreamDecoder,
                         public FilterChainFactoryCallbacks,
-                        public WsHandlerCallbacks,
+                        public WebSocketProxyCallbacks,
                         public Tracing::Config {
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
@@ -258,6 +272,8 @@ private:
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
+                        std::function<void(HeaderMap& headers)> modify_headers);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
@@ -289,7 +305,7 @@ private:
     }
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
-    // Http::WsHandlerCallbacks
+    // Http::WebSocketProxyCallbacks
     void sendHeadersOnlyResponse(HeaderMap& headers) override {
       encodeHeaders(nullptr, headers, true);
     }
@@ -417,7 +433,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cluster_manager_;
-  WebSocket::WsHandlerImplPtr ws_connection_{};
+  WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
 };

@@ -80,7 +80,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromJson(json), true));
+        Server::parseListenerFromJson(json), "", true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();

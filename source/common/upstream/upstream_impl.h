@@ -134,12 +134,12 @@ public:
   }
 
   // Upstream::Host
-  std::list<Stats::CounterSharedPtr> counters() const override { return stats_store_.counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() const override { return stats_store_.counters(); }
   CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
   CreateConnectionData createHealthCheckConnection(Event::Dispatcher& dispatcher) const override;
-  std::list<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() const override { return stats_store_.gauges(); }
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
@@ -360,6 +360,8 @@ public:
     return cluster_socket_options_;
   };
 
+  bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -398,6 +400,7 @@ private:
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
+  const bool drain_connections_on_host_removal_;
 };
 
 /**
@@ -515,7 +518,7 @@ protected:
   using ClusterImplBase::ClusterImplBase;
 
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
-                             HostVector& hosts_added, HostVector& hosts_removed, bool depend_on_hc);
+                             HostVector& hosts_added, HostVector& hosts_removed);
 };
 
 /**

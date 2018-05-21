@@ -14,8 +14,10 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/c_smart_ptr.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -340,8 +342,46 @@ public:
 
 } // namespace Http
 
+namespace Stats {
+/**
+ * This is a heap test allocator that works similar to how the shared memory allocator works in
+ * terms of reference counting, etc.
+ */
+class TestAllocator : public RawStatDataAllocator {
+public:
+  ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
+
+  RawStatData* alloc(const std::string& name) override {
+    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
+    if (!stat_ref) {
+      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
+      stat_ref->initialize(name);
+    } else {
+      stat_ref->ref_count_++;
+    }
+
+    return stat_ref.get();
+  }
+
+  void free(RawStatData& data) override {
+    if (--data.ref_count_ > 0) {
+      return;
+    }
+
+    if (stats_.erase(std::string(data.name_)) == 0) {
+      FAIL();
+    }
+  }
+
+private:
+  static void freeAdapter(RawStatData* data) { ::free(data); }
+  std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
+};
+
+} // namespace Stats
+
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
 
-} // Envoy
+} // namespace Envoy
