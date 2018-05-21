@@ -2,7 +2,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "absl/base/thread_annotations.h"
+#include "common/common/thread_annotations.h"
 
 namespace Envoy {
 namespace Thread {
