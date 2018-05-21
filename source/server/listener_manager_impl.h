@@ -302,20 +302,33 @@ public:
 private:
   void addFilterChain(const std::vector<std::string>& server_names,
                       const std::string& transport_protocol,
+                      const std::vector<std::string>& application_protocols,
                       Network::TransportSocketFactoryPtr&& transport_socket_factory,
                       std::vector<Network::FilterFactoryCb> filters_factory);
+  void addFilterChainForApplicationProtocols(
+      std::unordered_map<std::string, Network::FilterChainSharedPtr>& transport_protocol_map,
+      const std::vector<std::string>& application_protocols,
+      const Network::FilterChainSharedPtr& filter_chain);
   const Network::FilterChain* findFilterChainForServerName(
-      const std::unordered_map<std::string, Network::FilterChainSharedPtr>& server_name_match,
+      const std::unordered_map<std::string,
+                               std::unordered_map<std::string, Network::FilterChainSharedPtr>>&
+          server_name_match,
+      const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain* findFilterChainForApplicationProtocols(
+      const std::unordered_map<std::string, Network::FilterChainSharedPtr>&
+          transport_protocol_match,
       const Network::ConnectionSocket& socket) const;
   static bool isWildcardServerName(const std::string& name);
 
   // Mapping of FilterChain's configured server name and transport protocol, i.e.
-  //   map[server_name][transport_protocol] => FilterChain
+  //   map[server_name][transport_protocol][application_protocol] => FilterChainSharedPtr
   //
   // For the server_name lookups, both exact server names and wildcard domains are part of the same
   // map, in which wildcard domains are prefixed with "." (i.e. ".example.com" for "*.example.com")
   // to differentiate between exact and wildcard entries.
-  std::unordered_map<std::string, std::unordered_map<std::string, Network::FilterChainSharedPtr>>
+  std::unordered_map<
+      std::string, std::unordered_map<
+                       std::string, std::unordered_map<std::string, Network::FilterChainSharedPtr>>>
       filter_chains_;
 
   ListenerManagerImpl& parent_;

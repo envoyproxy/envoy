@@ -178,9 +178,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
     filter_chains.insert(filter_chain_match);
 
-    std::vector<std::string> server_names(filter_chain_match.sni_domains().begin(),
-                                          filter_chain_match.sni_domains().end());
-
     // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
     // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
     // We copy by value first then override if necessary.
@@ -200,12 +197,20 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
 
-    addFilterChain(server_names, filter_chain_match.transport_protocol(),
+    std::vector<std::string> server_names(filter_chain_match.sni_domains().begin(),
+                                          filter_chain_match.sni_domains().end());
+
+    std::vector<std::string> application_protocols(
+        filter_chain_match.application_protocols().begin(),
+        filter_chain_match.application_protocols().end());
+
+    addFilterChain(server_names, filter_chain_match.transport_protocol(), application_protocols,
                    config_factory.createTransportSocketFactory(*message, *this, server_names),
                    parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
     need_tls_inspector = filter_chain_match.transport_protocol() == "tls" ||
-                         (filter_chain_match.transport_protocol().empty() && !server_names.empty());
+                         (filter_chain_match.transport_protocol().empty() &&
+                          (!server_names.empty() || !application_protocols.empty()));
   }
 
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
@@ -249,21 +254,39 @@ bool ListenerImpl::isWildcardServerName(const std::string& name) {
 
 void ListenerImpl::addFilterChain(const std::vector<std::string>& server_names,
                                   const std::string& transport_protocol,
+                                  const std::vector<std::string>& application_protocols,
                                   Network::TransportSocketFactoryPtr&& transport_socket_factory,
                                   std::vector<Network::FilterFactoryCb> filters_factory) {
   const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
                                                               std::move(filters_factory));
   // Save mappings.
   if (server_names.empty()) {
-    filter_chains_[EMPTY_STRING][transport_protocol] = filter_chain;
+    addFilterChainForApplicationProtocols(filter_chains_[EMPTY_STRING][transport_protocol],
+                                          application_protocols, filter_chain);
   } else {
     for (const auto& server_name : server_names) {
       if (isWildcardServerName(server_name)) {
         // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
-        filter_chains_[server_name.substr(1)][transport_protocol] = filter_chain;
+        addFilterChainForApplicationProtocols(
+            filter_chains_[server_name.substr(1)][transport_protocol], application_protocols,
+            filter_chain);
       } else {
-        filter_chains_[server_name][transport_protocol] = filter_chain;
+        addFilterChainForApplicationProtocols(filter_chains_[server_name][transport_protocol],
+                                              application_protocols, filter_chain);
       }
+    }
+  }
+}
+
+void ListenerImpl::addFilterChainForApplicationProtocols(
+    std::unordered_map<std::string, Network::FilterChainSharedPtr>& transport_protocol_map,
+    const std::vector<std::string>& application_protocols,
+    const Network::FilterChainSharedPtr& filter_chain) {
+  if (application_protocols.empty()) {
+    transport_protocol_map[EMPTY_STRING] = filter_chain;
+  } else {
+    for (const auto& application_protocol : application_protocols) {
+      transport_protocol_map[application_protocol] = filter_chain;
     }
   }
 }
@@ -298,19 +321,41 @@ ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
 }
 
 const Network::FilterChain* ListenerImpl::findFilterChainForServerName(
-    const std::unordered_map<std::string, Network::FilterChainSharedPtr>& server_name_match,
+    const std::unordered_map<std::string,
+                             std::unordered_map<std::string, Network::FilterChainSharedPtr>>&
+        server_name_match,
     const Network::ConnectionSocket& socket) const {
   const std::string transport_protocol(socket.detectedTransportProtocol());
 
   // Match on exact transport protocol, e.g. "tls".
   const auto transport_protocol_match = server_name_match.find(transport_protocol);
   if (transport_protocol_match != server_name_match.end()) {
-    return transport_protocol_match->second.get();
+    return findFilterChainForApplicationProtocols(transport_protocol_match->second, socket);
   }
 
   // Match on a filter chain without transport protocol requirements.
   const auto any_protocol_match = server_name_match.find(EMPTY_STRING);
   if (any_protocol_match != server_name_match.end()) {
+    return findFilterChainForApplicationProtocols(any_protocol_match->second, socket);
+  }
+
+  return nullptr;
+}
+
+const Network::FilterChain* ListenerImpl::findFilterChainForApplicationProtocols(
+    const std::unordered_map<std::string, Network::FilterChainSharedPtr>& transport_protocol_match,
+    const Network::ConnectionSocket& socket) const {
+  // Match on exact application protocol, e.g. "h2" or "http/1.1".
+  for (const auto& application_protocol : socket.requestedApplicationProtocols()) {
+    const auto application_protocol_match = transport_protocol_match.find(application_protocol);
+    if (application_protocol_match != transport_protocol_match.end()) {
+      return application_protocol_match->second.get();
+    }
+  }
+
+  // Match on a filter chain without application protocol requirements.
+  const auto any_protocol_match = transport_protocol_match.find(EMPTY_STRING);
+  if (any_protocol_match != transport_protocol_match.end()) {
     return any_protocol_match->second.get();
   }
 
