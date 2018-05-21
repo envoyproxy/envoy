@@ -13,6 +13,8 @@ envoy_cc_test(
     srcs = ["owned_impl_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

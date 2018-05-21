@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 
 #include "event2/buffer.h"
@@ -94,7 +95,42 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
 }
 
 int OwnedImpl::read(int fd, uint64_t max_length) {
-  return evbuffer_read(buffer_.get(), fd, max_length);
+  if (max_length == 0) {
+    return 0;
+  }
+  constexpr uint64_t MaxSlices = 2;
+  RawSlice slices[MaxSlices];
+  const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
+  struct iovec iov[num_slices];
+  uint64_t num_slices_to_read = 0;
+  uint64_t num_bytes_to_read = 0;
+  for (; num_slices_to_read < num_slices && num_bytes_to_read < max_length; num_slices_to_read++) {
+    iov[num_slices_to_read].iov_base = slices[num_slices_to_read].mem_;
+    const size_t slice_length = std::min(slices[num_slices_to_read].len_,
+                                         static_cast<size_t>(max_length - num_bytes_to_read));
+    iov[num_slices_to_read].iov_len = slice_length;
+    num_bytes_to_read += slice_length;
+  }
+  ASSERT(num_slices_to_read <= MaxSlices);
+  ASSERT(num_bytes_to_read <= max_length);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const ssize_t rc = os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
+  if (rc < 0) {
+    return rc;
+  }
+  uint64_t num_slices_to_commit = 0;
+  uint64_t bytes_to_commit = rc;
+  ASSERT(bytes_to_commit <= max_length);
+  while (bytes_to_commit != 0) {
+    slices[num_slices_to_commit].len_ =
+        std::min(slices[num_slices_to_commit].len_, static_cast<size_t>(bytes_to_commit));
+    ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
+    bytes_to_commit -= slices[num_slices_to_commit].len_;
+    num_slices_to_commit++;
+  }
+  ASSERT(num_slices_to_commit <= num_slices);
+  commit(slices, num_slices_to_commit);
+  return rc;
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -115,7 +151,29 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-int OwnedImpl::write(int fd) { return evbuffer_write(buffer_.get(), fd); }
+int OwnedImpl::write(int fd) {
+  constexpr uint64_t MaxSlices = 16;
+  RawSlice slices[MaxSlices];
+  const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
+  struct iovec iov[num_slices];
+  uint64_t num_slices_to_write = 0;
+  for (uint64_t i = 0; i < num_slices; i++) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      iov[num_slices_to_write].iov_base = slices[i].mem_;
+      iov[num_slices_to_write].iov_len = slices[i].len_;
+      num_slices_to_write++;
+    }
+  }
+  if (num_slices_to_write == 0) {
+    return 0;
+  }
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const ssize_t rc = os_syscalls.writev(fd, iov, num_slices_to_write);
+  if (rc > 0) {
+    drain(static_cast<uint64_t>(rc));
+  }
+  return static_cast<int>(rc);
+}
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}
 

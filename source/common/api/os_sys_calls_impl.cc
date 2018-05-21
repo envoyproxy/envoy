@@ -21,6 +21,14 @@ ssize_t OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
   return ::write(fd, buffer, num_bytes);
 }
 
+ssize_t OsSysCallsImpl::writev(int fd, const iovec* iovec, int num_iovec) {
+  return ::writev(fd, iovec, num_iovec);
+}
+
+ssize_t OsSysCallsImpl::readv(int fd, const iovec* iovec, int num_iovec) {
+  return ::readv(fd, iovec, num_iovec);
+}
+
 ssize_t OsSysCallsImpl::recv(int socket, void* buffer, size_t length, int flags) {
   return ::recv(socket, buffer, length, flags);
 }
