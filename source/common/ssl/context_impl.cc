@@ -117,6 +117,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
 
   if (!config.verifyCertificateHashList().empty()) {
     for (auto hash : config.verifyCertificateHashList()) {
+      // Remove colons from the 95 chars long colon-separated "fingerprint"
+      // in order to get the hex-encoded string.
       if (hash.size() == 95) {
         hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
       }
