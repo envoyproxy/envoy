@@ -519,7 +519,8 @@ message RouteAction {
       string name = 1 [(validate.rules).string.min_bytes = 1];
 
       // If specified, a cookie with the TTL will be generated if the cookie is
-      // not present.
+      // not present. If the TTL is present and zero, the generated cookie will
+      // be a session cookie.
       google.protobuf.Duration ttl = 2 [(gogoproto.stdduration) = true];
     }
 

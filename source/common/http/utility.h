@@ -70,7 +70,8 @@ public:
    * Produce the value for a Set-Cookie header with the given parameters.
    * @param key is the name of the cookie that is being set.
    * @param value the value to set the cookie to; this value is trusted.
-   * @param max_age the length of time for which the cookie is valid.
+   * @param max_age the length of time for which the cookie is valid, or zero
+   * to create a session cookie.
    * @return std::string a valid Set-Cookie header value string
    */
   static std::string makeSetCookieValue(const std::string& key, const std::string& value,
