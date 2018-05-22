@@ -149,8 +149,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   // SNI-based selection logic isn't happening in Ssl::SslSocket anymore.
   ASSERT(server_proto.filter_chains().size() == 1);
   const auto& filter_chain = server_proto.filter_chains(0);
-  std::vector<std::string> server_names(filter_chain.filter_chain_match().sni_domains().begin(),
-                                        filter_chain.filter_chain_match().sni_domains().end());
+  std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
+                                        filter_chain.filter_chain_match().server_names().end());
   Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context());
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         server_names);
