@@ -134,7 +134,7 @@ message CertificateValidationContext {
   //
   // .. code-block:: bash
   //
-  //   $ openssl x509 -in path/to/client.crt -outform DER | sha256sum | cut -d" " -f1
+  //   $ openssl x509 -in path/to/client.crt -outform DER | openssl dgst -sha256 | cut -d" " -f2
   //   df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a
   //
   // A long hex-encoded and colon-separated SHA-256 (a.k.a. "fingerprint") of the certificate
