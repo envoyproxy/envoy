@@ -6,8 +6,7 @@
 #include <string>
 
 #include "envoy/secret/secret.h"
-
-#include "common/secret/secret_manager_impl.h"
+#include "envoy/secret/secret_manager.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,7 +21,7 @@ public:
   ~MockSecretManager();
 
   MOCK_METHOD1(addOrUpdateStaticSecret, bool(const SecretSharedPtr secret));
-  MOCK_METHOD1(getStaticSecret, SecretSharedPtr(const std::string& name));
+  MOCK_CONST_METHOD1(staticSecret, const SecretSharedPtr(const std::string& name));
 };
 
 } // namespace Secret

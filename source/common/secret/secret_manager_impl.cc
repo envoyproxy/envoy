@@ -11,7 +11,7 @@ bool SecretManagerImpl::addOrUpdateStaticSecret(const SecretSharedPtr secret) {
   return true;
 }
 
-SecretSharedPtr SecretManagerImpl::getStaticSecret(const std::string& name) {
+const SecretSharedPtr SecretManagerImpl::staticSecret(const std::string& name) const {
   auto static_secret = static_secrets_.find(name);
   return (static_secret != static_secrets_.end()) ? static_secret->second : nullptr;
 }

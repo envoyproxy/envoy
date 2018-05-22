@@ -47,7 +47,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           return Config::DataSource::read(config.tls_certificates()[0].certificate_chain(), true);
         } else if (!config.tls_certificate_sds_secret_configs().empty()) {
           auto static_secret =
-              secret_manager.getStaticSecret(config.tls_certificate_sds_secret_configs()[0].name());
+              secret_manager.staticSecret(config.tls_certificate_sds_secret_configs()[0].name());
           if (static_secret == nullptr) {
             throw EnvoyException(
                 fmt::format("Static secret is not defined: {}",
@@ -68,7 +68,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
         } else if (!config.tls_certificate_sds_secret_configs().empty()) {
           // static SDS secret
           auto static_secret =
-              secret_manager.getStaticSecret(config.tls_certificate_sds_secret_configs()[0].name());
+              secret_manager.staticSecret(config.tls_certificate_sds_secret_configs()[0].name());
           if (static_secret == nullptr) {
             throw EnvoyException(
                 fmt::format("Static secret is not defined: {}",

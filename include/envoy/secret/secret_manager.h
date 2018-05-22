@@ -31,7 +31,7 @@ public:
   /**
    * @return the static secret for the given name
    */
-  virtual SecretSharedPtr getStaticSecret(const std::string& name) PURE;
+  virtual const SecretSharedPtr staticSecret(const std::string& name) const PURE;
 };
 
 } // namespace Secret

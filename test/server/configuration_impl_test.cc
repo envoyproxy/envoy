@@ -390,8 +390,8 @@ TEST_F(ConfigurationImplTest, StaticSecretRead) {
   config.initialize(bootstrap, server_, cluster_manager_factory_);
 
   EXPECT_EQ(kExpectedCertificateChain,
-            server_.secretManager().getStaticSecret("abc.com")->certificateChain());
-  EXPECT_EQ(kExpectedPrivateKey, server_.secretManager().getStaticSecret("abc.com")->privateKey());
+            server_.secretManager().staticSecret("abc.com")->certificateChain());
+  EXPECT_EQ(kExpectedPrivateKey, server_.secretManager().staticSecret("abc.com")->privateKey());
 }
 
 } // namespace Configuration
