@@ -176,11 +176,7 @@ void FileImpl::flushThreadFunc() {
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
       while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
-        // CondVar::wait() does not throw, and never will, as it's based on
-        // absl::CondVar, so it's safe to pass the mutex to wait() directly,
-        // bypassing the guard. See definition of CondVar in
-        // source/source/thread.h for an alterante implementation, which does
-        // not work with thread annotation.
+        // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
       }
 

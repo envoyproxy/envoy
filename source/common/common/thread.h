@@ -57,12 +57,18 @@ private:
  */
 class CondVar {
 public:
-  // Note that it is not necessary to be holding an associated mutex to call signal).
-  // See the discussion in
+  // Note that it is not necessary to be holding an associated mutex to call
+  // notifyOne or notifyAll. See the discussion in
   //     http://en.cppreference.com/w/cpp/thread/condition_variable_any/notify_one
   // for more details.
   void notifyOne() noexcept { condvar_.Signal(); }
   void notifyAll() noexcept { condvar_.SignalAll(); };
+
+  // wait() and waitFor do not throw, and never will, as they are based on
+  // absl::CondVar, so it's safe to pass the a mutex to wait() directly, even if
+  // it's also managed by a LockGuard. See definition of CondVar in
+  // source/source/thread.h for an alternate implementation, which does not work
+  // with thread annotation.
   void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.Wait(&mutex.mutex_);
   }
