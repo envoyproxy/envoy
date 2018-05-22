@@ -923,8 +923,8 @@ message HeaderMatcher {
   }
 
   // If specified, header match will be performed based on if the header value is *not* the value
-  // specified or if the header is not present.  Defaults to false.
-  google.protobuf.BoolValue invert_match = 7;
+  // specified or if the header is not present. Defaults to false.
+  bool invert_match = 7;
 }
 
 // Query parameter matching treats the query string of a request's :path header

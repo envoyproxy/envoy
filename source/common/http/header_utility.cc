@@ -22,7 +22,7 @@ namespace Http {
 //     here, using half open interval semantics [start,end).
 HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
     : name_(config.name()),
-      invert_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, invert_match, false)) {
+      invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
   case envoy::api::v2::route::HeaderMatcher::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
