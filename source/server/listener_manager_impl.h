@@ -201,7 +201,7 @@ public:
    */
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool modifiable,
-               bool workers_started, uint64_t hash, Secret::SecretManager& secret_manager);
+               bool workers_started, uint64_t hash);
   ~ListenerImpl();
 
   /**
@@ -298,7 +298,6 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
-  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 private:
   void addFilterChain(const std::vector<std::string>& server_names,
@@ -353,7 +352,6 @@ private:
   const envoy::api::v2::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
-  Secret::SecretManager& secret_manager_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
