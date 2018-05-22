@@ -52,11 +52,7 @@ public:
   }
 
   // Stats::Sink
-  void beginFlush() override {}
-  void flushCounter(const Stats::Counter& counter, uint64_t delta) override;
-  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
-  void flushHistogram(const Stats::ParentHistogram&) override {}
-  void endFlush() override {}
+  void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   // Called in unit test to validate writer construction and address.
@@ -85,20 +81,7 @@ public:
                 Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
-  void beginFlush() override { tls_->getTyped<TlsSink>().beginFlush(true); }
-
-  void flushCounter(const Stats::Counter& counter, uint64_t delta) override {
-    tls_->getTyped<TlsSink>().flushCounter(counter.name(), delta);
-  }
-
-  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override {
-    tls_->getTyped<TlsSink>().flushGauge(gauge.name(), value);
-  }
-
-  void flushHistogram(const Stats::ParentHistogram&) override {}
-
-  void endFlush() override { tls_->getTyped<TlsSink>().endFlush(true); }
-
+  void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
     // For statsd histograms are all timers.
     tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),

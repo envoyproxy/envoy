@@ -231,10 +231,7 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
   return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-void FaultFilter::onDestroy() {
-  resetTimerState();
-  stream_destroyed_ = true;
-}
+void FaultFilter::onDestroy() { resetTimerState(); }
 
 void FaultFilter::postDelayInjection() {
   resetTimerState();
@@ -250,8 +247,8 @@ void FaultFilter::postDelayInjection() {
 
 void FaultFilter::abortWithHTTPStatus() {
   callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::FaultInjected);
-  Http::Utility::sendLocalReply(*callbacks_, stream_destroyed_,
-                                static_cast<Http::Code>(abortHttpStatus()), "fault filter abort");
+  callbacks_->sendLocalReply(static_cast<Http::Code>(abortHttpStatus()), "fault filter abort",
+                             nullptr);
   recordAbortsInjectedStats();
 }
 

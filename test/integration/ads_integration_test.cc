@@ -86,9 +86,8 @@ public:
     Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-    return std::make_unique<Ssl::ServerSslSocketFactory>(cfg, EMPTY_STRING,
-                                                         std::vector<std::string>{}, true,
-                                                         context_manager_, *upstream_stats_store);
+    return std::make_unique<Ssl::ServerSslSocketFactory>(
+        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
   AssertionResult

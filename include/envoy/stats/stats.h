@@ -220,9 +220,51 @@ public:
    * Returns the cumulative histogram summary statistics.
    */
   virtual const HistogramStatistics& cumulativeStatistics() const PURE;
+
+  /**
+   * Returns the summary representation.
+   */
+  virtual const std::string summary() const PURE;
 };
 
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
+
+/**
+ * Provides cached access to a particular store's stats.
+ */
+class Source {
+public:
+  virtual ~Source() {}
+
+  /**
+   * Returns all known counters. Will use cached values if already accessed and clearCache() hasn't
+   * been called since.
+   * @return std::vector<CounterSharedPtr>& all known counters. Note: reference may not be valid
+   * after clearCache() is called.
+   */
+  virtual const std::vector<CounterSharedPtr>& cachedCounters() PURE;
+
+  /**
+   * Returns all known gauges. Will use cached values if already accessed and clearCache() hasn't
+   * been called since.
+   * @return std::vector<GaugeSharedPtr>& all known gauges. Note: reference may not be valid after
+   * clearCache() is called.
+   */
+  virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
+
+  /**
+   * Returns all known parent histograms. Will use cached values if already accessed and
+   * clearCache() hasn't been called since.
+   * @return std::vector<ParentHistogramSharedPtr>& all known histograms. Note: reference may not be
+   * valid after clearCache() is called.
+   */
+  virtual const std::vector<ParentHistogramSharedPtr>& cachedHistograms() PURE;
+
+  /**
+   * Resets the cache so that any future calls to get cached metrics will refresh the set.
+   */
+  virtual void clearCache() PURE;
+};
 
 /**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
@@ -232,34 +274,16 @@ public:
   virtual ~Sink() {}
 
   /**
-   * This will be called before a sequence of flushCounter() and flushGauge() calls. Sinks can
-   * choose to optimize writing if desired with a paired endFlush() call.
+   * Periodic metric flush to the sink.
+   * @param source interface through which the sink can access all metrics being flushed.
    */
-  virtual void beginFlush() PURE;
+  virtual void flush(Source& source) PURE;
 
   /**
-   * Flush a counter delta.
-   */
-  virtual void flushCounter(const Counter& counter, uint64_t delta) PURE;
-
-  /**
-   * Flush a gauge value.
-   */
-  virtual void flushGauge(const Gauge& gauge, uint64_t value) PURE;
-
-  /**
-   * Flush a histogram.
-   */
-  virtual void flushHistogram(const ParentHistogram& histogram) PURE;
-
-  /**
-   * This will be called after beginFlush(), some number of flushCounter(), and some number of
-   * flushGauge(). Sinks can use this to optimize writing if desired.
-   */
-  virtual void endFlush() PURE;
-
-  /**
-   * Flush a histogram value.
+   * Flush a single histogram sample. Note: this call is called synchronously as a part of recording
+   * the metric, so implementations must be thread-safe.
+   * @param histogram the histogram that this sample applies to.
+   * @param value the value of the sample.
    */
   virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
 };
@@ -315,17 +339,17 @@ public:
   /**
    * @return a list of all known counters.
    */
-  virtual std::list<CounterSharedPtr> counters() const PURE;
+  virtual std::vector<CounterSharedPtr> counters() const PURE;
 
   /**
    * @return a list of all known gauges.
    */
-  virtual std::list<GaugeSharedPtr> gauges() const PURE;
+  virtual std::vector<GaugeSharedPtr> gauges() const PURE;
 
   /**
    * @return a list of all known histograms.
    */
-  virtual std::list<ParentHistogramSharedPtr> histograms() const PURE;
+  virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;
@@ -371,6 +395,12 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
+
+  /**
+   * Returns the Source to provide cached metrics.
+   * @return Source& the source.
+   */
+  virtual Source& source() PURE;
 };
 
 typedef std::unique_ptr<StoreRoot> StoreRootPtr;

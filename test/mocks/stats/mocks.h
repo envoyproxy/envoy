@@ -32,6 +32,9 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
 
+  bool used_;
+  uint64_t value_;
+  uint64_t latch_;
   std::string name_;
   std::vector<Tag> tags_;
 };
@@ -52,6 +55,8 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
 
+  bool used_;
+  uint64_t value_;
   std::string name_;
   std::vector<Tag> tags_;
 };
@@ -84,6 +89,7 @@ public:
   // creates a deadlock in gmock and is an unintended use of mock functions.
   const std::string& name() const override { return name_; };
   void merge() override {}
+  const std::string summary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
@@ -94,9 +100,25 @@ public:
 
   std::string name_;
   std::vector<Tag> tags_;
+  bool used_;
   Store* store_;
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
+};
+
+class MockSource : public Source {
+public:
+  MockSource();
+  ~MockSource();
+
+  MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
+  MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
+  MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
+  MOCK_METHOD0(clearCache, void());
+
+  std::vector<CounterSharedPtr> counters_;
+  std::vector<GaugeSharedPtr> gauges_;
+  std::vector<ParentHistogramSharedPtr> histograms_;
 };
 
 class MockSink : public Sink {
@@ -104,11 +126,7 @@ public:
   MockSink();
   ~MockSink();
 
-  MOCK_METHOD0(beginFlush, void());
-  MOCK_METHOD2(flushCounter, void(const Counter& counter, uint64_t delta));
-  MOCK_METHOD2(flushGauge, void(const Gauge& gauge, uint64_t value));
-  MOCK_METHOD1(flushHistogram, void(const ParentHistogram& histogram));
-  MOCK_METHOD0(endFlush, void());
+  MOCK_METHOD1(flush, void(Source& source));
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 
@@ -121,12 +139,12 @@ public:
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
   MOCK_METHOD1(counter, Counter&(const std::string&));
-  MOCK_CONST_METHOD0(counters, std::list<CounterSharedPtr>());
+  MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
-  MOCK_CONST_METHOD0(gauges, std::list<GaugeSharedPtr>());
+  MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
-  MOCK_CONST_METHOD0(histograms, std::list<ParentHistogramSharedPtr>());
+  MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;

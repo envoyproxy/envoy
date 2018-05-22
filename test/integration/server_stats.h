@@ -47,14 +47,14 @@ public:
   virtual Stats::GaugeSharedPtr gauge(const std::string& name) PURE;
 
   /**
-   * @return std::list<Stats::CounterSharedPtr> snapshot of server counters.
+   * @return std::vector<Stats::CounterSharedPtr> snapshot of server counters.
    */
-  virtual std::list<Stats::CounterSharedPtr> counters() PURE;
+  virtual std::vector<Stats::CounterSharedPtr> counters() PURE;
 
   /**
-   * @return std::list<Stats::GaugeSharedPtr> snapshot of server counters.
+   * @return std::vector<Stats::GaugeSharedPtr> snapshot of server counters.
    */
-  virtual std::list<Stats::GaugeSharedPtr> gauges() PURE;
+  virtual std::vector<Stats::GaugeSharedPtr> gauges() PURE;
 };
 
 } // namespace Envoy

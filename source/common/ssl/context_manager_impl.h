@@ -3,7 +3,6 @@
 #include <functional>
 #include <list>
 #include <shared_mutex>
-#include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
@@ -30,32 +29,22 @@ public:
    * admin purposes. When a caller frees a context it will tell us to release it also from the list
    * of contexts.
    */
-  void releaseClientContext(ClientContext* context);
-  void releaseServerContext(ServerContext* context, const std::string& listener_name,
-                            const std::vector<std::string>& server_names);
+  void releaseContext(Context* context);
 
   // Ssl::ContextManager
   Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
                                                const ClientContextConfig& config) override;
-  Ssl::ServerContextPtr createSslServerContext(const std::string& listener_name,
-                                               const std::vector<std::string>& server_names,
-                                               Stats::Scope& scope,
-                                               const ServerContextConfig& config,
-                                               bool skip_context_update) override;
-  Ssl::ServerContext* findSslServerContext(const std::string& listener_name,
-                                           const std::string& server_name) const override;
+  Ssl::ServerContextPtr
+  createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
+                         const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Context&)> callback) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 private:
-  static bool isWildcardServerName(const std::string& name);
-
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
   mutable std::shared_timed_mutex contexts_lock_;
-  std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_exact_;
-  std::unordered_map<std::string, std::unordered_map<std::string, ServerContext*>> map_wildcard_;
   Secret::SecretManager& secret_manager_;
 };
 

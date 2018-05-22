@@ -295,12 +295,12 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            bool enable_half_close)
-    : http_type_(type), transport_socket_factory_(std::move(transport_socket_factory)),
-      socket_(std::move(listen_socket)), api_(new Api::Impl(std::chrono::milliseconds(10000))),
+    : http_type_(type), socket_(std::move(listen_socket)),
+      api_(new Api::Impl(std::chrono::milliseconds(10000))),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close),
-      listener_(*this) {
+      allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
+      filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
   thread_.reset(new Thread::Thread([this]() -> void { threadRoutine(); }));
   server_initialized_.waitReady();
 }
@@ -315,7 +315,8 @@ void FakeUpstream::cleanUp() {
   }
 }
 
-bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection) {
+bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
+                                            const std::vector<Network::FilterFactoryCb>&) {
   std::unique_lock<std::mutex> lock(lock_);
   connection.readDisable(true);
   new_connections_.emplace_back(
@@ -410,7 +411,11 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
 }
 
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
+  std::unique_lock<std::mutex> lock(lock_);
+  ASSERT_FALSE(disconnected_);
   connection_.dispatcher().post([data, end_stream, this]() -> void {
+    std::unique_lock<std::mutex> lock(lock_);
+    ASSERT_FALSE(disconnected_);
     Buffer::OwnedImpl to_write(data);
     connection_.write(to_write, end_stream);
   });

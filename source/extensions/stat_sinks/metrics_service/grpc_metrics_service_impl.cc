@@ -61,7 +61,7 @@ void GrpcMetricsStreamerImpl::ThreadLocalStreamer::send(
 MetricsServiceSink::MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer)
     : grpc_metrics_streamer_(grpc_metrics_streamer) {}
 
-void MetricsServiceSink::flushCounter(const Stats::Counter& counter, uint64_t) {
+void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter.name());
@@ -71,14 +71,14 @@ void MetricsServiceSink::flushCounter(const Stats::Counter& counter, uint64_t) {
   counter_metric->set_value(counter.value());
 }
 
-void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge, uint64_t value) {
+void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
   auto* metric = metrics_family->add_metric();
   metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
   auto* gauage_metric = metric->mutable_gauge();
-  gauage_metric->set_value(value);
+  gauage_metric->set_value(gauge.value());
 }
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram) {
   io::prometheus::client::MetricFamily* metrics_family = message_.add_envoy_metrics();
@@ -92,6 +92,40 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
     auto* quantile = summary_metric->add_quantile();
     quantile->set_quantile(hist_stats.supportedQuantiles()[i]);
     quantile->set_value(hist_stats.computedQuantiles()[i]);
+  }
+}
+
+void MetricsServiceSink::flush(Stats::Source& source) {
+  message_.clear_envoy_metrics();
+  const std::vector<Stats::CounterSharedPtr>& counters = source.cachedCounters();
+  const std::vector<Stats::GaugeSharedPtr>& gauges = source.cachedGauges();
+  const std::vector<Stats::ParentHistogramSharedPtr>& histograms = source.cachedHistograms();
+  // TODO(mrice32): there's probably some more sophisticated preallocation we can do here where we
+  // actually preallocate the submessages and then pass ownership to the proto (rather than just
+  // preallocating the pointer array).
+  message_.mutable_envoy_metrics()->Reserve(counters.size() + gauges.size() + histograms.size());
+  for (const Stats::CounterSharedPtr& counter : counters) {
+    if (counter->used()) {
+      flushCounter(*counter);
+    }
+  }
+
+  for (const Stats::GaugeSharedPtr& gauge : gauges) {
+    if (gauge->used()) {
+      flushGauge(*gauge);
+    }
+  }
+
+  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
+    if (histogram->used()) {
+      flushHistogram(*histogram);
+    }
+  }
+
+  grpc_metrics_streamer_->send(message_);
+  // for perf reasons, clear the identifer after the first flush.
+  if (message_.has_identifier()) {
+    message_.clear_identifier();
   }
 }
 

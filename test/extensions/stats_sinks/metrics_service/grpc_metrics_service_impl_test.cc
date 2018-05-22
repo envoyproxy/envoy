@@ -97,54 +97,56 @@ public:
 class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
+  NiceMock<Stats::MockSource> source;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
   MetricsServiceSink sink(streamer_);
 
-  sink.beginFlush();
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source.counters_.push_back(counter);
 
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
-  sink.flushCounter(counter, 1);
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  source.gauges_.push_back(gauge);
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  sink.flushGauge(gauge, 1);
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "test_histogram";
+  histogram->used_ = true;
 
-  NiceMock<Stats::MockParentHistogram> histogram;
-  histogram.name_ = "test_histogram";
-  sink.flushHistogram(histogram);
   EXPECT_CALL(*streamer_, send(_));
 
-  sink.endFlush();
+  sink.flush(source);
 }
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
+  NiceMock<Stats::MockSource> source;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
   MetricsServiceSink sink(streamer_);
 
-  sink.beginFlush();
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source.counters_.push_back(counter);
 
-  NiceMock<Stats::MockCounter> counter;
-  counter.name_ = "test_counter";
-  sink.flushCounter(counter, 1);
+  auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
+  gauge->name_ = "test_gauge";
+  gauge->value_ = 1;
+  gauge->used_ = true;
+  source.gauges_.push_back(gauge);
 
-  NiceMock<Stats::MockGauge> gauge;
-  gauge.name_ = "test_gauge";
-  sink.flushGauge(gauge, 1);
-
-  sink.endFlush();
+  sink.flush(source);
   EXPECT_EQ(2, (*streamer_).metric_count);
 
   // Verify only newly added metrics come after endFlush call.
-  sink.beginFlush();
-
-  NiceMock<Stats::MockCounter> counter1;
-  counter1.name_ = "test_counter";
-  sink.flushCounter(counter1, 1);
-
-  sink.endFlush();
+  gauge->used_ = false;
+  sink.flush(source);
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 

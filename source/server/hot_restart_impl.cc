@@ -121,7 +121,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
   {
     // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
-    std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+    Thread::LockGuard lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
                                         shmem_.stats_set_data_));
   }
@@ -140,7 +140,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+  Thread::LockGuard lock(stat_lock_);
   absl::string_view key = name;
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
@@ -161,7 +161,7 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
 
 void HotRestartImpl::free(Stats::RawStatData& data) {
   // We must hold the lock since the reference decrement can race with an initialize above.
-  std::unique_lock<Thread::BasicLockable> lock(stat_lock_);
+  Thread::LockGuard lock(stat_lock_);
   ASSERT(data.ref_count_ > 0);
   if (--data.ref_count_ > 0) {
     return;
@@ -248,12 +248,12 @@ void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
   // could also potentially use connection oriented sockets and accept connections from our child,
   // and connect to our parent, but again, this becomes complicated.
   //
-  // Instead, we guard this condition with a lock. However, to avoid deadlock, we must try_lock()
+  // Instead, we guard this condition with a lock. However, to avoid deadlock, we must tryLock()
   // in this path, since this call runs in the same thread as the event loop that is receiving
-  // messages. If try_lock() fails it is sufficient to not return any parent stats.
-  std::unique_lock<Thread::BasicLockable> lock(init_lock_, std::defer_lock);
+  // messages. If tryLock() fails it is sufficient to not return any parent stats.
+  Thread::TryLockGuard lock(init_lock_);
   memset(&info, 0, sizeof(info));
-  if (options_.restartEpoch() == 0 || parent_terminated_ || !lock.try_lock()) {
+  if (options_.restartEpoch() == 0 || parent_terminated_ || !lock.tryLock()) {
     return;
   }
 
@@ -447,7 +447,7 @@ void HotRestartImpl::onSocketEvent() {
 
 void HotRestartImpl::shutdownParentAdmin(ShutdownParentAdminInfo& info) {
   // See large comment in getParentStats() on why this operation is locked.
-  std::unique_lock<Thread::BasicLockable> lock(init_lock_);
+  Thread::LockGuard lock(init_lock_);
   if (options_.restartEpoch() == 0) {
     return;
   }
@@ -472,6 +472,7 @@ void HotRestartImpl::terminateParent() {
 void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
+  Thread::LockGuard lock(stat_lock_);
   return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);
 }
 

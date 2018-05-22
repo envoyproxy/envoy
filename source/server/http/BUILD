@@ -16,6 +16,7 @@ envoy_cc_library(
         ":config_tracker_lib",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:filter_interface",
+        "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:admin_interface",

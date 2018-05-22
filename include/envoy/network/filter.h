@@ -3,6 +3,8 @@
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/transport_socket.h"
 #include "envoy/upstream/host_description.h"
 
 namespace Envoy {
@@ -233,6 +235,43 @@ public:
 typedef std::function<void(ListenerFilterManager& filter_manager)> ListenerFilterFactoryCb;
 
 /**
+ * Interface representing a single filter chain.
+ */
+class FilterChain {
+public:
+  virtual ~FilterChain() {}
+
+  /**
+   * @return const TransportSocketFactory& a transport socket factory to be used by the new
+   * connection.
+   */
+  virtual const TransportSocketFactory& transportSocketFactory() const PURE;
+
+  /**
+   * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
+   */
+  virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
+};
+
+typedef std::shared_ptr<FilterChain> FilterChainSharedPtr;
+
+/**
+ * Interface for searching through configured filter chains.
+ */
+class FilterChainManager {
+public:
+  virtual ~FilterChainManager() {}
+
+  /**
+   * Find filter chain that's matching metadata from the new connection.
+   * @param socket supplies connection metadata that's going to be used for the filter chain lookup.
+   * @return const FilterChain* filter chain to be used by the new connection,
+   *         nullptr if no matching filter chain was found.
+   */
+  virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
+};
+
+/**
  * Creates a chain of network filters for a new connection.
  */
 class FilterChainFactory {
@@ -242,10 +281,12 @@ public:
   /**
    * Called to create the network filter chain.
    * @param connection supplies the connection to create the chain on.
+   * @param filter_factories supplies a list of filter factories to create the chain from.
    * @return true if filter chain was created successfully. Otherwise
    *   false, e.g. filter chain is empty.
    */
-  virtual bool createNetworkFilterChain(Connection& connection) PURE;
+  virtual bool createNetworkFilterChain(Connection& connection,
+                                        const std::vector<FilterFactoryCb>& filter_factories) PURE;
 
   /**
    * Called to create the listener filter chain.

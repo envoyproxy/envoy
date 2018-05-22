@@ -10,11 +10,16 @@ app = Flask(__name__)
 TRACE_HEADERS_TO_PROPAGATE = [
     'X-Ot-Span-Context',
     'X-Request-Id',
+
+    # Zipkin headers
     'X-B3-TraceId',
     'X-B3-SpanId',
     'X-B3-ParentSpanId',
     'X-B3-Sampled',
-    'X-B3-Flags'
+    'X-B3-Flags',
+
+    # Jaeger header (for native client)
+    "uber-trace-id"
 ]
 
 @app.route('/service/<service_number>')

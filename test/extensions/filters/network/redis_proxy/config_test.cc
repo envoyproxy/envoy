@@ -1,3 +1,5 @@
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
 #include "common/config/filter_json.h"
 
 #include "extensions/filters/network/redis_proxy/config.h"

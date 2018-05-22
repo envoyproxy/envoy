@@ -8,7 +8,7 @@ capabilities using `Jaeger <http://jaegertracing.io/>`_ as the tracing provider 
 `C++ client <https://github.com/jaegertracing/jaeger-client-cpp>`_ as a plugin. Using Jaeger with its
 native client instead of with Envoy's builtin Zipkin client has the following advantages:
 
-- Trace propagation will work with other other services using Jaeger without needing to make
+- Trace propagation will work with the other services using Jaeger without needing to make
   configuration `changes <https://github.com/jaegertracing/jaeger-client-go#zipkin-http-b3-compatible-header-propagation>`_.
 - A variety of different `sampling strategies <https://www.jaegertracing.io/docs/sampling/#client-sampling-configuration>`_
   can be used, including probabilistic or remote where sampling can be centrally controlled from Jaeger's backend.

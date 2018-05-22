@@ -257,12 +257,33 @@ public:
   MOCK_METHOD1(addAcceptFilter_, void(Network::ListenerFilterPtr&));
 };
 
+class MockFilterChain : public FilterChain {
+public:
+  MockFilterChain();
+  ~MockFilterChain();
+
+  // Network::FilterChain
+  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
+  MOCK_CONST_METHOD0(networkFilterFactories, const std::vector<FilterFactoryCb>&());
+};
+
+class MockFilterChainManager : public FilterChainManager {
+public:
+  MockFilterChainManager();
+  ~MockFilterChainManager();
+
+  // Network::FilterChainManager
+  MOCK_CONST_METHOD1(findFilterChain, const FilterChain*(const ConnectionSocket& socket));
+};
+
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();
   ~MockFilterChainFactory();
 
-  MOCK_METHOD1(createNetworkFilterChain, bool(Connection& connection));
+  MOCK_METHOD2(createNetworkFilterChain,
+               bool(Connection& connection,
+                    const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
 };
 
@@ -305,10 +326,12 @@ public:
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD2(setLocalAddress, void(const Address::InstanceConstSharedPtr&, bool));
   MOCK_CONST_METHOD0(localAddressRestored, bool());
+  MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setDetectedTransportProtocol, void(absl::string_view));
   MOCK_CONST_METHOD0(detectedTransportProtocol, absl::string_view());
-  MOCK_METHOD1(setRemoteAddress, void(const Address::InstanceConstSharedPtr&));
+  MOCK_METHOD1(setRequestedApplicationProtocols, void(const std::vector<absl::string_view>&));
+  MOCK_CONST_METHOD0(requestedApplicationProtocols, const std::vector<std::string>&());
   MOCK_METHOD1(setRequestedServerName, void(absl::string_view));
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
@@ -325,9 +348,9 @@ public:
   MockListenerConfig();
   ~MockListenerConfig();
 
+  MOCK_METHOD0(filterChainManager, FilterChainManager&());
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
   MOCK_METHOD0(socket, Socket&());
-  MOCK_METHOD0(transportSocketFactory, TransportSocketFactory&());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
