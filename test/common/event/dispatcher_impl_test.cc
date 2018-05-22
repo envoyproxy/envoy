@@ -91,9 +91,9 @@ TEST_F(DispatcherImplTest, Post) {
   });
 
   Thread::LockGuard lock(mu_);
-
-  mu_.await(absl::Condition(&work_finished_));
-  // cv_.wait(lock, [this]() { return work_finished_; });
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
 }
 
 TEST_F(DispatcherImplTest, Timer) {

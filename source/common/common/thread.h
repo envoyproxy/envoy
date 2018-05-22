@@ -47,8 +47,6 @@ public:
   bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) override { return mutex_.TryLock(); }
   void unlock() UNLOCK_FUNCTION() override { mutex_.Unlock(); }
 
-  void await(const absl::Condition& condition) { mutex_.Await(condition); }
-
 private:
   friend class CondVar;
   absl::Mutex mutex_;
