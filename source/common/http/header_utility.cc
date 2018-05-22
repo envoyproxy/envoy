@@ -21,8 +21,7 @@ namespace Http {
 //   c.range_match: Match will succeed if header value lies within the range specified
 //     here, using half open interval semantics [start,end).
 HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
-    : name_(config.name()),
-      invert_match_(config.invert_match()) {
+    : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
   case envoy::api::v2::route::HeaderMatcher::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
