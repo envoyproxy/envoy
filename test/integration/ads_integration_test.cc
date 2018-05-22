@@ -493,112 +493,42 @@ TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
 
-const std::string static_resources_config = R"EOF(
-dynamic_resources:
-  ads_config:
-    api_type: GRPC
-static_resources:
-  listeners:
-  - name: dummy_listener
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-      filters:
-      - name: envoy.http_connection_manager
-        config:
-          stat_prefix: listener
-          idle_timeout: 90s
-          rds:
-            config_source:
-              ads: {}
-            route_config_name: route_config
-          http_filters:
-          - name: envoy.router
-  - name: dummy_listener2
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    filter_chains:
-      filters:
-      - name: envoy.http_connection_manager
-        config:
-          stat_prefix: listener
-          idle_timeout: 90s
-          rds:
-            config_source:
-              ads: {}
-            route_config_name: route_config2
-          http_filters:
-          - name: envoy.router
-  clusters:
-  - name: ads_dummy
-    connect_timeout: { seconds: 5 }
-    type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-  - name: dummy_cluster
-    connect_timeout: { seconds: 5 }
-    type: EDS
-    eds_cluster_config:
-      eds_config:
-        ads: {}
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-  - name: dummy_cluster_2
-    connect_timeout: { seconds: 5 }
-    type: EDS
-    eds_cluster_config:
-      eds_config:
-        ads: {}
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-  )EOF";
+// Validates that the initial xDS request batches all resources referred to in static config
+TEST_P(AdsIntegrationTest, XdsBatching) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      bootstrap.mutable_dynamic_resources()->clear_cds_config();
+      bootstrap.mutable_dynamic_resources()->clear_lds_config();
 
-class StaticAdsIntegrationTest : public AdsIntegrationTest {
-public:
-  StaticAdsIntegrationTest() : AdsIntegrationTest(static_resources_config) {}
-};
+      auto static_resources = bootstrap.mutable_static_resources();
+      static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster"));
+      static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster2"));
 
-TEST_P(StaticAdsIntegrationTest, XdsBatching) {
-  // Validates that the initial xDS request batches all resources referred to in static config
+      static_resources->add_listeners()->MergeFrom(buildListener("rds_listener", "route_config"));
+      static_resources->add_listeners()->MergeFrom(buildListener("rds_listener2", "route_config2"));
+      });
+
   pre_worker_start_test_steps_ = [this]() {
     ads_connection_ = fake_upstreams_.back()->waitForHttpConnection(*dispatcher_);
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                        {"dummy_cluster_2", "dummy_cluster"}));
+          {"eds_cluster2", "eds_cluster"}));
     sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment,
-        {buildClusterLoadAssignment("dummy_cluster"), buildClusterLoadAssignment("dummy_cluster1")},
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster1")},
         "1");
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                         {"route_config2", "route_config"}));
     sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration,
-        {buildRouteConfig("route", "dummy_cluster"), buildRouteConfig("route1", "dummy_cluster")},
+        {buildRouteConfig("route_config2", "eds_cluster2"), buildRouteConfig("route_config", "dummy_cluster")},
         "1");
   };
 
   initialize();
 }
-
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, StaticAdsIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 } // namespace
 } // namespace Envoy
