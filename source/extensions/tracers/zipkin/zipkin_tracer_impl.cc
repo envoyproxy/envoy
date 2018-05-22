@@ -107,9 +107,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
     // it needs to be divided into two 64 bit numbers (high and low).
     if (request_headers.XB3TraceId()->value().size() == 32) {
-      std::string tid = request_headers.XB3TraceId()->value().c_str();
-      std::string high_tid = tid.substr(0, 16);
-      std::string low_tid = tid.substr(16, 16);
+      const std::string tid = request_headers.XB3TraceId()->value().c_str();
+      const std::string high_tid = tid.substr(0, 16);
+      const std::string low_tid = tid.substr(16, 16);
       if (!StringUtil::atoul(high_tid.c_str(), trace_id_high, 16) ||
           !StringUtil::atoul(low_tid.c_str(), trace_id, 16)) {
         return Tracing::SpanPtr(new Tracing::NullSpan());
