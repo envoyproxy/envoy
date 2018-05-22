@@ -51,6 +51,8 @@ public:
   MOCK_METHOD1(close, int(int));
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
+  MOCK_METHOD3(writev, ssize_t(int, const iovec*, int));
+  MOCK_METHOD3(readv, ssize_t(int, const iovec*, int));
   MOCK_METHOD4(recv, ssize_t(int socket, void* buffer, size_t length, int flags));
 
   MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));

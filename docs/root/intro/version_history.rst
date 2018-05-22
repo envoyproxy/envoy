@@ -72,6 +72,8 @@ Version history
   already been proxied downstream when the timeout occurs. Previously, the response would be reset 
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
   timeout will be ignored and the response will continue to proxy up to the global request timeout. 
+* router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
+  to ignore the source port.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners

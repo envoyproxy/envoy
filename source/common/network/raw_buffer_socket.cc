@@ -16,11 +16,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   uint64_t bytes_read = 0;
   bool end_stream = false;
   do {
-    // 16K read is arbitrary. IIRC, libevent will currently clamp this to 4K. libevent will also
-    // use an ioctl() before every read to figure out how much data there is to read.
-    //
-    // TODO(mattklein123) PERF: Tune the read size and figure out a way of getting rid of the
-    // ioctl(). The extra syscall is not worth it.
+    // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
     int rc = buffer.read(callbacks_->fd(), 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
 
