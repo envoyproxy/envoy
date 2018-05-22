@@ -20,6 +20,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -51,10 +52,11 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
               const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager);
+  ContextManagerImpl manager(runtime, secret_manager);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
 
@@ -66,7 +68,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -143,7 +145,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Secret::MockSecretManager secret_manager;
+  ContextManagerImpl manager(runtime, secret_manager);
   std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in Ssl::SslSocket anymore.
@@ -162,7 +165,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
-  ClientContextConfigImpl client_ctx_config(client_ctx_proto);
+  ClientContextConfigImpl client_ctx_config(client_ctx_proto, secret_manager);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
@@ -730,8 +733,8 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
 
@@ -788,8 +791,8 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
 
@@ -809,7 +812,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager_);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -861,6 +864,7 @@ TEST_P(SslSocketTest, HalfClose) {
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -871,8 +875,8 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager);
+  ContextManagerImpl manager(runtime, secret_manager);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
 
@@ -891,7 +895,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -948,12 +952,13 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                  const Network::Address::IpVersion ip_version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  ContextManagerImpl manager(runtime);
+  Secret::MockSecretManager secret_manager;
+  ContextManagerImpl manager(runtime, secret_manager);
 
   Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);
   Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
-  ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1);
-  ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2);
+  ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1, secret_manager);
+  ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2, secret_manager);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory1(server_ctx_config1, manager, stats_store,
                                                          server_names1);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory2(server_ctx_config2, manager, stats_store,
@@ -970,7 +975,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1310,10 +1315,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
   Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
-  ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader, secret_manager_);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
   Ssl::ServerSslSocketFactory server2_ssl_socket_factory(server2_ctx_config, manager, stats_store,
@@ -1337,7 +1342,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager_);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1423,8 +1428,8 @@ TEST_P(SslSocketTest, SslError) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
-  ContextManagerImpl manager(runtime);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
+  ContextManagerImpl manager(runtime, secret_manager_);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
 
@@ -1708,15 +1713,15 @@ class SslReadBufferLimitTest : public SslCertsTest,
 public:
   void initialize() {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
-    server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
-    manager_.reset(new ContextManagerImpl(runtime_));
+    server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_, secret_manager_));
+    manager_.reset(new ContextManagerImpl(runtime_, secret_manager_));
     server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
         *server_ctx_config_, *manager_, stats_store_, std::vector<std::string>{}));
 
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
-    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
+    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_, secret_manager_));
 
     client_ssl_socket_factory_.reset(
         new ClientSslSocketFactory(*client_ctx_config_, *manager_, stats_store_));

@@ -20,6 +20,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -106,7 +107,8 @@ public:
       new NiceMock<Network::MockDnsResolver>};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
+  Secret::MockSecretManager secret_manager_;
+  Ssl::ContextManagerImpl ssl_context_manager_{runtime_, secret_manager_};
   NiceMock<Event::MockDispatcher> dispatcher_;
   LocalInfo::MockLocalInfo local_info_;
 };

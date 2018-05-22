@@ -5,6 +5,7 @@
 #include "common/config/cds_json.h"
 #include "common/config/json_utility.h"
 #include "common/config/lds_json.h"
+#include "common/config/tls_context_json.h"
 #include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
@@ -127,6 +128,21 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
     JSON_UTIL_SET_STRING(*json_runtime, *runtime, symlink_root);
     JSON_UTIL_SET_STRING(*json_runtime, *runtime, subdirectory);
     JSON_UTIL_SET_STRING(*json_runtime, *runtime, override_subdirectory);
+  }
+}
+
+void BootstrapJson::translateStaticSecretsBootstrap(
+    const Json::Object& json_secrets, envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+
+  for (const Json::ObjectSharedPtr& secret : json_secrets.getObjectArray("secrets")) {
+    auto secret_object = bootstrap.mutable_static_resources()->mutable_secrets()->Add();
+    secret_object->set_name(secret->getString("name"));
+
+    if (secret->hasObject("tls_certificate")) {
+      TlsContextJson::translateTlsCertificate(*secret->getObject("tls_certificate"),
+                                              *secret_object->mutable_tls_certificate());
+    } else if (secret->hasObject("session_ticket_keys")) {
+    }
   }
 }
 

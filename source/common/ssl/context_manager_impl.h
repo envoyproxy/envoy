@@ -5,6 +5,7 @@
 #include <shared_mutex>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
@@ -19,7 +20,8 @@ namespace Ssl {
  */
 class ContextManagerImpl final : public ContextManager {
 public:
-  ContextManagerImpl(Runtime::Loader& runtime) : runtime_(runtime) {}
+  ContextManagerImpl(Runtime::Loader& runtime, Secret::SecretManager& secret_manager)
+      : runtime_(runtime), secret_manager_(secret_manager) {}
   ~ContextManagerImpl();
 
   /**
@@ -37,11 +39,13 @@ public:
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Context&)> callback) override;
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 private:
   Runtime::Loader& runtime_;
   std::list<Context*> contexts_;
   mutable std::shared_timed_mutex contexts_lock_;
+  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Ssl

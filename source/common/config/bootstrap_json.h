@@ -23,6 +23,14 @@ public:
    */
   static void translateBootstrap(const Json::Object& json_config,
                                  envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+
+  /**
+   * Translate static secrets to v2 envoy::config::bootstrap::v2::Bootstrap.
+   * @param json_config source static secrets.
+   * @param bootstrap destination v2 envoy::config::bootstrap::v2::Bootstrap.
+   */
+  static void translateStaticSecretsBootstrap(const Json::Object& json_secrets,
+                                              envoy::config::bootstrap::v2::Bootstrap& bootstrap);
 };
 
 } // namespace Config

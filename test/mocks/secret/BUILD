@@ -9,10 +9,11 @@ load(
 envoy_package()
 
 envoy_cc_mock(
-    name = "server_mocks",
+    name = "secret_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/secret:secret_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:configuration_interface",
@@ -36,7 +37,6 @@ envoy_cc_mock(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",

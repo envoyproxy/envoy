@@ -297,7 +297,7 @@ void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
-  context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
+  context_manager_.reset(new Ssl::ContextManagerImpl(runtime_, secret_manager_));
   payload_reader_.reset(new WaitForPayloadReader(*dispatcher_));
 }
 

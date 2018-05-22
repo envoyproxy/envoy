@@ -22,6 +22,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -778,7 +779,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    Ssl::ClientContextConfigImpl cfg(tls_context);
+    Ssl::ClientContextConfigImpl cfg(tls_context, secret_manager_);
 
     mock_cluster_info_->transport_socket_factory_ =
         std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, *stats_store_);
@@ -807,7 +808,7 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
-    Ssl::ServerContextConfigImpl cfg(tls_context);
+    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -815,7 +816,8 @@ public:
   }
 
   bool use_client_cert_{};
-  Ssl::ContextManagerImpl context_manager_{runtime_};
+  Secret::MockSecretManager secret_manager_;
+  Ssl::ContextManagerImpl context_manager_{runtime_, secret_manager_};
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.

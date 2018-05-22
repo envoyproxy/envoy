@@ -18,6 +18,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/ratelimit/ratelimit_impl.h"
+#include "common/secret/secret_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
@@ -46,6 +47,14 @@ bool FilterChainUtility::buildFilterChain(
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
+  const auto& secrets = bootstrap.static_resources().secrets();
+  ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
+  for (ssize_t i = 0; i < secrets.size(); i++) {
+    ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
+    server.secretManager().addOrUpdateStaticSecret(
+        Secret::SecretSharedPtr(new Secret::SecretImpl(secrets[i])));
+  }
+
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(
       bootstrap, server.stats(), server.threadLocal(), server.runtime(), server.random(),
       server.localInfo(), server.accessLogManager(), server.admin());
