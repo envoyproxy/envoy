@@ -387,7 +387,7 @@ public:
 };
 
 class MockIp : public Address::Ip {
- public:
+public:
   MOCK_CONST_METHOD0(addressAsString, const std::string&());
   MOCK_CONST_METHOD0(isAnyAddress, bool());
   MOCK_CONST_METHOD0(isUnicastAddress, bool());
