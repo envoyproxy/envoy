@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -11,6 +10,7 @@
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/lock_guard.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"

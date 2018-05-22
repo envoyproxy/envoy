@@ -9,11 +9,13 @@
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/utility.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/address_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -339,6 +341,49 @@ TEST(DnsImplConstructor, SupportsCustomResolvers) {
   EXPECT_EQ(resolvers->next->udp_port, 54);
   EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
                "::1");
+  ares_free_data(resolvers);
+}
+
+// Custom instance that dispatches everything to a regular instance except for asString(), where
+// it borks the port.
+class CustomInstance : public Address::Instance {
+public:
+  CustomInstance(const std::string& address, uint32_t port) : instance_(address, port) {
+    antagonistic_name_ = fmt::format("{}:borked_port_{}", address, port);
+  }
+  ~CustomInstance() override {}
+
+  // Address::Instance
+  bool operator==(const Address::Instance& rhs) const override {
+    return asString() == rhs.asString();
+  }
+  const std::string& asString() const override { return antagonistic_name_; }
+  const std::string& logicalName() const override { return antagonistic_name_; }
+  int bind(int fd) const override { return instance_.bind(fd); }
+  int connect(int fd) const override { return instance_.connect(fd); }
+  const Address::Ip* ip() const override { return instance_.ip(); }
+  int socket(Address::SocketType type) const override { return instance_.socket(type); }
+  Address::Type type() const override { return instance_.type(); }
+
+private:
+  std::string antagonistic_name_;
+  Address::Ipv4Instance instance_;
+};
+
+TEST(DnsImplConstructor, SupportCustomAddressInstances) {
+  Event::DispatcherImpl dispatcher;
+  auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
+  EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
+  auto resolver = dispatcher.createDnsResolver({test_instance});
+  auto peer = std::unique_ptr<DnsResolverImplPeer>{
+      new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 45);
+  char addr4str[INET_ADDRSTRLEN];
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
   ares_free_data(resolvers);
 }
 

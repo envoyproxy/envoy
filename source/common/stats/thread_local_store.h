@@ -80,6 +80,7 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
+  const std::string summary() const override;
 
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);

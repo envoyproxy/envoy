@@ -4,9 +4,10 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_set>
+
+#include "common/common/lock_guard.h"
 
 namespace Envoy {
 namespace Stats {
@@ -380,6 +381,22 @@ void ParentHistogramImpl::merge() {
     hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
     cumulative_statistics_.refresh(cumulative_histogram_);
     interval_statistics_.refresh(interval_histogram_);
+  }
+}
+
+const std::string ParentHistogramImpl::summary() const {
+  if (used()) {
+    std::vector<std::string> summary;
+    const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
+    summary.reserve(supported_quantiles_ref.size());
+    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
+      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
+                                    interval_statistics_.computedQuantiles()[i],
+                                    cumulative_statistics_.computedQuantiles()[i]));
+    }
+    return absl::StrJoin(summary, " ");
+  } else {
+    return std::string("No recorded values");
   }
 }
 

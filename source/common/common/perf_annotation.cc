@@ -10,6 +10,7 @@
 #include <iostream>
 #include <string>
 
+#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 
 #include "absl/strings/str_cat.h"

@@ -137,15 +137,23 @@ public:
     socket_.reset(new NiceMock<Network::MockConnectionSocket>());
   }
 
-  const Network::FilterChain* findFilterChain(std::string server_name,
-                                              bool expect_transport_protocol_test,
-                                              std::string transport_protocol) {
+  const Network::FilterChain*
+  findFilterChain(const std::string& server_name, bool expect_server_name_match,
+                  const std::string& transport_protocol, bool expect_transport_protocol_match,
+                  const std::vector<std::string>& application_protocols) {
     EXPECT_CALL(*socket_, requestedServerName()).WillOnce(Return(absl::string_view(server_name)));
-    if (expect_transport_protocol_test) {
+    if (expect_server_name_match) {
       EXPECT_CALL(*socket_, detectedTransportProtocol())
           .WillOnce(Return(absl::string_view(transport_protocol)));
+      if (expect_transport_protocol_match) {
+        EXPECT_CALL(*socket_, requestedApplicationProtocols())
+            .WillOnce(ReturnRef(application_protocols));
+      } else {
+        EXPECT_CALL(*socket_, requestedApplicationProtocols()).Times(0);
+      }
     } else {
       EXPECT_CALL(*socket_, detectedTransportProtocol()).Times(0);
+      EXPECT_CALL(*socket_, requestedApplicationProtocols()).Times(0);
     }
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -221,7 +229,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
   manager_->addOrUpdateListener(parseListenerFromJson(json), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  auto filter_chain = findFilterChain("", true, "tls");
+  auto filter_chain = findFilterChain("", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
 }
@@ -1003,15 +1011,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSniMatch) {
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without SNI - no match.
-  auto filter_chain = findFilterChain("", false, "tls");
+  auto filter_chain = findFilterChain("", false, "tls", false, {});
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client without matching SNI - no match.
-  filter_chain = findFilterChain("www.example.com", false, "tls");
+  filter_chain = findFilterChain("www.example.com", false, "tls", false, {});
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client with matching SNI - using 1st filter chain.
-  filter_chain = findFilterChain("server1.example.com", true, "tls");
+  filter_chain = findFilterChain("server1.example.com", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1045,11 +1053,49 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TCP client - no match.
-  auto filter_chain = findFilterChain("", true, "raw_buffer");
+  auto filter_chain = findFilterChain("", true, "raw_buffer", false, {});
   EXPECT_EQ(filter_chain, nullptr);
 
   // TLS client - using 1st filter chain.
-  filter_chain = findFilterChain("", true, "tls");
+  filter_chain = findFilterChain("", true, "tls", true, {});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  auto ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationProtocolMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        application_protocols: "http/1.1"
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS client without ALPN - no match.
+  auto filter_chain = findFilterChain("", true, "tls", true, {});
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // TLS client with "http/1.1" ALPN - using 1st filter chain.
+  filter_chain = findFilterChain("", true, "tls", true, {"h2", "http/1.1"});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1106,7 +1152,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSniMatch)
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TLS client without SNI - using 1st filter chain.
-  auto filter_chain = findFilterChain("", true, "tls");
+  auto filter_chain = findFilterChain("", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1115,7 +1161,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSniMatch)
   EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
 
   // TLS client with exact SNI match - using 2nd filter chain.
-  filter_chain = findFilterChain("server1.example.com", true, "tls");
+  filter_chain = findFilterChain("server1.example.com", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1125,7 +1171,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSniMatch)
   EXPECT_EQ(server_names.front(), "server1.example.com");
 
   // TLS client with wildcard SNI match - using 3nd filter chain.
-  filter_chain = findFilterChain("server2.example.com", true, "tls");
+  filter_chain = findFilterChain("server2.example.com", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1161,12 +1207,105 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
   EXPECT_EQ(1U, manager_->listeners().size());
 
   // TCP client - using 1st filter chain.
-  auto filter_chain = findFilterChain("", true, "raw_buffer");
+  auto filter_chain = findFilterChain("", true, "raw_buffer", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
 
   // TLS client - using 2nd filter chain.
-  filter_chain = findFilterChain("server1.example.com", true, "tls");
+  filter_chain = findFilterChain("", true, "tls", true, {});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  auto ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicationProtocolMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        # empty
+    - filter_chain_match:
+        application_protocols: ["dummy", "h2"]
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS client without ALPN - using 1st filter chain.
+  auto filter_chain = findFilterChain("", true, "tls", true, {});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+
+  // TLS client with "h2,http/1.1" ALPN - using 2nd filter chain.
+  filter_chain = findFilterChain("", true, "tls", true, {"h2", "http/1.1"});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  auto ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleRequirementsMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        # empty
+    - filter_chain_match:
+        sni_domains: ["www.example.com", "server1.example.com"]
+        transport_protocol: "tls"
+        application_protocols: ["dummy", "h2"]
+      tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS client without SNI and ALPN - using 1st filter chain.
+  auto filter_chain = findFilterChain("", true, "tls", true, {});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+
+  // TLS client with exact SNI match but without ALPN - no match (SNI blackholed by configuration).
+  filter_chain = findFilterChain("server1.example.com", true, "tls", true, {});
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // TLS client with ALPN match but without SNI - using 1st filter chain.
+  filter_chain = findFilterChain("", true, "tls", true, {"h2", "http/1.1"});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_FALSE(filter_chain->transportSocketFactory().implementsSecureTransport());
+
+  // TLS client with exact SNI match and ALPN match - using 2nd filter chain.
+  filter_chain = findFilterChain("server1.example.com", true, "tls", true, {"h2", "http/1.1"});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1281,9 +1420,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
-  // TLS Inspector is automatically injected for filter chains with TLS requirements.
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS Inspector is automatically injected for filter chains with TLS requirements,
+  // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector) {
@@ -1298,9 +1445,42 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector
 
   EXPECT_CALL(server_.random_, uuid());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
-  // TLS Inspector is automatically injected for filter chains with SNI requirements.
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS Inspector is automatically injected for filter chains with SNI requirements,
+  // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, AlpnFilterChainWithoutTlsInspector) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - filter_chain_match:
+        application_protocols: ["h2", "http/1.1"]
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // TLS Inspector is automatically injected for filter chains with ALPN requirements,
+  // so make sure there is exactly 1 listener filter (and assume it's TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr&) -> void {}));
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWithoutTlsInspector) {
@@ -1318,6 +1498,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+
+  // Make sure there are no listener filters (i.e. no automatically injected TLS Inspector).
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+  EXPECT_CALL(manager, addAcceptFilter_(_)).Times(0);
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {

@@ -57,7 +57,7 @@ message Filter {
 // [#comment:TODO(PiotrSikora): destination IP / ranges are going to be 1.]
 // 1. Server name (e.g. SNI for TLS protocol),
 // 2. Transport protocol.
-// [#comment:TODO(PiotrSikora): application protocols are going to be 4.]
+// 3. Application protocols (e.g. ALPN for TLS protocol).
 //
 // For criterias that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
@@ -113,14 +113,34 @@ message FilterChainMatch {
 
   // If non-empty, a transport protocol to consider when determining a filter chain match.
   // This value will be compared against the transport protocol of a new connection, when
-  // it's detected by one of the listener filters (this needs to be configured separately).
+  // it's detected by one of the listener filters.
   //
-  // Valid values include:
+  // Suggested values include:
   //
   // * ``raw_buffer`` - default, used when no transport protocol is detected,
   // * ``tls`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //   when TLS protocol is detected.
   string transport_protocol = 9;
+
+  // If non-empty, a list of application protocols to consider when determining a filter chain
+  // match. Those values will be compared against the application protocols of a new connection,
+  // when detected by one of the listener filters.
+  //
+  // Suggested values include:
+  //
+  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`,
+  // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  //
+  // .. attention::
+  //
+  //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+  //   application protocol detection based on the requested
+  //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
+  //
+  //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
+  //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
+  //   unless all connecting clients are known to use ALPN.
+  repeated string application_protocols = 10;
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and

@@ -53,8 +53,9 @@ public:
 
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms) {
-    return AdminImpl::statsAsJson(all_stats, all_histograms, true);
+                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                     const bool used_only) {
+    return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, true);
   }
 
   MOCK_METHOD1(alloc, Stats::RawStatData*(const std::string& name));
@@ -117,7 +118,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms());
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -176,6 +177,102 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             }
                         ]
                     },
+                    {
+                        "name": "h1",
+                        "values": [
+                            {
+                                "interval": 100.0,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": 102.5,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": 105.0,
+                                "cumulative": 110.0
+                            },
+                            {
+                                "interval": 107.5,
+                                "cumulative": 205.0
+                            },
+                            {
+                                "interval": 109.0,
+                                "cumulative": 208.0
+                            },
+                            {
+                                "interval": 109.5,
+                                "cumulative": 209.0
+                            },
+                            {
+                                "interval": 109.9,
+                                "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.99,
+                                "cumulative": 209.98
+                            },
+                            {
+                                "interval": 110.0,
+                                "cumulative": 210.0
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_EQ(expected_json, actual_json);
+  store_->shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Stats::Histogram& h1 = store_->histogram("h1");
+  Stats::Histogram& h2 = store_->histogram("h2");
+
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  store_->mergeHistograms([]() -> void {});
+
+  // Again record a new value in h1 so that it has both interval and cumulative values.
+  // h2 should only have cumulative values.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(*this, free(_));
+
+  std::map<std::string, uint64_t> all_stats;
+
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+
+  // Expected JSON should not have h2 values as it is not used.
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
                     {
                         "name": "h1",
                         "values": [

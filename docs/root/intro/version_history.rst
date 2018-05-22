@@ -53,6 +53,9 @@ Version history
   Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
   header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
+  (e.g. ALPN for TLS protocol).
 * listeners: removed restriction on all filter chains having identical filters.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
@@ -69,6 +72,8 @@ Version history
   already been proxied downstream when the timeout occurs. Previously, the response would be reset 
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
   timeout will be ignored and the response will continue to proxy up to the global request timeout. 
+* router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
+  to ignore the source port.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
