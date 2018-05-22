@@ -128,7 +128,7 @@ message CertificateValidationContext {
   core.DataSource trusted_ca = 1;
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
-  // SHA-256 of the DER-encoded presented certificate matches one of the specified values.
+  // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
   //
   // A hex-encoded SHA-256 of the certificate can be generated with the following command:
   //
