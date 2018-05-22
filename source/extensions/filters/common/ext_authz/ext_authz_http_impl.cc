@@ -71,7 +71,6 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
       response->headers().removeMethod();
       response->headers().removePath();
       response->headers().removeContentLength();
-      response->headers().removeContentType();
       authz_response->status = CheckStatus::OK;
       authz_response->status_code = Http::Code::OK;
     } else {
@@ -80,13 +79,14 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
       authz_response->status_code = static_cast<Http::Code>(status_code);
     }
   } else {
+    ENVOY_LOG(warn, "Authz_Ext failed to parse the HTTP response code.");
     authz_response->status_code = Http::Code::Forbidden;
     authz_response->status = CheckStatus::Denied;
   }
 
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        static_cast<KeyValueHeaders*>(context)->emplace_back(std::make_pair(
+        static_cast<Http::KeyValueHeaders*>(context)->emplace_back(std::make_pair(
             Http::LowerCaseString{header.key().c_str()}, std::string{header.value().c_str()}));
         return Http::HeaderMap::Iterate::Continue;
       },

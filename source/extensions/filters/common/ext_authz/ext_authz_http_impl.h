@@ -2,6 +2,8 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/logger.h"
+
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
@@ -10,7 +12,16 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class RawHttpClientImpl : public Client, public Http::AsyncClient::Callbacks {
+/**
+ * This client implementation is used when the Ext_Authz filter needs to communicate with an
+ * HTTP authorization server. Unlike the gRPC client that allows the server to define the
+ * response object, in the HTTP client, all headers and body provided in the response are
+ * dispatched to the downstream, and some headers to the upstream. The HTTP client also allows
+ * setting a path prefix witch is not available for gRPC.
+ */
+class RawHttpClientImpl : public Client,
+                          public Http::AsyncClient::Callbacks,
+                          Logger::Loggable<Logger::Id::config> {
 public:
   explicit RawHttpClientImpl(const std::string& cluster_name,
                              Upstream::ClusterManager& cluster_manager,

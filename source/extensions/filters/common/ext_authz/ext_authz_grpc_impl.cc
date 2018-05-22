@@ -45,7 +45,16 @@ void GrpcClientImpl::onSuccess(
   ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
 
-  if (response->status().code() != Grpc::Status::GrpcStatus::Ok) {
+  if (response->status().code() == Grpc::Status::GrpcStatus::Ok) {
+    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
+    authz_response->status = CheckStatus::OK;
+    if (response->has_ok_response()) {
+      for (const auto& header : response->ok_response().headers()) {
+        authz_response->headers.emplace_back(
+            std::make_pair(Http::LowerCaseString(header.first), header.second));
+      }
+    }
+  } else {
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
     if (response->has_denied_response()) {
@@ -58,15 +67,6 @@ void GrpcClientImpl::onSuccess(
       authz_response->body = response->denied_response().body();
     } else {
       authz_response->status_code = Http::Code::Forbidden;
-    }
-  } else {
-    span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
-    authz_response->status = CheckStatus::OK;
-    if (response->has_ok_response()) {
-      for (const auto& header : response->ok_response().headers()) {
-        authz_response->headers.emplace_back(
-            std::make_pair(Http::LowerCaseString(header.first), header.second));
-      }
     }
   }
 

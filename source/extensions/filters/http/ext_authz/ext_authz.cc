@@ -109,7 +109,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "Ext_authz rejected the request", *callbacks_);
-
     callbacks_->sendLocalReply(
         response->status_code, response->body,
         [& authz_headers = response->headers,
@@ -121,7 +120,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                 response_headers.addReferenceKey(header.first, header.second);
               }
             });
-
     callbacks_->requestInfo().setResponseFlag(
         RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {

@@ -82,8 +82,7 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
-  void addResponseHeaders(Http::HeaderMap& header_map,
-                          const Filters::Common::ExtAuthz::KeyValueHeaders& headers);
+  void addResponseHeaders(Http::HeaderMap& header_map, const Http::KeyValueHeaders& headers);
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
   // it or has completed.

@@ -38,8 +38,13 @@ struct ConstantValues {
 
 typedef ConstSingleton<ConstantValues> Constants;
 
-// NOTE: We create gRPC client for each filter stack instead of a client per thread.
-// That is ok since this is unary RPC and the cost of doing this is minimal.
+/*
+ * This client implementation is used when the Ext_Authz filter needs to communicate with an gRPC
+ * authorization server. Unlike the HTTP client, the gRPC allows the server to define response
+ * objects which contain the HTTP attributes to be sent to the upstream or to the downstream client.
+ * The gRPC client does not rewrite path. NOTE: We create gRPC client for each filter stack instead
+ * of a client per thread. That is ok since this is unary RPC and the cost of doing this is minimal.
+ */
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,

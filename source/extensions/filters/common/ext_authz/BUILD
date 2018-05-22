@@ -52,6 +52,7 @@ envoy_cc_library(
     deps = [
         ":check_request_utils_lib",
         ":ext_authz_interface",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/http:async_client_lib",
     ],
 )

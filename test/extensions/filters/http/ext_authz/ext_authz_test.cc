@@ -64,8 +64,8 @@ public:
 protected:
   Filters::Common::ExtAuthz::ResponsePtr
   makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status,
-                    Filters::Common::ExtAuthz::KeyValueHeaders&& headers = {},
-                    std::string&& body = std::string{}, Http::Code status_code = Http::Code::OK) {
+                    Http::KeyValueHeaders&& headers = {}, std::string&& body = std::string{},
+                    Http::Code status_code = Http::Code::OK) {
     Filters::Common::ExtAuthz::ResponsePtr response =
         std::make_unique<Filters::Common::ExtAuthz::Response>();
     response->status = status;

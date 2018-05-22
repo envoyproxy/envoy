@@ -496,5 +496,10 @@ public:
 
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
 
+/**
+ * Convinient container type for storeing Http::LowerCaseString and std::string key/value pairs.
+ */
+typedef std::vector<std::pair<LowerCaseString, std::string>> KeyValueHeaders;
+
 } // namespace Http
 } // namespace Envoy

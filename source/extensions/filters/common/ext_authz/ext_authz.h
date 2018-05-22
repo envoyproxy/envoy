@@ -28,8 +28,6 @@ enum class CheckStatus {
   Denied
 };
 
-typedef std::vector<std::pair<Http::LowerCaseString, std::string>> KeyValueHeaders;
-
 /**
  * Authorization response object for a RequestCallback.
  */
@@ -37,7 +35,7 @@ struct Response {
   // Call status.
   CheckStatus status;
   // Optional http headers used on either denied or ok responses.
-  KeyValueHeaders headers;
+  Http::KeyValueHeaders headers;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.
