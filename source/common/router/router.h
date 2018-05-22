@@ -155,7 +155,7 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->requestInfo().downstreamRemoteAddress()->asString(), *downstream_headers_,
+            callbacks_->requestInfo().downstreamRemoteAddress().get(), *downstream_headers_,
             [this](const std::string& key, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, max_age);
             });
@@ -376,5 +376,5 @@ private:
                                  Upstream::ResourcePriority priority) override;
 };
 
-} // Router
+} // namespace Router
 } // namespace Envoy
