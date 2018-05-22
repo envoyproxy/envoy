@@ -61,18 +61,22 @@ public:
   // See the discussion in
   //     http://en.cppreference.com/w/cpp/thread/condition_variable_any/notify_one
   // for more details.
-  void notifyOne() { condvar_.Signal(); }
-  void notifyAll() { condvar_.SignalAll(); };
-  void wait(MutexBasicLockable& mutex) EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void notifyOne() noexcept { condvar_.Signal(); }
+  void notifyAll() noexcept { condvar_.SignalAll(); };
+  void wait(MutexBasicLockable& mutex) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.Wait(&mutex.mutex_);
   }
   template <class Rep, class Period>
-  void waitFor(MutexBasicLockable& mutex, std::chrono::duration<Rep, Period> duration)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  void
+  waitFor(MutexBasicLockable& mutex,
+          std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration));
   }
 
 private:
+  // Note: alternate implementation of this class based on std::condition_variable_any
+  // https://gist.github.com/jmarantz/d22b836cee3ca203cc368553eda81ce5
+  // does not currently work well with thread-annotation.
   absl::CondVar condvar_;
 };
 

@@ -1,15 +1,12 @@
 #include "server/guarddog_impl.h"
 
 #include <chrono>
-#include <mutex>
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 
 #include "server/watchdog_impl.h"
-
-#include "absl/time/time.h"
 
 namespace Envoy {
 namespace Server {
