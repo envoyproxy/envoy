@@ -77,7 +77,8 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
 
@@ -96,7 +97,8 @@ class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
   CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
 
-  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
@@ -118,13 +120,21 @@ private:
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  absl::optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
+                                    const Http::HeaderMap&,
                                     const HashPolicy::AddCookieCallback) const override {
-    absl::optional<uint64_t> hash;
-    if (!downstream_addr.empty()) {
-      hash = HashUtil::xxHash64(downstream_addr);
+    if (downstream_addr == nullptr) {
+      return absl::nullopt;
     }
-    return hash;
+    auto* downstream_ip = downstream_addr->ip();
+    if (downstream_ip == nullptr) {
+      return absl::nullopt;
+    }
+    const auto& downstream_addr_str = downstream_ip->addressAsString();
+    if (downstream_addr_str.empty()) {
+      return absl::nullopt;
+    }
+    return HashUtil::xxHash64(downstream_addr_str);
   }
 };
 
@@ -155,9 +165,10 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                      const Http::HeaderMap& headers,
-                                                      const AddCookieCallback add_cookie) const {
+absl::optional<uint64_t>
+HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
+                             const Http::HeaderMap& headers,
+                             const AddCookieCallback add_cookie) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const absl::optional<uint64_t> new_hash =

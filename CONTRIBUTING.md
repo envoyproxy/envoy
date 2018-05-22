@@ -11,6 +11,8 @@ maximize the chances of your PR being merged.
   agreement. This is to prevent your time being wasted, as well as ours. The GitHub review process
   for major features is also important so that [organizations with commit access](OWNERS.md) can
   come to agreement on design.
+* Specifically, if the goal is to add a new [extension](REPO_LAYOUT.md#sourceextensions-layout),
+  please read the [extension policy](GOVERNANCE.md#extension-addition-policy).
 * Small patches and bug fixes don't need prior communication.
 
 # Coding style
