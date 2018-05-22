@@ -691,7 +691,7 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A" 
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
   }
   )EOF";
 
