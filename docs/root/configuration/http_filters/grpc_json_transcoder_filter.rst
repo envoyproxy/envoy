@@ -36,18 +36,18 @@ Then run protoc to generate the descriptor set from bookstore.proto:
 
 If you have more than one proto source files, you can pass all of them in one command.
 
-Route config for transcoded requests
-------------------------------------
+Route configs for transcoded requests
+-------------------------------------
 
-The route config to be used with the gRPC-JSON transcoder should be identical with gRPC route,
+The route configs to be used with the gRPC-JSON transcoder should be identical to the gRPC route.
 The requests processed by the transcoder filter will have `/<package>.<service>/<method>` path and
-`POST` method. The route config for those request should match on `/<package>.<service>/<method>`
-but not the incoming request path. This allows the routes can be used for both gRPC requests and
+`POST` method. The route configs for those requests should match on `/<package>.<service>/<method>`,
+not the incoming request path. This allows the routes to be used for both gRPC requests and
 gRPC-JSON transcoded requests.
 
 For example, with the following proto example, the router will process `/helloworld.Greeter/SayHello`
-as path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to match
-incoming request path, set `match_incoming_request_route` to true.
+as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
+match the incoming request path, set `match_incoming_request_route` to true.
 
 .. code-block:: proto
 
