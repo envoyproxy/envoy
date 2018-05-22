@@ -18,6 +18,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -118,8 +119,8 @@ protected:
 private:
   FakeHttpConnection& parent_;
   Http::StreamEncoder& encoder_;
-  absl::Mutex lock_;
-  absl::CondVar decoder_event_;
+  Thread::MutexBasicLockable lock_;
+  Thread::CondVar decoder_event_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
@@ -209,7 +210,7 @@ protected:
 
   Network::Connection& connection_;
   mutable Thread::MutexBasicLockable lock_;
-  std::condition_variable connection_event_;
+  Thread::CondVar connection_event_;
   bool disconnected_{};
   bool half_closed_{};
   bool initialized_{false};
@@ -361,7 +362,7 @@ private:
   // main test thread.
   Thread::MutexBasicLockable lock_;
   Thread::ThreadPtr thread_;
-  std::condition_variable new_connection_event_;
+  Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;

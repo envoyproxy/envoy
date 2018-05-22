@@ -49,7 +49,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   // the server is up and ready for testing.
   Thread::LockGuard guard(listeners_mutex_);
   while (pending_listeners_ != 0) {
-    listeners_cv_.wait(guard);
+    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
   }
   ENVOY_LOG(info, "listener wait complete");
 }
@@ -74,7 +74,7 @@ void IntegrationTestServer::onWorkerListenerAdded() {
   Thread::LockGuard guard(listeners_mutex_);
   if (pending_listeners_ > 0) {
     pending_listeners_--;
-    listeners_cv_.notify_one();
+    listeners_cv_.notifyOne();
   }
 }
 

@@ -34,21 +34,21 @@ void FakeStream::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
   Thread::LockGuard lock(lock_);
   headers_ = std::move(headers);
   setEndStream(end_stream);
-  decoder_event_.notify_one();
+  decoder_event_.notifyOne();
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   Thread::LockGuard lock(lock_);
   body_.add(data);
   setEndStream(end_stream);
-  decoder_event_.notify_one();
+  decoder_event_.notifyOne();
 }
 
 void FakeStream::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   Thread::LockGuard lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
-  decoder_event_.notify_one();
+  decoder_event_.notifyOne();
 }
 
 void FakeStream::encode100ContinueHeaders(const Http::HeaderMapImpl& headers) {
@@ -98,20 +98,20 @@ void FakeStream::encodeResetStream() {
 void FakeStream::onResetStream(Http::StreamResetReason) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
-  decoder_event_.notify_one();
+  decoder_event_.notifyOne();
 }
 
 void FakeStream::waitForHeadersComplete() {
   Thread::LockGuard lock(lock_);
   while (!headers_) {
-    decoder_event_.Wait(&lock_);
+    decoder_event_.wait(lock_);
   }
 }
 
 void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length) {
   Thread::LockGuard lock(lock_);
   while (bodyLength() < body_length) {
-    decoder_event_.WaitWithTimeout(&lock_, absl::Milliseconds(5));
+    decoder_event_.waitFor(lock_, std::chrono::milliseconds(5));
     if (bodyLength() < body_length) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -122,7 +122,7 @@ void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body
 void FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher) {
   Thread::LockGuard lock(lock_);
   while (!end_stream_) {
-    decoder_event_.WaitWithTimeout(&lock_, absl::Milliseconds(5));
+    decoder_event_.waitFor(lock_, std::chrono::milliseconds(5));
     if (!end_stream_) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -133,7 +133,7 @@ void FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher) {
 void FakeStream::waitForReset() {
   Thread::LockGuard lock(lock_);
   while (!saw_reset_) {
-    decoder_event_.wait(lock);
+    decoder_event_.wait(lock_); // Safe since CondVar::wait won't throw.
   }
 }
 
@@ -187,7 +187,7 @@ void FakeConnectionBase::enableHalfClose(bool enable) {
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
   Thread::LockGuard lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder));
-  connection_event_.notify_one();
+  connection_event_.notifyOne();
   return *new_streams_.back();
 }
 
@@ -196,14 +196,14 @@ void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     disconnected_ = true;
-    connection_event_.notify_one();
+    connection_event_.notifyOne();
   }
 }
 
 void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   Thread::LockGuard lock(lock_);
   while (!disconnected_) {
-    connection_event_.wait(lock);
+    connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
     // The default behavior of waitForDisconnect is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -220,7 +220,7 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
 void FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events) {
   Thread::LockGuard lock(lock_);
   while (!half_closed_) {
-    connection_event_.wait(lock);
+    connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
     // The default behavior of waitForHalfClose is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -238,11 +238,12 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
                                                    bool ignore_spurious_events) {
   Thread::LockGuard lock(lock_);
   while (new_streams_.empty()) {
-    std::cv_status status = connection_event_.WaitWithTimeout(&lock_, absl::Milliseconds(5));
+    Thread::CondVar::WaitStatus status =
+        connection_event_.waitFor(lock_, std::chrono::milliseconds(5));
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
-    if (status == std::cv_status::no_timeout && !ignore_spurious_events) {
+    if (status == Thread::CondVar::NoTimeout && !ignore_spurious_events) {
       break;
     }
     if (new_streams_.empty()) {
@@ -318,7 +319,7 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
   connection.readDisable(true);
   new_connections_.emplace_back(
       new QueuedConnectionWrapper(connection, allow_unexpected_disconnects_));
-  new_connection_event_.notify_one();
+  new_connection_event_.notifyOne();
   return true;
 }
 
@@ -335,7 +336,7 @@ void FakeUpstream::threadRoutine() {
 FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher) {
   Thread::LockGuard lock(lock_);
   while (new_connections_.empty()) {
-    new_connection_event_.WaitWithTimeout(&lock_, absl::Milliseconds(5));
+    new_connection_event_.waitFor(lock_, std::chrono::milliseconds(5));
     if (new_connections_.empty()) {
       // Run the client dispatcher since we may need to process window updates, etc.
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
@@ -359,8 +360,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       FakeUpstream& upstream = **it;
       Thread::LockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
-        upstream.new_connection_event_.wait_until(lock, std::chrono::system_clock::now() +
-                                                            std::chrono::milliseconds(5));
+        upstream.new_connection_event_.waitFor(upstream.lock_, std::chrono::milliseconds(5));
       }
 
       if (upstream.new_connections_.empty()) {
@@ -383,7 +383,7 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection(std::chrono::millisecond
   Thread::LockGuard lock(lock_);
   if (new_connections_.empty()) {
     ENVOY_LOG(debug, "waiting for raw connection");
-    new_connection_event_.wait_for(lock, wait_for_ms);
+    new_connection_event_.waitFor(lock_, wait_for_ms); // Safe since CondVar::wait won't throw.
   }
 
   if (new_connections_.empty()) {
@@ -401,7 +401,7 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   Thread::LockGuard lock(lock_);
   while (data_.size() != num_bytes) {
     ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
-    connection_event_.wait(lock);
+    connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
   }
   return data_;
 }
@@ -424,7 +424,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
   parent_.data_.append(TestUtility::bufferToString(data));
   parent_.half_closed_ = end_stream;
   data.drain(data.length());
-  parent_.connection_event_.notify_one();
+  parent_.connection_event_.notifyOne();
   return Network::FilterStatus::StopIteration;
 }
 } // namespace Envoy

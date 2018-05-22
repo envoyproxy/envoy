@@ -293,8 +293,8 @@ public:
   void waitReady();
 
 private:
-  absl::CondVar cv_;
-  absl::Mutex mutex_;
+  Thread::CondVar cv_;
+  Thread::MutexBasicLockable mutex_;
   bool ready_{false};
 };
 

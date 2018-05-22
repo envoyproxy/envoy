@@ -1,5 +1,6 @@
 #include <mutex>
 
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/singleton/threadsafe_singleton.h"
 

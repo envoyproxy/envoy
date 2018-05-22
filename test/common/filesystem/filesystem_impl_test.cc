@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"

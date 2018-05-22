@@ -16,6 +16,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -173,20 +174,20 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void ConditionalInitializer::setReady() {
-  absl::MutexLock lock(&mutex_);
+  Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
-  cv_.SignalAll();
+  cv_.notifyAll();
 }
 
 void ConditionalInitializer::waitReady() {
-  absl::MutexLock lock(&mutex_);
+  Thread::LockGuard lock(mutex_);
   if (ready_) {
     ready_ = false;
     return;
   }
 
-  cv_.Wait(&mutex_);
+  cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
 }

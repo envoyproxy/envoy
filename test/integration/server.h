@@ -10,6 +10,7 @@
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"
+#include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/stats/stats_impl.h"
@@ -291,7 +292,7 @@ private:
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;
-  std::condition_variable listeners_cv_;
+  Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;

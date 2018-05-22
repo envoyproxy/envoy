@@ -1,6 +1,7 @@
 #include "mocks.h"
 
 #include "common/common/assert.h"
+#include "common/common/lock_guard.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +25,7 @@ int MockOsSysCalls::open(const std::string& full_path, int flags, int mode) {
 
   int result = open_(full_path, flags, mode);
   num_open_++;
-  open_event_.notify_one();
+  open_event_.notifyOne();
 
   return result;
 }
@@ -34,7 +35,7 @@ ssize_t MockOsSysCalls::write(int fd, const void* buffer, size_t num_bytes) {
 
   ssize_t result = write_(fd, buffer, num_bytes);
   num_writes_++;
-  write_event_.notify_one();
+  write_event_.notifyOne();
 
   return result;
 }
