@@ -4,9 +4,10 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_set>
+
+#include "common/common/lock_guard.h"
 
 namespace Envoy {
 namespace Stats {

@@ -234,9 +234,11 @@ public:
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
-    ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
-    ads_stream_->startGrpcStream();
+    if (ads_stream_ == nullptr) {
+      ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+      ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+      ads_stream_->startGrpcStream();
+    }
   }
 
   Secret::MockSecretManager secret_manager_;
@@ -489,6 +491,44 @@ TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
+}
+
+// Validates that the initial xDS request batches all resources referred to in static config
+TEST_P(AdsIntegrationTest, XdsBatching) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    bootstrap.mutable_dynamic_resources()->clear_cds_config();
+    bootstrap.mutable_dynamic_resources()->clear_lds_config();
+
+    auto static_resources = bootstrap.mutable_static_resources();
+    static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster"));
+    static_resources->add_clusters()->MergeFrom(buildCluster("eds_cluster2"));
+
+    static_resources->add_listeners()->MergeFrom(buildListener("rds_listener", "route_config"));
+    static_resources->add_listeners()->MergeFrom(buildListener("rds_listener2", "route_config2"));
+  });
+
+  pre_worker_start_test_steps_ = [this]() {
+    ads_connection_ = fake_upstreams_.back()->waitForHttpConnection(*dispatcher_);
+    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+    ads_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"eds_cluster2", "eds_cluster"}));
+    sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment,
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster1")},
+        "1");
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+                                        {"route_config2", "route_config"}));
+    sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+        Config::TypeUrl::get().RouteConfiguration,
+        {buildRouteConfig("route_config2", "eds_cluster2"),
+         buildRouteConfig("route_config", "dummy_cluster")},
+        "1");
+  };
+
+  initialize();
 }
 
 } // namespace

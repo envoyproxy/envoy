@@ -15,6 +15,7 @@
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"
+#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 

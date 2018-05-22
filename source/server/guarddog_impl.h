@@ -10,6 +10,7 @@
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/stats.h"
 
+#include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
@@ -46,8 +47,8 @@ public:
    */
   int loopIntervalForTest() const { return loop_interval_.count(); }
   void forceCheckForTest() {
-    exit_event_.notify_all();
-    std::lock_guard<Thread::MutexBasicLockable> guard(exit_lock_);
+    exit_event_.notifyAll();
+    Thread::LockGuard guard(exit_lock_);
     force_checked_event_.wait(exit_lock_);
   }
 
@@ -61,7 +62,7 @@ private:
    * @return True if we should continue, false if signalled to stop.
    */
   bool waitOrDetectStop();
-  void start();
+  void start() EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
   void stop();
   // Per the C++ standard it is OK to use these in ctor initializer as long as
   // it is after kill and multikill timeout values are initialized.
@@ -87,9 +88,9 @@ private:
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
   Thread::MutexBasicLockable exit_lock_;
-  std::condition_variable_any exit_event_;
-  bool run_thread_;
-  std::condition_variable_any force_checked_event_;
+  Thread::CondVar exit_event_;
+  bool run_thread_ GUARDED_BY(exit_lock_);
+  Thread::CondVar force_checked_event_;
 };
 
 } // namespace Server

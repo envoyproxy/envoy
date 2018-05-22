@@ -1,6 +1,7 @@
 #include "common/grpc/google_async_client_impl.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/tracing/http_tracer_impl.h"
