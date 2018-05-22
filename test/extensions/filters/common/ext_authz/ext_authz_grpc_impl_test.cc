@@ -102,9 +102,8 @@ public:
         }
       }
     } else {
-      auto response_headers = response->mutable_ok_response()->mutable_headers();
-      ;
       if (!headers.empty()) {
+        auto response_headers = response->mutable_ok_response()->mutable_headers();
         for (auto& header : headers) {
           response_headers->insert(
               Envoy::Protobuf::MapPair<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>(
