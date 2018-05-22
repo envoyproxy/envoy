@@ -2,9 +2,7 @@
 
 #include <stdlib.h>
 
-#include <condition_variable>
 #include <list>
-#include <mutex>
 #include <random>
 #include <string>
 #include <vector>

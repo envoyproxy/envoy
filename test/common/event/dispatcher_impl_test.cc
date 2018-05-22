@@ -1,6 +1,4 @@
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"

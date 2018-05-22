@@ -2,10 +2,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
-#include <mutex>
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"

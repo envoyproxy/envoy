@@ -4,7 +4,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <mutex>
 #include <unordered_map>
 
 #include "common/common/thread.h"

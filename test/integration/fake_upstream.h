@@ -1,10 +1,8 @@
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "envoy/api/api.h"

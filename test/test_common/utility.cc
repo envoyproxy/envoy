@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <iostream>
 #include <list>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>

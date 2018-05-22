@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "envoy/server/options.h"
