@@ -222,14 +222,14 @@ public:
                      hash_policy);
 
   // Router::HashPolicy
-  absl::optional<uint64_t> generateHash(const std::string& downstream_addr,
+  absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
                                         const Http::HeaderMap& headers,
                                         const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
-    virtual absl::optional<uint64_t> evaluate(const std::string& downstream_addr,
+    virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                               const Http::HeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
   };
