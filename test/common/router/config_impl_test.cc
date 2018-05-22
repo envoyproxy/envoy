@@ -1445,6 +1445,28 @@ TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashIpNonIpAddress) {
+  NiceMock<Network::MockIp> bad_ip;
+  NiceMock<Network::MockResolvedAddress> bad_ip_address("", "");
+  firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
+  {
+    ON_CALL(bad_ip_address, ip()).WillByDefault(Return(nullptr));
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash(&bad_ip_address, headers, add_cookie_nop_));
+  }
+  {
+    const std::string empty;
+    ON_CALL(bad_ip_address, ip()).WillByDefault(Return(&bad_ip));
+    ON_CALL(bad_ip, addressAsString()).WillByDefault(ReturnRef(empty));
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash(&bad_ip_address, headers, add_cookie_nop_));
+  }
+}
+
 TEST_F(RouterMatcherHashPolicyTest, HashIpv4DifferentAddresses) {
   firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
   {
