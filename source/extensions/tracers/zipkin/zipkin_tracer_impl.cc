@@ -73,9 +73,8 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
 
   tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer(
-        new Tracer(local_info_.clusterName(), local_info_.address(), random_generator));
-    tracer->setTraceId128Bit(trace_id_128bit);
+    TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
+                                trace_id_128bit));
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
     return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};

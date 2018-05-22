@@ -38,7 +38,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -221,7 +221,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -305,7 +305,7 @@ TEST(ZipkinTracerTest, finishNotSampledSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -334,7 +334,7 @@ TEST(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -363,8 +363,7 @@ TEST(ZipkinTracerTest, RootSpan128bitTraceId) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
-  tracer.setTraceId128Bit(true);
+  Tracer tracer("my_service_name", addr, random_generator, true);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
