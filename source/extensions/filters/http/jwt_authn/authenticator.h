@@ -1,7 +1,6 @@
-
 #pragma once
 
-#include "extensions/filters/http/jwt_authn/data_store.h"
+#include "extensions/filters/http/jwt_authn/config.h"
 
 #include "jwt_verify_lib/status.h"
 
@@ -36,7 +35,7 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(DataStoreFactorySharedPtr store_factory);
+  static AuthenticatorPtr create(ConfigSharedPtr config);
 };
 
 } // namespace JwtAuthn

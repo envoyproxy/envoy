@@ -2,6 +2,7 @@
 
 #include "envoy/http/async_client.h"
 
+#include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
@@ -24,7 +25,7 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(Upstream::ClusterManager& cm, DataStore& store) : cm_(cm), store_(store) {}
+  AuthenticatorImpl(ConfigSharedPtr config) : config_(config) {}
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
@@ -49,18 +50,16 @@ private:
   void doneWithStatus(const Status& status);
 
   // Return true if it is OK to forward this request without JWT.
-  bool okToBypass();
+  bool okToBypass() const;
 
-  // The cluster manager object to make HTTP call.
-  Upstream::ClusterManager& cm_;
-  // The cache object.
-  DataStore& store_;
+  // The config object.
+  ConfigSharedPtr config_;
 
   // The token data
   JwtLocationConstPtr token_;
   // The JWT object.
   ::google::jwt_verify::Jwt jwt_;
-  // The jwks data object
+  // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
 
   // The HTTP request headers
@@ -75,7 +74,7 @@ private:
 };
 
 void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& rule : store_.config().rules()) {
+  for (const auto& rule : config_->config().rules()) {
     if (!rule.forward_payload_header().empty()) {
       headers.remove(Http::LowerCaseString(rule.forward_payload_header()));
     }
@@ -87,7 +86,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   callback_ = callback;
 
   ENVOY_LOG(debug, "Jwt authentication starts");
-  auto tokens = store_.getExtractor().extract(headers);
+  auto tokens = config_->getExtractor().extract(headers);
   if (tokens.empty()) {
     if (okToBypass()) {
       doneWithStatus(Status::Ok);
@@ -124,7 +123,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   }
 
   // Check the issuer is configured or not.
-  jwks_data_ = store_.getJwksCache().findByIssuer(jwt_.iss_);
+  jwks_data_ = config_->tl_cache().getJwksCache().findByIssuer(jwt_.iss_);
   if (jwks_data_ == nullptr) {
     doneWithStatus(Status::JwtUnknownIssuer);
     return;
@@ -141,7 +140,10 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
-  // TODO(qiwzhang): check in progress fetching, not to issue second remote call.
+  // TODO(qiwzhang): potential optimization.
+  // If request 1 triggers a remote jwks fetching, but is not yet replied when the request 2
+  // of using the same jwks comes. The request 2 will trigger another remote fetching for the
+  // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
   fetchRemoteJwks();
 }
 
@@ -156,23 +158,23 @@ void AuthenticatorImpl::fetchRemoteJwks() {
   message->headers().insertHost().value(host);
 
   const auto& cluster = jwks_data_->getJwtRule().remote_jwks().http_uri().cluster();
-  if (cm_.get(cluster) == nullptr) {
+  if (config_->cm().get(cluster) == nullptr) {
     doneWithStatus(Status::JwksFetchFail);
     return;
   }
 
   ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_);
-  request_ = cm_.httpAsyncClientForCluster(cluster).send(
+  request_ = config_->cm().httpAsyncClientForCluster(cluster).send(
       std::move(message), *this, absl::optional<std::chrono::milliseconds>());
 }
 
 void AuthenticatorImpl::onSuccess(Http::MessagePtr&& response) {
   request_ = nullptr;
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
-  if (status_code == 200) {
+  if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(debug, "fetch pubkey [uri = {}]: success", uri_);
     if (response->body()) {
-      auto len = response->body()->length();
+      const auto len = response->body()->length();
       const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
       onFetchRemoteJwksDone(body);
       return;
@@ -192,7 +194,7 @@ void AuthenticatorImpl::onFailure(Http::AsyncClient::FailureReason) {
 }
 
 void AuthenticatorImpl::onDestroy() {
-  if (request_) {
+  if (request_ != nullptr) {
     request_->cancel();
     request_ = nullptr;
     ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_);
@@ -232,8 +234,8 @@ void AuthenticatorImpl::verifyKey() {
   doneWithStatus(Status::Ok);
 }
 
-bool AuthenticatorImpl::okToBypass() {
-  if (store_.config().allow_missing_or_failed()) {
+bool AuthenticatorImpl::okToBypass() const {
+  if (config_->config().allow_missing_or_failed()) {
     return true;
   }
 
@@ -244,7 +246,7 @@ bool AuthenticatorImpl::okToBypass() {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
-  if (status != Status::Ok && store_.config().allow_missing_or_failed()) {
+  if (status != Status::Ok && config_->config().allow_missing_or_failed()) {
     callback_->onComplete(Status::Ok);
   } else {
     callback_->onComplete(status);
@@ -254,8 +256,8 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(DataStoreFactorySharedPtr store_factory) {
-  return AuthenticatorPtr(new AuthenticatorImpl(store_factory->cm(), store_factory->store()));
+AuthenticatorPtr Authenticator::create(ConfigSharedPtr config) {
+  return std::make_unique<AuthenticatorImpl>(config);
 }
 
 } // namespace JwtAuthn

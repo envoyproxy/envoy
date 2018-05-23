@@ -390,6 +390,19 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   Utility::extractHostPathFromUri("/x/y/z", host, path);
   EXPECT_EQ(host, "");
   EXPECT_EQ(path, "/x/y/z");
+
+  // Some invalid URI
+  Utility::extractHostPathFromUri("scheme://adf-scheme://adf", host, path);
+  EXPECT_EQ(host, "adf-scheme:");
+  EXPECT_EQ(path, "//adf");
+
+  Utility::extractHostPathFromUri("://", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/");
+
+  Utility::extractHostPathFromUri("/:/adsf", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/:/adsf");
 }
 
 } // namespace Http

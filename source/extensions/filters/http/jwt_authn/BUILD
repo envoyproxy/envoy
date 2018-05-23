@@ -19,7 +19,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "authenticator.h",
-        "data_store.h",
+        "config.h",
         "extractor.h",
         "filter.h",
         "filter_factory.h",

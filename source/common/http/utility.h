@@ -182,6 +182,11 @@ public:
 
   /**
    * Extract host and path from a URI
+   * This function doesn't validate if the URI is valid. It only parses the URI with following
+   * format:
+   *    scheme://host/path
+   * if not "://", the whole string will be "host/path" portion.
+   * if not "/" in the "host/path" portion,  the whole string will be host with path as "/".
    * @param the input URI string
    * @param the output host string.
    * @param the output path string.

@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(DataStoreFactorySharedPtr store_factory) : store_factory_(store_factory) {}
+Filter::Filter(ConfigSharedPtr config) : config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
@@ -25,10 +25,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   // store_factory can be created in route::per_filter_config
 
   // For now, only use config from filter.
-  if (!store_factory_) {
+  if (!config_) {
     return Http::FilterHeadersStatus::Continue;
   }
-  auth_ = Authenticator::create(store_factory_);
+  auth_ = Authenticator::create(config_);
 
   // Remove headers configured to pass payload
   auth_->sanitizePayloadHeaders(headers);

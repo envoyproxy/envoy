@@ -3,7 +3,7 @@
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/jwt_authn/data_store.h"
+#include "extensions/filters/http/jwt_authn/config.h"
 #include "extensions/filters/http/jwt_authn/filter.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
@@ -17,9 +17,9 @@ Http::FilterFactoryCb
 FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
                                                  const std::string&,
                                                  Server::Configuration::FactoryContext& context) {
-  auto store_factory = std::make_shared<DataStoreFactory>(proto_config, context);
-  return [store_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(store_factory));
+  auto config = std::make_shared<Config>(proto_config, context);
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(config));
   };
 }
 
