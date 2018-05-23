@@ -38,31 +38,12 @@ public:
   static const std::vector<std::string> GetAllConfigFiles() {
     SetupTestDirectory();
 
-    std::string all_file_names =
-        TestEnvironment::readFileToStringForTest(directory_ + "test_out/all_config_files.txt");
-    std::vector<std::string> files;
-    // all_config_files.txt contains a list of all config files from tar file created by
-    // example_configs_test_setup.sh Names of the files are separated by EOL. Tokenize those  names
-    // and put them into a std container.
-    size_t pos = 0;
-    size_t prev_pos = pos;
-    while (pos != std::string::npos) {
-      pos = all_file_names.find('\n', pos);
-      if (pos != std::string::npos) {
-        files.emplace_back(all_file_names.substr(prev_pos, pos - prev_pos));
-        pos += 1;
-        prev_pos = pos;
-      } else {
-        // last item. Process it if not empty line.
-        if (prev_pos < all_file_names.length()) {
-          files.emplace_back(all_file_names.substr(prev_pos));
-        }
-      }
+    auto files = TestUtility::listFiles(ValidationServerTest::directory_, false);
+
+    // Strip directory part. options_ adds it for each test.
+    for (std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++) {
+      (*it) = it->substr(directory_.length() + 1);
     }
-    // Make sure that reading file with config file names and tokenizing was successful.
-    // If something went wrong, files container will be empty and parameterized tests will not be
-    // instantiated but there will be no warning.
-    ASSERT(!files.empty());
     return files;
   }
 };
@@ -90,6 +71,5 @@ TEST_P(ValidationServerTest_1, RunWithoutCrash) {
 
 INSTANTIATE_TEST_CASE_P(AllConfigs, ValidationServerTest_1,
                         ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
-
 } // namespace Server
 } // namespace Envoy
