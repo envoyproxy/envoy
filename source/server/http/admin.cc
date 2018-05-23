@@ -544,12 +544,12 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   Value histograms_obj;
   histograms_obj.SetObject();
 
-  bool supported_quantiles_added = false;
+  bool found_used_histogram = false;
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (show_all || histogram->used()) {
-      if (!supported_quantiles_added) {
+      if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
         Stats::HistogramStatisticsImpl empty_statistics;
@@ -560,7 +560,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
           supported_quantile_array.PushBack(quantile_type, allocator);
         }
         histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
-        supported_quantiles_added = true;
+        found_used_histogram = true;
       }
       Value histogram_obj;
       histogram_obj.SetObject();
@@ -590,7 +590,7 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       histogram_array.PushBack(histogram_obj, allocator);
     }
   }
-  if (supported_quantiles_added) {
+  if (found_used_histogram) {
     histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
     histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
     stats_array.PushBack(histograms_container_obj, allocator);
