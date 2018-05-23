@@ -53,6 +53,11 @@ Version history
   Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
   header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
+  (e.g. ALPN for TLS protocol).
+* listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
+  :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
 * listeners: removed restriction on all filter chains having identical filters.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
@@ -65,12 +70,16 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
-* router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
-  already been proxied downstream when the timeout occurs. Previously, the response would be reset 
-  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
+* router: The behavior of per-try timeouts have changed in the case where a portion of the response has
+  already been proxied downstream when the timeout occurs. Previously, the response would be reset
+  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
+* router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
+  to ignore the source port.
+* router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
+  to explicitly match based on a header's presence.
 * router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
-  to support matching on missing headers or headers that do not have a desired value.
+  which supports inverting all other match types to match based on headers which are not a desired value.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners

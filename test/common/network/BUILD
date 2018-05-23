@@ -59,10 +59,12 @@ envoy_cc_test(
     srcs = ["dns_impl_test.cc"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/network:address_interface",
         "//include/envoy/network:dns_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
         "//source/common/network:dns_lib",
         "//source/common/network:filter_lib",
         "//source/common/network:listen_socket_lib",

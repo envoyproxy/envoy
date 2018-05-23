@@ -40,6 +40,7 @@ public:
   const std::string NOT_SAMPLED = "0";
 
   const std::string DEFAULT_COLLECTOR_ENDPOINT = "/api/v1/spans";
+  const bool DEFAULT_TRACE_ID_128BIT = false;
 };
 
 typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;

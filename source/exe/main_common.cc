@@ -93,7 +93,7 @@ bool MainCommonBase::run() {
   NOT_REACHED;
 }
 
-MainCommon::MainCommon(int argc, char** argv)
+MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info), base_(options_) {}
 
 std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,

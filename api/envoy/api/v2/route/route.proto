@@ -873,7 +873,10 @@ message HeaderMatcher {
 
   // Specifies the value of the header. If the value is absent a request that
   // has the name header will match, regardless of the header’s value.
-  string value = 2;
+  //
+  // .. attention::
+  //   Deprecated. Use :ref:`exact_match <envoy_api_field_route.HeaderMatcher.exact_match>` instead.
+  string value = 2 [deprecated = true];
 
   // Specifies whether the header value is a regular
   // expression or not. Defaults to false. The entire request header value must match the regex. The
@@ -886,7 +889,10 @@ message HeaderMatcher {
   // * The regex *\d{3}* matches the value *123*
   // * The regex *\d{3}* does not match the value *1234*
   // * The regex *\d{3}* does not match the value *123.456*
-  google.protobuf.BoolValue regex = 3;
+  //
+  // .. attention::
+  //   Deprecated. Use :ref:`regex_match <envoy_api_field_route.HeaderMatcher.regex_match>` instead.
+  google.protobuf.BoolValue regex = 3 [deprecated = true];
 
   // Specifies how the header match will be performed to route the request.
   // If header_match_specifier is absent, a request that has the
