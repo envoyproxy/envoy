@@ -214,6 +214,16 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                           filter_chain_match.sni_domains().end());
     }
 
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : server_names) {
+      if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\" (or the deprecated \"sni_domains\")",
+                        address_->asString()));
+      }
+    }
+
     std::vector<std::string> application_protocols(
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
@@ -315,14 +325,15 @@ ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
     return findFilterChainForServerName(server_name_exact_match->second, socket);
   }
 
-  // Match on the wildcard domain, i.e. ".example.com" for "www.example.com".
-  const size_t pos = server_name.find('.');
-  if (pos > 0 && pos < server_name.size() - 1) {
+  // Match on all wildcard domains, i.e. ".example.com" and ".com" for "www.example.com".
+  size_t pos = server_name.find('.', 1);
+  while (pos < server_name.size() - 1 && pos != std::string::npos) {
     const std::string wildcard = server_name.substr(pos);
     const auto server_name_wildcard_match = filter_chains_.find(wildcard);
     if (server_name_wildcard_match != filter_chains_.end()) {
       return findFilterChainForServerName(server_name_wildcard_match->second, socket);
     }
+    pos = server_name.find('.', pos + 1);
   }
 
   // Match on a filter chain without server name requirements.

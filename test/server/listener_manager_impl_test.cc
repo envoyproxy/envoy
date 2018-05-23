@@ -1134,7 +1134,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
           keys:
           - filename: "{{ test_rundir }}/test/common/ssl/test_data/ticket_key_a"
     - filter_chain_match:
-        server_names: "*.example.com"
+        server_names: "*.com"
       tls_context:
         common_tls_context:
           tls_certificates:
@@ -1172,6 +1172,16 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
 
   // TLS client with wildcard SNI match - using 3nd filter chain.
   filter_chain = findFilterChain("server2.example.com", true, "tls", true, {});
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
+  server_names = ssl_socket->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 2);
+  EXPECT_EQ(server_names.front(), "*.example.com");
+
+  // TLS client with wildcard SNI match - using 3nd filter chain.
+  filter_chain = findFilterChain("www.wildcard.com", true, "tls", true, {});
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
@@ -1385,6 +1395,25 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
   manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServerNamesMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        server_names: "*w.example.com"
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': partial wildcards are not "
+                            "supported in \"server_names\" (or the deprecated \"sni_domains\")");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch) {
