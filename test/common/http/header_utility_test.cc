@@ -312,7 +312,8 @@ invert_match: true
 
 TEST(MatchHeadersTest, HeaderPresentMatch) {
   TestHeaderMapImpl matching_headers{{"match-header", "123"}};
-  TestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"}, {"other-nonmatch-header", "123.456"}};
+  TestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"},
+                                       {"other-nonmatch-header", "123.456"}};
 
   const std::string yaml = R"EOF(
 name: match-header
@@ -327,7 +328,8 @@ present_match: true
 
 TEST(MatchHeadersTest, HeaderPresentInverseMatch) {
   TestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
-  TestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"}, {"other-nonmatch-header", "123.456"}};
+  TestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"},
+                                     {"other-nonmatch-header", "123.456"}};
 
   const std::string yaml = R"EOF(
 name: match-header
