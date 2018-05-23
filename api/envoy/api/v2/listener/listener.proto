@@ -102,8 +102,8 @@ message FilterChainMatch {
   google.protobuf.UInt32Value destination_port = 8;
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
-  // a filter chain match. Those values will be compared against the server names of a new connection,
-  // when detected by one of the listener filters.
+  // a filter chain match. Those values will be compared against the server names of a new
+  // connection, when detected by one of the listener filters.
   //
   // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
   // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
@@ -128,12 +128,13 @@ message FilterChainMatch {
   string transport_protocol = 9;
 
   // If non-empty, a list of application protocols (e.g. ALPN for TLS protocol) to consider when
-  // determining a filter chain match. Those values will be compared against the application protocols
-  // of a new connection, when detected by one of the listener filters.
+  // determining a filter chain match. Those values will be compared against the application
+  // protocols of a new connection, when detected by one of the listener filters.
   //
   // Suggested values include:
   //
-  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`,
+  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector
+  //   <config_listener_filters_tls_inspector>`,
   // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //
   // .. attention::
@@ -148,8 +149,8 @@ message FilterChainMatch {
   repeated string application_protocols = 10;
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
-  // a filter chain match. Those values will be compared against the server names of a new connection,
-  // when detected by one of the listener filters.
+  // a filter chain match. Those values will be compared against the server names of a new
+  // connection, when detected by one of the listener filters.
   //
   // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
   // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
@@ -158,7 +159,8 @@ message FilterChainMatch {
   //
   // .. attention::
   //
-  //   Deprecated. Use :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>` instead.
+  //   Deprecated. Use :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`
+  //   instead.
   repeated string sni_domains = 1 [deprecated = true];
 }
 

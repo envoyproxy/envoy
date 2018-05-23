@@ -26,6 +26,5 @@ message StringMatch {
     // The regex grammar is defined `here
     // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     string regex = 4;
- }
+  }
 }
-

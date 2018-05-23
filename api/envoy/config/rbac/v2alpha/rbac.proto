@@ -7,18 +7,20 @@ import "envoy/type/string_match.proto";
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
 
-// Role Based Access Control (RBAC) provides service-level and method-level access control for a service.
-// The RBAC engine authorizes a request by evaluating the request context (expressed in the form of
-// :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against the RBAC policies.
+// Role Based Access Control (RBAC) provides service-level and method-level access control for a
+// service. The RBAC engine authorizes a request by evaluating the request context (expressed in the
+// form of :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against
+// the RBAC policies.
 //
-// RBAC policies are additive. The policies are examined in order. A request is allowed once a matching policy
-// is found (suppose the `action` is ALLOW).
+// RBAC policies are additive. The policies are examined in order. A request is allowed once a
+// matching policy is found (suppose the `action` is ALLOW).
 //
 // Here is an example of RBAC configuration. It has two policies:
-// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry means full access)
-//   to the service.
-// * Any user (empty principal entry means any user) can read ("GET") the service at paths with prefix "/products" or
-//   suffix "/reviews" when request header "version" set to either "v1" or "v2".
+// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry
+//   means full access) to the service.
+// * Any user (empty principal entry means any user) can read ("GET") the service at paths with
+//   prefix "/products" or suffix "/reviews" when request header "version" set to either "v1" or
+//   "v2".
 //
 //   action: ALLOW
 //   policies:
@@ -59,11 +61,11 @@ message RBAC {
 
 // Policy specifies a role and the principals that are assigned/denied the role.
 message Policy {
- // Required. The set of permissions that define a role.
- repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
+  // Required. The set of permissions that define a role.
+  repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
 
- // Required. List of principals that are assigned/denied the role based on “action”.
- repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
+  // Required. List of principals that are assigned/denied the role based on “action”.
+  repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
 // Specifies how to match an entry in a map.

@@ -14,7 +14,8 @@ import traceback
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-", "./bazel/external", "./.cache")
 SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst", ".proto")
-DOCS_SUFFIX = (".md", ".rst", ".proto")
+DOCS_SUFFIX = (".md", ".rst")
+PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
 GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf', 'api/test')
@@ -167,11 +168,13 @@ def checkFilePath(file_path):
 
   if file_path.endswith(DOCS_SUFFIX):
     return error_messages
-  error_messages += checkNamespace(file_path)
-  error_messages += checkProtobufExternalDeps(file_path)
 
-  command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
-  error_messages += executeCommand(command, "header_order.py check failed", file_path)
+  if not file_path.endswith(PROTO_SUFFIX):
+    error_messages += checkNamespace(file_path)
+    error_messages += checkProtobufExternalDeps(file_path)
+
+    command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
+    error_messages += executeCommand(command, "header_order.py check failed", file_path)
 
   command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
   error_messages += executeCommand(command, "clang-format check failed", file_path)
@@ -223,19 +226,23 @@ def fixFilePath(file_path):
       return ["buildifier rewrite failed for file: %s" % file_path]
     return []
   fixFileContents(file_path)
+
   if file_path.endswith(DOCS_SUFFIX):
     return []
 
-  error_messages = checkNamespace(file_path)
-  if error_messages == []:
-    error_messages = checkProtobufExternalDepsBuild(file_path)
-  if error_messages == []:
-    error_messages = checkProtobufExternalDeps(file_path)
-  if error_messages:
-    return error_messages + ["This cannot be automatically corrected. Please fix by hand."]
-
   error_messages = []
-  error_messages += fixHeaderOrder(file_path)
+  if not file_path.endswith(PROTO_SUFFIX):
+    error_messages = checkNamespace(file_path)
+    if error_messages == []:
+      error_messages = checkProtobufExternalDepsBuild(file_path)
+    if error_messages == []:
+      error_messages = checkProtobufExternalDeps(file_path)
+    if error_messages:
+      return error_messages + ["This cannot be automatically corrected. Please fix by hand."]
+
+    error_messages = []
+    error_messages += fixHeaderOrder(file_path)
+
   error_messages += clangFormat(file_path)
   return error_messages
 
