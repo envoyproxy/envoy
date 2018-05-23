@@ -56,11 +56,12 @@ public:
    * @param address Pointer to a network-address object. The IP address and port are used
    * in all annotations' endpoints of the spans created by the Tracer.
    * @param random_generator Reference to the random-number generator to be used by the Tracer.
+   * @param trace_id_128bit Whether 128bit ids should be used.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
-         Runtime::RandomGenerator& random_generator)
+         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit)
       : service_name_(service_name), address_(address), reporter_(nullptr),
-        random_generator_(random_generator) {}
+        random_generator_(random_generator), trace_id_128bit_(trace_id_128bit) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -112,6 +113,7 @@ private:
   Network::Address::InstanceConstSharedPtr address_;
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
+  const bool trace_id_128bit_;
 };
 
 typedef std::unique_ptr<Tracer> TracerPtr;

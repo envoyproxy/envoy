@@ -99,6 +99,12 @@ If a maintainer is no longer interested or cannot perform the maintainer duties 
 should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
 the maintainers per the voting process below.
 
+# Extension addition policy
+
+Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
+see [this](https://docs.google.com/document/d/1eDQQSxqx2khTXfa2vVm4vqkyRwXYkPzZCcbjxJ2_AvA) document
+for more information.
+
 # Conflict resolution and voting
 
 In general, we prefer that technical issues and maintainer membership are amicably worked out

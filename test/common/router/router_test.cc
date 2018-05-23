@@ -404,7 +404,7 @@ TEST_F(RouterTest, AddCookie) {
 
   std::string cookie_value;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+      .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
         cookie_value = add_cookie("foo", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
@@ -450,7 +450,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
           }));
 
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+      .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
         // this should be ignored
         add_cookie("foo", std::chrono::seconds(1337));
@@ -498,7 +498,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   std::string choco_c, foo_c;
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, const Http::HeaderMap&,
+      .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
         choco_c = add_cookie("choco", std::chrono::seconds(15));
         foo_c = add_cookie("foo", std::chrono::seconds(1337));

@@ -386,6 +386,17 @@ public:
   MOCK_METHOD0(stopListeners, void());
 };
 
+class MockIp : public Address::Ip {
+public:
+  MOCK_CONST_METHOD0(addressAsString, const std::string&());
+  MOCK_CONST_METHOD0(isAnyAddress, bool());
+  MOCK_CONST_METHOD0(isUnicastAddress, bool());
+  MOCK_CONST_METHOD0(ipv4, Address::Ipv4*());
+  MOCK_CONST_METHOD0(ipv6, Address::Ipv6*());
+  MOCK_CONST_METHOD0(port, uint32_t());
+  MOCK_CONST_METHOD0(version, Address::IpVersion());
+};
+
 class MockResolvedAddress : public Address::Instance {
 public:
   MockResolvedAddress(const std::string& logical, const std::string& physical)
