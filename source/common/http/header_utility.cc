@@ -20,6 +20,7 @@ namespace Http {
 //   b.regex_match: Match will succeed if header value matches the value specified here.
 //   c.range_match: Match will succeed if header value lies within the range specified
 //     here, using half open interval semantics [start,end).
+//   d.present_match: Match will succeed if the header is present.
 HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
     : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
@@ -35,6 +36,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     header_match_type_ = HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
+    break;
+  case envoy::api::v2::route::HeaderMatcher::kPresentMatch:
+    header_match_type_ = HeaderMatchType::Present;
     break;
   case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
@@ -65,21 +69,26 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     for (const HeaderData& cfg_header_data : config_headers) {
       const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
 
+      if (header == nullptr) {
+        matches = cfg_header_data.header_match_type_ == HeaderMatchType::Present
+                      ? cfg_header_data.invert_match_
+                      : false;
+        break;
+      }
+
       switch (cfg_header_data.header_match_type_) {
       case HeaderMatchType::Value:
-        matches &= (header != nullptr) && (cfg_header_data.value_.empty() ||
-                                           header->value() == cfg_header_data.value_.c_str());
+        matches &=
+            (cfg_header_data.value_.empty() || header->value() == cfg_header_data.value_.c_str());
         break;
 
       case HeaderMatchType::Regex:
-        matches &= (header != nullptr) &&
-                   std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
+        matches &= std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
         break;
 
       case HeaderMatchType::Range: {
         int64_t header_value = 0;
-        matches &= (header != nullptr) &&
-                   StringUtil::atol(header->value().c_str(), header_value, 10) &&
+        matches &= StringUtil::atol(header->value().c_str(), header_value, 10) &&
                    header_value >= cfg_header_data.range_.start() &&
                    header_value < cfg_header_data.range_.end();
         break;
