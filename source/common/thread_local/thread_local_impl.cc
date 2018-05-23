@@ -95,7 +95,7 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
-  // all_threads_complete_cb method. Parallelism of main thread execution is being traded off 
+  // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
   // for programming simplicity here.
   cb();
   std::shared_ptr<std::atomic<uint64_t>> worker_count =
