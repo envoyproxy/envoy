@@ -30,20 +30,18 @@
         http_filters:
         - name: envoy.router
           config: {}
-          name: envoy.health_check
+        - name: envoy.health_check
           config:
             pass_through_mode: false
             endpoint: "/healthcheck"
-          name: envoy.buffer
+        - name: envoy.buffer
           config:
             max_request_bytes: 5242880
-            max_request_time: 120
-          name: envoy.rate_limit
+            max_request_time: 120s
+        - name: envoy.rate_limit
           config:
             domain: envoy_front
             request_type: external
-          name: envoy.router
-          config: {}
 {% endmacro -%}
 admin:
   access_log_path: /var/log/envoy/admin_access.log
