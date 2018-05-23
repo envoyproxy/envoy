@@ -116,13 +116,20 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
-            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
-            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
-            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
-            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+    return {{"headers", static_luaHeaders},
+            {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},
+            {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},
+            {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},
+            {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},
+            {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical},
+            {"httpCall", static_luaHttpCall},
+            {"respond", static_luaRespond},
+            {"addOrUpdateCluster", static_luaAddorUpdateCluster}};
   }
 
 private:
@@ -175,6 +182,11 @@ private:
    * @return a handle to the metadata.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
+
+  /**
+   * @return a handle to create a cluster on the request path.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaAddorUpdateCluster);
 
   /**
    * Log a message to the Envoy log.

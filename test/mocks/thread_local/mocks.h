@@ -32,6 +32,7 @@ public:
     cb();
     main_callback();
   }
+  bool isMainThread() { return true; }
 
   void shutdownThread_() {
     shutdown_ = true;
@@ -61,6 +62,7 @@ public:
     void runOnAllThreads(Event::PostCb cb, Event::PostCb main_callback) override {
       parent_.runOnAllThreads(cb, main_callback);
     }
+    bool isMainThread() override { return true; }
     void set(InitializeCb cb) override { parent_.data_[index_] = cb(parent_.dispatcher_); }
 
     MockInstance& parent_;

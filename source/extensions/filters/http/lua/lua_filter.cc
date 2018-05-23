@@ -200,6 +200,16 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   }
 }
 
+int StreamHandleWrapper::luaAddorUpdateCluster(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  const std::string cluster_template_yaml = luaL_checkstring(state, 2);
+  envoy::api::v2::Cluster cluster;
+  MessageUtil::loadFromYaml(cluster_template_yaml, cluster);
+  filter_.clusterManager().addOrUpdateCluster(cluster, "1");
+  // TODO: Better error handling
+  return 1;
+}
+
 void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");

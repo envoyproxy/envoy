@@ -55,6 +55,8 @@ public:
    */
   virtual void runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) PURE;
 
+  virtual bool isMainThread() PURE;
+
   /**
    * Set thread local data on all threads previously registered via registerThread().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor

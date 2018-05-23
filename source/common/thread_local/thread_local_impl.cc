@@ -110,6 +110,8 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_c
   }
 }
 
+bool InstanceImpl::isMainThread() { return (std::this_thread::get_id() == main_thread_id_); }
+
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
   ASSERT(std::this_thread::get_id() == parent_.main_thread_id_);
   ASSERT(!parent_.shutdown_);

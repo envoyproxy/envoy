@@ -172,8 +172,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        Event::Dispatcher& main_thread_dispatcher,
                                        Server::Admin& admin)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
-      local_info_(local_info), cm_stats_(generateStats(stats)),
+      main_thread_dispatcher_(main_thread_dispatcher), random_(random),
+      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
+      cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })) {
@@ -406,7 +407,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads(
+  createOrUpdateThreadLocalClusterInternal(
       [
         this, new_cluster = cluster.cluster_->info(),
         thread_aware_lb_factory = cluster.loadBalancerFactory()
@@ -428,6 +429,16 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
               cb->onClusterAddOrUpdate(*thread_local_cluster);
             }
           });
+}
+
+void ClusterManagerImpl::createOrUpdateThreadLocalClusterInternal(
+    std::function<void()> thread_local_clustercb) {
+  if (tls_->isMainThread()) {
+    tls_->runOnAllThreads(thread_local_clustercb);
+  } else {
+    thread_local_clustercb();
+    main_thread_dispatcher_.post(thread_local_clustercb);
+  }
 }
 
 bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
@@ -561,8 +572,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
-
-  tls_->runOnAllThreads([
+  postThreadLocalClusterUpdateInternal([
     this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
     hosts_per_locality_copy, healthy_hosts_per_locality_copy,
     locality_weights = host_set->localityWeights(), hosts_added, hosts_removed
@@ -571,6 +581,16 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
         name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
         healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
   });
+}
+
+void ClusterManagerImpl::postThreadLocalClusterUpdateInternal(
+    std::function<void()> thread_local_cluster_updatecb) {
+  if (tls_->isMainThread()) {
+    tls_->runOnAllThreads(thread_local_cluster_updatecb);
+  } else {
+    thread_local_cluster_updatecb();
+    main_thread_dispatcher_.post(thread_local_cluster_updatecb);
+  }
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -619,6 +639,7 @@ Http::AsyncClient& ClusterManagerImpl::httpAsyncClientForCluster(const std::stri
 ClusterUpdateCallbacksHandlePtr
 ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& cb) {
   ThreadLocalClusterManagerImpl& cluster_manager = tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  cluster_manager.update_callbacks_.emplace_back(&cb);
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
