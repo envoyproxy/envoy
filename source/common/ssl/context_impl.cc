@@ -115,11 +115,19 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
-  if (!config.verifyCertificateHash().empty()) {
-    std::string hash = config.verifyCertificateHash();
-    // remove ':' delimiters from hex string
-    hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
-    verify_certificate_hash_ = Hex::decode(hash);
+  if (!config.verifyCertificateHashList().empty()) {
+    for (auto hash : config.verifyCertificateHashList()) {
+      // Remove colons from the 95 chars long colon-separated "fingerprint"
+      // in order to get the hex-encoded string.
+      if (hash.size() == 95) {
+        hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
+      }
+      const auto& decoded = Hex::decode(hash);
+      if (decoded.size() != SHA256_DIGEST_LENGTH) {
+        throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
+      }
+      verify_certificate_hash_list_.push_back(decoded);
+    }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
@@ -255,7 +263,8 @@ int ContextImpl::verifyCertificate(X509* cert) {
     return 0;
   }
 
-  if (!verify_certificate_hash_.empty() && !verifyCertificateHash(cert, verify_certificate_hash_)) {
+  if (!verify_certificate_hash_list_.empty() &&
+      !verifyCertificateHashList(cert, verify_certificate_hash_list_)) {
     stats_.fail_verify_cert_hash_.inc();
     return 0;
   }
@@ -324,13 +333,19 @@ bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) 
   return false;
 }
 
-bool ContextImpl::verifyCertificateHash(X509* cert, const std::vector<uint8_t>& expected_hash) {
+bool ContextImpl::verifyCertificateHashList(
+    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
 
-  return computed_hash == expected_hash;
+  for (const auto& expected_hash : expected_hashes) {
+    if (computed_hash == expected_hash) {
+      return true;
+    }
+  }
+  return false;
 }
 
 SslStats ContextImpl::generateStats(Stats::Scope& store) {
@@ -558,10 +573,12 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     }
 
     // verify_certificate_hash_ can only be set with a ca_cert
-    rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
-                          verify_certificate_hash_.size() *
-                              sizeof(decltype(verify_certificate_hash_)::value_type));
-    RELEASE_ASSERT(rc == 1);
+    for (const auto& hash : verify_certificate_hash_list_) {
+      rc = EVP_DigestUpdate(&md, hash.data(),
+                            hash.size() *
+                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+      RELEASE_ASSERT(rc == 1);
+    }
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different

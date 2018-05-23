@@ -59,17 +59,12 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
               : Config::DataSource::getPath(config.tls_certificates()[0].private_key())),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
-      verify_certificate_hash_(config.validation_context().verify_certificate_hash().empty()
-                                   ? ""
-                                   : config.validation_context().verify_certificate_hash()[0]),
+      verify_certificate_hash_list_(config.validation_context().verify_certificate_hash().begin(),
+                                    config.validation_context().verify_certificate_hash().end()),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
-  // TODO(htuch): Support multiple hashes.
-  if (config.validation_context().verify_certificate_hash().size() > 1) {
-    throw EnvoyException("Multiple TLS certificate verification hashes are not supported");
-  }
   if (ca_cert_.empty() && !certificate_revocation_list_.empty()) {
     throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
                                      certificateRevocationListPath()));
