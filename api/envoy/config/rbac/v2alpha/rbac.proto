@@ -125,7 +125,7 @@ message Principal {
     // A set of identifiers that all must match in order to define the principal.
     Set and_ids = 1;
 
-    // A set of identifiers that all must match in order to define the principal.
+    // A set of identifiers at least one must match in order to define the principal.
     Set or_ids = 2;
 
     // When any is set, it matches any principal.
