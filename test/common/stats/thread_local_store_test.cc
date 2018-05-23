@@ -15,12 +15,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Stats {
@@ -603,7 +603,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
   h2.recordValue(2);
   EXPECT_FALSE(name_histogram_map["h2"]->used());
-  
+
   // Merge histograms again and validate that both h1 and h2 are used.
   store_->mergeHistograms([]() -> void {});
 
