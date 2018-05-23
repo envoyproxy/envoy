@@ -88,13 +88,8 @@ protected:
   int verifyCertificate(X509* cert);
 
   /**
-   * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER encoded
+   * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
    * certificate.
-   *
-   * The hash can be computed using either of the following commands:
-   *
-   * $ openssl x509 -in cert.pem -noout -fingerprint -sha256
-   * $ openssl x509 -in cert.pem -outform DER | sha256sum
    *
    * @param ssl the certificate to verify
    * @param certificate_hash_list the configured list of certificate hashes to match
