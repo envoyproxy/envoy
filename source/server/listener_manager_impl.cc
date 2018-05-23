@@ -198,8 +198,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
 
     std::vector<std::string> server_names;
-    if (filter_chain_match.server_names().size() != 0) {
-      if (filter_chain_match.sni_domains().size() != 0) {
+    if (!filter_chain_match.server_names().empty()) {
+      if (!filter_chain_match.sni_domains().empty()) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': both \"server_names\" and the deprecated "
                         "\"sni_domains\" are used, please merge the list of expected server names "
@@ -209,7 +209,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
       server_names.assign(filter_chain_match.server_names().begin(),
                           filter_chain_match.server_names().end());
-    } else if (filter_chain_match.sni_domains().size() != 0) {
+    } else if (!filter_chain_match.sni_domains().empty()) {
       server_names.assign(filter_chain_match.sni_domains().begin(),
                           filter_chain_match.sni_domains().end());
     }
