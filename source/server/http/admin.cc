@@ -544,20 +544,24 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   Value histograms_obj;
   histograms_obj.SetObject();
 
-  // It is not possible for the supported quantiles to differ across histograms, so it is ok to
-  // send them once.
-  Stats::HistogramStatisticsImpl empty_statistics;
-  rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
-  for (double quantile : empty_statistics.supportedQuantiles()) {
-    Value quantile_type;
-    quantile_type.SetDouble(quantile * 100);
-    supported_quantile_array.PushBack(quantile_type, allocator);
-  }
-  histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
+  bool supported_quantiles_added = false;
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (show_all || histogram->used()) {
+      if (!supported_quantiles_added) {
+        // It is not possible for the supported quantiles to differ across histograms, so it is ok
+        // to send them once.
+        Stats::HistogramStatisticsImpl empty_statistics;
+        rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
+        for (double quantile : empty_statistics.supportedQuantiles()) {
+          Value quantile_type;
+          quantile_type.SetDouble(quantile * 100);
+          supported_quantile_array.PushBack(quantile_type, allocator);
+        }
+        histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
+        supported_quantiles_added = true;
+      }
       Value histogram_obj;
       histogram_obj.SetObject();
       Value histogram_name;
@@ -586,9 +590,11 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       histogram_array.PushBack(histogram_obj, allocator);
     }
   }
-  histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
-  histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
-  stats_array.PushBack(histograms_container_obj, allocator);
+  if (supported_quantiles_added) {
+    histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
+    histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
+    stats_array.PushBack(histograms_container_obj, allocator);
+  }
   document.AddMember("stats", stats_array, allocator);
   rapidjson::StringBuffer strbuf;
   if (pretty_print) {
