@@ -95,7 +95,8 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
+  CookieHashMethod(const std::string& key, const absl::optional<std::chrono::seconds>& ttl)
+      : key_(key), ttl_(ttl) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -103,8 +104,8 @@ public:
     absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
-    if (value.empty() && ttl_ != std::chrono::seconds(0)) {
-      value = add_cookie(key_, ttl_);
+    if (value.empty() && ttl_.has_value()) {
+      value = add_cookie(key_, ttl_.value());
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -115,7 +116,7 @@ public:
 
 private:
   const std::string key_;
-  const std::chrono::seconds ttl_;
+  const absl::optional<std::chrono::seconds> ttl_;
 };
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
@@ -149,10 +150,14 @@ HashPolicyImpl::HashPolicyImpl(
     case envoy::api::v2::route::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie:
-      hash_impls_.emplace_back(
-          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
+    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie: {
+      absl::optional<std::chrono::seconds> ttl;
+      if (hash_policy.cookie().has_ttl()) {
+        ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
+      }
+      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name(), ttl));
       break;
+    }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());

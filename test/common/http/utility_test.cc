@@ -241,6 +241,13 @@ TEST(HttpUtility, TestHasSetCookieBadValues) {
   EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
 }
 
+TEST(HttpUtility, TestMakeSetCookieValue) {
+  EXPECT_EQ("name=\"value\"; Max-Age=10",
+            Utility::makeSetCookieValue("name", "value", std::chrono::seconds(10)));
+  EXPECT_EQ("name=\"value\"",
+            Utility::makeSetCookieValue("name", "value", std::chrono::seconds::zero()));
+}
+
 TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;

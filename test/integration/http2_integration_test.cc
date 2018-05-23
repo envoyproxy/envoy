@@ -459,7 +459,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
   EXPECT_EQ(served_by.size(), num_upstreams_);
 }
 
-TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithTtlSet) {
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
@@ -485,6 +485,36 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithTtlSet) {
         std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
         set_cookies.insert(value);
         EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15"));
+      });
+  EXPECT_EQ(set_cookies.size(), 1);
+}
+
+TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* hash_policy = hcm.mutable_route_config()
+                                ->mutable_virtual_hosts(0)
+                                ->mutable_routes(0)
+                                ->mutable_route()
+                                ->add_hash_policy();
+        auto* cookie = hash_policy->mutable_cookie();
+        cookie->set_name("foo");
+        cookie->mutable_ttl();
+      });
+
+  std::set<std::string> set_cookies;
+  sendMultipleRequests(
+      1024,
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"}},
+      [&](IntegrationStreamDecoder& response) {
+        EXPECT_STREQ("200", response.headers().Status()->value().c_str());
+        std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
+        set_cookies.insert(value);
+        EXPECT_THAT(value, MatchesRegex("^foo=.*$"));
       });
   EXPECT_EQ(set_cookies.size(), 1);
 }
