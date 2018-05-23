@@ -94,6 +94,9 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
         break;
       }
 
+      case HeaderMatchType::Present:
+        break;
+
       default:
         NOT_REACHED;
       }

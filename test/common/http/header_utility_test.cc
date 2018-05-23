@@ -119,7 +119,21 @@ range_match:
   EXPECT_EQ(-10, header_data.range_.end());
 }
 
-TEST(HeaderDataConstructorTest, InverseMatchSpecifier) {
+TEST(HeaderDataConstructorTest, PresentMatchSpecifier) {
+  const std::string yaml = R"EOF(
+name: test-header
+present_match: true
+  )EOF";
+
+  HeaderUtility::HeaderData header_data =
+      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
+
+  EXPECT_EQ("test-header", header_data.name_.get());
+  EXPECT_EQ(HeaderUtility::HeaderMatchType::Present, header_data.header_match_type_);
+  EXPECT_EQ("", header_data.value_);
+}
+
+TEST(HeaderDataConstructorTest, InvertMatchSpecifier) {
   const std::string yaml = R"EOF(
 name: test-header
 exact_match: value
@@ -287,6 +301,37 @@ name: match-header
 range_match:
   start: -10
   end: 0
+invert_match: true
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderData> header_data;
+  header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderPresentMatch) {
+  TestHeaderMapImpl matching_headers{{"match-header", "123"}};
+  TestHeaderMapImpl unmatching_headers{{"nonmatch-header", "1234"}, {"other-nonmatch-header", "123.456"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+present_match: true
+  )EOF";
+
+  std::vector<HeaderUtility::HeaderData> header_data;
+  header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
+  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
+  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+TEST(MatchHeadersTest, HeaderPresentInverseMatch) {
+  TestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
+  TestHeaderMapImpl matching_headers{{"nonmatch-header", "1234"}, {"other-nonmatch-header", "123.456"}};
+
+  const std::string yaml = R"EOF(
+name: match-header
+present_match: true
 invert_match: true
   )EOF";
 
