@@ -26,6 +26,57 @@ static_resources:
                   cluster: main_website
           http_filters:
           - name: envoy.router
+            config: {}
+
+
+
+  - name: listener_1
+    address:
+      socket_address:
+        protocol: TCP
+        port_value: 9002
+        address: 127.0.0.1
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: AUTO
+          stat_prefix: egress_http
+          #change route_config to RDS
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  host_rewrite: www.main_website.com
+                  cluster: main_website
+          add_user_agent: true
+          tracing:
+            operation_name: EGRESS
+          idle_timeout: 840s
+          #change this filter to an or_filter with status_code>=400 or duration_filter>=2000
+          access_log:
+          - name: envoy.file_access_log
+            filter:
+              not_health_check_filter:
+                {}
+            config:
+              path: "/var/log/envoy/egress_http_error.log"
+          use_remote_address: true
+          http_filters:
+          - name: envoy.rate_limit
+            config:
+              domain: envoy_service_to_service
+          - name: envoy.grpc_http1_bridge
+            config: {}
+          - name: envoy.router
+            config: {}
+
+
   clusters:
   {% for mapping in external_virtual_hosts -%}
   {% for host in mapping['hosts'] -%}
