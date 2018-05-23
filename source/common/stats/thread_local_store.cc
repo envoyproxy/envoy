@@ -346,7 +346,8 @@ ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          std::vector<Tag>&& tags)
     : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),merged_(false) {}
+      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
+      merged_(false) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);
