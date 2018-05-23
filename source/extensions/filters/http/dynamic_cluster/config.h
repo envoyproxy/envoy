@@ -1,7 +1,6 @@
 #pragma once
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
-
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -15,15 +14,15 @@ namespace DynamicCluster {
  */
 class DynamicClusterFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-
-  DynamicClusterFilterConfig() : Common::EmptyHttpFilterConfig(HttpFilterNames::get().DYNAMIC_CLUSTER) {}
+  DynamicClusterFilterConfig()
+      : Common::EmptyHttpFilterConfig(HttpFilterNames::get().DYNAMIC_CLUSTER) {}
 
 private:
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext& context) override;
 };
 
-} // namespace ExtAuthz
+} // namespace DynamicCluster
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

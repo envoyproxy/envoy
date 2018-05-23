@@ -16,7 +16,7 @@ namespace DynamicCluster {
 
 Http::FilterFactoryCb
 DynamicClusterFilterConfig::createFilter(const std::string&,
-                                        Server::Configuration::FactoryContext& context) {
+                                         Server::Configuration::FactoryContext& context) {
   return [&context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new DynamicCluster(context.clusterManager())});
