@@ -62,8 +62,8 @@ message Filter {
 // For criterias that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
 // to be used (e.g. for SNI ``www.example.com`` the most specific match would be
-// ``www.example.com``, then ``*.example.com``, then any filter chain without
-// ``server_names`` requirements).
+// ``www.example.com``, then ``*.example.com``, then ``*.com``, then any filter
+// chain without ``server_names`` requirements).
 //
 // [#comment: Implemented rules are kept in the preference order, with deprecated fields
 // listed at the end, because that's how we want to list them in the docs.
@@ -105,12 +105,10 @@ message FilterChainMatch {
   // a filter chain match. Those values will be compared against the server names of a new connection,
   // when detected by one of the listener filters.
   //
-  // The values may contain a wildcard prefix for the bottom-level domain of a domain name,
-  // e.g. ``*.example.com``.
+  // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
+  // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
   //
-  // Note that ``foo.example.com`` will be matched by ``foo.example.com`` and ``*.example.com``
-  // server names, but **not** by ``*foo.example.com``, ``*oo.example.com``, ``*example.com``,
-  // ``*.com`` or ``*``.
+  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
   //
   // .. attention::
   //
@@ -153,12 +151,10 @@ message FilterChainMatch {
   // a filter chain match. Those values will be compared against the server names of a new connection,
   // when detected by one of the listener filters.
   //
-  // The values may contain a wildcard prefix for the bottom-level domain of a domain name,
-  // e.g. ``*.example.com``.
+  // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
+  // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
   //
-  // Note that ``foo.example.com`` will be matched by ``foo.example.com`` and ``*.example.com``
-  // server names, but **not** by ``*foo.example.com``, ``*oo.example.com``, ``*example.com``,
-  // ``*.com`` or ``*``.
+  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
   //
   // .. attention::
   //
