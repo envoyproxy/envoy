@@ -136,7 +136,7 @@ message FilterChainMatch {
   // Suggested values include:
   //
   // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector
-  // <config_listener_filters_tls_inspector>`,
+  //   <config_listener_filters_tls_inspector>`,
   // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
   //
   // .. attention::
