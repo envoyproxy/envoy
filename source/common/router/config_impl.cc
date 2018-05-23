@@ -156,7 +156,8 @@ HashPolicyImpl::HashPolicyImpl(
         ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
       }
       hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name(), ttl));
-    } break;
+      break;
+    }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());
