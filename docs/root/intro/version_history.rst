@@ -76,6 +76,8 @@ Version history
   timeout will be ignored and the response will continue to proxy up to the global request timeout. 
 * router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
   to ignore the source port.
+* router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
+  generate session cookies.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
