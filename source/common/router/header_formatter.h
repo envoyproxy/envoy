@@ -9,6 +9,10 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+
+class DateFormatter;
+typedef std::shared_ptr<DateFormatter> DateFormatterSharedPtr;
+
 namespace Router {
 
 /**
@@ -43,6 +47,7 @@ public:
 private:
   std::function<std::string(const Envoy::RequestInfo::RequestInfo&)> field_extractor_;
   const bool append_;
+  DateFormatterSharedPtr date_formatter_;
 };
 
 /**

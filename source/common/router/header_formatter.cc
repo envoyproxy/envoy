@@ -113,7 +113,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 }
 
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
-parseStartTimeField(absl::string_view params_str) {
+parseStartTimeField(absl::string_view params_str, DateFormatterSharedPtr& date_formatter) {
   params_str = StringUtil::trim(params_str);
   std::string format;
   if (!params_str.empty()) {
@@ -126,13 +126,17 @@ parseStartTimeField(absl::string_view params_str) {
     format = std::string(params_str.substr(1, params_str.size() - 2)); // trim parens
   }
 
-  return [format](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-    if (format.empty()) {
-      return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
-    }
-    Envoy::DateFormatter date_formatter(format);
-    return date_formatter.fromTime(request_info.startTime());
-  };
+  if (!format.empty()) {
+    date_formatter.reset(new Envoy::DateFormatter(format));
+  }
+
+  return
+      [format, date_formatter](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
+        if (format.empty()) {
+          return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
+        }
+        return date_formatter->fromTime(request_info.startTime());
+      };
 }
 
 } // namespace
@@ -158,7 +162,8 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
           *request_info.downstreamLocalAddress());
     };
   } else if (field_name.find("START_TIME") == 0) {
-    field_extractor_ = parseStartTimeField(field_name.substr(STATIC_STRLEN("START_TIME")));
+    field_extractor_ =
+        parseStartTimeField(field_name.substr(STATIC_STRLEN("START_TIME")), date_formatter_);
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
