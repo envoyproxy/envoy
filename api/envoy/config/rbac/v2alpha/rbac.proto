@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
-import "envoy/type/string_match.proto";
+import "envoy/api/v2/route/route.proto";
 
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
@@ -16,33 +16,39 @@ option go_package = "v2alpha";
 // matching policy is found (suppose the `action` is ALLOW).
 //
 // Here is an example of RBAC configuration. It has two policies:
+//
 // * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry
 //   means full access) to the service.
+//
 // * Any user (empty principal entry means any user) can read ("GET") the service at paths with
 //   prefix "/products" or suffix "/reviews" when request header "version" set to either "v1" or
 //   "v2".
+//
+//  .. code-block:: yaml
 //
 //   action: ALLOW
 //   policies:
 //     "service-admin":
 //       permissions:
-//       -
+//         - any: true
 //       principals:
-//         authenticated:
-//           name: "cluster.local/ns/default/sa/admin"
+//         - authenticated: { name: "cluster.local/ns/default/sa/admin" }
+//         - authenticated: { name: "cluster.local/ns/default/sa/superuser" }
 //     "product-viewer":
 //       permissions:
-//       - paths: [prefix: "/products", suffix: "/reviews"]
-//         methods: ["GET"]
-//         conditions:
-//         - header:
-//             key: "version"
-//             values: [simple: "v1", simple: "v2"]
+//           - and_rules:
+//               rules:
+//                 - header: { name: ":method", exact_match: "GET" }
+//                 - header: { name: ":path", regex_match: "/products(/.*)?" }
+//                 - or_rules:
+//                     rules:
+//                       - destination_port: 80
+//                       - destination_port: 443
 //       principals:
-//       -
+//         - any: true
 //
 message RBAC {
-  // Should we do white-list or black-list style access control.
+  // Should we do white-list or black-list style access control?
   enum Action {
     // The policies grant access to principals. The rest is denied. This is white-list style
     // access control. This is the default type.
@@ -53,105 +59,98 @@ message RBAC {
     DENY = 1;
   }
 
+  // The action to take if a policy matches. The request is allowed if and only if:
+  //
+  //   * `action` is "ALLOWED" and at least one policy matches
+  //   * `action` is "DENY" and none of the policies match
   Action action = 1;
 
-  // Maps from policy name to policy.
+  // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   map<string, Policy> policies = 2;
 }
 
-// Policy specifies a role and the principals that are assigned/denied the role.
+// Policy specifies a role and the principals that are assigned/denied the role. A policy matches if
+// and only if at least one of its permissions match the action taking place AND at least one of its
+// principals match the downstream.
 message Policy {
-  // Required. The set of permissions that define a role.
+  // Required. The set of permissions that define a role. Each permission is matched with OR
+  // semantics. To match all actions for this policy, a single Permission with the `any` field set
+  // to true should be used.
   repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
 
-  // Required. List of principals that are assigned/denied the role based on “action”.
+  // Required. The set of principals that are assigned/denied the role based on “action”. Each
+  // principal is matched with OR semantics. To match all downstreams for this policy, a single
+  // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
-// Specifies how to match an entry in a map.
-message MapEntryMatch {
-  // The key to select an entry from the map.
-  string key = 1;
-
-  // A list of matched values.
-  repeated envoy.type.StringMatch values = 2;
-}
-
-// Specifies how to match IP addresses.
-message IpMatch {
-  // IP addresses in CIDR notation.
-  repeated envoy.api.v2.core.CidrRange cidrs = 1;
-}
-
-// Specifies how to match ports.
-message PortMatch {
-  // Port numbers.
-  repeated uint32 ports = 1;
-}
-
-// Permission defines a permission to access the service.
+// Permission defines an action (or actions) that a principal can take.
 message Permission {
-  // Optional. A list of HTTP paths or gRPC methods.
-  // gRPC methods must be presented as fully-qualified name in the form of
-  // packageName.serviceName/methodName.
-  // If this field is unset, it applies to any path.
-  repeated envoy.type.StringMatch paths = 1;
 
-  // Required. A list of HTTP methods (e.g., "GET", "POST").
-  // If this field is unset, it applies to any method.
-  repeated string methods = 2;
-
-  // Definition of a custom condition.
-  message Condition {
-    oneof condition_spec {
-      // Header match. This matches to the "request.http.headers" field in
-      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      // The map key is the header name. The header specifies how the service is accessed.
-      MapEntryMatch header = 1;
-
-      // Destination IP addresses.
-      IpMatch destination_ips = 2;
-
-      // Destination ports.
-      PortMatch destination_ports = 3;
-    }
+  // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
+  // each are applied with the associated behavior.
+  message Set {
+    repeated Permission rules = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-  // Optional. Custom conditions.
-  repeated Condition conditions = 3;
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set of rules that all must match in order to define the action.
+    Set and_rules = 1;
+
+    // A set of rules where at least one must match in order to define the action.
+    Set or_rules = 2;
+
+    // When any is set, it matches any action.
+    bool any = 3 [(validate.rules).bool.const = true];
+
+    // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
+    envoy.api.v2.route.HeaderMatcher header = 4;
+
+    // A CIDR block that describes the destination IP.
+    envoy.api.v2.core.CidrRange destination_ip = 5;
+
+    // A port number that describes the destination port connecting to.
+    uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
+  }
 }
 
-// Principal defines an identity or a group of identities.
+// Principal defines an identity or a group of identities for a downstream subject.
 message Principal {
-  // Authentication attributes for principal. These could be filled out inside RBAC filter.
-  // Or if an authentication filter is used, they can be provided by the authentication filter.
+
+  // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
+  // each are applied with the associated behavior.
+  message Set {
+    repeated Principal ids = 1 [(validate.rules).repeated .min_items = 1];
+  }
+
+  // Authentication attributes for a downstream.
   message Authenticated {
-    // Optional. The name of the principal. This matches to the "source.principal" field in
-    // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-    // If unset, it applies to any user.
+    // The name of the principal. If set, the URI SAN is used from the certificate, otherwise the
+    // subject field is used. If unset, it applies to any user that is authenticated.
     string name = 1;
   }
 
-  // Optional. Authenticated attributes that identify the principal.
-  Authenticated authenticated = 1;
+  oneof identifier {
+    option (validate.required) = true;
 
-  // Definition of a custom attribute to identify the principal.
-  message Attribute {
-    oneof attribute_spec {
-      // Source service name. This matches to the "source.service" field in
-      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      string service = 1;
+    // A set of identifiers that all must match in order to define the downstream.
+    Set and_ids = 1;
 
-      // Source IP addresses.
-      IpMatch source_ips = 2;
+    // A set of identifiers at least one must match in order to define the downstream.
+    Set or_ids = 2;
 
-      // Header match. This matches to the "request.http.headers" field in
-      // ":ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`.
-      // The map "key" is the header name. The header identifies the client.
-      MapEntryMatch header = 3;
-    }
+    // When any is set, it matches any downstream.
+    bool any = 3 [(validate.rules).bool.const = true];
+
+    // Authenticated attributes that identify the downstream.
+    Authenticated authenticated = 4;
+
+    // A CIDR block that describes the downstream IP.
+    envoy.api.v2.core.CidrRange source_ip = 5;
+
+    // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
+    envoy.api.v2.route.HeaderMatcher header = 6;
   }
-
-  // Optional. Custom attributes that identify the principal.
-  repeated Attribute attributes = 2;
 }
