@@ -55,7 +55,7 @@ BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
-                                   const std::string& host) {
+                                   const std::string& host, const std::string& content_type) {
   Api::Impl api(std::chrono::milliseconds(9000));
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
@@ -78,6 +78,9 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   headers.insertPath().value(url);
   headers.insertHost().value(host);
   headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
+  if (!content_type.empty()) {
+    headers.insertContentType().value(content_type);
+  }
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {
     Buffer::OwnedImpl body_buffer(body);
@@ -88,12 +91,14 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   return response;
 }
 
-BufferingStreamDecoderPtr IntegrationUtil::makeSingleRequest(
-    uint32_t port, const std::string& method, const std::string& url, const std::string& body,
-    Http::CodecClient::Type type, Network::Address::IpVersion ip_version, const std::string& host) {
+BufferingStreamDecoderPtr
+IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
+                                   const std::string& body, Http::CodecClient::Type type,
+                                   Network::Address::IpVersion ip_version, const std::string& host,
+                                   const std::string& content_type) {
   auto addr = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
-  return makeSingleRequest(addr, method, url, body, type, host);
+  return makeSingleRequest(addr, method, url, body, type, host, content_type);
 }
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,

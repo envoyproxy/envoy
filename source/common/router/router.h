@@ -155,7 +155,7 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->requestInfo().downstreamRemoteAddress()->asString(), *downstream_headers_,
+            callbacks_->requestInfo().downstreamRemoteAddress().get(), *downstream_headers_,
             [this](const std::string& key, std::chrono::seconds max_age) {
               return addDownstreamSetCookie(key, max_age);
             });
@@ -337,16 +337,6 @@ private:
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
 
-  /**
-   * Send a locally generated (non-proxied) HTTP response.
-   * @param code supplies the HTTP status code.
-   * @param body supplies the response body (empty string if no body is needed).
-   * @param modify_headers supplies an optional callback function that can modify the
-   *                       response headers.
-   */
-  void sendLocalReply(Http::Code code, const std::string& body,
-                      std::function<void(Http::HeaderMap& headers)> modify_headers = nullptr);
-
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
@@ -386,5 +376,5 @@ private:
                                  Upstream::ResourcePriority priority) override;
 };
 
-} // Router
+} // namespace Router
 } // namespace Envoy

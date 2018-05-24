@@ -149,6 +149,7 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counter(const std::string& name) override {
     std::unique_lock<std::mutex> lock(lock_);
@@ -169,16 +170,16 @@ public:
   }
 
   // Stats::Store
-  std::list<CounterSharedPtr> counters() const override {
+  std::vector<CounterSharedPtr> counters() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.counters();
   }
-  std::list<GaugeSharedPtr> gauges() const override {
+  std::vector<GaugeSharedPtr> gauges() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.gauges();
   }
 
-  std::list<ParentHistogramSharedPtr> histograms() const override {
+  std::vector<ParentHistogramSharedPtr> histograms() const override {
     std::unique_lock<std::mutex> lock(lock_);
     return store_.histograms();
   }
@@ -189,10 +190,12 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
+  Source& source() override { return source_; }
 
 private:
   mutable std::mutex lock_;
   IsolatedStoreImpl store_;
+  SourceImpl source_;
 };
 
 } // namespace Stats
@@ -259,9 +262,9 @@ public:
     return TestUtility::findGauge(*stat_store_, name);
   }
 
-  std::list<Stats::CounterSharedPtr> counters() override { return stat_store_->counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store_->counters(); }
 
-  std::list<Stats::GaugeSharedPtr> gauges() override { return stat_store_->gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store_->gauges(); }
 
   // TestHooks
   void onWorkerListenerAdded() override;

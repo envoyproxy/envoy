@@ -9,6 +9,7 @@
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/ostream.h"
@@ -94,7 +95,7 @@ typedef std::shared_ptr<DelegatingLogSink> DelegatingLogSinkPtr;
  * On destruction, logging is reverted to its previous state. SinkDelegates must
  * be allocated/freed as a stack.
  */
-class SinkDelegate {
+class SinkDelegate : NonCopyable {
 public:
   explicit SinkDelegate(DelegatingLogSinkPtr log_sink);
   virtual ~SinkDelegate();

@@ -38,7 +38,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -54,6 +54,7 @@ TEST(ZipkinTracerTest, spanCreation) {
   EXPECT_EQ("my_span", root_span->name());
   EXPECT_NE(0LL, root_span->startTime());
   EXPECT_NE(0ULL, root_span->traceId());            // trace id must be set
+  EXPECT_FALSE(root_span->isSetTraceIdHigh());      // by default, should be using 64 bit trace id
   EXPECT_EQ(root_span->traceId(), root_span->id()); // span id and trace id must be the same
   EXPECT_FALSE(root_span->isSetParentId());         // no parent set
   // span's timestamp must be set
@@ -175,7 +176,8 @@ TEST(ZipkinTracerTest, spanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   const uint generated_parent_id = Util::generateRandom64();
-  SpanContext modified_root_span_context(root_span_context.trace_id(), root_span_context.id(),
+  SpanContext modified_root_span_context(root_span_context.trace_id_high(),
+                                         root_span_context.trace_id(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
   SpanPtr new_shared_context_span =
       tracer.startSpan(config, "new_shared_context_span", timestamp, modified_root_span_context);
@@ -219,7 +221,7 @@ TEST(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -303,7 +305,7 @@ TEST(ZipkinTracerTest, finishNotSampledSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -332,7 +334,7 @@ TEST(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator);
+  Tracer tracer("my_service_name", addr, random_generator, false);
   NiceMock<MockSystemTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.currentTime();
 
@@ -355,6 +357,24 @@ TEST(ZipkinTracerTest, SpanSampledPropagatedToChild) {
 
   // Test that sampled flag is false
   EXPECT_FALSE(child_span2->sampled());
+}
+
+TEST(ZipkinTracerTest, RootSpan128bitTraceId) {
+  Network::Address::InstanceConstSharedPtr addr =
+      Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
+  NiceMock<Runtime::MockRandomGenerator> random_generator;
+  Tracer tracer("my_service_name", addr, random_generator, true);
+  NiceMock<MockSystemTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.currentTime();
+
+  NiceMock<Tracing::MockConfig> config;
+  ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
+
+  // Create root span
+  SpanPtr root_span = tracer.startSpan(config, "root_span", timestamp);
+
+  // Test that high 64 bit trace id is set
+  EXPECT_TRUE(root_span->isSetTraceIdHigh());
 }
 
 } // namespace Zipkin

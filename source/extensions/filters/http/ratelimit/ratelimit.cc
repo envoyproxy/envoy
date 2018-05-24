@@ -16,16 +16,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
-namespace {
-
-static const Http::HeaderMap* getTooManyRequestsHeader() {
-  static const Http::HeaderMap* header_map = new Http::HeaderMapImpl{
-      {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::TooManyRequests))}};
-  return header_map;
-}
-
-} // namespace
-
 void Filter::initiateCall(const Http::HeaderMap& headers) {
   bool is_internal_request =
       headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
@@ -133,8 +123,7 @@ void Filter::complete(RateLimit::LimitStatus status) {
   if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl(*getTooManyRequestsHeader())};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "", nullptr);
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();

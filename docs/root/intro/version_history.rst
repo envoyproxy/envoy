@@ -49,7 +49,16 @@ Version history
   local configuration.
 * http: added the ability to pass DNS type Subject Alternative Names of the client certificate in the
   :ref:`config_http_conn_man_headers_x-forwarded-client-cert` header.
+* http: local responses to gRPC requests are now sent as trailers-only gRPC responses instead of plain HTTP responses.
+  Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
+  header, optionally accompanied with a text message in "grpc-message" header.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
+  (e.g. ALPN for TLS protocol).
+* listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
+  :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
+* listeners: removed restriction on all filter chains having identical filters.
 * load balancing: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
@@ -67,6 +76,10 @@ Version history
   already been proxied downstream when the timeout occurs. Previously, the response would be reset
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
+* router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
+  to ignore the source port.
+* router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
+  generate session cookies.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -80,6 +93,10 @@ Version history
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * stats: added support for histograms.
 * stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
+* stats: updated stats sink interface to flush through a single call.
+* tls: added support for multiple
+  :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
+  values.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header

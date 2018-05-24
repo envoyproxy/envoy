@@ -93,13 +93,22 @@ public:
   void onComplete(Filters::Common::ExtAuthz::CheckStatus status) override;
 
 private:
+  // State of this filter's communication with the external authorization service.
+  // The filter has either not started calling the external service, in the middle of calling
+  // it or has completed.
   enum class Status { NotStarted, Calling, Complete };
+  // FilterReturn is used to capture what the return code should be to the filter chain.
+  // if this filter is either in the middle of calling the external service or the result is denied
+  // then the filter chain should stop. Otherwise the filter chain can continue to the next filter.
+  enum class FilterReturn { Stop, Continue };
   void callCheck();
 
   ConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
   Network::ReadFilterCallbacks* filter_callbacks_{};
   Status status_{Status::NotStarted};
+  FilterReturn filter_return_{FilterReturn::Stop};
+  // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
   envoy::service::auth::v2alpha::CheckRequest check_request_{};
 };

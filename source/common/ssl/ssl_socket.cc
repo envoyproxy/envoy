@@ -385,13 +385,10 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 ServerSslSocketFactory::ServerSslSocketFactory(const ServerContextConfig& config,
-                                               const std::string& listener_name,
-                                               const std::vector<std::string>& server_names,
-                                               bool skip_context_update,
                                                Ssl::ContextManager& manager,
-                                               Stats::Scope& stats_scope)
-    : ssl_ctx_(manager.createSslServerContext(listener_name, server_names, stats_scope, config,
-                                              skip_context_update)) {}
+                                               Stats::Scope& stats_scope,
+                                               const std::vector<std::string>& server_names)
+    : ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
   return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Server);

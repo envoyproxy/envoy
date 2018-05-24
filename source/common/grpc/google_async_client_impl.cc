@@ -1,6 +1,7 @@
 #include "common/grpc/google_async_client_impl.h"
 
 #include "common/common/empty_string.h"
+#include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -41,7 +42,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
     ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
-    absl::MutexLock lock(&stream.completed_ops_lock_);
+    Thread::LockGuard lock(stream.completed_ops_lock_);
 
     // It's an invariant that there must only be one pending post for arbitrary
     // length completed_ops_, otherwise we can race in stream destruction, where
@@ -222,7 +223,7 @@ void GoogleAsyncStreamImpl::writeQueued() {
 }
 
 void GoogleAsyncStreamImpl::onCompletedOps() {
-  absl::MutexLock lock(&completed_ops_lock_);
+  Thread::LockGuard lock(completed_ops_lock_);
   while (!completed_ops_.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;

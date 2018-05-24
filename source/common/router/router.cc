@@ -172,23 +172,6 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, fake_response_headers, upstream_host, dropped);
 }
 
-void Filter::sendLocalReply(Http::Code code, const std::string& body,
-                            std::function<void(Http::HeaderMap& headers)> modify_headers) {
-  // This is a customized version of send local reply that allows us to set the overloaded
-  // header.
-  Http::Utility::sendLocalReply(
-      [this, modify_headers](Http::HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (headers != nullptr && modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        callbacks_->encodeHeaders(std::move(headers), end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        callbacks_->encodeData(data, end_stream);
-      },
-      stream_destroyed_, code, body);
-}
-
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   // Do a common header check. We make sure that all outgoing requests have all HTTP/2 headers.
   // These get stripped by HTTP/1 codec where applicable.
@@ -197,6 +180,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Host());
 
   downstream_headers_ = &headers;
+
+  // TODO: Maybe add a filter API for this.
+  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -210,9 +196,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().c_str());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-        {Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::NotFound))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -221,7 +205,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
     direct_response->rewritePathHeader(headers);
-    sendLocalReply(
+    callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
             ->void {
@@ -242,10 +226,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
-    Http::HeaderMapPtr response_headers{new Http::HeaderMapImpl{
-        {Http::Headers::get().Status,
-         std::to_string(enumToInt(route_entry_->clusterNotFoundResponseCode()))}}};
-    callbacks_->encodeHeaders(std::move(response_headers), true);
+    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -265,7 +246,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    sendLocalReply(
+    callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode", [](Http::HeaderMap& headers) {
           headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
         });
@@ -302,7 +283,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool));
   upstream_request_->encodeHeaders(end_stream);
   if (end_stream) {
@@ -331,7 +311,7 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
-  sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream");
+  callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -518,7 +498,7 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
+    callbacks_->sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
       if (dropped) {
         headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
       }
@@ -553,7 +533,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool en
     if (end_stream) {
       absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(headers);
       if (grpc_status &&
-          !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+          !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
         upstream_request_->upstream_host_->stats().rq_success_.inc();
       } else {
         upstream_request_->upstream_host_->stats().rq_error_.inc();
@@ -660,7 +640,7 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers) {
   if (upstream_request_->grpc_rq_success_deferred_) {
     absl::optional<Grpc::Status::GrpcStatus> grpc_status = Grpc::Common::getGrpcStatus(*trailers);
     if (grpc_status &&
-        !Http::CodeUtility::is5xx(Grpc::Common::grpcToHttpStatus(grpc_status.value()))) {
+        !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request_->upstream_host_->stats().rq_success_.inc();
     } else {
       upstream_request_->upstream_host_->stats().rq_error_.inc();

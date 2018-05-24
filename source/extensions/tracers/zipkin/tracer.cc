@@ -33,6 +33,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
   span_ptr->setTraceId(random_number);
+  if (trace_id_128bit_) {
+    span_ptr->setTraceIdHigh(random_generator_.random());
+  }
   int64_t start_time_micro =
       std::chrono::duration_cast<std::chrono::microseconds>(
           ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
@@ -104,6 +107,9 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
   // Keep the same trace id
   span_ptr->setTraceId(previous_context.trace_id());
+  if (previous_context.is128BitTraceId()) {
+    span_ptr->setTraceIdHigh(previous_context.trace_id_high());
+  }
 
   // Keep the same sampled flag
   span_ptr->setSampled(previous_context.sampled());

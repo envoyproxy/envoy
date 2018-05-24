@@ -9,7 +9,6 @@
 #include <functional>
 
 #include "common/common/assert.h"
-#include "common/common/logger.h"
 #include "common/common/macros.h"
 
 namespace Envoy {

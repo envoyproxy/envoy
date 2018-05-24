@@ -21,6 +21,12 @@ public:
   virtual ~ListenerConfig() {}
 
   /**
+   * @return FilterChainManager& the factory for adding and searching through configured
+   *         filter chains.
+   */
+  virtual FilterChainManager& filterChainManager() PURE;
+
+  /**
    * @return FilterChainFactory& the factory for setting up the filter chain on a new
    *         connection.
    */
@@ -31,11 +37,6 @@ public:
    *         different from configured if for example the configured address binds to port zero.
    */
   virtual Socket& socket() PURE;
-
-  /**
-   * @return TransportSocketFactory& the transport socket factory.
-   */
-  virtual TransportSocketFactory& transportSocketFactory() PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
