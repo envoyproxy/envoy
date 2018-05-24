@@ -59,6 +59,8 @@
 static_resources:
   listeners:
   {{ ingress_listener("tcp", "0.0.0.0", 9211) | indent(2)}}
+  #listener at 127.0.0.1:9001 is to be updated after access_log updates
+  #It is similar to listener at 127.0.0.1:9002
   - name: listener_1
     address:
       socket_address:
@@ -104,6 +106,78 @@ static_resources:
             config: {}
           - name: envoy.router
             config: {}
+  {% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
+  {% for mapping in external_virtual_hosts -%}
+  - name: "{{ mapping['address']}}"
+    address:
+      socket_address:
+        address: "{{ mapping['address'] }}"
+        protocol: TCP
+        port_value: 9901
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          codec_type: AUTO
+          idle_timeout: 840s
+          stat_prefix: egress_{{ mapping['name'] }}
+          #update access_logs here
+          route_config:
+            virtual_hosts:
+            {% for host in mapping['hosts'] %}
+            - name: egress_{{ host['name'] }}
+              domains:
+              - "{{ host['domain'] }}"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: egress_{{ host['name'] }}
+                  retry_policy:
+                    retry_on: connect-failure
+                  {% if host.get('host_rewrite', False) %}
+                  host_rewrite: "{{host['host_rewrite']}}"
+                  {% endif %}
+            {% if not loop.last %}{% endif %}
+            {% endfor %}
+          http_filters:
+          {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
+          - name: envoy.http_dynamo_filter
+            config: {}
+          {% endif -%}
+          - name: envoy.router
+            config: {}
+  {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
+  {% endfor -%}
+  {% for key, value in mongos_servers.iteritems() -%}
+  - name : "{{ value['address'] }}"
+    address:
+      socket_address:
+        address: "{{ value['address'] }}"
+        protocol: TCP
+        port_value: 9003
+    filter_chains:
+    - filters:
+      - name: envoy.tcp_proxy
+        config:
+          stat_prefix: mongo_{{ key }}
+          cluster: mongo_{{ key }}
+      - name: envoy.mongo_proxy
+        config:
+          stat_prefix: "{{ key }}"
+          access_log: "/var/log/envoy/mongo_{{ key }}.log"
+      {% if value.get('ratelimit', False) %}
+      - name: envoy.ratelimit
+        config:
+          stat_prefix: "{{ key }}"
+          domain: envoy_mongo_cps
+          descriptors:
+            entries:
+            - key: database
+              value: "{{ key }}"
+      {% endif %}
+  {% if not loop.last %}{% endif -%}
+  {% endfor -%}
   clusters:
   {% for mapping in external_virtual_hosts -%}
   {% for host in mapping['hosts'] -%}
@@ -193,7 +267,7 @@ static_resources:
   - name: lightstep_saas
     connect_timeout: 1s
     type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN    
+    lb_policy: ROUND_ROBIN
     hosts:
     - socket_address:
         protocol: TCP
@@ -207,7 +281,7 @@ static_resources:
           trusted_ca:
             filename: certs/cacert.pem
           verify_subject_alt_name:
-          - collector-grpc.lightstep.com            
+          - collector-grpc.lightstep.com
   - name: cds_cluster
     connect_timeout: 0.25s
     type: STRICT_DNS  
