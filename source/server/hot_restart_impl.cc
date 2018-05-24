@@ -37,7 +37,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   return hash_set_options;
 }
 
-SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options) {
+SharedMemory& SharedMemory::initialize(size_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::size();

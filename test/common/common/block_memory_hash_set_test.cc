@@ -64,7 +64,7 @@ protected:
     ret = fmt::format("options={}\ncontrol={}\n", hs.control_->options.toString(), control_string);
     for (uint32_t i = 0; i < hs.control_->options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
-      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell) {
+      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell_index) {
         ret += " " + std::string(hs.getCell(j).value.key());
       }
       ret += "\n";
