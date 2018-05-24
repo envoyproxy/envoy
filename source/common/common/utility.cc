@@ -89,8 +89,8 @@ std::string DateFormatter::parse(const std::string& format_string) {
   for (std::sregex_iterator i = specifier_begin; i != specifier_end; ++i) {
     const std::smatch& match = *i;
 
-    absl::string_view piece = format_string.substr(start, match.position() - start);
-    const size_t formatted_length = strftime(&buf[0], buf.size(), piece.data(), &current_tm);
+    const std::string piece = format_string.substr(start, match.position() - start);
+    const size_t formatted_length = strftime(&buf[0], buf.size(), piece.c_str(), &current_tm);
     delta += static_cast<int32_t>(formatted_length - piece.size()) + inner_delta;
     start = match.position() + match.length();
 
@@ -102,9 +102,8 @@ std::string DateFormatter::parse(const std::string& format_string) {
     }
     subseconds_.emplace_back(subsecond);
 
-    absl::string_view placeholder =
-        SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_);
-    absl::StrAppend(&new_format_string, piece, placeholder);
+    absl::StrAppend(&new_format_string, piece,
+                    SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
 
     // This takes into account the difference between the specifier length and the desired
     // rendered width.
