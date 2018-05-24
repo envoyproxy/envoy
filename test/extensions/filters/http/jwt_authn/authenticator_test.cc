@@ -69,19 +69,19 @@ public:
 class AuthenticatorTest : public ::testing::Test {
 public:
   void SetUp() {
-    MessageUtil::loadFromYaml(ExampleConfig, config_pb_);
+    MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }
 
   void CreateAuthenticator() {
-    config_obj_ = ::std::make_shared<Config>(config_pb_, mock_factory_ctx_);
-    auth_ = Authenticator::create(config_obj_);
+    filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, mock_factory_ctx_);
+    auth_ = Authenticator::create(filter_config_);
   }
 
-  JwtAuthentication config_pb_;
+  JwtAuthentication proto_config_;
+  FilterConfigSharedPtr filter_config_;
   std::unique_ptr<Authenticator> auth_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-  ConfigSharedPtr config_obj_;
   MockAuthenticatorCallbacks mock_cb_;
 };
 
@@ -199,7 +199,7 @@ TEST_F(AuthenticatorTest, TestOkJWTPubkeyNoKid) {
 
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Confit forward_jwt flag
-  config_pb_.mutable_rules(0)->set_forward(true);
+  proto_config_.mutable_rules(0)->set_forward(true);
   CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
@@ -232,7 +232,7 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is missing, the status should still be OK
   // because allow_missing_or_failed is true.
-  config_pb_.set_allow_missing_or_failed(true);
+  proto_config_.set_allow_missing_or_failed(true);
   CreateAuthenticator();
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
@@ -248,7 +248,7 @@ TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
 TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is invalid, the status should still be OK
   // because allow_missing_or_failed is true.
-  config_pb_.set_allow_missing_or_failed(true);
+  proto_config_.set_allow_missing_or_failed(true);
   CreateAuthenticator();
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
@@ -321,7 +321,7 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
 
 TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   // Create a config with an other issuer.
-  config_pb_.mutable_rules(0)->set_issuer("other_issuer");
+  proto_config_.mutable_rules(0)->set_issuer("other_issuer");
   CreateAuthenticator();
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
@@ -445,7 +445,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
 
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
-  auto rule0 = config_pb_.mutable_rules(0);
+  auto rule0 = proto_config_.mutable_rules(0);
   rule0->clear_forward_payload_header();
   CreateAuthenticator();
 

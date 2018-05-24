@@ -17,7 +17,7 @@ class Filter : public Http::StreamDecoderFilter,
                public Authenticator::Callbacks,
                public Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(ConfigSharedPtr config);
+  Filter(FilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -36,7 +36,7 @@ private:
   // The callback funcion.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   // config object
-  ConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
   // The auth object.
   AuthenticatorPtr auth_;
   // The state of the request

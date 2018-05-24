@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(ConfigSharedPtr config) : config_(config) {}
+Filter::Filter(FilterConfigSharedPtr config) : config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);

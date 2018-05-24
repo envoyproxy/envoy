@@ -25,7 +25,7 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(ConfigSharedPtr config) : config_(config) {}
+  AuthenticatorImpl(FilterConfigSharedPtr config) : config_(config) {}
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
@@ -53,7 +53,7 @@ private:
   bool okToBypass() const;
 
   // The config object.
-  ConfigSharedPtr config_;
+  FilterConfigSharedPtr config_;
 
   // The token data
   JwtLocationConstPtr token_;
@@ -74,7 +74,7 @@ private:
 };
 
 void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& rule : config_->config().rules()) {
+  for (const auto& rule : config_->getProtoConfig().rules()) {
     if (!rule.forward_payload_header().empty()) {
       headers.remove(Http::LowerCaseString(rule.forward_payload_header()));
     }
@@ -123,7 +123,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   }
 
   // Check the issuer is configured or not.
-  jwks_data_ = config_->tl_cache().getJwksCache().findByIssuer(jwt_.iss_);
+  jwks_data_ = config_->getCache().getJwksCache().findByIssuer(jwt_.iss_);
   if (jwks_data_ == nullptr) {
     doneWithStatus(Status::JwtUnknownIssuer);
     return;
@@ -235,7 +235,7 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 bool AuthenticatorImpl::okToBypass() const {
-  if (config_->config().allow_missing_or_failed()) {
+  if (config_->getProtoConfig().allow_missing_or_failed()) {
     return true;
   }
 
@@ -246,7 +246,7 @@ bool AuthenticatorImpl::okToBypass() const {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
-  if (status != Status::Ok && config_->config().allow_missing_or_failed()) {
+  if (status != Status::Ok && config_->getProtoConfig().allow_missing_or_failed()) {
     callback_->onComplete(Status::Ok);
   } else {
     callback_->onComplete(status);
@@ -256,7 +256,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(ConfigSharedPtr config) {
+AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config) {
   return std::make_unique<AuthenticatorImpl>(config);
 }
 
