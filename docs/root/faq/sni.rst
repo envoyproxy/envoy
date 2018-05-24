@@ -22,7 +22,7 @@ The following is a YAML example of the above requirement.
     config: {}
   filter_chains:
   - filter_chain_match:
-      sni_domains: "example.com"
+      server_names: "example.com"
     tls_context:
       common_tls_context:
         tls_certificates:
@@ -37,7 +37,7 @@ The following is a YAML example of the above requirement.
             - match: { prefix: "/" }
               route: { cluster: service_foo }
   - filter_chain_match:
-      sni_domains: "www.example.com"
+      server_names: "www.example.com"
     tls_context:
       common_tls_context:
         tls_certificates:

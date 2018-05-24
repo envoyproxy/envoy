@@ -347,7 +347,8 @@ ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          std::vector<Tag>&& tags)
     : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_) {}
+      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
+      merged_(false) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);
@@ -361,13 +362,13 @@ void ParentHistogramImpl::recordValue(uint64_t value) {
 }
 
 bool ParentHistogramImpl::used() const {
-  Thread::LockGuard lock(merge_lock_);
-  return usedLockHeld();
+  // Consider ParentHistogram used only if has ever been merged.
+  return merged_;
 }
 
 void ParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);
-  if (usedLockHeld()) {
+  if (merged_ || usedLockHeld()) {
     hist_clear(interval_histogram_);
     // Here we could copy all the pointers to TLS histograms in the tls_histogram_ list,
     // then release the lock before we do the actual merge. However it is not a big deal
@@ -381,6 +382,7 @@ void ParentHistogramImpl::merge() {
     hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
     cumulative_statistics_.refresh(cumulative_histogram_);
     interval_statistics_.refresh(interval_histogram_);
+    merged_ = true;
   }
 }
 

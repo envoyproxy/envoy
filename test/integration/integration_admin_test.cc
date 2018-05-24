@@ -163,7 +163,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("application/json", ContentType(response));
-  validateStatsJson(response->body());
+  validateStatsJson(response->body(), 0);
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah",
                                                 "", downstreamProtocol(), version_);
@@ -176,7 +176,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  validateStatsJson(response->body());
+  validateStatsJson(response->body(), 1);
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);

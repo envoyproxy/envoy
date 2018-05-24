@@ -10,7 +10,7 @@ and/or `Application-Layer Protocol Negotiation
 <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_
 from the client. This can be used to select a
 :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` via the
-:ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` and/or
+:ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>` and/or
 :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
 of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 

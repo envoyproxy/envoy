@@ -29,7 +29,7 @@ public:
   /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
-  void validateStatsJson(const std::string stats_json) {
+  void validateStatsJson(const std::string stats_json, const uint64_t expected_hist_count) {
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;
@@ -55,8 +55,8 @@ public:
       }
     }
 
-    // Validate that the stats JSON has exactly one histograms element.
-    EXPECT_EQ(1, histogram_count);
+    // Validate that the stats JSON has expected histograms element.
+    EXPECT_EQ(expected_hist_count, histogram_count);
   }
 };
 

@@ -1407,6 +1407,23 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
   }
 }
 
+TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
+  firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
+
+  MockFunction<std::string(const std::string&, long)> mock_cookie_cb;
+  auto add_cookie = [&mock_cookie_cb](const std::string& name,
+                                      std::chrono::seconds ttl) -> std::string {
+    return mock_cookie_cb.Call(name, ttl.count());
+  };
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_CALL(mock_cookie_cb, Call("hash", 0));
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie));
+  }
+}
+
 TEST_F(RouterMatcherHashPolicyTest, HashIp) {
   Network::Address::Ipv4Instance valid_address("1.2.3.4");
   firstRouteHashPolicy()->mutable_connection_properties()->set_source_ip(true);
