@@ -159,4 +159,12 @@ TEST(OptionsImplTest, BadObjNameLenOption) {
     EXPECT_THAT(e.what(), HasSubstr("'max-obj-name-len' value specified"));
   }
 }
+TEST(OptionsImplTest, BadMaxStatsOption) {
+  try {
+    createOptionsImpl("envoy --max-stats 1000000000");
+    FAIL();
+  } catch (const MalformedArgvException& e) {
+    EXPECT_THAT(e.what(), HasSubstr("'max-stats' value specified"));
+  }
+}
 } // namespace Envoy

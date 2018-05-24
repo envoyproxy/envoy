@@ -82,13 +82,13 @@ public:
    * backing-store (eg) in memory, which we do after
    * constructing the object with the desired sizing.
    */
-  static size_t numBytes(const BlockMemoryHashSetOptions& options) {
-    size_t size =
+  static uint64_t numBytes(const BlockMemoryHashSetOptions& options) {
+    uint64_t size =
         cellOffset(options.capacity) + sizeof(Control) + options.num_slots * sizeof(uint32_t);
     return align(size);
   }
 
-  size_t numBytes() const { return numBytes(control_->options); }
+  uint64_t numBytes() const { return numBytes(control_->options); }
 
   /**
    * Returns the options structure that was used to construct the set.
@@ -292,7 +292,7 @@ private:
   struct Control {
     BlockMemoryHashSetOptions options; // Options established at map construction time.
     uint64_t hash_signature;           // Hash of a constant signature string.
-    size_t num_bytes;                  // Bytes allocated on behalf of the map.
+    uint64_t num_bytes;                // Bytes allocated on behalf of the map.
     uint32_t size;                     // Number of values currently stored.
     uint32_t free_cell_index;          // Offset of first free cell.
   };
@@ -306,12 +306,12 @@ private:
   };
 
   // It seems like this is an obvious constexpr, but it won't compile as one.
-  static size_t calculateAlignment() {
+  static uint64_t calculateAlignment() {
     return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
   }
 
-  static size_t align(uint64_t size) {
-    const size_t alignment = calculateAlignment();
+  static uint64_t align(uint64_t size) {
+    const uint64_t alignment = calculateAlignment();
     // Check that alignment is a power of 2:
     // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
     RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0));
@@ -323,10 +323,10 @@ private:
    * simply an array index because we don't know the size of a key at
    * compile-time.
    */
-  static size_t cellOffset(uint32_t cell_index) {
+  static uint64_t cellOffset(uint32_t cell_index) {
     // sizeof(Cell) includes 'sizeof Value' which may not be accurate. So we need to
     // subtract that off, and add the template method's view of the actual value-size.
-    size_t cell_size = align(sizeof(Cell) + Value::size() - sizeof(Value));
+    uint64_t cell_size = align(sizeof(Cell) + Value::size() - sizeof(Value));
     return cell_index * cell_size;
   }
 
