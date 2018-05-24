@@ -14,6 +14,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
@@ -172,8 +173,9 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        Event::Dispatcher& main_thread_dispatcher,
                                        Server::Admin& admin)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
-      random_(random), bind_config_(bootstrap.cluster_manager().upstream_bind_config()),
-      local_info_(local_info), cm_stats_(generateStats(stats)),
+      main_thread_dispatcher_(main_thread_dispatcher), random_(random),
+      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
+      cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })) {
@@ -406,7 +408,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads(
+  createOrUpdateThreadLocalClusterInternal(
       [
         this, new_cluster = cluster.cluster_->info(),
         thread_aware_lb_factory = cluster.loadBalancerFactory()
@@ -428,6 +430,24 @@ void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) 
               cb->onClusterAddOrUpdate(*thread_local_cluster);
             }
           });
+}
+
+void ClusterManagerImpl::createOrUpdateThreadLocalClusterInternal(
+    std::function<void()> thread_local_clustercb) {
+  if (tls_->isMainThread()) {
+    tls_->runOnAllThreads(thread_local_clustercb);
+  } else {
+    Thread::CondVar tls_update_;
+    Thread::MutexBasicLockable tls_lock_;
+    Thread::ReleasableLockGuard lock(tls_lock_);
+    main_thread_dispatcher_.post([this, &thread_local_clustercb, &tls_update_]() -> void {
+      tls_->runOnAllThreads(thread_local_clustercb);
+      tls_update_.notifyOne(); // Ensures main thread is updated before we proceed.
+    });
+    // TODO(ramaraochavali): This is inefficient. On one worker thread, this gets called twice.
+    thread_local_clustercb();
+    tls_update_.wait(tls_lock_);
+  }
 }
 
 bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
@@ -562,7 +582,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
 
-  tls_->runOnAllThreads([
+  postThreadLocalClusterUpdateInternal([
     this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
     hosts_per_locality_copy, healthy_hosts_per_locality_copy,
     locality_weights = host_set->localityWeights(), hosts_added, hosts_removed
@@ -571,6 +591,24 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
         name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
         healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
   });
+}
+
+void ClusterManagerImpl::postThreadLocalClusterUpdateInternal(
+    std::function<void()> thread_local_cluster_updatecb) {
+  if (tls_->isMainThread()) {
+    tls_->runOnAllThreads(thread_local_cluster_updatecb);
+  } else {
+    Thread::CondVar tls_update_;
+    Thread::MutexBasicLockable tls_lock_;
+    Thread::ReleasableLockGuard lock(tls_lock_);
+    main_thread_dispatcher_.post([this, &thread_local_cluster_updatecb, &tls_update_]() -> void {
+      tls_->runOnAllThreads(thread_local_cluster_updatecb);
+      tls_update_.notifyOne(); // Ensures main thread is updated here.
+    });
+    // TODO(ramaraochavali): This is inefficient. On one worker thread, this gets called twice.
+    thread_local_cluster_updatecb();
+    tls_update_.wait(tls_lock_);
+  }
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
