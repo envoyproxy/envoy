@@ -13,6 +13,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/singleton/const_singleton.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
@@ -22,73 +23,96 @@
 
 namespace Envoy {
 
+namespace {
+
+class SubsecondConstantValues {
+public:
+  const std::string PLACEHOLDER{"000000000"};
+  const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
+};
+
+typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
+
+} // namespace
+
 std::string DateFormatter::fromTime(const SystemTime& time) const {
-  const std::string new_format_string = setCustomField(
-      // "%f" is the custom field for subsecond.
-      CustomFields::f(),
-      fmt::FormatInt(
-          // By default we want nanoseconds.
-          std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count())
-          .str()
-          .substr(10));
+  struct CachedTime {
+    std::chrono::seconds epoch_time_seconds;
+    std::unordered_map<std::string, std::string> formatted;
+  };
+  static thread_local CachedTime cached_time;
 
-  const time_t current_time = std::chrono::system_clock::to_time_t(time);
-  if (new_format_string.empty()) {
-    return fromTime(current_time);
+  const std::chrono::nanoseconds epoch_time_ns =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
+
+  const std::chrono::seconds epoch_time_seconds =
+      std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
+
+  if (cached_time.formatted.find(format_string_) == cached_time.formatted.end() ||
+      cached_time.epoch_time_seconds != epoch_time_seconds) {
+    cached_time.formatted.emplace(
+        std::make_pair(format_string_, fromTime(std::chrono::system_clock::to_time_t(time))));
+
+    cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
-  // Send the newly formatted format string to stftime.
-  return fromTime(current_time, new_format_string);
+  // Copy the cached formatted string, then replace its subseconds part.
+  std::string formatted = cached_time.formatted.at(format_string_);
+  const char* value = fmt::FormatInt(epoch_time_ns.count()).c_str();
+  for (const auto subsecond : subseconds_) {
+    formatted.replace(subsecond.position_, subsecond.width_, value + 10, subsecond.width_);
+  }
+  // TODO(dio): ASSERT formatted length.
+  return formatted;
 }
 
-std::string DateFormatter::fromTime(time_t time, const std::string& new_format_string) const {
+std::string DateFormatter::parse(const std::string& format_string) {
+  const auto& specifier_begin = std::sregex_iterator(format_string.begin(), format_string.end(),
+                                                     SubsecondConstants::get().PATTERN);
+  const auto& specifier_end = std::sregex_iterator();
+  if (specifier_begin == specifier_end) {
+    return format_string;
+  }
+
+  std::string new_format_string = EMPTY_STRING;
+  subseconds_.reserve(std::distance(specifier_begin, specifier_end));
+
+  auto now = std::chrono::system_clock::now();
+  time_t current_time = std::chrono::system_clock::to_time_t(now);
   tm current_tm;
-  gmtime_r(&time, &current_tm);
+  gmtime_r(&current_time, &current_tm);
 
+  size_t start = 0;
+  int32_t delta = 0;
+  int32_t inner_delta = 0;
   std::array<char, 1024> buf;
-  strftime(&buf[0], buf.size(), new_format_string.c_str(), &current_tm);
-  return std::string(&buf[0]);
-}
+  for (std::sregex_iterator i = specifier_begin; i != specifier_end; ++i) {
+    const std::smatch& match = *i;
 
-std::string DateFormatter::setCustomField(const std::string& field,
-                                          const std::string& value) const {
-  size_t found = format_string_.find(field);
-  if (found == std::string::npos) {
-    // If no field specifier inside the current format string, return an empty string and
-    // subsequently use the default formatter.
-    return EMPTY_STRING;
+    absl::string_view piece = format_string.substr(start, match.position() - start);
+    const size_t formatted_length = strftime(&buf[0], buf.size(), piece.data(), &current_tm);
+    delta += static_cast<int32_t>(formatted_length - piece.size()) + inner_delta;
+    start = match.position() + match.length();
+
+    // Save a subsecond's position and width inside the rendered format string.
+    SubsecondSpecifier subsecond(match.position() + delta);
+    absl::string_view matched_str = match[1].str();
+    if (!matched_str.empty()) {
+      subsecond.width_ = matched_str[0] - '0';
+    }
+    subseconds_.emplace_back(subsecond);
+
+    absl::string_view placeholder(
+        SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
+    absl::StrAppend(&new_format_string, piece, placeholder);
+
+    // This takes into account the difference between the specifier length and the desired
+    // rendered width.
+    inner_delta = static_cast<int32_t>(subsecond.width_ - match.length());
   }
 
-  size_t index = found;
-  std::string new_format_string = format_string_;
-
-  while (found != std::string::npos) {
-    index = found;
-
-    size_t start = found - 1;
-    if (start < new_format_string.size()) {
-      std::string sub = new_format_string.substr(start, 2);
-      if (sub.at(0) == '%' && sub.size() == 2) {
-        // This field definitely has no width specifier, e.g. %f.
-        new_format_string = new_format_string.replace(start, 2, value);
-      } else {
-        start = found - 2;
-
-        // This field potentially has a valid width specifier, e.g. %3f.
-        if (start < new_format_string.size()) {
-          std::string sub = new_format_string.substr(start, 2);
-
-          if (sub.at(0) == '%' && sub.size() == 2) {
-            uint64_t width;
-            if (StringUtil::atoul(sub.substr(1, 1).c_str(), width)) {
-              new_format_string = new_format_string.replace(start, 3, value.substr(0, width));
-            }
-          }
-        }
-      }
-    }
-
-    found = new_format_string.find(field, ++index);
+  if (start < format_string.size()) {
+    absl::StrAppend(&new_format_string, format_string.substr(start));
   }
 
   return new_format_string;

@@ -29,7 +29,7 @@ typedef std::unordered_map<std::string, std::function<std::string(const SystemTi
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : format_string_(format_string) {}
+  DateFormatter(const std::string& format_string) : format_string_(parse(format_string)) {}
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -52,14 +52,19 @@ public:
   const std::string& formatString() const { return format_string_; }
 
 private:
-  std::string fromTime(time_t time, const std::string& new_format_string) const;
-  std::string setCustomField(const std::string& field, const std::string& value) const;
+  std::string parse(const std::string& format_string);
 
-  struct CustomFields {
-    static const std::string& f() { CONSTRUCT_ON_FIRST_USE(std::string, "f"); }
+  struct SubsecondSpecifier {
+    // The default subsecond width specifier is 9 digits (nanoseconds).
+    SubsecondSpecifier(const size_t position, size_t width = 9)
+        : position_(position), width_(width) {}
+
+    const size_t position_;
+    size_t width_;
   };
+  std::vector<SubsecondSpecifier> subseconds_;
 
-  std::string format_string_;
+  const std::string format_string_;
 };
 
 /**
