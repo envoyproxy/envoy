@@ -20,10 +20,6 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-
-typedef std::unordered_map<std::string, std::function<std::string(const SystemTime& time)>>
-    CustomDateFormatterMap;
-
 /**
  * Utility class for formatting dates given a strftime style format string.
  */
