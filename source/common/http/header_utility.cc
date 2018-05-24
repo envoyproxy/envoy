@@ -47,8 +47,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
       header_match_type_ = HeaderMatchType::Regex;
       regex_pattern_ = RegexUtil::parseRegex(config.value());
     } else {
-      header_match_type_ = HeaderMatchType::Value;
-      value_ = config.value();
+      header_match_type_ = HeaderMatchType::Present;
     }
     break;
   }
