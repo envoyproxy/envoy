@@ -48,7 +48,7 @@ option go_package = "v2alpha";
 //         - any: true
 //
 message RBAC {
-  // Should we do white-list or black-list style access control.
+  // Should we do white-list or black-list style access control?
   enum Action {
     // The policies grant access to principals. The rest is denied. This is white-list style
     // access control. This is the default type.
@@ -59,24 +59,36 @@ message RBAC {
     DENY = 1;
   }
 
+  // The action to take if a policy matches. The request is allowed if and only if:
+  //
+  //   * `action` is "ALLOWED" and at least one policy matches
+  //   * `action` is "DENY" and none of the policies match
   Action action = 1;
 
-  // Maps from policy name to policy.
+  // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   map<string, Policy> policies = 2;
 }
 
-// Policy specifies a role and the principals that are assigned/denied the role.
+// Policy specifies a role and the principals that are assigned/denied the role. A policy matches if
+// and only if at least one of its permissions match the action taking place AND at least one of its
+// principals match the downstream.
 message Policy {
-  // Required. The set of permissions that define a role.
+  // Required. The set of permissions that define a role. Each permission is matched with OR
+  // semantics. To match all actions for this policy, a single Permission with the `any` field set
+  // to true should be used.
   repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
 
-  // Required. List of principals that are assigned/denied the role based on “action”.
+  // Required. The set of principals that are assigned/denied the role based on “action”. Each
+  // principal is matched with OR semantics. To match all downstreams for this policy, a single
+  // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
 }
 
-// Permission defines a permission to access the service.
+// Permission defines an action (or actions) that a principal can take.
 message Permission {
 
+  // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
+  // each are applied with the associated behavior.
   message Set {
     repeated Permission rules = 1 [(validate.rules).repeated .min_items = 1];
   }
@@ -104,15 +116,16 @@ message Permission {
   }
 }
 
-// Principal defines an identity or a group of identities.
+// Principal defines an identity or a group of identities for a downstream subject.
 message Principal {
 
+  // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
+  // each are applied with the associated behavior.
   message Set {
     repeated Principal ids = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-  // Authentication attributes for principal. These could be filled out inside RBAC filter.
-  // Or if an authentication filter is used, they can be provided by the authentication filter.
+  // Authentication attributes for a downstream.
   message Authenticated {
     // The name of the principal. If set, the URI SAN is used from the certificate, otherwise the
     // subject field is used. If unset, it applies to any user that is authenticated.
@@ -122,19 +135,19 @@ message Principal {
   oneof identifier {
     option (validate.required) = true;
 
-    // A set of identifiers that all must match in order to define the principal.
+    // A set of identifiers that all must match in order to define the downstream.
     Set and_ids = 1;
 
-    // A set of identifiers at least one must match in order to define the principal.
+    // A set of identifiers at least one must match in order to define the downstream.
     Set or_ids = 2;
 
-    // When any is set, it matches any principal.
+    // When any is set, it matches any downstream.
     bool any = 3 [(validate.rules).bool.const = true];
 
-    // Authenticated attributes that identify the principal.
+    // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;
 
-    // A CIDR block that describes the source IP.
+    // A CIDR block that describes the downstream IP.
     envoy.api.v2.core.CidrRange source_ip = 5;
 
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
