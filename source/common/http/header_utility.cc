@@ -46,8 +46,11 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
       header_match_type_ = HeaderMatchType::Regex;
       regex_pattern_ = RegexUtil::parseRegex(config.value());
-    } else {
+    } else if (config.value().empty()) {
       header_match_type_ = HeaderMatchType::Present;
+    } else {
+      header_match_type_ = HeaderMatchType::Value;
+      value_ = config.value();
     }
     break;
   }
