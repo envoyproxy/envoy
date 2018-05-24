@@ -147,7 +147,7 @@ message CertificateValidationContext {
   //
   // Both of those formats are acceptable.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated.items.string = {min_bytes: 64, max_bytes: 95}];
+      [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
 
   // If specified, Envoy will verify (pin) base64-encoded SHA-256 hash of
   // the Subject Public Key Information (SPKI) of the presented certificate.

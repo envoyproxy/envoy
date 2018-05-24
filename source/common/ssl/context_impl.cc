@@ -334,13 +334,13 @@ bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) 
 }
 
 bool ContextImpl::verifyCertificateHashList(
-    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
+    X509* cert, const std::vector<std::vector<uint8_t>>& certificate_hash_list) {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
 
-  for (const auto& expected_hash : expected_hashes) {
+  for (const auto& expected_hash : certificate_hash_list) {
     if (computed_hash == expected_hash) {
       return true;
     }

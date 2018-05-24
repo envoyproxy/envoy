@@ -6,7 +6,8 @@ package pb.lyft.ratelimit;
 
 service RateLimitService {
   // Determine whether rate limiting should take place.
-  rpc ShouldRateLimit (RateLimitRequest) returns (RateLimitResponse) {}
+  rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
+  }
 }
 
 // Main message for a rate limit request. The rate limit service is designed to be fully generic
@@ -60,10 +61,10 @@ message RateLimitDescriptor {
 message RateLimit {
   enum Unit {
     UNKNOWN = 0;
-    SECOND  = 1;
-    MINUTE  = 2;
-    HOUR    = 3;
-    DAY     = 4;
+    SECOND = 1;
+    MINUTE = 2;
+    HOUR = 3;
+    DAY = 4;
   }
 
   uint32 requests_per_unit = 1;

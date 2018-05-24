@@ -30,7 +30,7 @@ public:
   /**
    * Converts a hex dump to binary data
    * @param input the hex dump to decode
-   * @return binary data
+   * @return binary data or empty vector in case of invalid input
    */
   static std::vector<uint8_t> decode(const std::string& input);
 
