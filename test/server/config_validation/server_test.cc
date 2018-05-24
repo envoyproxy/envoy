@@ -62,7 +62,7 @@ INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
                                           "google_com_proxy.yaml", "google_com_proxy.v2.yaml",
                                           "s2s-grpc-envoy.yaml", "service-envoy.yaml"));
 
-// Just make sure that all configs can be injested without a crash. Processing of config files
+// Just make sure that all configs can be ingested without a crash. Processing of config files
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
   validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_);
