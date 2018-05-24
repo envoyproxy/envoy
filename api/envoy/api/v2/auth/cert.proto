@@ -190,8 +190,13 @@ message CommonTlsContext {
   // [#not-implemented-hide:]
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
-  // How to validate peer certificates.
-  CertificateValidationContext validation_context = 3;
+  oneof validation_context_type {
+    // How to validate peer certificates.
+    CertificateValidationContext validation_context = 3;
+
+    // [#not-implemented-hide:]
+    SdsSecretConfig validation_context_sds_secret_config = 7;
+  }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the
@@ -262,5 +267,6 @@ message Secret {
   oneof type {
     TlsCertificate tls_certificate = 2;
     TlsSessionTicketKeys session_ticket_keys = 3;
+    CertificateValidationContext validation_context = 4;
   }
 }
