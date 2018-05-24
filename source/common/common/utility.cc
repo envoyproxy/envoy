@@ -102,8 +102,8 @@ std::string DateFormatter::parse(const std::string& format_string) {
     }
     subseconds_.emplace_back(subsecond);
 
-    absl::string_view placeholder(
-        SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
+    absl::string_view placeholder =
+        SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_);
     absl::StrAppend(&new_format_string, piece, placeholder);
 
     // This takes into account the difference between the specifier length and the desired
