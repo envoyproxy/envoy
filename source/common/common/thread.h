@@ -58,9 +58,9 @@ private:
  */
 class CondVar {
 public:
-  enum WaitStatus {
+  enum class WaitStatus {
     Timeout,
-    NoTimeout,
+    NoTimeout, // Success or Spurious
   };
 
   /**
@@ -85,13 +85,14 @@ public:
   template <class Rep, class Period>
 
   /**
-   * @return {WaitStatus} whether the condition timed out or not.
+   * @return WaitStatus whether the condition timed out or not.
    */
   WaitStatus
   waitFor(MutexBasicLockable& mutex,
           std::chrono::duration<Rep, Period> duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
-    return condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration)) ? Timeout
-                                                                               : NoTimeout;
+    return condvar_.WaitWithTimeout(&mutex.mutex_, absl::FromChrono(duration))
+               ? WaitStatus::Timeout
+               : WaitStatus::NoTimeout;
   }
 
 private:

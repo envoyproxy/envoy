@@ -242,7 +242,7 @@ FakeStreamPtr FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dis
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
-    if (status == Thread::CondVar::NoTimeout && !ignore_spurious_events) {
+    if (status == Thread::CondVar::WaitStatus::NoTimeout && !ignore_spurious_events) {
       break;
     }
     if (new_streams_.empty()) {
