@@ -251,110 +251,117 @@ void AdminImpl::addCircuitSettings(envoy::admin::v2alpha::CircuitSettings& circu
   circuit_settings.set_max_retries(resource_manager.retries().max());
 }
 
+void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Clusters clusters;
+  for (auto& cluster_pair : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_pair.second.get();
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+
+    envoy::admin::v2alpha::ClusterStatus& cluster_status =
+        (*clusters.mutable_cluster_statuses())[cluster_info->name()];
+
+    const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
+    if (outlier_detector != nullptr) {
+      cluster_status.mutable_outlier_info()->set_success_rate_average(
+          outlier_detector->successRateAverage());
+      cluster_status.mutable_outlier_info()->set_success_rate_ejection_threshold(
+          outlier_detector->successRateEjectionThreshold());
+    }
+
+    addCircuitSettings((*cluster_status.mutable_circuit_settings())["default"],
+                       cluster_info->resourceManager(Upstream::ResourcePriority::Default));
+    addCircuitSettings((*cluster_status.mutable_circuit_settings())["high"],
+                       cluster_info->resourceManager(Upstream::ResourcePriority::High));
+
+    cluster_status.set_added_via_api(cluster_info->addedViaApi());
+
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      for (auto& host : host_set->hosts()) {
+        envoy::admin::v2alpha::HostStatus& host_status =
+            (*cluster_status.mutable_host_statuses())[host->address()->asString()];
+
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          (*host_status.mutable_stats())[counter->name()] = counter->value();
+        }
+
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          (*host_status.mutable_stats())[gauge->name()] = gauge->value();
+        }
+
+        host_status.set_health_flags(Upstream::HostUtility::healthFlagsToString(*host));
+        host_status.set_weight(host->weight());
+        *host_status.mutable_locality() = host->locality();
+        host_status.set_canary(host->canary());
+        host_status.set_success_rate(host->outlierDetector().successRate());
+      }
+    }
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
+}
+
+void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
+  for (auto& cluster : server_.clusterManager().clusters()) {
+    addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
+                   response);
+
+    addCircuitSettings(
+        cluster.second.get().info()->name(), "default",
+        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
+        response);
+    addCircuitSettings(
+        cluster.second.get().info()->name(), "high",
+        cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
+
+    response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
+                             cluster.second.get().info()->addedViaApi()));
+    for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
+      for (auto& host : host_set->hosts()) {
+        std::map<std::string, uint64_t> all_stats;
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          all_stats[counter->name()] = counter->value();
+        }
+
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          all_stats[gauge->name()] = gauge->value();
+        }
+
+        for (auto stat : all_stats) {
+          response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
+                                   host->address()->asString(), stat.first, stat.second));
+        }
+
+        response.add(fmt::format("{}::{}::health_flags::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(),
+                                 Upstream::HostUtility::healthFlagsToString(*host)));
+        response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->weight()));
+        response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().region()));
+        response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().zone()));
+        response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->locality().sub_zone()));
+        response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(), host->canary()));
+        response.add(fmt::format("{}::{}::success_rate::{}\n", cluster.second.get().info()->name(),
+                                 host->address()->asString(),
+                                 host->outlierDetector().successRate()));
+      }
+    }
+  }
+}
+
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
   auto it = query_params.find("format");
+
   if (it != query_params.end() && it->second == "json") {
-    envoy::admin::v2alpha::Clusters clusters;
-    for (auto& cluster_pair : server_.clusterManager().clusters()) {
-      const Upstream::Cluster& cluster = cluster_pair.second.get();
-      Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
-
-      envoy::admin::v2alpha::ClusterStatus& cluster_status =
-          (*clusters.mutable_cluster_statuses())[cluster_info->name()];
-
-      const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
-      if (outlier_detector != nullptr) {
-        cluster_status.mutable_outlier_info()->set_success_rate_average(
-            outlier_detector->successRateAverage());
-        cluster_status.mutable_outlier_info()->set_success_rate_ejection_threshold(
-            outlier_detector->successRateEjectionThreshold());
-      }
-
-      addCircuitSettings((*cluster_status.mutable_circuit_settings())["default"],
-                         cluster_info->resourceManager(Upstream::ResourcePriority::Default));
-      addCircuitSettings((*cluster_status.mutable_circuit_settings())["high"],
-                         cluster_info->resourceManager(Upstream::ResourcePriority::High));
-
-      cluster_status.set_added_via_api(cluster_info->addedViaApi());
-
-      for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-        for (auto& host : host_set->hosts()) {
-          envoy::admin::v2alpha::HostStatus& host_status =
-              (*cluster_status.mutable_host_statuses())[host->address()->asString()];
-
-          for (const Stats::CounterSharedPtr& counter : host->counters()) {
-            (*host_status.mutable_stats())[counter->name()] = counter->value();
-          }
-
-          for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-            (*host_status.mutable_stats())[gauge->name()] = gauge->value();
-          }
-
-          host_status.set_health_flags(Upstream::HostUtility::healthFlagsToString(*host));
-          host_status.set_weight(host->weight());
-          *host_status.mutable_locality() = host->locality();
-          host_status.set_canary(host->canary());
-          host_status.set_success_rate(host->outlierDetector().successRate());
-        }
-      }
-    }
-
+    writeClustersAsJson(response);
     response_headers.insertContentType().value().setReference(
         Http::Headers::get().ContentTypeValues.Json);
-    response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
   } else {
-
-    for (auto& cluster : server_.clusterManager().clusters()) {
-      addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
-                     response);
-
-      addCircuitSettings(
-          cluster.second.get().info()->name(), "default",
-          cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::Default),
-          response);
-      addCircuitSettings(
-          cluster.second.get().info()->name(), "high",
-          cluster.second.get().info()->resourceManager(Upstream::ResourcePriority::High), response);
-
-      response.add(fmt::format("{}::added_via_api::{}\n", cluster.second.get().info()->name(),
-                               cluster.second.get().info()->addedViaApi()));
-      for (auto& host_set : cluster.second.get().prioritySet().hostSetsPerPriority()) {
-        for (auto& host : host_set->hosts()) {
-          std::map<std::string, uint64_t> all_stats;
-          for (const Stats::CounterSharedPtr& counter : host->counters()) {
-            all_stats[counter->name()] = counter->value();
-          }
-
-          for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-            all_stats[gauge->name()] = gauge->value();
-          }
-
-          for (auto stat : all_stats) {
-            response.add(fmt::format("{}::{}::{}::{}\n", cluster.second.get().info()->name(),
-                                     host->address()->asString(), stat.first, stat.second));
-          }
-
-          response.add(fmt::format("{}::{}::health_flags::{}\n",
-                                   cluster.second.get().info()->name(), host->address()->asString(),
-                                   Upstream::HostUtility::healthFlagsToString(*host)));
-          response.add(fmt::format("{}::{}::weight::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), host->weight()));
-          response.add(fmt::format("{}::{}::region::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), host->locality().region()));
-          response.add(fmt::format("{}::{}::zone::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), host->locality().zone()));
-          response.add(fmt::format("{}::{}::sub_zone::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), host->locality().sub_zone()));
-          response.add(fmt::format("{}::{}::canary::{}\n", cluster.second.get().info()->name(),
-                                   host->address()->asString(), host->canary()));
-          response.add(fmt::format("{}::{}::success_rate::{}\n",
-                                   cluster.second.get().info()->name(), host->address()->asString(),
-                                   host->outlierDetector().successRate()));
-        }
-      }
-    }
+    writeClustersAsText(response);
   }
 
   return Http::Code::OK;
