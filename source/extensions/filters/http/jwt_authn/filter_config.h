@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
@@ -35,21 +36,40 @@ private:
 };
 
 /**
+ * All stats for the Jwt Authn filter. @see stats_macros.h
+ */
+
+// clang-format off
+#define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
+  COUNTER(allowed)                                                                                 \
+  COUNTER(denied)
+// clang-format on
+
+/**
+ * Wrapper struct for RBAC filter stats. @see stats_macros.h
+ */
+struct JwtAuthnFilterStats {
+  ALL_JWT_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * The filer config object to hold config and relavant objects.
  */
 class FilterConfig : public Logger::Loggable<Logger::Id::config> {
 public:
   FilterConfig(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
-      Server::Configuration::FactoryContext& context)
-      : proto_config_(proto_config), tls_(context.threadLocal().allocateSlot()),
-        cm_(context.clusterManager()) {
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
+      : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
+        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()) {
+    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_);
     });
-    ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     extractor_ = Extractor::create(proto_config_);
   }
+
+  JwtAuthnFilterStats& stats() { return stats_; }
 
   // Get the Config.
   const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication&
@@ -66,8 +86,15 @@ public:
   const Extractor& getExtractor() const { return *extractor_; }
 
 private:
+  JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = prefix + "jwt_authn.";
+    return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+
   // The proto config.
   ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication proto_config_;
+  // The stats for the filter.
+  JwtAuthnFilterStats stats_;
   // Thread local slot to store per-thread auth store
   ThreadLocal::SlotPtr tls_;
   // the cluster manager object.

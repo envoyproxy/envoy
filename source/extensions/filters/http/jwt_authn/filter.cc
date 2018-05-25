@@ -53,6 +53,7 @@ void Filter::onComplete(const Status& status) {
     return;
   }
   if (status != Status::Ok) {
+    config_->stats().denied_.inc();
     state_ = Responded;
     // verification failed
     Http::Code code = Http::Code::Unauthorized;
@@ -62,6 +63,7 @@ void Filter::onComplete(const Status& status) {
     return;
   }
 
+  config_->stats().allowed_.inc();
   state_ = Complete;
   if (stopped_) {
     decoder_callbacks_->continueDecoding();

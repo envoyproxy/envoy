@@ -14,9 +14,9 @@ namespace JwtAuthn {
 
 Http::FilterFactoryCb
 FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_config,
-                                                 const std::string&,
+                                                 const std::string& prefix,
                                                  Server::Configuration::FactoryContext& context) {
-  auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
+  auto filter_config = std::make_shared<FilterConfig>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };
