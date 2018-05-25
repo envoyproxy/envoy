@@ -95,6 +95,8 @@ Version history
 * tls: added support for multiple
   :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   values.
+* tls: added support for
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
