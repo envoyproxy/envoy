@@ -151,8 +151,8 @@ message CertificateValidationContext {
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_spki_sha256
-  // <envoy_api_field_auth.CertificateValidationContext.verify_spki_sha256>` are specified, hash
-  // matching value from either of the lists will result in certificate being accepted.
+  // <envoy_api_field_auth.CertificateValidationContext.verify_spki_sha256>` are specified, a hash
+  // matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
 
@@ -177,8 +177,8 @@ message CertificateValidationContext {
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
   // :ref:`verify_spki_sha256
-  // <envoy_api_field_auth.CertificateValidationContext.verify_spki_sha256>` are specified, hash
-  // matching value from either of the lists will result in certificate being accepted.
+  // <envoy_api_field_auth.CertificateValidationContext.verify_spki_sha256>` are specified, a hash
+  // matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_spki_sha256 = 3
       [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
 
