@@ -134,7 +134,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
 
   if (!config.verifyCertificateSpkiList().empty()) {
     for (auto hash : config.verifyCertificateSpkiList()) {
-      const auto& decoded = Base64::decode(hash);
+      const auto decoded = Base64::decode(hash);
       if (decoded.size() != SHA256_DIGEST_LENGTH) {
         throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
       }
