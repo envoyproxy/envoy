@@ -7,8 +7,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
-    "envoy_sh_test",
     "envoy_select_hot_restart",
+    "envoy_sh_test",
 )
 load(
     "//source/extensions:all_extensions.bzl",
