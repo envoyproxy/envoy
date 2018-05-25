@@ -275,7 +275,7 @@ private:
    * @return uint64_t& a reference to the configured size, which can then be changed
    * by callers.
    */
-  static uint64_t& initializeAndGetMutableMaxObjNameLength(size_t configured_size);
+  static uint64_t& initializeAndGetMutableMaxObjNameLength(uint64_t configured_size);
 };
 
 /**
