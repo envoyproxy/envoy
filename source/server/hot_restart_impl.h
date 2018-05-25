@@ -48,7 +48,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(size_t stats_set_size, Options& options);
+  static SharedMemory& initialize(uint64_t stats_set_size, Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.

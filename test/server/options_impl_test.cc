@@ -18,6 +18,7 @@
 using testing::HasSubstr;
 
 namespace Envoy {
+
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
@@ -143,28 +144,18 @@ TEST(OptionsImplTest, DefaultParams) {
 }
 
 TEST(OptionsImplTest, BadCliOption) {
-  try {
-    createOptionsImpl("envoy -c hello --local-address-ip-version foo");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("error: unknown IP address version 'foo'"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
+                          MalformedArgvException, "error: unknown IP address version 'foo'");
 }
 
 TEST(OptionsImplTest, BadObjNameLenOption) {
-  try {
-    createOptionsImpl("envoy --max-obj-name-len 1");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("'max-obj-name-len' value specified"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
+                          "'max-obj-name-len' value specified");
 }
+
 TEST(OptionsImplTest, BadMaxStatsOption) {
-  try {
-    createOptionsImpl("envoy --max-stats 1000000000");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("'max-stats' value specified"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
+                          "'max-stats' value specified");
 }
+
 } // namespace Envoy
