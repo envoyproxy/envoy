@@ -32,9 +32,10 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
                                                       spdlog::level::warn));
 }
 
-TEST(OptionsImplTest,
-     HotRestartVersion){EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"),
-                                                NoServingException, "NoServingException")}
+TEST(OptionsImplTest, HotRestartVersion) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
+                          "NoServingException");
+}
 
 TEST(OptionsImplTest, InvalidMode) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --mode bogus"), MalformedArgvException, "bogus");
