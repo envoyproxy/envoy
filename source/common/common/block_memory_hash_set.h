@@ -38,7 +38,7 @@ struct BlockMemoryHashSetOptions {
  * construction time. Value must provide these methods:
  *    absl::string_view Value::key()
  *    void Value::initialize(absl::string_view key)
- *    static size_t Value::size()
+ *    static uint64_t Value::size()
  *    static uint64_t Value::hash()
  *
  * This set may also be suitable for persisting a hash-table to long

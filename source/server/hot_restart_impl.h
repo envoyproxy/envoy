@@ -26,7 +26,7 @@ typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
  */
 class SharedMemory {
 public:
-  static void configure(size_t max_num_stats, size_t max_stat_name_len);
+  static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
   static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
   // Made public for testing.

@@ -20,11 +20,11 @@ protected:
   struct TestValueBase {
     absl::string_view key() const { return name; }
     void initialize(absl::string_view key) {
-      size_t xfer = std::min(sizeof(name) - 1, key.size());
+      uint64_t xfer = std::min(sizeof(name) - 1, key.size());
       memcpy(name, key.data(), xfer);
       name[xfer] = '\0';
     }
-    static size_t size() { return sizeof(TestValue); }
+    static uint64_t size() { return sizeof(TestValue); }
 
     int64_t number;
     char name[256];
