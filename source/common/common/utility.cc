@@ -56,13 +56,19 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
+  if (subseconds_.empty()) {
+    return cached_time.formatted.at(format_string_);
+  }
+
   // Copy the cached formatted string, then replace its subseconds part.
   std::string formatted = cached_time.formatted.at(format_string_);
-  const char* value = fmt::FormatInt(epoch_time_ns.count()).c_str();
+  const std::string value = fmt::FormatInt(epoch_time_ns.count()).str();
   for (const auto subsecond : subseconds_) {
-    formatted.replace(subsecond.position_, subsecond.width_, value + 10, subsecond.width_);
+    // TODO(dio): Infer the length of second from parsing step. Currently, it is defaulted to 10.
+    formatted.replace(subsecond.position_, subsecond.width_, value.substr(10, subsecond.width_));
   }
-  // TODO(dio): ASSERT formatted length.
+
+  // TODO(dio): Assert the formatted length.
   return formatted;
 }
 
