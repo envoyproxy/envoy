@@ -3,8 +3,8 @@
 #include <fstream>
 
 #include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/extensions/common/tap/v2alpha/capture.pb.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/output/tap/v2alpha/capture.pb.h"
 
 namespace Envoy {
 namespace Extensions {
