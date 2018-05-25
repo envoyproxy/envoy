@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <mutex>
 #include <vector>
 
 #include "envoy/event/deferred_deletable.h"

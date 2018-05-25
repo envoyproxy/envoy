@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <iostream>
 #include <list>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -16,6 +15,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
@@ -173,20 +173,20 @@ std::vector<std::string> TestUtility::split(const std::string& source, const std
 }
 
 void ConditionalInitializer::setReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
   ready_ = true;
-  cv_.notify_all();
+  cv_.notifyAll();
 }
 
 void ConditionalInitializer::waitReady() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (ready_) {
     ready_ = false;
     return;
   }
 
-  cv_.wait(lock);
+  cv_.wait(mutex_);
   EXPECT_TRUE(ready_);
   ready_ = false;
 }
