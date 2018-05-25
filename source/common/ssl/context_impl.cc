@@ -276,10 +276,14 @@ int ContextImpl::verifyCertificate(X509* cert) {
   }
 
   if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
-    if (!((!verify_certificate_hash_list_.empty() &&
-           verifyCertificateHashList(cert, verify_certificate_hash_list_)) ||
-          (!verify_certificate_spki_list_.empty() &&
-           verifyCertificateSpkiList(cert, verify_certificate_spki_list_)))) {
+    const bool valid_certificate_hash =
+        !verify_certificate_hash_list_.empty() &&
+        verifyCertificateHashList(cert, verify_certificate_hash_list_);
+    const bool valid_certificate_spki =
+        !verify_certificate_spki_list_.empty() &&
+        verifyCertificateSpkiList(cert, verify_certificate_spki_list_);
+
+    if (!valid_certificate_hash && !valid_certificate_spki) {
       stats_.fail_verify_cert_hash_.inc();
       return 0;
     }
