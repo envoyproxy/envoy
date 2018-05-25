@@ -9,6 +9,7 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
+* access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
@@ -70,8 +71,6 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
-* router: added `START_TIME` as one of supported variables in :ref:`header
-  formatters <config_http_conn_man_headers_custom_request_headers>`. The timestamp unit is in milliseconds.
 * router: The behavior of per-try timeouts have changed in the case where a portion of the response has
   already been proxied downstream when the timeout occurs. Previously, the response would be reset
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
@@ -80,6 +79,8 @@ Version history
   to ignore the source port.
 * router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
   generate session cookies.
+* router: added START_TIME as one of supported variables in :ref:`header
+  formatters <config_http_conn_man_headers_custom_request_headers>`.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
