@@ -20,22 +20,22 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkEngine(const RBAC::RBACEngineImpl& engine, bool expected_net, bool expected_http,
+void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
                  const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
                  const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl()) {
-  EXPECT_EQ(expected_net, engine.allowed(connection));
-  EXPECT_EQ(expected_http, engine.allowed(connection, headers));
+  EXPECT_EQ(expected, engine.allowed(connection, headers));
 }
 
-TEST(RBACEngineImpl, Disabled) {
+TEST(RoleBasedAccessControlEngineImpl, Disabled) {
   envoy::config::filter::http::rbac::v2::RBACPerRoute config;
   config.set_disabled(true);
-  checkEngine(RBAC::RBACEngineImpl(config), true, true);
-  checkEngine(RBAC::RBACEngineImpl(envoy::config::filter::http::rbac::v2::RBAC(), true), true,
-              true);
+  checkEngine(RBAC::RoleBasedAccessControlEngineImpl(config), true);
+  checkEngine(
+      RBAC::RoleBasedAccessControlEngineImpl(envoy::config::filter::http::rbac::v2::RBAC(), true),
+      true);
 }
 
-TEST(RBACEngineImpl, AllowedWhitelist) {
+TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
@@ -45,20 +45,20 @@ TEST(RBACEngineImpl, AllowedWhitelist) {
   rbac->set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
   (*rbac->mutable_policies())["foo"] = policy;
 
-  RBAC::RBACEngineImpl engine(config);
+  RBAC::RoleBasedAccessControlEngineImpl engine(config);
 
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
-  checkEngine(engine, true, true, conn);
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  checkEngine(engine, true, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
-  checkEngine(engine, false, false, conn);
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  checkEngine(engine, false, conn);
 }
 
-TEST(RBACEngineImpl, DeniedBlacklist) {
+TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
@@ -68,17 +68,17 @@ TEST(RBACEngineImpl, DeniedBlacklist) {
   rbac->set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_DENY);
   (*rbac->mutable_policies())["foo"] = policy;
 
-  RBAC::RBACEngineImpl engine(config);
+  RBAC::RoleBasedAccessControlEngineImpl engine(config);
 
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
-  checkEngine(engine, false, false, conn);
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  checkEngine(engine, false, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
-  checkEngine(engine, true, true, conn);
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  checkEngine(engine, true, conn);
 }
 
 } // namespace

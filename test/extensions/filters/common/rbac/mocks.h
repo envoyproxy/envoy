@@ -10,12 +10,11 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-class MockEngine : public RBACEngine {
+class MockEngine : public RoleBasedAccessControlEngine {
 public:
   MockEngine(){};
   ~MockEngine(){};
 
-  MOCK_CONST_METHOD1(allowed, bool(const Envoy::Network::Connection&));
   MOCK_CONST_METHOD2(allowed,
                      bool(const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&));
 };

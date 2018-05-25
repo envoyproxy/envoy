@@ -11,26 +11,18 @@ namespace Common {
 namespace RBAC {
 
 /**
- * Shared logic for evaluating RBAC policies for both network and HTTP filters.
+ * Shared logic for evaluating RBAC policies.
  */
-class RBACEngine : public Router::RouteSpecificFilterConfig {
+class RoleBasedAccessControlEngine : public Router::RouteSpecificFilterConfig {
 public:
-  virtual ~RBACEngine() {}
+  virtual ~RoleBasedAccessControlEngine() {}
 
   /**
-   * Returns whether or not the current action is permitted. This overload of `allowed` should only
-   * be used for non-HTTP network calls (e.g., a binary TCP protocol).
+   * Returns whether or not the current action is permitted.
    *
    * @param connection the downstream connection used to identify the action/principal.
-   */
-  virtual bool allowed(const Network::Connection& connection) const PURE;
-
-  /**
-   * Returns whether or not the current action is permitted. This overload of `allowed` should only
-   * be used for HTTP calls.
-   *
-   * @param connection the downstream connection used to identify the action/principal.
-   * @param headers    the headers of the incoming request used to identify the action/principal.
+   * @param headers    the headers of the incoming request used to identify the action/principal. An
+   *                   empty map should be used if there are no headers available.
    */
   virtual bool allowed(const Network::Connection& connection,
                        const Envoy::Http::HeaderMap& headers) const PURE;

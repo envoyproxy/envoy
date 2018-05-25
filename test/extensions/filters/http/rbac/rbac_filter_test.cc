@@ -21,9 +21,9 @@ namespace HttpFilters {
 namespace RBACFilter {
 namespace {
 
-class RBACFilterTest : public testing::Test {
+class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  RBACFilterConfigSharedPtr setupConfig() {
+  RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
     envoy::config::rbac::v2alpha::Policy policy;
     policy.add_permissions()->set_destination_port(123);
     policy.add_principals()->set_any(true);
@@ -31,10 +31,10 @@ public:
     config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-    return std::make_shared<RBACFilterConfig>(config, "test", store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
 
-  RBACFilterTest() : config_(setupConfig()), filter_(config_) {}
+  RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {}
 
   void SetUp() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
@@ -53,13 +53,13 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_{};
   Stats::IsolatedStoreImpl store_;
-  RBACFilterConfigSharedPtr config_;
-  RBACFilter filter_;
+  RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
   Http::TestHeaderMapImpl headers_;
 };
 
-TEST_F(RBACFilterTest, Allowed) {
+TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   setDestinationPort(123);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
@@ -70,7 +70,7 @@ TEST_F(RBACFilterTest, Allowed) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(headers_));
 }
 
-TEST_F(RBACFilterTest, Denied) {
+TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   setDestinationPort(456);
 
   Http::TestHeaderMapImpl response_headers{
@@ -85,7 +85,7 @@ TEST_F(RBACFilterTest, Denied) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
-TEST_F(RBACFilterTest, RouteLocalOverride) {
+TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   setDestinationPort(456, 0);
 
   NiceMock<Filters::Common::RBAC::MockEngine> engine;

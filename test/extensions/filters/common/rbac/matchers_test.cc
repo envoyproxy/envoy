@@ -20,21 +20,20 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkMatcher(const RBAC::Matcher& matcher, bool expected_net, bool expected_http,
+void checkMatcher(const RBAC::Matcher& matcher, bool expected,
                   const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
                   const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl()) {
-  EXPECT_EQ(expected_net, matcher.matches(connection));
-  EXPECT_EQ(expected_http, matcher.matches(connection, headers));
+  EXPECT_EQ(expected, matcher.matches(connection, headers));
 }
 
-TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true, true); }
+TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
   envoy::config::rbac::v2alpha::Permission_Set set;
   envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set), true, true);
+  checkMatcher(RBAC::AndMatcher(set), true);
 
   perm = set.add_rules();
   perm->set_destination_port(123);
@@ -42,14 +41,14 @@ TEST(AndMatcher, Permission_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), true, true, conn);
+  checkMatcher(RBAC::AndMatcher(set), true, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), false, false, conn);
+  checkMatcher(RBAC::AndMatcher(set), false, conn);
 }
 
 TEST(AndMatcher, Principal_Set) {
@@ -57,7 +56,7 @@ TEST(AndMatcher, Principal_Set) {
   envoy::config::rbac::v2alpha::Principal* principal = set.add_ids();
   principal->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set), true, true);
+  checkMatcher(RBAC::AndMatcher(set), true);
 
   principal = set.add_ids();
   auto* cidr = principal->mutable_source_ip();
@@ -67,14 +66,14 @@ TEST(AndMatcher, Principal_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), true, true, conn);
+  checkMatcher(RBAC::AndMatcher(set), true, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
 
-  checkMatcher(RBAC::AndMatcher(set), false, false, conn);
+  checkMatcher(RBAC::AndMatcher(set), false, conn);
 }
 
 TEST(OrMatcher, Permission_Set) {
@@ -85,14 +84,14 @@ TEST(OrMatcher, Permission_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(RBAC::OrMatcher(set), false, false, conn);
+  checkMatcher(RBAC::OrMatcher(set), false, conn);
 
   perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, true, conn);
+  checkMatcher(RBAC::OrMatcher(set), true, conn);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -105,14 +104,14 @@ TEST(OrMatcher, Principal_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
-  EXPECT_CALL(conn, remoteAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(RBAC::OrMatcher(set), false, false, conn);
+  checkMatcher(RBAC::OrMatcher(set), false, conn);
 
   id = set.add_ids();
   id->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, true, conn);
+  checkMatcher(RBAC::OrMatcher(set), true, conn);
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {
@@ -127,15 +126,13 @@ TEST(HeaderMatcher, HeaderMatcher) {
 
   RBAC::HeaderMatcher matcher(config);
 
-  checkMatcher(matcher, false, true, Envoy::Network::MockConnection(), headers);
+  checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
 
   value = "baz";
   headers.setReference(key, value);
 
-  checkMatcher(matcher, false, false, Envoy::Network::MockConnection(), headers);
-
-  checkMatcher(matcher, false, false, Envoy::Network::MockConnection(),
-               Envoy::Http::HeaderMapImpl());
+  checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(matcher, false);
 }
 
 TEST(IPMatcher, IPMatcher) {
@@ -144,8 +141,8 @@ TEST(IPMatcher, IPMatcher) {
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
   Envoy::Network::Address::InstanceConstSharedPtr remote =
       Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(local));
-  EXPECT_CALL(conn, remoteAddress()).Times(4).WillRepeatedly(ReturnRef(remote));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(local));
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(remote));
 
   envoy::api::v2::core::CidrRange local_cidr;
   local_cidr.set_address_prefix("1.2.3.0");
@@ -155,62 +152,62 @@ TEST(IPMatcher, IPMatcher) {
   remote_cidr.set_address_prefix("4.5.6.7");
   remote_cidr.mutable_prefix_len()->set_value(32);
 
-  checkMatcher(IPMatcher(local_cidr, true), true, true, conn);
-  checkMatcher(IPMatcher(remote_cidr, false), true, true, conn);
+  checkMatcher(IPMatcher(local_cidr, true), true, conn);
+  checkMatcher(IPMatcher(remote_cidr, false), true, conn);
 
   local_cidr.set_address_prefix("1.2.4.8");
   remote_cidr.set_address_prefix("4.5.6.0");
 
-  checkMatcher(IPMatcher(local_cidr, true), false, false, conn);
-  checkMatcher(IPMatcher(remote_cidr, false), false, false, conn);
+  checkMatcher(IPMatcher(local_cidr, true), false, conn);
+  checkMatcher(IPMatcher(remote_cidr, false), false, conn);
 }
 
 TEST(PortMatcher, PortMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(PortMatcher(123), true, true, conn);
-  checkMatcher(PortMatcher(456), false, false, conn);
+  checkMatcher(PortMatcher(123), true, conn);
+  checkMatcher(PortMatcher(456), false, conn);
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return("foo"));
-  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("foo"));
+  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
   auth.set_name("foo");
-  checkMatcher(AuthenticatedMatcher(auth), true, true, conn);
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(""));
-  EXPECT_CALL(ssl, subjectPeerCertificate()).Times(2).WillRepeatedly(Return("bar"));
-  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return(""));
+  EXPECT_CALL(ssl, subjectPeerCertificate()).WillOnce(Return("bar"));
+  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
   auth.set_name("bar");
-  checkMatcher(AuthenticatedMatcher(auth), true, true, conn);
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
-  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
-  checkMatcher(AuthenticatedMatcher({}), true, true, conn);
+  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
+  checkMatcher(AuthenticatedMatcher({}), true, conn);
 }
 
 TEST(AuthenticatedMatcher, NoSSL) {
   Envoy::Network::MockConnection conn;
-  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(nullptr));
-  checkMatcher(AuthenticatedMatcher({}), false, false, conn);
+  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(nullptr));
+  checkMatcher(AuthenticatedMatcher({}), false, conn);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
@@ -227,21 +224,21 @@ TEST(PolicyMatcher, PolicyMatcher) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(4).WillRepeatedly(Return("bar"));
-  EXPECT_CALL(Const(conn), ssl()).Times(4).WillRepeatedly(Return(&ssl));
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return("bar"));
+  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, true, true, conn);
+  checkMatcher(matcher, true, conn);
 
-  EXPECT_CALL(Const(conn), ssl()).Times(4).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, false, false, conn);
+  checkMatcher(matcher, false, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 789, false);
-  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
-  checkMatcher(matcher, false, false, conn);
+  checkMatcher(matcher, false, conn);
 }
 
 } // namespace

@@ -25,39 +25,45 @@ namespace RBACFilter {
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h
  */
-struct RBACFilterStats {
+struct RoleBasedAccessControlFilterStats {
   ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
  * Configuration for the RBAC filter.
  */
-class RBACFilterConfig {
+class RoleBasedAccessControlFilterConfig {
 public:
-  RBACFilterConfig(const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
-                   const std::string& stats_prefix, Stats::Scope& scope);
+  RoleBasedAccessControlFilterConfig(
+      const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
+      const std::string& stats_prefix, Stats::Scope& scope);
 
-  RBACFilterStats& stats() { return stats_; }
-  const Filters::Common::RBAC::RBACEngine& engine(const Router::RouteConstSharedPtr) const;
+  RoleBasedAccessControlFilterStats& stats() { return stats_; }
+
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine&
+  engine(const Router::RouteConstSharedPtr route) const;
 
 private:
-  RBACFilterStats stats_;
-  const Filters::Common::RBAC::RBACEngineImpl engine_;
+  RoleBasedAccessControlFilterStats stats_;
+  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl engine_;
 };
 
-typedef std::shared_ptr<RBACFilterConfig> RBACFilterConfigSharedPtr;
+typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
+    RoleBasedAccessControlFilterConfigSharedPtr;
 
 /**
  * A filter that provides role-based access control authorization for HTTP requests.
  */
-class RBACFilter : public Http::StreamDecoderFilter {
+class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter {
 public:
-  RBACFilter(RBACFilterConfigSharedPtr config) : config_(config) {}
+  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
+      : config_(config) {}
 
-  static RBACFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  static RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
+                                                         Stats::Scope& scope);
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
 
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     return Http::FilterDataStatus::Continue;
@@ -72,12 +78,11 @@ public:
   }
 
   // Http::StreamFilterBase
-  void onDestroy() override { stream_destroyed_ = true; }
+  void onDestroy() override {}
 
 private:
-  RBACFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
-  bool stream_destroyed_{};
 };
 
 } // namespace RBACFilter

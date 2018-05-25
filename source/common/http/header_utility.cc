@@ -69,7 +69,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   // TODO (rodaine): Should this really allow empty headers to always match?
   if (!config_headers.empty()) {
     for (const HeaderData& cfg_header_data : config_headers) {
-      if (!matchHeaders(request_headers_, cfg_header_data)) {
+      if (!matchHeaders(request_headers, cfg_header_data)) {
         return false;
       }
     }
@@ -90,8 +90,10 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
     match = header_data.value_.empty() || header->value() == header_data.value_.c_str();
+    break;
   case HeaderMatchType::Regex:
     match = std::regex_match(header->value().c_str(), header_data.regex_pattern_);
+    break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
     match = StringUtil::atol(header->value().c_str(), header_value, 10) &&

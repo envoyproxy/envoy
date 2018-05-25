@@ -10,17 +10,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
-RBACFilterConfig::RBACFilterConfig(const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
-                                   const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(RBACFilter::generateStats(stats_prefix, scope)), engine_(proto_config, false) {}
+RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
+    const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(RoleBasedAccessControlFilter::generateStats(stats_prefix, scope)),
+      engine_(proto_config, false) {}
 
-RBACFilterStats RBACFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  std::string final_prefix = prefix + "rbac.";
+RoleBasedAccessControlFilterStats
+RoleBasedAccessControlFilter::generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = prefix + "rbac.";
   return {ALL_RBAC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-const Filters::Common::RBAC::RBACEngine&
-RBACFilterConfig::engine(const Router::RouteConstSharedPtr route) const {
+const Filters::Common::RBAC::RoleBasedAccessControlEngine&
+RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route) const {
   if (!route || !route->routeEntry()) {
     return engine_;
   }
@@ -29,14 +32,17 @@ RBACFilterConfig::engine(const Router::RouteConstSharedPtr route) const {
   const auto* entry = route->routeEntry();
 
   const auto* route_local =
-      entry->perFilterConfigTyped<Filters::Common::RBAC::RBACEngine>(name)
-          ?: entry->virtualHost().perFilterConfigTyped<Filters::Common::RBAC::RBACEngine>(name);
+      entry->perFilterConfigTyped<Filters::Common::RBAC::RoleBasedAccessControlEngine>(name)
+          ?: entry->virtualHost()
+                 .perFilterConfigTyped<Filters::Common::RBAC::RoleBasedAccessControlEngine>(name);
 
   return route_local ? *route_local : engine_;
 }
 
-Http::FilterHeadersStatus RBACFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  const Filters::Common::RBAC::RBACEngine& engine = config_->engine(callbacks_->route());
+Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
+                                                                      bool) {
+  const Filters::Common::RBAC::RoleBasedAccessControlEngine& engine =
+      config_->engine(callbacks_->route());
 
   if (engine.allowed(*callbacks_->connection(), headers)) {
     config_->stats().allowed_.inc();

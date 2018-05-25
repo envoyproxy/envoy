@@ -6,11 +6,12 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-RBACEngineImpl::RBACEngineImpl(const envoy::config::filter::http::rbac::v2::RBAC& config,
-                               bool disabled)
-    : disabled_(disabled),
-      allowed_(disabled || config.rules().action() ==
-                               envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW) {
+RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
+    const envoy::config::filter::http::rbac::v2::RBAC& config, bool disabled)
+    : engine_disabled_(disabled),
+      allowed_if_matched_(disabled ||
+                          config.rules().action() ==
+                              envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW) {
   if (disabled) {
     return;
   }
@@ -20,16 +21,28 @@ RBACEngineImpl::RBACEngineImpl(const envoy::config::filter::http::rbac::v2::RBAC
   }
 }
 
-RBACEngineImpl::RBACEngineImpl(const envoy::config::filter::http::rbac::v2::RBACPerRoute& config)
-    : RBACEngineImpl(config.rbac(), config.disabled()) {}
+RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
+    const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config)
+    : RoleBasedAccessControlEngineImpl(per_route_config.rbac(), per_route_config.disabled()) {}
 
-bool RBACEngineImpl::allowed(const Network::Connection& connection) const {
-  return isAllowed(connection);
-}
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
+                                               const Envoy::Http::HeaderMap& headers) const {
+  if (engine_disabled_) {
+    return true;
+  }
 
-bool RBACEngineImpl::allowed(const Network::Connection& connection,
-                             const Envoy::Http::HeaderMap& headers) const {
-  return isAllowed(connection, headers);
+  bool matched = false;
+  for (const auto& policy : policies_) {
+    if (policy.matches(connection, headers)) {
+      matched = true;
+      break;
+    }
+  }
+
+  // only allowed if:
+  //   - matched and ALLOW action
+  //   - not matched and DENY action
+  return matched == allowed_if_matched_;
 }
 
 } // namespace RBAC

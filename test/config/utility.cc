@@ -115,7 +115,7 @@ config:
 
 const std::string ConfigHelper::READONLY_RBAC_FILTER =
     R"EOF(
-name: envoy.rbac_http
+name: envoy.filters.http.rbac
 config:
   rules:
     policies:

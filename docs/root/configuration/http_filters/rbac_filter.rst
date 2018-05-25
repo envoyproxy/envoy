@@ -5,9 +5,9 @@ Role Based Access Control (RBAC) Filter
 
 The RBAC filter is used to authorize actions (permissions) by identified downstream clients
 (principals). This is useful to explicitly manage callers to an application and protect it from
-unexpected or forbidden agents. The filter supports configuration with either a whitelist (ALLOW) or
-blacklist (DENY) set of policies based off properties of the connection (IPs, ports, SSL subject) as
-well as the incoming request's HTTP headers.
+unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
+block-list (DENY) set of policies based off properties of the connection (IPs, ports, SSL subject)
+as well as the incoming request's HTTP headers.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rbac.v2.RBAC>`
 

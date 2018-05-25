@@ -1,3 +1,5 @@
+#include "extensions/filters/http/well_known_names.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
@@ -63,7 +65,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_per_filter_config();
 
-        (*config)["envoy.rbac_http"] = pfc;
+        (*config)[Extensions::HttpFilters::HttpFilterNames::get().RBAC] = pfc;
       });
   config_helper_.addFilter(ConfigHelper::READONLY_RBAC_FILTER);
 

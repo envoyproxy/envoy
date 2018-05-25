@@ -1,8 +1,9 @@
 #pragma once
 
 #include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/server/filter_config.h"
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.validate.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -13,31 +14,26 @@ namespace RBACFilter {
 /**
  * Config registration for the RBAC filter. @see NamedHttpFilterConfigFactory.
  */
-class RBACFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class RoleBasedAccessControlFilterConfigFactory
+    : public Common::FactoryBase<envoy::config::filter::http::rbac::v2::RBAC,
+                                 envoy::config::filter::http::rbac::v2::RBACPerRoute> {
 public:
+  RoleBasedAccessControlFilterConfigFactory() : FactoryBase(HttpFilterNames::get().RBAC) {}
+
   Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                             Server::Configuration::FactoryContext&) override {
     NOT_IMPLEMENTED;
   }
 
+private:
   Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               const std::string& stats_prefix,
-                               Server::Configuration::FactoryContext& context) override;
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::rbac::v2::RBAC()};
-  }
-
-  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::filter::http::rbac::v2::RBACPerRoute()};
-  }
-
-  Router::RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const Protobuf::Message& proto_config,
-                                  Server::Configuration::FactoryContext& context) override;
-
-  std::string name() override { return HttpFilterNames::get().RBAC; }
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::config::filter::http::rbac::v2::RBACPerRoute& proto_config,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace RBACFilter

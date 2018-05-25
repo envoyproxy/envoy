@@ -58,16 +58,6 @@ AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set) {
   }
 }
 
-bool AndMatcher::matches(const Network::Connection& connection) const {
-  for (const auto& matcher : matchers_) {
-    if (!matcher->matches(connection)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 bool AndMatcher::matches(const Network::Connection& connection,
                          const Envoy::Http::HeaderMap& headers) const {
   for (const auto& matcher : matchers_) {
@@ -80,27 +70,17 @@ bool AndMatcher::matches(const Network::Connection& connection,
 }
 
 OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& permissions) {
-  for (const auto& permission : permissions) {
-    matchers_.push_back(Matcher::create(permission));
+    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules) {
+  for (const auto& rule : rules) {
+    matchers_.push_back(Matcher::create(rule));
   }
 }
 
 OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& principals) {
-  for (const auto& principal : principals) {
-    matchers_.push_back(Matcher::create(principal));
+    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids) {
+  for (const auto& id : ids) {
+    matchers_.push_back(Matcher::create(id));
   }
-}
-
-bool OrMatcher::matches(const Network::Connection& connection) const {
-  for (const auto& matcher : matchers_) {
-    if (matcher->matches(connection)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 bool OrMatcher::matches(const Network::Connection& connection,
@@ -119,19 +99,22 @@ bool HeaderMatcher::matches(const Network::Connection&,
   return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
 }
 
-bool IPMatcher::matches(const Network::Connection& connection) const {
+bool IPMatcher::matches(const Network::Connection& connection,
+                        const Envoy::Http::HeaderMap&) const {
   const Envoy::Network::Address::InstanceConstSharedPtr& ip =
       destination_ ? connection.localAddress() : connection.remoteAddress();
 
   return range_.isInRange(*ip.get());
 }
 
-bool PortMatcher::matches(const Network::Connection& connection) const {
+bool PortMatcher::matches(const Network::Connection& connection,
+                          const Envoy::Http::HeaderMap&) const {
   const Envoy::Network::Address::Ip* ip = connection.localAddress().get()->ip();
   return ip && ip->port() == port_;
 }
 
-bool AuthenticatedMatcher::matches(const Network::Connection& connection) const {
+bool AuthenticatedMatcher::matches(const Network::Connection& connection,
+                                   const Envoy::Http::HeaderMap&) const {
   const auto* ssl = connection.ssl();
   if (!ssl) { // connection was not authenticated
     return false;
@@ -143,10 +126,6 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection) const 
   principal = principal.empty() ? ssl->subjectPeerCertificate() : principal;
 
   return principal == name_;
-}
-
-bool PolicyMatcher::matches(const Network::Connection& connection) const {
-  return permissions_.matches(connection) && principals_.matches(connection);
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,

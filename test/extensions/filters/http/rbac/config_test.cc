@@ -15,14 +15,14 @@ namespace HttpFilters {
 namespace RBACFilter {
 namespace {
 
-TEST(RBACFilterConfigFactoryTest, ValidateFail) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(RBACFilterConfigFactory().createFilterFactoryFromProto(
+  EXPECT_THROW(RoleBasedAccessControlFilterConfigFactory().createFilterFactoryFromProto(
                    envoy::config::filter::http::rbac::v2::RBAC(), "stats", context),
                ProtoValidationException);
 }
 
-TEST(RBACFilterConfigFactoryTest, ValidProto) {
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
   envoy::config::rbac::v2alpha::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
@@ -30,29 +30,29 @@ TEST(RBACFilterConfigFactoryTest, ValidProto) {
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  RBACFilterConfigFactory factory;
+  RoleBasedAccessControlFilterConfigFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);
 }
 
-TEST(RBACFilterConfigFactoryTest, EmptyProto) {
-  RBACFilterConfigFactory factory;
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
+  RoleBasedAccessControlFilterConfigFactory factory;
   auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(
       factory.createEmptyConfigProto().get());
   EXPECT_NE(nullptr, config);
 }
 
-TEST(RBACFilterConfigFactoryTest, EmptyRouteProto) {
-  RBACFilterConfigFactory factory;
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
+  RoleBasedAccessControlFilterConfigFactory factory;
   auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(
       factory.createEmptyRouteConfigProto().get());
   EXPECT_NE(nullptr, config);
 }
 
-TEST(RBACFilterConfigFactoryTest, RouteSpecificConfig) {
-  RBACFilterConfigFactory factory;
+TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
+  RoleBasedAccessControlFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
@@ -66,7 +66,8 @@ TEST(RBACFilterConfigFactoryTest, RouteSpecificConfig) {
       factory.createRouteSpecificFilterConfig(*proto_config, context);
   EXPECT_TRUE(route_config.get());
 
-  const auto* inflated = dynamic_cast<const Filters::Common::RBAC::RBACEngine*>(route_config.get());
+  const auto* inflated =
+      dynamic_cast<const Filters::Common::RBAC::RoleBasedAccessControlEngine*>(route_config.get());
   EXPECT_NE(nullptr, inflated);
 }
 

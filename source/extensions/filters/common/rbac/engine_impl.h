@@ -11,38 +11,25 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-class RBACEngineImpl : public RBACEngine {
+class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
 public:
-  RBACEngineImpl(const envoy::config::filter::http::rbac::v2::RBAC&, bool disabled);
-  RBACEngineImpl(const envoy::config::filter::http::rbac::v2::RBACPerRoute&);
-  ~RBACEngineImpl() {}
+  RoleBasedAccessControlEngineImpl(const envoy::config::filter::http::rbac::v2::RBAC& config,
+                                   bool disabled);
+  RoleBasedAccessControlEngineImpl(
+      const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
 
-  bool allowed(const Network::Connection&) const override;
-  bool allowed(const Network::Connection&, const Envoy::Http::HeaderMap&) const override;
+  bool allowed(const Network::Connection& connection,
+               const Envoy::Http::HeaderMap& headers) const override;
 
 private:
-  const bool disabled_;
-  const bool allowed_;
+  // Indicates that the engine will not evaluate an action and just return true for calls to
+  // allowed. This value is only set by route-local configuration.
+  const bool engine_disabled_;
+
+  // Indicates the behavior to take if a policy matches an action.
+  const bool allowed_if_matched_;
+
   std::vector<PolicyMatcher> policies_;
-
-  template <class... Args> bool isAllowed(Args&&... args) const {
-    if (disabled_) {
-      return true;
-    }
-
-    bool matched = false;
-    for (const auto& policy : policies_) {
-      if (policy.matches(std::forward<Args>(args)...)) {
-        matched = true;
-        break;
-      }
-    }
-
-    // only allowed if:
-    //   - matched and ALLOW action
-    //   - not matched and DENY action
-    return matched == allowed_;
-  }
 }; // namespace RBAC
 
 } // namespace RBAC
