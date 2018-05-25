@@ -365,7 +365,7 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       // Not a base64-encoded string.
-      ->add_verify_spki_sha256("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+      ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   ClientContextConfigImpl client_context_config(tls_context);
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);

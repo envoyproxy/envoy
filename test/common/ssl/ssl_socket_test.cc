@@ -785,8 +785,10 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
           ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
-  server_validation_ctx->add_verify_spki_sha256("QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
@@ -817,8 +819,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCert) {
           ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
-  server_validation_ctx->add_verify_spki_sha256("QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
 
@@ -840,8 +844,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerification) {
           ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
-  server_validation_ctx->add_verify_spki_sha256("QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
@@ -872,8 +878,10 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
-  server_validation_ctx->add_verify_spki_sha256("QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
@@ -906,7 +914,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
 
@@ -930,7 +939,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerification) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
-  server_validation_ctx->add_verify_spki_sha256("NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
