@@ -96,9 +96,9 @@ std::string DateFormatter::parse(const std::string& format_string) {
 
     // Save a subsecond's position and width inside the rendered format string.
     SubsecondSpecifier subsecond(match.position() + delta);
-    absl::string_view matched_str = match[1].str();
-    if (!matched_str.empty()) {
-      subsecond.width_ = matched_str[0] - '0';
+    const std::string match_str = match[1].str();
+    if (!match_str.empty()) {
+      subsecond.width_ = match_str.at(0) - '0';
     }
     subseconds_.emplace_back(subsecond);
 
