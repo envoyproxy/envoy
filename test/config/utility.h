@@ -54,8 +54,6 @@ public:
   static const std::string DEFAULT_HEALTH_CHECK_FILTER;
   // a string for a squash filter which can be used with addFilter()
   static const std::string DEFAULT_SQUASH_FILTER;
-  // A string for a simple readonly HTTP RBAC filter which can be used with addFilter()
-  static const std::string READONLY_RBAC_FILTER;
 
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.

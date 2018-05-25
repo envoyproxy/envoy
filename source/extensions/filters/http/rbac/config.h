@@ -20,11 +20,6 @@ class RoleBasedAccessControlFilterConfigFactory
 public:
   RoleBasedAccessControlFilterConfigFactory() : FactoryBase(HttpFilterNames::get().RBAC) {}
 
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED;
-  }
-
 private:
   Http::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const envoy::config::filter::http::rbac::v2::RBAC& proto_config,

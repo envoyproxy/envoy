@@ -30,7 +30,7 @@ private:
   const bool allowed_if_matched_;
 
   std::vector<PolicyMatcher> policies_;
-}; // namespace RBAC
+};
 
 } // namespace RBAC
 } // namespace Common

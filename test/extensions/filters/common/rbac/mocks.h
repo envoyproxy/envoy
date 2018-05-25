@@ -12,8 +12,8 @@ namespace RBAC {
 
 class MockEngine : public RoleBasedAccessControlEngine {
 public:
-  MockEngine(){};
-  ~MockEngine(){};
+  MockEngine();
+  virtual ~MockEngine();
 
   MOCK_CONST_METHOD2(allowed,
                      bool(const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&));

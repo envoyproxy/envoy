@@ -5,6 +5,18 @@
 namespace Envoy {
 namespace {
 
+const std::string RBAC_CONFIG = R"EOF(
+name: envoy.filters.http.rbac
+config:
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header: { name: ":method", exact_match: "GET" }
+        principals:
+          - any: true
+)EOF";
+
 typedef HttpProtocolIntegrationTest RBACIntegrationTest;
 
 INSTANTIATE_TEST_CASE_P(Protocols, RBACIntegrationTest,
@@ -12,7 +24,7 @@ INSTANTIATE_TEST_CASE_P(Protocols, RBACIntegrationTest,
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(RBACIntegrationTest, Allowed) {
-  config_helper_.addFilter(ConfigHelper::READONLY_RBAC_FILTER);
+  config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -35,7 +47,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
-  config_helper_.addFilter(ConfigHelper::READONLY_RBAC_FILTER);
+  config_helper_.addFilter(RBAC_CONFIG);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -67,7 +79,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
         (*config)[Extensions::HttpFilters::HttpFilterNames::get().RBAC] = pfc;
       });
-  config_helper_.addFilter(ConfigHelper::READONLY_RBAC_FILTER);
+  config_helper_.addFilter(RBAC_CONFIG);
 
   initialize();
 
