@@ -70,12 +70,16 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
-* router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
-  already been proxied downstream when the timeout occurs. Previously, the response would be reset 
-  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
-  timeout will be ignored and the response will continue to proxy up to the global request timeout. 
+* router: The behavior of per-try timeouts have changed in the case where a portion of the response has
+  already been proxied downstream when the timeout occurs. Previously, the response would be reset
+  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
+  timeout will be ignored and the response will continue to proxy up to the global request timeout.
 * router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
   to ignore the source port.
+* router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
+  to explicitly match based on a header's presence.
+* router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
+  which supports inverting all other match types to match based on headers which are not a desired value.
 * router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
   generate session cookies.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support

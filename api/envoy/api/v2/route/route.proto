@@ -929,7 +929,19 @@ message HeaderMatcher {
     // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
     //   "-1somestring"
     envoy.type.Int64Range range_match = 6;
+
+    // If specified, header match will be be performed based on whether the header is in the
+    // request.
+    bool present_match = 7;
   }
+
+  // If specified, the match result will be inverted before before checking. Defaults to false.
+  //
+  // Examples:
+  //
+  // * The regex *\d{3}* does not match the value *1234*, so it will match when inverted.
+  // * The range [-10,0) will match the value -1, so it will not match when inverted.
+  bool invert_match = 8;
 }
 
 // Query parameter matching treats the query string of a request's :path header
