@@ -26,7 +26,7 @@ typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
  */
 class SharedMemory {
 public:
-  static void configure(size_t max_num_stats, size_t max_stat_name_len);
+  static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
   static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
   // Made public for testing.
@@ -48,7 +48,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(uint32_t stats_set_size, Options& options);
+  static SharedMemory& initialize(uint64_t stats_set_size, Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
