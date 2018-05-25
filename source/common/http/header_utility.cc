@@ -14,13 +14,15 @@ namespace Http {
 //   exact string matching.
 //   This is now deprecated.
 // 2.header_match_specifier which can be any one of exact_match, regex_match or range_match.
+//   Each of these also can be inverted with the invert_match option.
 //   Absence of these options implies empty header value match based on header presence.
 //   a.exact_match: value will be used for exact string matching.
 //   b.regex_match: Match will succeed if header value matches the value specified here.
 //   c.range_match: Match will succeed if header value lies within the range specified
 //     here, using half open interval semantics [start,end).
+//   d.present_match: Match will succeed if the header is present.
 HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
-    : name_(config.name()) {
+    : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
   case envoy::api::v2::route::HeaderMatcher::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
@@ -35,12 +37,17 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
     break;
+  case envoy::api::v2::route::HeaderMatcher::kPresentMatch:
+    header_match_type_ = HeaderMatchType::Present;
+    break;
   case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
       header_match_type_ = HeaderMatchType::Regex;
       regex_pattern_ = RegexUtil::parseRegex(config.value());
+    } else if (config.value().empty()) {
+      header_match_type_ = HeaderMatchType::Present;
     } else {
       header_match_type_ = HeaderMatchType::Value;
       value_ = config.value();
@@ -65,7 +72,9 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
       const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
 
       if (header == nullptr) {
-        matches = false;
+        matches = cfg_header_data.header_match_type_ == HeaderMatchType::Present
+                      ? cfg_header_data.invert_match_
+                      : false;
         break;
       }
 
@@ -87,9 +96,14 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
         break;
       }
 
+      case HeaderMatchType::Present:
+        break;
+
       default:
         NOT_REACHED;
       }
+
+      matches ^= cfg_header_data.invert_match_;
 
       if (!matches) {
         break;
