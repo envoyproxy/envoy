@@ -1444,6 +1444,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
+    - filter_chain_match:
+        # empty
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1469,6 +1471,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SniFilterChainWithoutTlsInspector
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
+    - filter_chain_match:
+        # empty
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1494,6 +1498,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AlpnFilterChainWithoutTlsInspecto
     filter_chains:
     - filter_chain_match:
         application_protocols: ["h2", "http/1.1"]
+    - filter_chain_match:
+        # empty
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1520,6 +1526,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
     - filter_chain_match:
         server_names: "example.com"
         transport_protocol: "custom"
+    - filter_chain_match:
+        # empty
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
