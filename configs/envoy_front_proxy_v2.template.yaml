@@ -1,13 +1,14 @@
 {% import 'routing_helper_v2.template.yaml' as helper -%}
 {% macro router_file_content() -%}{% include kwargs['router_file'] -%}{% endmacro -%}
-{% macro listener(protocol, address, port_value, proxy_proto) -%}
-  name: not_requrired_for_static_listeners
+{% macro listener(protocol, address, port_value, proxy_proto, tls) -%}
+  name: not_required_for_static_listeners
   address:
     socket_address:
       protocol: {{protocol}}
       address: {{address}}
       port_value: {{port_value}}
   filter_chains:
+  {% if tls %}
   - tls_context:
       common_tls_context:
         alpn_protocols: h2,http/1.1
@@ -16,6 +17,14 @@
             filename: certs/servercert.pem
           private_key:
             filename: certs/serverkey.pem
+      {% if kwargs.get('pin_double_proxy_client', False) %}
+      validation_context:
+        trusted_ca:
+          filename: certs/cacert.pm
+        #update comment from conflicting commit here
+        verify_certificate_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+      {% endif %}
+  {%endif %}
     filters:
     - name: envoy.http_connection_manager
       config:
@@ -28,33 +37,54 @@
         route_config:
           {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
         http_filters:
-        - name: envoy.router
-          config: {}
-        - name: envoy.health_check
-          config:
-            pass_through_mode: false
-            endpoint: "/healthcheck"
         - name: envoy.buffer
           config:
             max_request_bytes: 5242880
             max_request_time: 120s
+        - name: envoy.router
+          config: {}
         - name: envoy.rate_limit
           config:
             domain: envoy_front
             request_type: external
+        - name: envoy.health_check
+          config:
+            pass_through_mode: false
+            endpoint: "/healthcheck"
+        add_user_agent: true
+        tracing:
+          operation_name: INGRESS
+        idle_timeout: 840s
+        access_log:
+        - name: envoy.file_access_log
+          filter:
+            or_filter:
+              filters:
+                - status_code_filter:
+                    comparison:
+                      op: GE
+                      value:
+                        default_value: 500
+                        runtime_key: access_log.access_error.status
+                - duration_filter:
+                    comparison:
+                      op: GE
+                      value:
+                        default_value: 1000
+                        runtime_key: access_log.access_error.duration
+                - traceable_filter: {}
+          config:
+            path: /var/log/envoy/access_error.log
+            format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+    {%if proxy_proto%}
+    use_proxy_proto: true
+    {%endif%}
 {% endmacro -%}
-admin:
-  access_log_path: /var/log/envoy/admin_access.log
-  address:
-    socket_address:
-      protocol: TCP
-      address: 0.0.0.0
-      port_value: 9901
 static_resources:
   listeners:
-  - {{ listener("TCP", "0.0.0.0", "9300", True)|indent(2) }}
-  - {{ listener("TCP", "0.0.0.0", "9301", True)|indent(2) }}
-  - {{ listener("TCP", "0.0.0.0", "9400", True)|indent(2) }}
+  - {{ listener("TCP", "0.0.0.0", "9300", True, True)|indent(2) }}
+  - {{ listener("TCP", "0.0.0.0", "9301", True, True)|indent(2) }}
+  - {{ listener("TCP", "0.0.0.0", "9400", True, True)|indent(2) }}
   clusters:
   - name: sds
     type: STRICT_DNS
@@ -96,7 +126,20 @@ cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
 flags_path: /etc/envoy/flags
+#uncomment this when interval_cluster_definition calls
+#to helper are added
+#rate_limit_service:
+#  grpc_service:
+#    envoy_grpc:
+#      cluster_name: ratelimit
 runtime:
   symlink_root: /srv/runtime_data/current
   subdirectory: envoy
   override_subdirectory: envoy_override
+admin:
+  access_log_path: /var/log/envoy/admin_access.log
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
