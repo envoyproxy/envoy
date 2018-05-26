@@ -3,8 +3,11 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
@@ -14,54 +17,54 @@ envoy_cc_library(
     hdrs = ["test_common.h"],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "extractor_test",
     srcs = [
         "extractor_test.cc",
     ],
+    extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        "//source/exe:envoy_common_lib",
-        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:extractor_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_factory_test",
     srcs = [
         "filter_factory_test.cc",
     ],
+    extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":test_common_lib",
-        "//source/exe:envoy_common_lib",
-        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "jwks_cache_test",
     srcs = [
         "jwks_cache_test.cc",
     ],
+    extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":test_common_lib",
-        "//source/exe:envoy_common_lib",
-        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:jwks_cache_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "authenticator_test",
     srcs = [
         "authenticator_test.cc",
     ],
+    extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":test_common_lib",
-        "//source/exe:envoy_common_lib",
-        "//source/extensions/filters/http/jwt_authn:jwt_lib",
+        "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
