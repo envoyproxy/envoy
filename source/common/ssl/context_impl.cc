@@ -380,10 +380,9 @@ bool ContextImpl::verifyCertificateSpkiList(
     return false;
   }
   uint8_t spki[len];
-  uint8_t* spkip = spki;
-  if (len != i2d_X509_PUBKEY(pubkey, &spkip)) {
-    return false;
-  }
+  uint8_t* p = spki;
+  const int len2 = i2d_X509_PUBKEY(pubkey, &p);
+  RELEASE_ASSERT(len2 == len);
 
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   SHA256(spki, len, computed_hash.data());
