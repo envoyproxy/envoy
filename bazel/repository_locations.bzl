@@ -26,9 +26,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/eile/tclap",
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "10a9f184d4d66f135093a08396d3b0a0ebe8d97b79f8b3ddb8559f75fe4fcbc3",
-        strip_prefix = "fmt-4.0.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
+        sha256 = "46628a2f068d0e33c716be0ed9dcae4370242df135aed663a180b9fd8e36733d",
+        strip_prefix = "fmt-4.1.0",
+        urls = ["https://github.com/fmtlib/fmt/archive/4.1.0.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "94f74fd1b3344733d1db3de2ec22e6cbeb769f93a8baa0d4a22b1f62dc7369f8",
