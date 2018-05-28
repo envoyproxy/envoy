@@ -13,7 +13,7 @@
       common_tls_context:
         alpn_protocols: h2,http/1.1
         tls_certificates:
-          certificate_chain:
+        - certificate_chain:
             filename: certs/servercert.pem
           private_key:
             filename: certs/serverkey.pem
