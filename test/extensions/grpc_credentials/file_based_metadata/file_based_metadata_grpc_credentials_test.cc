@@ -3,6 +3,7 @@
 
 #include "envoy/extensions/grpc_credentials/file_based_metadata.pb.h"
 
+#include "common/common/fmt.h"
 #include "common/grpc/google_async_client_impl.h"
 
 #include "extensions/grpc_credentials/well_known_names.h"
@@ -10,8 +11,6 @@
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
-
-#include "fmt/printf.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -39,13 +38,13 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (header_value_1_ != "") {
-      std::string yaml1 = fmt::sprintf(R"EOF(
+      std::string yaml1 = fmt::format(R"EOF(
 secret_data:
-  inline_string: %s
-header_key: %s
-header_prefix: %s
+  inline_string: {}
+header_key: {}
+header_prefix: {}
 )EOF",
-                                       header_value_1_, header_key_1_, header_prefix_1_);
+                                      header_value_1_, header_key_1_, header_prefix_1_);
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config;
@@ -53,11 +52,11 @@ header_prefix: %s
     }
     if (header_value_2_ != "") {
       // uses default key/prefix
-      std::string yaml2 = fmt::sprintf(R"EOF(
+      std::string yaml2 = fmt::format(R"EOF(
 secret_data:
-  inline_string: %s
+  inline_string: {}
 )EOF",
-                                       header_value_2_);
+                                      header_value_2_);
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
