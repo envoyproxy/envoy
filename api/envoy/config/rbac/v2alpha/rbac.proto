@@ -8,12 +8,8 @@ package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
-// service. The RBAC engine authorizes a request by evaluating the request context (expressed in the
-// form of :ref: `AttributeContext <envoy_api_msg_service.auth.v2alpha.AttributeContext>`) against
-// the RBAC policies.
-//
-// RBAC policies are additive. The policies are examined in order. A request is allowed once a
-// matching policy is found (suppose the `action` is ALLOW).
+// service. RBAC policies are additive. The policies are examined in order. A request is allowed
+// once a matching policy is found (suppose the `action` is ALLOW).
 //
 // Here is an example of RBAC configuration. It has two policies:
 //
@@ -48,13 +44,13 @@ option go_package = "v2alpha";
 //         - any: true
 //
 message RBAC {
-  // Should we do white-list or black-list style access control?
+  // Should we do safe-list or block-list style access control?
   enum Action {
-    // The policies grant access to principals. The rest is denied. This is white-list style
+    // The policies grant access to principals. The rest is denied. This is safe-list style
     // access control. This is the default type.
     ALLOW = 0;
 
-    // The policies deny access to principals. The rest is allowed. This is black-list style
+    // The policies deny access to principals. The rest is allowed. This is block-list style
     // access control.
     DENY = 1;
   }

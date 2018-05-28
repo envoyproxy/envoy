@@ -273,7 +273,7 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   return cached_url_encoded_pem_encoded_peer_certificate_;
 }
 
-std::string SslSocket::uriSanPeerCertificate() {
+std::string SslSocket::uriSanPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return "";
@@ -289,7 +289,7 @@ std::vector<std::string> SslSocket::dnsSansPeerCertificate() {
   return getDnsSansFromCertificate(cert.get());
 }
 
-std::string SslSocket::getUriSanFromCertificate(X509* cert) {
+std::string SslSocket::getUriSanFromCertificate(X509* cert) const {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {

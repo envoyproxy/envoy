@@ -42,6 +42,8 @@ public:
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
                            const std::vector<HeaderData>& config_headers);
+
+  static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
 };
 } // namespace Http
 } // namespace Envoy
