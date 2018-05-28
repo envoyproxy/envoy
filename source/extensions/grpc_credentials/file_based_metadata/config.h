@@ -27,8 +27,7 @@ public:
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() {
-    return Envoy::ProtobufTypes::MessagePtr{
-        new envoy::extensions::grpc_credentials::FileBasedMetadataConfig()};
+    return std::make_unique<envoy::extensions::grpc_credentials::FileBasedMetadataConfig>();
   }
 
   std::string name() const override { return GrpcCredentialsNames::get().FILE_BASED_METADATA; }
