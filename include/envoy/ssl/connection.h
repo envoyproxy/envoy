@@ -48,7 +48,7 @@ public:
    * @return std::string the URI in the SAN field of the peer certificate. Returns "" if there is no
    *         peer certificate, or no SAN field, or no URI.
    **/
-  virtual std::string uriSanPeerCertificate() PURE;
+  virtual std::string uriSanPeerCertificate() const PURE;
 
   /**
    * @return std::string the URL-encoded PEM-encoded representation of the peer certificate. Returns

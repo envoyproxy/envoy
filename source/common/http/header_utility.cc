@@ -65,53 +65,49 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
 
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
                                  const std::vector<HeaderData>& config_headers) {
-  bool matches = true;
 
+  // TODO (rodaine): Should this really allow empty headers to always match?
   if (!config_headers.empty()) {
     for (const HeaderData& cfg_header_data : config_headers) {
-      const Http::HeaderEntry* header = request_headers.get(cfg_header_data.name_);
-
-      if (header == nullptr) {
-        matches = cfg_header_data.header_match_type_ == HeaderMatchType::Present
-                      ? cfg_header_data.invert_match_
-                      : false;
-        break;
-      }
-
-      switch (cfg_header_data.header_match_type_) {
-      case HeaderMatchType::Value:
-        matches &=
-            (cfg_header_data.value_.empty() || header->value() == cfg_header_data.value_.c_str());
-        break;
-
-      case HeaderMatchType::Regex:
-        matches &= std::regex_match(header->value().c_str(), cfg_header_data.regex_pattern_);
-        break;
-
-      case HeaderMatchType::Range: {
-        int64_t header_value = 0;
-        matches &= StringUtil::atol(header->value().c_str(), header_value, 10) &&
-                   header_value >= cfg_header_data.range_.start() &&
-                   header_value < cfg_header_data.range_.end();
-        break;
-      }
-
-      case HeaderMatchType::Present:
-        break;
-
-      default:
-        NOT_REACHED;
-      }
-
-      matches ^= cfg_header_data.invert_match_;
-
-      if (!matches) {
-        break;
+      if (!matchHeaders(request_headers, cfg_header_data)) {
+        return false;
       }
     }
   }
 
-  return matches;
+  return true;
+}
+
+bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
+                                 const HeaderData& header_data) {
+  const Http::HeaderEntry* header = request_headers.get(header_data.name_);
+
+  if (header == nullptr) {
+    return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
+  }
+
+  bool match;
+  switch (header_data.header_match_type_) {
+  case HeaderMatchType::Value:
+    match = header_data.value_.empty() || header->value() == header_data.value_.c_str();
+    break;
+  case HeaderMatchType::Regex:
+    match = std::regex_match(header->value().c_str(), header_data.regex_pattern_);
+    break;
+  case HeaderMatchType::Range: {
+    int64_t header_value = 0;
+    match = StringUtil::atol(header->value().c_str(), header_value, 10) &&
+            header_value >= header_data.range_.start() && header_value < header_data.range_.end();
+    break;
+  }
+  case HeaderMatchType::Present:
+    match = true;
+    break;
+  default:
+    NOT_REACHED;
+  }
+
+  return match != header_data.invert_match_;
 }
 
 } // namespace Http
