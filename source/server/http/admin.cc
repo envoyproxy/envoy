@@ -35,6 +35,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/stats/stats_impl.h"
@@ -243,42 +244,37 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-void AdminImpl::addCircuitSettings(envoy::admin::v2alpha::CircuitSettings& circuit_settings,
-                                   Upstream::ResourceManager& resource_manager) {
-  circuit_settings.set_max_connections(resource_manager.connections().max());
-  circuit_settings.set_max_pending_requests(resource_manager.pendingRequests().max());
-  circuit_settings.set_max_requests(resource_manager.requests().max());
-  circuit_settings.set_max_retries(resource_manager.retries().max());
-}
-
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
   envoy::admin::v2alpha::Clusters clusters;
   for (auto& cluster_pair : server_.clusterManager().clusters()) {
     const Upstream::Cluster& cluster = cluster_pair.second.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
 
-    envoy::admin::v2alpha::ClusterStatus& cluster_status =
-        (*clusters.mutable_cluster_statuses())[cluster_info->name()];
+    envoy::admin::v2alpha::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
+    cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
     if (outlier_detector != nullptr) {
-      cluster_status.mutable_outlier_info()->set_success_rate_average(
-          outlier_detector->successRateAverage());
-      cluster_status.mutable_outlier_info()->set_success_rate_ejection_threshold(
-          outlier_detector->successRateEjectionThreshold());
-    }
+      double success_rate_average = outlier_detector->successRateAverage();
+      if (success_rate_average >= 0.0) {
+        cluster_status.mutable_outlier_info()->mutable_success_rate_average()->set_value(
+            success_rate_average);
+      }
 
-    addCircuitSettings((*cluster_status.mutable_circuit_settings())["default"],
-                       cluster_info->resourceManager(Upstream::ResourcePriority::Default));
-    addCircuitSettings((*cluster_status.mutable_circuit_settings())["high"],
-                       cluster_info->resourceManager(Upstream::ResourcePriority::High));
+      double success_rate_ejection_threshold = outlier_detector->successRateEjectionThreshold();
+      if (success_rate_ejection_threshold >= 0.0) {
+        cluster_status.mutable_outlier_info()->mutable_success_rate_ejection_threshold()->set_value(
+            success_rate_ejection_threshold);
+      }
+    }
 
     cluster_status.set_added_via_api(cluster_info->addedViaApi());
 
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
-        envoy::admin::v2alpha::HostStatus& host_status =
-            (*cluster_status.mutable_host_statuses())[host->address()->asString()];
+        envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
+        Network::Utility::addressToProtobufAddress(*host->address(),
+                                                   *host_status.mutable_address());
 
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           (*host_status.mutable_stats())[counter->name()] = counter->value();
@@ -288,11 +284,22 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
           (*host_status.mutable_stats())[gauge->name()] = gauge->value();
         }
 
-        host_status.set_health_flags(Upstream::HostUtility::healthFlagsToString(*host));
+        envoy::admin::v2alpha::HostHealthStatus& health_status =
+            *host_status.mutable_health_status();
+        health_status.set_healthy(host->healthy());
+        health_status.set_failed_active_health_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+        health_status.set_failed_outlier_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+        health_status.set_failed_eds_health_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH));
         host_status.set_weight(host->weight());
         *host_status.mutable_locality() = host->locality();
         host_status.set_canary(host->canary());
-        host_status.set_success_rate(host->outlierDetector().successRate());
+        double success_rate = host->outlierDetector().successRate();
+        if (success_rate >= 0) {
+          host_status.mutable_success_rate()->set_value(success_rate);
+        }
       }
     }
   }

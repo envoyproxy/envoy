@@ -710,34 +710,34 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   MessageUtil::loadFromJson(output_json, output_proto);
 
   const std::string expected_json = R"EOF({
- "cluster_statuses": {
-  "fake_cluster": {
+ "cluster_statuses": [
+  {
+   "name": "fake_cluster",
    "outlier_info": {
-    "success_rate_average": 5,
-    "success_rate_ejection_threshold": 6
-   },
-   "circuit_settings": {
-    "high": {
-     "max_connections": "5000",
-     "max_pending_requests": "6000",
-     "max_requests": "7000",
-     "max_retries": "8000"
+    "success_rate_average": {
+     "value": 5
     },
-    "default": {
-     "max_connections": "1000",
-     "max_pending_requests": "2000",
-     "max_requests": "3000",
-     "max_retries": "4000"
+    "success_rate_ejection_threshold": {
+     "value": 6
     }
    },
    "added_via_api": true,
-   "host_statuses": {
-    "1.2.3.4:80": {
+   "host_statuses": [
+    {
+     "address": {
+      "socket_address": {
+       "protocol": "TCP",
+       "address": "1.2.3.4",
+       "port_value": 80
+      }
+     },
      "stats": {
       "test_counter": "10",
       "test_gauge": "11"
      },
-     "health_flags": "healthy",
+     "health_status": {
+      "healthy": true
+     },
      "weight": "30",
      "locality": {
       "region": "test_region",
@@ -745,11 +745,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       "sub_zone": "test_sub_zone"
      },
      "canary": true,
-     "success_rate": 43.2
+     "success_rate": {
+      "value": 43.2
+     }
     }
-   }
+   ]
   }
- }
+ ]
 }
 )EOF";
 

@@ -19,6 +19,8 @@ api_proto_library(
     srcs = ["clusters.proto"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
+        "//envoy/type:percent",
     ],
 )
