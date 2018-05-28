@@ -1,7 +1,7 @@
 
 #ifdef ENVOY_GOOGLE_GRPC
 
-#include "envoy/extensions/grpc_credentials/file_based_metadata.pb.h"
+#include "envoy/config/grpc_credentials/v2alpha/file_based_metadata.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/grpc/google_async_client_impl.h"
@@ -47,7 +47,7 @@ header_prefix: {}
                                             header_value_1_, header_key_1_, header_prefix_1_);
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
-      envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config;
+      envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig metadata_config;
       MessageUtil::loadFromYaml(yaml1, *plugin_config->mutable_config());
     }
     if (!header_value_2_.empty()) {
@@ -57,7 +57,7 @@ secret_data:
   inline_string: {}
 )EOF",
                                             header_value_2_);
-      envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config2;
+      envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
       MessageUtil::loadFromYaml(yaml2, *plugin_config2->mutable_config());
