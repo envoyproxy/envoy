@@ -22,10 +22,10 @@ public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
     fake_stream.waitForHeadersComplete();
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
-    if (header_value_1_ != "") {
+    if (!header_value_1_.empty()) {
       EXPECT_EQ(header_prefix_1_ + header_value_1_, stream_headers.get_(header_key_1_));
     }
-    if (header_value_2_ != "") {
+    if (!header_value_2_.empty()) {
       EXPECT_EQ(header_value_2_, stream_headers.get_("authorization"));
     }
   }
@@ -37,7 +37,7 @@ public:
     auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    if (header_value_1_ != "") {
+    if (!header_value_1_.empty()) {
       std::string yaml1 = fmt::format(R"EOF(
 secret_data:
   inline_string: {}
@@ -50,7 +50,7 @@ header_prefix: {}
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config;
       MessageUtil::loadFromYaml(yaml1, *plugin_config->mutable_config());
     }
-    if (header_value_2_ != "") {
+    if (!header_value_2_.empty()) {
       // uses default key/prefix
       std::string yaml2 = fmt::format(R"EOF(
 secret_data:
@@ -62,7 +62,7 @@ secret_data:
       plugin_config2->set_name(credentials_factory_name_);
       MessageUtil::loadFromYaml(yaml2, *plugin_config2->mutable_config());
     }
-    if (access_token_value_ != "") {
+    if (!access_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_);
     }
     return config;
