@@ -1,5 +1,5 @@
 licenses(["notice"])  # Apache 2
-# Example gRPC Credentials
+# File Based Metadata gRPC Credentials
 
 load(
     "//bazel:envoy_build_system.bzl",
