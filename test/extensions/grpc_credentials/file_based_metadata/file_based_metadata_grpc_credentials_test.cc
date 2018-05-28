@@ -38,13 +38,13 @@ public:
     ssl_creds->mutable_root_certs()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (!header_value_1_.empty()) {
-      std::string yaml1 = fmt::format(R"EOF(
+      const std::string yaml1 = fmt::format(R"EOF(
 secret_data:
   inline_string: {}
 header_key: {}
 header_prefix: {}
 )EOF",
-                                      header_value_1_, header_key_1_, header_prefix_1_);
+                                            header_value_1_, header_key_1_, header_prefix_1_);
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config;
@@ -52,11 +52,11 @@ header_prefix: {}
     }
     if (!header_value_2_.empty()) {
       // uses default key/prefix
-      std::string yaml2 = fmt::format(R"EOF(
+      const std::string yaml2 = fmt::format(R"EOF(
 secret_data:
   inline_string: {}
 )EOF",
-                                      header_value_2_);
+                                            header_value_2_);
       envoy::extensions::grpc_credentials::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
