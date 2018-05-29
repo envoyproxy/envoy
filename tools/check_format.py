@@ -95,11 +95,12 @@ def hasInvalidAngleBracketDirectory(line):
 
 def checkOrFixFileContents(file_path, try_to_fix):
   error_messages = []
-  shouldCheckForProtobufDeps = whitelistedForProtobufDeps(file_path)
   isBuild = isBuildFile(file_path)
-  for zero_based_line_number, line in fileinput.input(file_path, inplace=try_to_fix):
+  line_number = 0
+  for line in fileinput.input(file_path, inplace=try_to_fix):
+    line_number += 1
     def reportError(message):
-      error_messages.append("%s:%d: %s" % (file_path, zero_based_line_number + 1, message))
+      error_messages.append("%s:%d: %s" % (file_path, line_number, message))
 
     # Some of the errors can be fixed automatically, if requested by the user.
     if try_to_fix:
@@ -120,7 +121,7 @@ def checkOrFixFileContents(file_path, try_to_fix):
     # If a fix is not requested by the user, just report those fixable errors.
     else:
       if line.find(".  ") != -1:
-        reportError"over-enthusiastic spaces")
+        reportError("over-enthusiastic spaces")
       if hasInvalidAngleBracketDirectory(line):
         reportError("envoy includes should not have angle brackets")
       for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
@@ -131,16 +132,17 @@ def checkOrFixFileContents(file_path, try_to_fix):
     # Some errors cannot be fixed automatically, and actionable, consistent,
     # navigable messages should be emitted to make it easy to find and fix
     # the errors by hand.
-    if shouldCheckForProtobufDeps:
+    if not whitelistedForProtobufDeps(file_path) and not file_path.endswith(PROTO_SUFFIX):
+
       if isBuild:
         if '"protobuf"' in text:
           reportError("unexpected direct external dependency on protobuf, use "
                       "//source/common/protobuf instead.")
       else:
-        if '"google/protobuf' in text or "google::protobuf" in text:
+        if '"google/protobuf' in line or "google::protobuf" in line:
           reportError("unexpected direct dependency on google.protobuf, use "
                       "the definitions in common/protobuf/protobuf.h instead.")
-    if text.startswith('#include <mutex>') or text.startswith'^#include <condition_variable>':
+    if line.startswith('#include <mutex>') or line.startswith('^#include <condition_variable>'):
       # We don't check here for std::mutex because that may legitimately show up in
       # comments, for example this one.
       reportError("Don't use <mutex> or <condition_variable, switch to "
@@ -150,7 +152,7 @@ def checkOrFixFileContents(file_path, try_to_fix):
 def checkOrFixBuildPath(file_path, try_to_fix):
   notApi = not isApiFile(file_path)
   error_messages = []
-  if tryToFix:
+  if try_to_fix:
     # TODO(htuch): Add API specific BUILD fixer script.
     if notApi:
       if os.system(
