@@ -136,11 +136,15 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
           *request_info.downstreamLocalAddress());
     };
   } else if (field_name.find("START_TIME") == 0) {
-    field_extractor_ = [field_name](const Envoy::RequestInfo::RequestInfo& request_info) {
-      const auto formatters =
-          AccessLog::AccessLogFormatParser::parse(fmt::format("%{}%", field_name));
-      ASSERT(formatters.size() == 1);
+    const std::string pattern = fmt::format("%{}%", field_name);
+    if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
+      start_time_formatters_.emplace(
+          std::make_pair(pattern, AccessLog::AccessLogFormatParser::parse(pattern)));
+    }
+    field_extractor_ = [this, pattern](const Envoy::RequestInfo::RequestInfo& request_info) {
       Http::HeaderMapImpl empty_map;
+      const auto& formatters = start_time_formatters_.at(pattern);
+      ASSERT(formatters.size() == 1);
       return formatters.at(0)->format(empty_map, empty_map, empty_map, request_info);
     };
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {

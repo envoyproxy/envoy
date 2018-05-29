@@ -49,7 +49,7 @@ static void BM_DateTimeFormatterWithSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 
   Envoy::SystemTime time(std::chrono::seconds(1522796769));
-  std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  std::mt19937 prng(1);
   std::uniform_int_distribution<long> distribution(-10, 20);
   Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s.%3f");
   for (auto _ : state) {
@@ -64,7 +64,7 @@ static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
   int outputBytes = 0;
 
   Envoy::SystemTime time(std::chrono::seconds(1522796769));
-  std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
+  std::mt19937 prng(1);
   std::uniform_int_distribution<long> distribution(-10, 20);
   Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s");
   for (auto _ : state) {
