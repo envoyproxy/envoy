@@ -5,7 +5,7 @@ Version history
 ===============
 
 * access log: added ability to log response trailers.
-* access log: addedability to format START_TIME.
+* access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers.
