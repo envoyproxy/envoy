@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 21]
+// [#comment:next free field: 25]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -170,6 +170,21 @@ message HttpConnectionManager {
   // is not specified. See the documentation for
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
+
+  // If set, Envoy will not append the remote address to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. This may be used in
+  // conjunction with HTTP filters that explicitly manipulate XFF after the HTTP connection manager
+  // has mutated the request headers.
+  bool skip_xff_append = 21;
+
+  // Do not consider requests to ever be of internal provenance.
+  bool external_only = 22;
+
+  // Do not add any additional *x-envoy-*` headers to requests or responses.
+  bool suppress_envoy_headers = 23;
+
+  // Via header value to append to request and response headers.
+  string via = 24;
 
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
