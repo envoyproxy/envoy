@@ -41,17 +41,17 @@ The following command operators are supported:
   START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:
 
-  +------------------------+--------------------------------------------------------------+
-  | Specifier              | Explanation                                                  |
-  +========================+==============================================================+
-  | ``%s``                 | The number of seconds since the Epoch.                       |
-  +------------------------+--------------------------------------------------------------+
-  | ``%f``, ``%{:digit}f`` | Fractional seconds digits, default is 9 digits (nanosecond). |
-  |                        +--------------------------------------------------------------+
-  |                        | - ``%3f`` millisecond (3 digits).                            |
-  |                        | - ``%6f`` microsecond (6 digits).                            |
-  |                        | - ``%9f`` nanosecond (9 digits).                             |
-  +------------------------+--------------------------------------------------------------+
+  +------------------------+-------------------------------------------------------------+
+  | Specifier              | Explanation                                                 |
+  +========================+=============================================================+
+  | ``%s``                 | The number of seconds since the Epoch                       |
+  +------------------------+-------------------------------------------------------------+
+  | ``%f``, ``%{:digit}f`` | Fractional seconds digits, default is 9 digits (nanosecond) |
+  |                        +-------------------------------------------------------------+
+  |                        | - ``%3f`` millisecond (3 digits)                            |
+  |                        | - ``%6f`` microsecond (6 digits)                            |
+  |                        | - ``%9f`` nanosecond (9 digits)                             |
+  +------------------------+-------------------------------------------------------------+
 
   Examples of formatting START_TIME is as follows:
 
