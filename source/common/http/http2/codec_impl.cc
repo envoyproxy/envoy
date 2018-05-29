@@ -38,6 +38,7 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
+ConnectionImpl::ClientHttp2Options ConnectionImpl::client_http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -622,11 +623,9 @@ void ConnectionImpl::sendSettings(const Http2Settings& http2_settings, bool disa
                    http2_settings.hpack_table_size_);
   }
 
-  if (http2_settings.max_concurrent_streams_ != NGHTTP2_INITIAL_MAX_CONCURRENT_STREAMS) {
-    iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
-    ENVOY_CONN_LOG(debug, "setting max concurrent streams to {}", connection_,
-                   http2_settings.max_concurrent_streams_);
-  }
+  iv.push_back({NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, http2_settings.max_concurrent_streams_});
+  ENVOY_CONN_LOG(debug, "setting max concurrent streams to {}", connection_,
+                 http2_settings.max_concurrent_streams_);
 
   if (http2_settings.initial_stream_window_size_ != NGHTTP2_INITIAL_WINDOW_SIZE) {
     iv.push_back(
@@ -749,12 +748,17 @@ ConnectionImpl::Http2Options::Http2Options() {
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options() {
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              client_http2_options_.options());
   sendSettings(http2_settings, true);
 }
 
