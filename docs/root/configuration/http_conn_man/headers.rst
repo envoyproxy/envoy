@@ -475,15 +475,16 @@ Supported variable names are:
 
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in
-    :ref:`access log format rules<config_access_log_format_start_time>`. An example of setting a custom header with
-    current time in seconds with the milliseconds resolution:
+    :ref:`access log format rules<config_access_log_format_start_time>`.
 
-.. code-block:: none
+    An example of setting a custom header with current time in seconds with the milliseconds resolution:
 
-  route:
-    cluster: www
-    request_headers_to_add:
-      - header:
-          key: "x-request-start"
-          value: "%START_TIME(%s.%3f)%"
-        append: true
+    .. code-block:: none
+
+      route:
+        cluster: www
+        request_headers_to_add:
+          - header:
+              key: "x-request-start"
+              value: "%START_TIME(%s.%3f)%"
+            append: true
