@@ -118,5 +118,5 @@ generate_config(SCRIPT_DIR, 'envoy_service_to_service_v2.template.yaml',
                 external_virtual_hosts=external_virtual_hosts,
                 mongos_servers=mongos_servers)
 
-for google_ext in ['yaml','json','v2.yaml']:
+for google_ext in ['v2.yaml']:
   shutil.copy(os.path.join(SCRIPT_DIR, 'google_com_proxy.%s' % google_ext), OUT_DIR)

@@ -1,8 +1,7 @@
 {% import 'routing_helper_v2.template.yaml' as helper -%}
 {% import 'access_log_format_helper_v2.template.yaml' as access_log_helper -%}
 {% macro ingress_listener(protocol, address, port_value) -%}
-- name: listener_0
-  address:
+- address:
     socket_address:
       protocol: {{protocol}}
       address: {{address}}
@@ -26,7 +25,7 @@
                 - name: content-type
                   value: application/grpc
               route:
-                cluster: main_website
+                cluster: local_service_grpc
             - match:
                 prefix: "/"
               route:
@@ -40,29 +39,47 @@
         - name: envoy.buffer
           config:
            max_request_bytes: 5242880
-           max_request_time: 0.12s
+           max_request_time: 120s
         - name: envoy.router
           config: {}
-        #Need to update access_log with logical_or and logical_and filters
-        # add calls to access_log_helper
         access_log:
-         - name: envoy.file_access_log
-           filter:
-             not_health_check_filter:
-               {}
-           config:
-             path: "/var/log/envoy/egress_http_error.log"
-        idle_timeout: 0.84s
+        - name: envoy.file_access_log
+          filter:
+            and_filter:
+              filters:
+                - or_filter:
+                    filters:
+                    - status_code_filter:
+                        comparison:
+                          op: GE
+                          value:
+                            default_value: 400
+                            runtime_key: access_log.access_error.status
+                    - status_code_filter:
+                        comparison:
+                          op: EQ
+                          value:
+                            default_value: 0
+                            runtime_key: access_log.access_error.status
+                    - duration_filter:
+                        comparison:
+                          op: GE
+                          value:
+                            default_value: 2000
+                            runtime_key: access_log.access_error.duration
+                - not_health_check_filter: {}
+          config:
+            path: /var/log/envoy/access_error.log
+            format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+        idle_timeout: 840s
         tracing:
           operation_name: INGRESS
 {% endmacro -%}
 static_resources:
   listeners:
   {{ ingress_listener("tcp", "0.0.0.0", 9211) | indent(2)}}
-  #listener at 127.0.0.1:9001 is to be updated after access_log updates
-  #It is similar to listener at 127.0.0.1:9002
-  - name: listener_1
-    address:
+  #listener at 127.0.0.1:9001 is to be updated after internal_cluster_definition update
+  - address:
       socket_address:
         protocol: TCP
         port_value: 9002
@@ -73,18 +90,13 @@ static_resources:
         config:
           codec_type: AUTO
           stat_prefix: egress_http
-          #change route_config to RDS
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  host_rewrite: www.main_website.com
-                  cluster: main_website
+          rds:
+            config_source:
+               api_config_source:
+                 api_type: GRPC
+                 cluster_names:
+                 - rds
+            route_config_name: rds_config_for_listener_1
           add_user_agent: true
           tracing:
             operation_name: EGRESS
@@ -93,10 +105,24 @@ static_resources:
           access_log:
           - name: envoy.file_access_log
             filter:
-              not_health_check_filter:
-                {}
+              or_filter:
+                filters:
+                  - status_code_filter:
+                      comparison:
+                        op: GE
+                        value:
+                          default_value: 400
+                          runtime_key: access_log.access_error.status
+                  - duration_filter:
+                      comparison:
+                        op: GE
+                        value:
+                          default_value: 2000
+                          runtime_key: access_log.access_error.duration
+                  - traceable_filter: {}
             config:
-              path: "/var/log/envoy/egress_http_error.log"
+              path: /var/log/envoy/access_error.log
+              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
           use_remote_address: true
           http_filters:
           - name: envoy.rate_limit
@@ -147,6 +173,34 @@ static_resources:
           {% endif -%}
           - name: envoy.router
             config: {}
+          access_log:
+          - name: envoy.file_access_log
+            filter:
+              or_filter:
+                filters:
+                  - status_code_filter:
+                      comparison:
+                        op: GE
+                        value:
+                          default_value: 400
+                          runtime_key: access_log.access_error.status
+                  - status_code_filter:
+                      comparison:
+                        op: EQ
+                        value:
+                          default_value: 0
+                          runtime_key: access_log.access_error.status
+                  {% if mapping.get('log_high_latency_requests', True) %}
+                  - duration_filter:
+                      comparison:
+                        op: GE
+                        value:
+                          default_value: 2000
+                          runtime_key: access_log.access_error.duration
+                  {% endif %}
+            config:
+              path: /var/log/envoy/access_error.log
+              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
   {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
   {% endfor -%}
   {% for key, value in mongos_servers.iteritems() -%}
@@ -235,9 +289,7 @@ static_resources:
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    #adding some http2 option, need to be rechecked
-    http2_protocol_options:
-      max_concurrent_streams: 100
+    http2_protocol_options: {}
     hosts:
     - socket_address:
         protocol: TCP
@@ -305,7 +357,7 @@ tracing:
 rate_limit_service:
   grpc_service:
     envoy_grpc:
-      #cluster_name needs to be changed      
+      #cluster_name needs to be changed
       cluster_name: main_website
 admin:
   access_log_path: /var/log/envoy/admin_access.log
