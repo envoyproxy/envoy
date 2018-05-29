@@ -12,7 +12,8 @@ import sys
 import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
-                     "./bazel-", "./bazel/external", "./.cache")
+                     "./bazel-", "./bazel/external", "./.cache",
+                     "./tools/testdata/check_format/")
 SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
