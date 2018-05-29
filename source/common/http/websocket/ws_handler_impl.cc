@@ -109,7 +109,7 @@ Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_str
 
 void WsHandlerImpl::onConnectionSuccess() {
   // path and host rewrites
-  route_entry_.finalizeRequestHeaders(request_headers_, request_info_);
+  route_entry_.finalizeRequestHeaders(request_headers_, request_info_, true);
   // for auto host rewrite
   if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
     request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());

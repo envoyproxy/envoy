@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 25]
+// [#comment:next free field: 23]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -180,16 +180,8 @@ message HttpConnectionManager {
   // when only an elision of XFF addition is intended.
   bool skip_xff_append = 21;
 
-  // Never consider requests to be of internal provenance when performing :ref:`header sanitization
-  // <config_http_conn_man_header_sanitizing>`. Envoy will scrub various *x-envoy-* headers that are
-  // only allowed to be set by internal network elements.
-  bool external_only = 22;
-
-  // Do not add any additional *x-envoy-* headers to requests or responses.
-  bool suppress_envoy_headers = 23;
-
   // Via header value to append to request and response headers.
-  string via = 24;
+  string via = 22;
 
   // Whether the connection manager will generate the :ref:`x-request-id
   // <config_http_conn_man_headers_x-request-id>` header if it does not exist. This defaults to
