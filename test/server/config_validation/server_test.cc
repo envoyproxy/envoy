@@ -58,8 +58,7 @@ TEST_P(ValidationServerTest, Validate) {
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
 // as-is.
 INSTANTIATE_TEST_CASE_P(ValidConfigs, ValidationServerTest,
-                        ::testing::Values("front-envoy.yaml", "google_com_proxy.json",
-                                          "google_com_proxy.yaml", "google_com_proxy.v2.yaml",
+                        ::testing::Values("front-envoy.yaml", "google_com_proxy.v2.yaml",
                                           "s2s-grpc-envoy.yaml", "service-envoy.yaml"));
 
 // Just make sure that all configs can be ingested without a crash. Processing of config files
