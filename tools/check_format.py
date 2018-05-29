@@ -61,7 +61,8 @@ def checkNamespace(file_path):
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
-  return any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST)
+  return (file_path.endswith(PROTO_SUFFIX) or
+          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -132,8 +133,7 @@ def checkOrFixFileContents(file_path, try_to_fix):
     # Some errors cannot be fixed automatically, and actionable, consistent,
     # navigable messages should be emitted to make it easy to find and fix
     # the errors by hand.
-    if not whitelistedForProtobufDeps(file_path) and not file_path.endswith(PROTO_SUFFIX):
-
+    if not whitelistedForProtobufDeps(file_path):
       if isBuild:
         if '"protobuf"' in text:
           reportError("unexpected direct external dependency on protobuf, use "
