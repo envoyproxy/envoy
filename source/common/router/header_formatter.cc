@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
 
@@ -112,33 +113,6 @@ parseUpstreamMetadataField(absl::string_view params_str) {
   };
 }
 
-std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
-parseStartTimeField(absl::string_view params_str, DateFormatterSharedPtr& date_formatter) {
-  params_str = StringUtil::trim(params_str);
-  std::string format;
-  if (!params_str.empty()) {
-    if (params_str.front() != '(' || params_str.back() != ')') {
-      throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
-                                       "START_TIME or START_TIME(%s ...), actual format "
-                                       "START_TIME{}",
-                                       params_str));
-    }
-    format = std::string(params_str.substr(1, params_str.size() - 2)); // trim parens
-  }
-
-  if (!format.empty()) {
-    date_formatter.reset(new Envoy::DateFormatter(format));
-  }
-
-  return
-      [format, date_formatter](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-        if (format.empty()) {
-          return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
-        }
-        return date_formatter->fromTime(request_info.startTime());
-      };
-}
-
 } // namespace
 
 RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_name, bool append)
@@ -162,8 +136,13 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
           *request_info.downstreamLocalAddress());
     };
   } else if (field_name.find("START_TIME") == 0) {
-    field_extractor_ =
-        parseStartTimeField(field_name.substr(STATIC_STRLEN("START_TIME")), date_formatter_);
+    field_extractor_ = [field_name](const Envoy::RequestInfo::RequestInfo& request_info) {
+      const auto formatters =
+          AccessLog::AccessLogFormatParser::parse(fmt::format("%{}%", field_name));
+      ASSERT(formatters.size() == 1);
+      Http::HeaderMapImpl empty_map;
+      return formatters.at(0)->format(empty_map, empty_map, empty_map, request_info);
+    };
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
