@@ -180,7 +180,7 @@ message HttpConnectionManager {
   // Do not consider requests to ever be of internal provenance.
   bool external_only = 22;
 
-  // Do not add any additional *x-envoy-*` headers to requests or responses.
+  // Do not add any additional *x-envoy-* headers to requests or responses.
   bool suppress_envoy_headers = 23;
 
   // Via header value to append to request and response headers.
