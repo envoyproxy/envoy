@@ -27,7 +27,9 @@ namespace {
 
 class SubsecondConstantValues {
 public:
-  const std::string PLACEHOLDER{"000000000"};
+  const size_t DEFAULT_SECONDS_LENGTH{10};
+  const char PLACEHOLDER_CHAR{'?'};
+  const std::string PLACEHOLDER{"?????????"};
   const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
 };
 
@@ -38,7 +40,7 @@ typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
-    std::unordered_map<std::string, std::string> formatted;
+    std::unordered_map<std::string, const std::string> formatted;
   };
   static thread_local CachedTime cached_time;
 
@@ -56,70 +58,35 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
-  if (subseconds_.empty()) {
+  if (subsecond_widths_.empty()) {
     return cached_time.formatted.at(format_string_);
   }
 
   // Copy the cached formatted string, then replace its subseconds part.
   std::string formatted = cached_time.formatted.at(format_string_);
   const std::string value = fmt::FormatInt(epoch_time_ns.count()).str();
-  for (const auto subsecond : subseconds_) {
-    // TODO(dio): Infer the length of second from parsing step. Currently, it is defaulted to 10.
-    formatted.replace(subsecond.position_, subsecond.width_, value.substr(10, subsecond.width_));
+  for (const auto width : subsecond_widths_) {
+    const std::string subsecond =
+        value.substr(SubsecondConstants::get().DEFAULT_SECONDS_LENGTH, width);
+    const size_t placeholder_index = formatted.find(SubsecondConstants::get().PLACEHOLDER_CHAR);
+    ASSERT(placeholder_index != std::string::npos);
+    formatted.replace(placeholder_index, width, subsecond);
   }
 
-  // TODO(dio): Assert the formatted length.
   return formatted;
 }
 
 std::string DateFormatter::parse(const std::string& format_string) {
-  const auto& specifier_begin = std::sregex_iterator(format_string.begin(), format_string.end(),
-                                                     SubsecondConstants::get().PATTERN);
-  const auto& specifier_end = std::sregex_iterator();
-  if (specifier_begin == specifier_end) {
-    return format_string;
+  std::string new_format_string = format_string;
+  std::smatch result;
+  while (regex_search(new_format_string, result, SubsecondConstants::get().PATTERN)) {
+    const std::string& width_specifier = result[1];
+    const size_t width = width_specifier.empty() ? SubsecondConstants::get().PLACEHOLDER.size()
+                                                 : width_specifier.at(0) - '0';
+    subsecond_widths_.emplace_back(width);
+    new_format_string.replace(result.position(), result.length(),
+                              SubsecondConstants::get().PLACEHOLDER.substr(0, width));
   }
-
-  std::string new_format_string = EMPTY_STRING;
-  subseconds_.reserve(std::distance(specifier_begin, specifier_end));
-
-  auto now = std::chrono::system_clock::now();
-  time_t current_time = std::chrono::system_clock::to_time_t(now);
-  tm current_tm;
-  gmtime_r(&current_time, &current_tm);
-
-  size_t start = 0;
-  int32_t delta = 0;
-  int32_t inner_delta = 0;
-  std::array<char, 1024> buf;
-  for (std::sregex_iterator i = specifier_begin; i != specifier_end; ++i) {
-    const std::smatch& match = *i;
-
-    const std::string piece = format_string.substr(start, match.position() - start);
-    const size_t formatted_length = strftime(&buf[0], buf.size(), piece.c_str(), &current_tm);
-    delta += static_cast<int32_t>(formatted_length - piece.size()) + inner_delta;
-    start = match.position() + match.length();
-
-    // Save a subsecond's position and width inside the rendered format string.
-    SubsecondSpecifier subsecond(match.position() + delta);
-    const std::string match_str = match[1].str();
-    if (!match_str.empty()) {
-      subsecond.width_ = match_str.at(0) - '0';
-    }
-    subseconds_.emplace_back(subsecond);
-
-    absl::StrAppend(&new_format_string, piece,
-                    SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
-
-    // This takes into account the difference between the specifier length and the desired
-    // rendered width.
-    inner_delta = static_cast<int32_t>(subsecond.width_ - match.length());
-  }
-
-  if (start < format_string.size()) {
-    absl::StrAppend(&new_format_string, format_string.substr(start));
-  }
-
   return new_format_string;
 }
 

@@ -49,16 +49,7 @@ public:
 
 private:
   std::string parse(const std::string& format_string);
-
-  struct SubsecondSpecifier {
-    // The default subsecond width specifier is 9 digits (nanoseconds).
-    SubsecondSpecifier(const size_t position, size_t width = 9)
-        : position_(position), width_(width) {}
-
-    const size_t position_;
-    size_t width_;
-  };
-  std::vector<SubsecondSpecifier> subseconds_;
+  std::vector<size_t> subsecond_widths_;
 
   const std::string format_string_;
 };
