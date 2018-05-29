@@ -474,9 +474,9 @@ Supported variable names are:
     parameters **do not** need to be escaped by doubling them.
 
 %START_TIME%
-    Request start time including milliseconds. START_TIME can be customized as mentioned in
+    Request start time. START_TIME can be customized with specifiers as specified in
     :ref:`access log format rules<config_access_log_format_start_time>`. An example of setting a custom header with
-    timestamp since epoch in milliseconds is:
+    current time in seconds with the milliseconds resolution:
 
 .. code-block:: none
 
@@ -485,5 +485,5 @@ Supported variable names are:
     request_headers_to_add:
       - header:
           key: "x-request-start"
-          value: "%START_TIME(%s%3f)%"
+          value: "%START_TIME(%s.%3f)%"
         append: true

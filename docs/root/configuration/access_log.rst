@@ -39,16 +39,32 @@ The following command operators are supported:
     Downstream connection start time including milliseconds.
 
   START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_.
-  In addition to that, START_TIME also accepts :code:`%f` to get the subsecond digits. The default is 9 digits (nanosecond).
-  The number of digits can be specified by specifiying the digit number after :code:`%`, e.g. :code:`%3f` to get 3 digits.
+  In addition to that, START_TIME also accepts following specifiers:
+
+  +------------------------+--------------------------------------------------------------+
+  | Specifier              | Explanation                                                  |
+  +========================+==============================================================+
+  | ``%s``                 | The number of seconds since the Epoch.                       |
+  +------------------------+--------------------------------------------------------------+
+  | ``%f``, ``%{:digit}f`` | Fractional seconds digits, default is 9 digits (nanosecond). |
+  |                        +--------------------------------------------------------------+
+  |                        | - ``%3f`` millisecond (3 digits).                            |
+  |                        | - ``%6f`` microsecond (6 digits).                            |
+  |                        | - ``%9f`` nanosecond (9 digits).                             |
+  +------------------------+--------------------------------------------------------------+
 
   Examples of formatting START_TIME is as follows:
 
-.. code-block:: none
+  .. code-block:: none
 
-  %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+    %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
 
-  %START_TIME(%s%3f)%
+    # To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
+    %START_TIME(%s.%3f)%
+
+    %START_TIME(%s.%6f)%
+
+    %START_TIME(%s.%9f)%
 
 %BYTES_RECEIVED%
   HTTP

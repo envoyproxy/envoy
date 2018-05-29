@@ -3,7 +3,6 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/http/protocol.h"
 
-#include "common/access_log/access_log_formatter.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
 #include "common/router/header_formatter.h"
