@@ -46,7 +46,7 @@ The following command operators are supported:
   +========================+=============================================================+
   | ``%s``                 | The number of seconds since the Epoch                       |
   +------------------------+-------------------------------------------------------------+
-  | ``%f``, ``%{:digit}f`` | Fractional seconds digits, default is 9 digits (nanosecond) |
+  | ``%f``, ``%[1-9]f``    | Fractional seconds digits, default is 9 digits (nanosecond) |
   |                        +-------------------------------------------------------------+
   |                        | - ``%3f`` millisecond (3 digits)                            |
   |                        | - ``%6f`` microsecond (6 digits)                            |
