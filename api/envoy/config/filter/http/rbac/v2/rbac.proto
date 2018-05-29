@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.rbac.v2;
+option go_package = "v2";
+
+import "envoy/config/rbac/v2alpha/rbac.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: RBAC]
+// Role-Based Access Control :ref:`configuration overview <config_http_filters_rbac>`.
+
+message RBAC {
+  // Specify the RBAC rules to be applied globally
+  config.rbac.v2alpha.RBAC rules = 1 [(validate.rules).message.required = true];
+}
+
+message RBACPerRoute {
+  oneof override {
+    option (validate.required) = true;
+
+    // Disable the filter for this particular vhost or route.
+    bool disabled = 1 [(validate.rules).bool.const = true];
+
+    // Override the global configuration of the filter with this new config.
+    RBAC rbac = 2 [(validate.rules).message.required = true];
+  }
+}
