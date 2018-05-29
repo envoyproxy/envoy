@@ -30,8 +30,8 @@ message ClusterStatus {
   repeated HostStatus host_statuses = 4;
 }
 
-// Cluster outlier detection statistics. -1 for any of these statistics denotes that there was not
-// enough data to compute it.
+// :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics. -1 for any of
+// these statistics denotes that there was not enough data to compute it.
 message OutlierInfo {
   // The average success rate of the hosts in the Detector for the last aggregation interval.
   //
