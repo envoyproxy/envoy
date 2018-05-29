@@ -20,8 +20,8 @@ src = os.path.join(tools, 'testdata', 'check_format')
 check_format = os.path.join(tools, 'check_format.py')
 errors = 0
 
-# Runs an OS command, returning exit status and the captured stdout as
-# a string array, printing the results.
+# Echoes and runs an OS command, returning exit status and the captured
+# stdout+stderr as a string array.
 def runCommand(command):
   stdout = []
   status = 0
@@ -33,7 +33,6 @@ def runCommand(command):
     status = e.returncode
     for line in e.output.splitlines():
       stdout.append(line)
-  sep = "\n    "
   print("%s" % command)
   return status, stdout
 
