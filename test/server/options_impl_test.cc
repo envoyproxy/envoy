@@ -34,18 +34,19 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
       argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
 }
 
-// There's an evil static local in Stats::RawStatsData::initializeAndGetMutableMaxObjNameLength,
-// which is a virus for tests. This evil hack is an anti-biotic; cures the symptom for now
-// but will surely breed a more resistant virus in the long term.
-void resetStatsSize() {
-  auto options = createOptionsImpl("envoy");
-  Stats::RawStatData::configureForTestsOnly(*options);
-}
-
 } // namespace
 
 TEST(OptionsImplTest, HotRestartVersion) {
-  resetStatsSize();
+  // There's an evil static local in
+  // Stats::RawStatsData::initializeAndGetMutableMaxObjNameLength, which causes
+  // problems when all test.cc files are linked together for coverage-testing.
+  // This resets the static to the default options-value of 60. Note; this is only
+  // needed in coverage tests.
+  {
+    auto options = createOptionsImpl("envoy");
+    Stats::RawStatData::configureForTestsOnly(*options);
+  }
+
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
                           "NoServingException");
 }
