@@ -229,7 +229,8 @@ message PerRouteConfig {
 // require jwt authentication from [jwt_issuer1, jwt_issuer2] and jwt_issuer2 has audiences
 // override defined.
 message RequirementRule {
-  // The route matching parameter.  Only match is satisfied, the other fields will apply.
+  // The route matching parameter. Only when the match is satisfied, the "requires" field will
+  // apply.
   //
   // For example: following match will match all requests.
   //
