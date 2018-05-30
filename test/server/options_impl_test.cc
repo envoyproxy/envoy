@@ -18,6 +18,7 @@
 using testing::HasSubstr;
 
 namespace Envoy {
+
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
@@ -32,30 +33,17 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
 }
 
 TEST(OptionsImplTest, HotRestartVersion) {
-  try {
-    createOptionsImpl("envoy --hot-restart-version");
-    FAIL();
-  } catch (const NoServingException& e) {
-    SUCCEED();
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
+                          "NoServingException");
 }
 
 TEST(OptionsImplTest, InvalidMode) {
-  try {
-    createOptionsImpl("envoy --mode bogus");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("bogus"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --mode bogus"), MalformedArgvException, "bogus");
 }
 
 TEST(OptionsImplTest, InvalidCommandLine) {
-  try {
-    createOptionsImpl("envoy --blah");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("Couldn't find match for argument"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --blah"), MalformedArgvException,
+                          "Couldn't find match for argument");
 }
 
 TEST(OptionsImplTest, All) {
@@ -143,20 +131,18 @@ TEST(OptionsImplTest, DefaultParams) {
 }
 
 TEST(OptionsImplTest, BadCliOption) {
-  try {
-    createOptionsImpl("envoy -c hello --local-address-ip-version foo");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("error: unknown IP address version 'foo'"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
+                          MalformedArgvException, "error: unknown IP address version 'foo'");
 }
 
 TEST(OptionsImplTest, BadObjNameLenOption) {
-  try {
-    createOptionsImpl("envoy --max-obj-name-len 1");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("'max-obj-name-len' value specified"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
+                          "'max-obj-name-len' value specified");
 }
+
+TEST(OptionsImplTest, BadMaxStatsOption) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
+                          "'max-stats' value specified");
+}
+
 } // namespace Envoy

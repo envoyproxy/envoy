@@ -18,5 +18,6 @@ HTTP filters
   ip_tagging_filter
   lua_filter
   rate_limit_filter
+  rbac_filter
   router_filter
   squash_filter
