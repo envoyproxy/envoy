@@ -51,6 +51,8 @@ public:
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
+  MOCK_CONST_METHOD0(skipXffAppend, bool());
+  MOCK_CONST_METHOD0(via, const std::string&());
   MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
                      const std::vector<Http::ClientCertDetailsType>&());
@@ -69,6 +71,8 @@ public:
 
     tracing_config_ = {Tracing::OperationName::Ingress, {}};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
+
+    ON_CALL(config_, via()).WillByDefault(ReturnRef(""));
   }
 
   struct MutateRequestRet {
