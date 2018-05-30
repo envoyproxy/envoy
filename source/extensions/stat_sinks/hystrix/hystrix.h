@@ -22,12 +22,6 @@ struct ClusterStatsCache {
   // the lookup.
   ClusterStatsCache(const std::string& cluster_name);
 
-  std::string upstream_rq_2xx_name_;
-  std::string upstream_rq_4xx_name_;
-  std::string retry_upstream_rq_4xx_name_;
-  std::string upstream_rq_5xx_name_;
-  std::string retry_upstream_rq_5xx_name_;
-
   std::string errors_name_;
   std::string success_name_;
   std::string total_name_;
@@ -82,8 +76,7 @@ public:
   /**
    * Calculate values needed to create the stream and write into the map.
    */
-  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
-                              Stats::Store& stats);
+  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info);
   /**
    * Clear map.
    */

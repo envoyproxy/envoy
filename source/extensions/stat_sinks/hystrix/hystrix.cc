@@ -21,12 +21,6 @@ const uint64_t HystrixSink::DEFAULT_NUM_OF_BUCKETS;
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name) {
   const std::string cluster_name_with_prefix = absl::StrCat("cluster.", cluster_name, ".");
 
-  upstream_rq_2xx_name_ = absl::StrCat(cluster_name_with_prefix, "upstream_rq_2xx");
-  upstream_rq_4xx_name_ = absl::StrCat(cluster_name_with_prefix, "upstream_rq_4xx");
-  retry_upstream_rq_4xx_name_ = absl::StrCat(cluster_name_with_prefix, "retry.upstream_rq_4xx");
-  upstream_rq_5xx_name_ = absl::StrCat(cluster_name_with_prefix, "upstream_rq_5xx");
-  retry_upstream_rq_5xx_name_ = absl::StrCat(cluster_name_with_prefix, "retry.upstream_rq_5xx");
-
   errors_name_ = absl::StrCat(cluster_name_with_prefix, "errors");
   success_name_ = absl::StrCat(cluster_name_with_prefix, "success");
   total_name_ = absl::StrCat(cluster_name_with_prefix, "total");
@@ -57,14 +51,12 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
   }
 }
 
-void HystrixSink::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
-                                         Stats::Store& stats) {
+void HystrixSink::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info) {
   const std::string cluster_name = cluster_info->name();
   Upstream::ClusterStats& cluster_stats = cluster_info->stats();
+  Stats::Scope& cluster_stats_scope = cluster_info->statsScope();
 
   if (cluster_stats_cache_map_.find(cluster_name) == cluster_stats_cache_map_.end()) {
-    // ClusterStatsCache cluster_stats_cache_inst(cluster_name);
-    // cluster_stats_cache_map_[cluster_name] = cluster_stats_cache_inst;
     cluster_stats_cache_map_[cluster_name] = std::make_unique<ClusterStatsCache>(cluster_name);
   }
 
@@ -81,15 +73,15 @@ void HystrixSink::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr clu
   // (alternative: each request including the retries counted as 1)
   // since timeouts are 504 (or 408), deduce them from here ("-" sign).
   // Timeout retries were not counted here anyway.
-  uint64_t errors = stats.counter(cluster_stats_cache.upstream_rq_5xx_name_).value() +
-                    stats.counter(cluster_stats_cache.retry_upstream_rq_5xx_name_).value() +
-                    stats.counter(cluster_stats_cache.upstream_rq_4xx_name_).value() +
-                    stats.counter(cluster_stats_cache.retry_upstream_rq_4xx_name_).value() -
+  uint64_t errors = cluster_stats_scope.counter("upstream_rq_5xx").value() +
+                    cluster_stats_scope.counter("retry.upstream_rq_5xx").value() +
+                    cluster_stats_scope.counter("upstream_rq_4xx").value() +
+                    cluster_stats_scope.counter("retry.upstream_rq_4xx").value() -
                     cluster_stats.upstream_rq_timeout_.value();
 
   pushNewValue(cluster_stats_cache.errors_, errors);
 
-  uint64_t success = stats.counter(cluster_stats_cache.upstream_rq_2xx_name_).value();
+  uint64_t success = cluster_stats_scope.counter("upstream_rq_2xx").value();
   pushNewValue(cluster_stats_cache.success_, success);
 
   uint64_t rejected = cluster_stats.upstream_rq_pending_overflow_.value();
@@ -227,6 +219,7 @@ void HystrixSink::addHystrixThreadPool(absl::string_view cluster_name, uint64_t 
 void HystrixSink::getClusterStats(absl::string_view cluster_name, uint64_t max_concurrent_requests,
                                   uint64_t reporting_hosts, uint64_t rolling_window,
                                   std::stringstream& ss) {
+
   addHystrixCommand(cluster_name, max_concurrent_requests, reporting_hosts, rolling_window, ss);
   addHystrixThreadPool(cluster_name, max_concurrent_requests, reporting_hosts, rolling_window, ss);
 }
@@ -322,21 +315,32 @@ void HystrixSink::flush(Stats::Source&) {
   if (callbacks_list_.empty())
     return;
   incCounter();
-  for (auto& cluster : server_.clusterManager().clusters()) {
-    updateRollingWindowMap(cluster.second.get().info(), server_.stats());
+  Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
+  for (auto& cluster : clusters) {
+    updateRollingWindowMap(cluster.second.get().info());
   }
+  // check if any clusters were removed, and remove from cache
+  if (clusters.size() < cluster_stats_cache_map_.size()) {
+    std::vector<std::string> clusters_to_remove;
+    for (auto& itr : cluster_stats_cache_map_) {
+      std::string name = itr.first;
+      if (clusters.find(name) != clusters.end()) {
+      } else {
+        clusters_to_remove.emplace_back(name);
+      }
+    }
+    for (std::string name : clusters_to_remove) {
+      cluster_stats_cache_map_.erase(name);
+    }
+  }
+
   std::stringstream ss;
-  for (auto& cluster : server_.clusterManager().clusters()) {
+  for (auto& cluster : clusters) {
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
     getClusterStats(
-        cluster.second.get().info()->name(),
-        cluster.second.get()
-            .info()
-            ->resourceManager(Upstream::ResourcePriority::Default)
-            .pendingRequests()
-            .max(),
-        server_.stats()
-            .gauge("cluster." + cluster.second.get().info()->name() + ".membership_total")
-            .value(),
+        cluster_info->name(),
+        cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
+        cluster_info->statsScope().gauge("membership_total").value(),
         server_.statsFlushInterval().count(), ss);
   }
   Buffer::OwnedImpl data;
@@ -359,12 +363,10 @@ void HystrixSink::registerConnection(Http::StreamDecoderFilterCallbacks* callbac
 }
 
 void HystrixSink::unregisterConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_remove) {
-  for (auto it = callbacks_list_.begin(); it != callbacks_list_.end();) {
+  for (auto it = callbacks_list_.begin(); it != callbacks_list_.end(); ++it) {
     if ((*it)->streamId() == callbacks_to_remove->streamId()) {
-      it = callbacks_list_.erase(it);
+      callbacks_list_.erase(it);
       break;
-    } else {
-      ++it;
     }
   }
 }
