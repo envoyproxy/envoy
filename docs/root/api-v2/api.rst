@@ -13,7 +13,7 @@ v2 API reference
   http_routes/http_routes
   config/config
   admin/admin
-  output/output
+  data/data
   service/service
   common_messages/common_messages
   types/types

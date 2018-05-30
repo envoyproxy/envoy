@@ -1,5 +1,5 @@
-Envoy outputs
-=============
+Envoy data
+==========
 
 .. toctree::
   :glob:

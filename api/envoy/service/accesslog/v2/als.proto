@@ -5,7 +5,7 @@ option go_package = "v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/output/accesslog/v2/accesslog.proto";
+import "envoy/data/accesslog/v2/accesslog.proto";
 
 import "validate/validate.proto";
 
@@ -45,14 +45,14 @@ message StreamAccessLogsMessage {
 
   // Wrapper for batches of HTTP access log entries.
   message HTTPAccessLogEntries {
-    repeated envoy.output.accesslog.v2.HTTPAccessLogEntry log_entry = 1
+    repeated envoy.data.accesslog.v2.HTTPAccessLogEntry log_entry = 1
         [(validate.rules).repeated .min_items = 1];
   }
 
   // [#not-implemented-hide:]
   // Wrapper for batches of TCP access log entries.
   message TCPAccessLogEntries {
-    repeated envoy.output.accesslog.v2.TCPAccessLogEntry log_entry = 1
+    repeated envoy.data.accesslog.v2.TCPAccessLogEntry log_entry = 1
         [(validate.rules).repeated .min_items = 1];
   }
 

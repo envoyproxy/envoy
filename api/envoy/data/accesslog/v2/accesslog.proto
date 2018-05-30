@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.output.accesslog.v2;
+package envoy.data.accesslog.v2;
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
