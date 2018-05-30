@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/options_impl.h"
 
@@ -19,6 +20,8 @@ using testing::HasSubstr;
 
 namespace Envoy {
 
+namespace {
+
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
@@ -27,12 +30,22 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
   for (const std::string& s : words) {
     argv.push_back(s.c_str());
   }
-  return std::unique_ptr<OptionsImpl>(new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]),
-                                                      [](uint64_t, uint64_t, bool) { return "1"; },
-                                                      spdlog::level::warn));
+  return std::make_unique<OptionsImpl>(
+      argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
 }
 
+// There's an evil static local in Stats::RawStatsData::initializeAndGetMutableMaxObjNameLength,
+// which is a virus for tests. This evil hack is an anti-biotic; cures the symptom for now
+// but will surely breed a more resistant virus in the long term.
+void resetStatsSize() {
+  auto options = createOptionsImpl("envoy");
+  Stats::RawStatData::configureForTestsOnly(*options);
+}
+
+} // namespace
+
 TEST(OptionsImplTest, HotRestartVersion) {
+  resetStatsSize();
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
                           "NoServingException");
 }
