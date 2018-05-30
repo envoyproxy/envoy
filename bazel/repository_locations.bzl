@@ -60,7 +60,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
+        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
