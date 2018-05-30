@@ -52,7 +52,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_py",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_py",
     ],
 )
 
@@ -403,7 +403,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 

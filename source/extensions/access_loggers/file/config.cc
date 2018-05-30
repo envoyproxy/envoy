@@ -1,6 +1,6 @@
 #include "extensions/access_loggers/file/config.h"
 
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
+#include "envoy/config/accesslog/v2/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -20,8 +20,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                               AccessLog::FilterPtr&& filter,
                                               Server::Configuration::FactoryContext& context) {
   const auto& fal_config =
-      MessageUtil::downcastAndValidate<const envoy::config::filter::accesslog::v2::FileAccessLog&>(
-          config);
+      MessageUtil::downcastAndValidate<const envoy::config::accesslog::v2::FileAccessLog&>(config);
   AccessLog::FormatterPtr formatter;
   if (fal_config.format().empty()) {
     formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
@@ -33,7 +32,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 }
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new envoy::config::filter::accesslog::v2::FileAccessLog()};
+  return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return AccessLogNames::get().FILE; }

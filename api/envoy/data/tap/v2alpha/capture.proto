@@ -4,7 +4,7 @@ syntax = "proto3";
 // Trace capture format for the capture transport socket extension. This dumps plain text read/write
 // sequences on a socket.
 
-package envoy.extensions.common.tap.v2alpha;
+package envoy.data.tap.v2alpha;
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";

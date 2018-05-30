@@ -11,10 +11,9 @@ v2 API reference
   listeners/listeners
   clusters/clusters
   http_routes/http_routes
-  config/filter/filter
-  config/health_checker/health_checker
-  config/rbac/rbac
-  config/transport_socket/transport_socket
+  config/config
   admin/admin
+  data/data
+  service/service
   common_messages/common_messages
   types/types

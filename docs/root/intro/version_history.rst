@@ -4,11 +4,13 @@ Version history
 1.7.0 (Pending)
 ===============
 
-* access log: ability to log response trailers
-* access log: ability to format START_TIME
+* access log: added ability to log response trailers.
+* access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
-  to filter logs based on request headers
+  to filter logs based on request headers.
+* access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
+  <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.

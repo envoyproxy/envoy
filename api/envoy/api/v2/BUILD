@@ -11,7 +11,7 @@ package_group(
         "//envoy/admin/...",
         "//envoy/api/v2",
         "//envoy/config/...",
-        "//envoy/extensions/...",
+        "//envoy/data/...",
         "//envoy/service/...",
     ],
 )
