@@ -490,7 +490,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
 
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("foo", response_headers.get_("custom_header"));
@@ -503,7 +503,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 

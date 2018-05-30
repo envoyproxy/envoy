@@ -864,7 +864,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_, "");
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -903,7 +903,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+                                                  connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.

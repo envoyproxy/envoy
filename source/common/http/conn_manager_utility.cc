@@ -266,12 +266,17 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers) {
+                                                     const Http::HeaderMap& request_headers,
+                                                     const std::string& via) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
+  }
+
+  if (!via.empty()) {
+    Utility::appendVia(response_headers, via);
   }
 }
 
