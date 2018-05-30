@@ -319,6 +319,18 @@ TEST(RouteMatcherTest, TestRoutes) {
     EXPECT_EQ("www2", route->virtualHost().name());
     route->finalizeRequestHeaders(headers, request_info, true);
     EXPECT_EQ("/api/new_endpoint/foo", headers.get_(Http::Headers::get().Path));
+    EXPECT_EQ("/new_endpoint/foo", headers.get_(Http::Headers::get().EnvoyOriginalPath));
+  }
+
+  // Prefix rewrite testing (x-envoy-* headers suppressed).
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/new_endpoint/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    EXPECT_EQ("www2", route->clusterName());
+    EXPECT_EQ("www2", route->virtualHost().name());
+    route->finalizeRequestHeaders(headers, request_info, false);
+    EXPECT_EQ("/api/new_endpoint/foo", headers.get_(Http::Headers::get().Path));
+    EXPECT_FALSE(headers.has(Http::Headers::get().EnvoyOriginalPath));
   }
 
   // Prefix rewrite on path match with query string params

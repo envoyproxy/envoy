@@ -72,7 +72,7 @@ public:
     tracing_config_ = {Tracing::OperationName::Ingress, {}};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
-    ON_CALL(config_, via()).WillByDefault(ReturnRef(""));
+    ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
   }
 
   struct MutateRequestRet {
@@ -106,7 +106,8 @@ public:
   Http::TracingConnectionManagerConfig tracing_config_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::string canary_node_{"canary"};
-  std::string empty_node_{""};
+  std::string empty_node_;
+  std::string via_;
 };
 
 // Verify external request and XFF is set when we are using remote address and the address is
@@ -120,6 +121,32 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(connection_.remote_address_->ip()->addressAsString(),
             headers.get_(Headers::get().ForwardedFor));
+}
+
+// Verify that we don't append XFF when skipXffAppend(), even if using remote
+// address and where the address is external.
+TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_FALSE(headers.has(Headers::get().ForwardedFor));
+}
+
+// Verify that we pass-thru XFF when skipAffAppend(), even if using remote
+// address and where the address is external.
+TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
+  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
 }
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
@@ -155,6 +182,40 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"198.51.100.2:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_EQ(headers.EnvoyExternalAddress(), nullptr);
+}
+
+// Verify that we don't set the via header on requests/responses when empty.
+TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  TestHeaderMapImpl request_headers;
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(request_headers, Protocol::Http2));
+  EXPECT_FALSE(request_headers.has(Headers::get().Via));
+
+  TestHeaderMapImpl response_headers;
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  EXPECT_FALSE(response_headers.has(Headers::get().Via));
+}
+
+// Verify that we append a non-empty via header on requests/responses.
+TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
+  via_ = "foo";
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  TestHeaderMapImpl request_headers;
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(request_headers, Protocol::Http2));
+  EXPECT_EQ("foo", request_headers.get_(Headers::get().Via));
+
+  TestHeaderMapImpl response_headers;
+  // Pretend we're doing a 100-continue transform here.
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  // The actual response header processing.
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  EXPECT_EQ("foo", response_headers.get_(Headers::get().Via));
 }
 
 // Verify that we don't set user agent when it is already set.
@@ -495,6 +556,7 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("foo", response_headers.get_("custom_header"));
   EXPECT_FALSE(response_headers.has("x-request-id"));
+  EXPECT_FALSE(response_headers.has(Headers::get().Via));
 }
 
 // Test that we correctly return x-request-id if we were requested to force a trace.

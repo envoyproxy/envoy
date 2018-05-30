@@ -1,4 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/config/metadata.h"
@@ -101,10 +102,14 @@ route_config:
 
 } // namespace
 
-class HeaderIntegrationTest : public HttpIntegrationTest,
-                              public testing::TestWithParam<Network::Address::IpVersion> {
+class HeaderIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
 public:
-  HeaderIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HeaderIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
+
+  bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
   enum HeaderMode {
     Append = 1,
@@ -187,6 +192,9 @@ public:
                 hcm) {
           // Overwrite default config with our own.
           MessageUtil::loadFromYaml(http_connection_mgr_config, hcm);
+          envoy::config::filter::http::router::v2::Router router_config;
+          router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
+          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config());
 
           const bool append = mode == HeaderMode::Append;
 
@@ -297,7 +305,7 @@ public:
                         test.namespace:
                           key: metadata-value
               )EOF",
-                Network::Test::getLoopbackAddressString(GetParam()),
+                Network::Test::getLoopbackAddressString(std::get<0>(GetParam())),
                 fake_upstreams_[0]->localAddress()->ip()->port()));
 
         discovery_response.add_resources()->PackFrom(cluster_load_assignment);
@@ -333,8 +341,10 @@ protected:
                       Http::TestHeaderMapImpl& expected_headers) {
     headers.remove(Envoy::Http::LowerCaseString{"content-length"});
     headers.remove(Envoy::Http::LowerCaseString{"date"});
-    headers.remove(Envoy::Http::LowerCaseString{"x-envoy-expected-rq-timeout-ms"});
-    headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
+    if (!routerSuppressEnvoyHeaders()) {
+      headers.remove(Envoy::Http::LowerCaseString{"x-envoy-expected-rq-timeout-ms"});
+      headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
+    }
     headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-proto"});
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
@@ -347,9 +357,9 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HeaderIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                         testing::Bool()));
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
