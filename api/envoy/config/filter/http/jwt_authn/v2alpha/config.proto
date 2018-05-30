@@ -204,20 +204,30 @@ message PerRouteConfig {
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
-// For example:
+// Example 1:
 //
 // .. code-block:: yaml
 //
 //    - match:
 //         prefix: "/healthz"
+//
+// In above example, There is no "requires" field for /healthz prefix match,
+// it means that requrests matched the path prefix don't require jwt authentication.
+//
+// Example 2:
+//
+// .. code-block:: yaml
+//
 //    - match:
 //         prefix: "/"
-//      - requires:
-//          issuer: jwt_issuer1
-//      - requires:
-//          issuer: jwt_issuer2
-//          audiences: [audience1, audience2]
+//      requires:
+//         - issuer: jwt_issuer1
+//         - issuer: jwt_issuer2
+//           audiences: [audience1, audience2]
 //
+// In above example, all requests (all requests matched "/" path prefix),
+// require jwt authentication from [jwt_issuer1, jwt_issuer2] and jwt_issuer2 has audiences
+// override defined.
 message RequirementRule {
   // The route matching parameter.  Only match is satisfied, the other fields will apply.
   //
@@ -244,41 +254,56 @@ message RequirementRule {
 //
 // .. code-block:: yaml
 //
-//    - providers:
-//        issuer: issuer1
+//   providers:
+//      - issuer: issuer1
 //        audiences:
 //        - audience1
-//          audience2
+//        - audience2
 //        remote_jwks:
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
-//    - providers:
-//        issuer: issuer2
-//        audiences:
+//      - issuer: issuer2
 //        local_jwks:
 //          inline_string: jwks_string
-//    # Not jwt verification is required for /health path
-//    - rules:
-//        match:
+//
+//   rules:
+//      # Not jwt verification is required for /health path
+//      - match:
 //          prefix: "/health"
-//    # Jwt verification for issuer1 is required for path prefixed with "prefix"
-//    - rules:
-//        match:
+//
+//      # Jwt verification for issuer1 is required for path prefixed with "prefix"
+//      - match:
 //          prefix: "/prefix"
-//        - requires:
-//            issuer: issuer1
+//        requires:
+//          - issuer: issuer1
 //            audiences: [audience_override]
+//
 //    # Jwt verification for issuer2 is required for all other requests.
-//    - rules:
-//        match:
+//      - match:
 //          prefix: "/"
-//        - requires:
-//            issuer: issuer2
+//        requires:
+//          - issuer: issuer2
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
-  // List of JWT providers.
+  // List of JWT providers. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   providers:
+  //      - issuer: issuer1
+  //        audiences:
+  //        - audience1
+  //        - audience2
+  //        remote_jwks:
+  //          http_uri:
+  //            uri: https://example.com/.well-known/jwks.json
+  //            cluster: example_jwks_cluster
+  //      - issuer: issuer2
+  //        local_jwks:
+  //          inline_string: jwks_string
+  //
   repeated JwtProvider providers = 1;
 
   // DEPRECATED: Please use "routes" field. if "routes" field is not empty,
@@ -295,14 +320,13 @@ message JwtAuthentication {
   //
   // .. code-block:: yaml
   //
-  //    - rules:
-  //      match:
-  //         prefix: "/healthz"
-  //    - rules:
-  //      match:
-  //         prefix: "/"
-  //      - requires:
-  //         issuer: issuer1
+  // rules:
+  //   - match:
+  //       prefix: "/healthz"
+  //   - match:
+  //       prefix: "/"
+  //     requires:
+  //       - issuer: issuer1
   //
   repeated RequirementRule rules = 3;
 }
