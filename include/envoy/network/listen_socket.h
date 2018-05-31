@@ -157,6 +157,17 @@ public:
   virtual absl::string_view detectedTransportProtocol() const PURE;
 
   /**
+   * Set requested application protocol(s) (e.g. ALPN in TLS).
+   */
+  virtual void
+  setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocol) PURE;
+
+  /**
+   * @return requested application protocol(s) (e.g. ALPN in TLS), if any.
+   */
+  virtual const std::vector<std::string>& requestedApplicationProtocols() const PURE;
+
+  /**
    * Set requested server name (e.g. SNI in TLS).
    */
   virtual void setRequestedServerName(absl::string_view server_name) PURE;

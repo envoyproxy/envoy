@@ -125,7 +125,7 @@ public:
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
   RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
-  std::chrono::milliseconds statsFlushInterval() override { return stats_flush_interval_; }
+  std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
   std::chrono::milliseconds wdMegaMissTimeout() const override {
     return watchdog_megamiss_timeout_;

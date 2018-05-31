@@ -220,6 +220,11 @@ public:
    * Returns the cumulative histogram summary statistics.
    */
   virtual const HistogramStatistics& cumulativeStatistics() const PURE;
+
+  /**
+   * Returns the summary representation.
+   */
+  virtual const std::string summary() const PURE;
 };
 
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;

@@ -135,3 +135,12 @@ envoy_cc_binary(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "lock_guard_test",
+    srcs = ["lock_guard_test.cc"],
+    deps = [
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
+    ],
+)

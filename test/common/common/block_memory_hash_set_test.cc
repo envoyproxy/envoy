@@ -20,11 +20,11 @@ protected:
   struct TestValueBase {
     absl::string_view key() const { return name; }
     void initialize(absl::string_view key) {
-      size_t xfer = std::min(sizeof(name) - 1, key.size());
+      uint64_t xfer = std::min(sizeof(name) - 1, key.size());
       memcpy(name, key.data(), xfer);
       name[xfer] = '\0';
     }
-    static size_t size() { return sizeof(TestValue); }
+    static uint64_t size() { return sizeof(TestValue); }
 
     int64_t number;
     char name[256];
@@ -64,7 +64,7 @@ protected:
     ret = fmt::format("options={}\ncontrol={}\n", hs.control_->options.toString(), control_string);
     for (uint32_t i = 0; i < hs.control_->options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
-      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell) {
+      for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell_index) {
         ret += " " + std::string(hs.getCell(j).value.key());
       }
       ret += "\n";

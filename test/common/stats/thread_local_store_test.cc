@@ -266,6 +266,23 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_CALL(*this, free(_)).Times(5);
 }
 
+// Validate that we sanitize away bad characters in the stats prefix.
+TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
+  EXPECT_CALL(*this, alloc(_));
+  Counter& c1 = scope1->counter("c1");
+  EXPECT_EQ("scope1___foo.c1", c1.name());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow stat.
+  EXPECT_CALL(*this, free(_)).Times(2);
+}
+
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -576,11 +593,19 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   h1.recordValue(1);
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_TRUE(name_histogram_map["h1"]->used());
+  EXPECT_FALSE(name_histogram_map["h1"]->used());
   EXPECT_FALSE(name_histogram_map["h2"]->used());
+
+  // Merge the histograms and validate that h1 is considered used.
+  store_->mergeHistograms([]() -> void {});
+  EXPECT_TRUE(name_histogram_map["h1"]->used());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
   h2.recordValue(2);
+  EXPECT_FALSE(name_histogram_map["h2"]->used());
+
+  // Merge histograms again and validate that both h1 and h2 are used.
+  store_->mergeHistograms([]() -> void {});
 
   for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());

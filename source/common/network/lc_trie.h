@@ -22,6 +22,13 @@ namespace Network {
 namespace LcTrie {
 
 /**
+ * Maximum number of nodes an LC trie can hold.
+ * @note If the size of LcTrieInternal::LcNode::address_ ever changes, this constant
+ *       should be changed to match.
+ */
+constexpr size_t MaxLcTrieNodes = (1 << 20);
+
+/**
  * Level Compressed Trie for tagging IP addresses. Both IPv4 and IPv6 addresses are supported
  * within this class with no calling pattern changes.
  *
@@ -310,15 +317,6 @@ private:
         return;
       }
 
-      // LcNode uses the last 20 bits to store either the index into ip_prefixes_ or trie_.
-      // In theory, the trie_ should only need twice the amount of entries of CIDR ranges.
-      // To prevent index out of bounds issues, only support a maximum of (2^19) CIDR ranges.
-      if (tag_data.size() > MAXIMUM_CIDR_RANGE_ENTRIES) {
-        throw EnvoyException(fmt::format("The input vector has '{0}' CIDR ranges entires. LC-Trie "
-                                         "can only support '{1}' CIDR ranges.",
-                                         tag_data.size(), MAXIMUM_CIDR_RANGE_ENTRIES));
-      }
-
       ip_prefixes_ = tag_data;
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
@@ -555,12 +553,8 @@ private:
     struct LcNode {
       uint32_t branch_ : 5;
       uint32_t skip_ : 7;
-      uint32_t address_ : 20;
+      uint32_t address_ : 20; // If this 20-bit size changes, please change MaxLcTrieNodes too.
     };
-
-    // Refer to LcNode to for further explanation on the current limitations for the maximum number
-    // of CIDR ranges supported and the maximum amount of nodes of supported in the trie.
-    static constexpr uint32_t MAXIMUM_CIDR_RANGE_ENTRIES = (1 << 19);
 
     // During build(), an estimate of the number of nodes required will be made and set this value.
     // This is used to ensure no out_of_range exception is thrown.

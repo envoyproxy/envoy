@@ -1,6 +1,14 @@
+#include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Buffer {
@@ -65,6 +73,65 @@ TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
   buffer.drain(6);
   EXPECT_EQ(0, buffer.length());
   EXPECT_TRUE(release_callback_called_);
+}
+
+TEST_F(OwnedImplTest, write) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("example");
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(7));
+  int rc = buffer.write(-1);
+  EXPECT_EQ(7, rc);
+  EXPECT_EQ(0, buffer.length());
+
+  buffer.add("example");
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(6));
+  rc = buffer.write(-1);
+  EXPECT_EQ(6, rc);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(0));
+  rc = buffer.write(-1);
+  EXPECT_EQ(0, rc);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(-1));
+  rc = buffer.write(-1);
+  EXPECT_EQ(-1, rc);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(1));
+  rc = buffer.write(-1);
+  EXPECT_EQ(1, rc);
+  EXPECT_EQ(0, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
+  rc = buffer.write(-1);
+  EXPECT_EQ(0, rc);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST_F(OwnedImplTest, read) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(0));
+  int rc = buffer.read(-1, 100);
+  EXPECT_EQ(0, rc);
+  EXPECT_EQ(0, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(-1));
+  rc = buffer.read(-1, 100);
+  EXPECT_EQ(-1, rc);
+  EXPECT_EQ(0, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).Times(0);
+  rc = buffer.read(-1, 0);
+  EXPECT_EQ(0, rc);
+  EXPECT_EQ(0, buffer.length());
 }
 
 } // namespace

@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library", "api_go_proto_library", "api_go_grpc_library")
+load("//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -11,5 +11,14 @@ api_proto_library(
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
         "@promotheus_metrics_model//:client_model",
+    ],
+)
+
+api_go_grpc_library(
+    name = "metrics_service",
+    proto = ":metrics_service",
+    deps = [
+        "//envoy/api/v2/core:base_go_proto",
+        "@promotheus_metrics_model//:client_model_go_proto",
     ],
 )

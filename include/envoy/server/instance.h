@@ -179,6 +179,11 @@ public:
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  /**
+   * @return the flush interval of stats sinks.
+   */
+  virtual std::chrono::milliseconds statsFlushInterval() const PURE;
 };
 
 } // namespace Server

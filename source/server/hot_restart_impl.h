@@ -26,7 +26,7 @@ typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
  */
 class SharedMemory {
 public:
-  static void configure(size_t max_num_stats, size_t max_stat_name_len);
+  static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
   static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
   // Made public for testing.
@@ -48,7 +48,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(uint32_t stats_set_size, Options& options);
+  static SharedMemory& initialize(uint64_t stats_set_size, Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -76,7 +76,7 @@ class ProcessSharedMutex : public Thread::BasicLockable {
 public:
   ProcessSharedMutex(pthread_mutex_t& mutex) : mutex_(mutex) {}
 
-  void lock() override {
+  void lock() EXCLUSIVE_LOCK_FUNCTION() override {
     // Deal with robust handling here. If the other process dies without unlocking, we are going
     // to die shortly but try to make sure that we can handle any signals, etc. that happen without
     // getting into a further messed up state.
@@ -87,7 +87,7 @@ public:
     }
   }
 
-  bool try_lock() override {
+  bool tryLock() EXCLUSIVE_TRYLOCK_FUNCTION(true) override {
     int rc = pthread_mutex_trylock(&mutex_);
     if (rc == EBUSY) {
       return false;
@@ -101,7 +101,7 @@ public:
     return true;
   }
 
-  void unlock() override {
+  void unlock() UNLOCK_FUNCTION() override {
     int rc = pthread_mutex_unlock(&mutex_);
     ASSERT(rc == 0);
   }
@@ -209,7 +209,7 @@ private:
   Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  std::unique_ptr<RawStatDataSet> stats_set_;
+  std::unique_ptr<RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;

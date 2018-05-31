@@ -2,11 +2,13 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
-#include "envoy/network/connection.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
 namespace Network {
+
+class Connection;
+enum class ConnectionEvent;
 
 /**
  * Action that should occur on a connection after I/O.

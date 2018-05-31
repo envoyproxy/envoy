@@ -222,7 +222,7 @@ struct RawStatData {
    * Returns the size of this struct, accounting for the length of name_
    * and padding for alignment. This is required by BlockMemoryHashSet.
    */
-  static size_t size();
+  static uint64_t size();
 
   /**
    * Initializes this object to have the specified key,
@@ -271,7 +271,11 @@ private:
   static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = 60;
   static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
 
-  static size_t& initializeAndGetMutableMaxObjNameLength(size_t configured_size);
+  /**
+   * @return uint64_t& a reference to the configured size, which can then be changed
+   * by callers.
+   */
+  static uint64_t& initializeAndGetMutableMaxObjNameLength(uint64_t configured_size);
 };
 
 /**
@@ -453,7 +457,7 @@ private:
   // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
-  absl::Mutex mutex_;
+  Thread::MutexBasicLockable mutex_;
 };
 
 /**

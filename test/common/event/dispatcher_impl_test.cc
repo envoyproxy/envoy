@@ -1,7 +1,6 @@
-#include <condition_variable>
 #include <functional>
-#include <mutex>
 
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 
@@ -75,8 +74,8 @@ protected:
 
   std::unique_ptr<Thread::Thread> dispatcher_thread_;
   DispatcherPtr dispatcher_;
-  std::mutex mu_;
-  std::condition_variable cv_;
+  Thread::MutexBasicLockable mu_;
+  Thread::CondVar cv_;
 
   bool work_finished_;
   TimerPtr keepalive_timer_;
@@ -85,38 +84,43 @@ protected:
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      Thread::LockGuard lock(mu_);
       work_finished_ = true;
     }
-    cv_.notify_one();
+    cv_.notifyOne();
   });
 
-  std::unique_lock<std::mutex> lock(mu_);
-
-  cv_.wait(lock, [this]() { return work_finished_; });
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
 }
 
 TEST_F(DispatcherImplTest, Timer) {
   TimerPtr timer;
   dispatcher_->post([this, &timer]() {
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      Thread::LockGuard lock(mu_);
       timer = dispatcher_->createTimer([this]() {
         {
-          std::lock_guard<std::mutex> lock(mu_);
+          Thread::LockGuard lock(mu_);
           work_finished_ = true;
         }
-        cv_.notify_one();
+        cv_.notifyOne();
       });
     }
-    cv_.notify_one();
+    cv_.notifyOne();
   });
 
-  std::unique_lock<std::mutex> lock(mu_);
-  cv_.wait(lock, [&timer]() { return timer != nullptr; });
+  Thread::LockGuard lock(mu_);
+  while (timer == nullptr) {
+    cv_.wait(mu_);
+  }
   timer->enableTimer(std::chrono::milliseconds(50));
 
-  cv_.wait(lock, [this]() { return work_finished_; });
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
 }
 
 } // namespace Event

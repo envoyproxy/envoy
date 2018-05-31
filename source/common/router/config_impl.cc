@@ -77,7 +77,8 @@ class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
   HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
 
-  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback) const override {
     absl::optional<uint64_t> hash;
 
@@ -94,15 +95,17 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, long ttl) : key_(key), ttl_(ttl) {}
+  CookieHashMethod(const std::string& key, const absl::optional<std::chrono::seconds>& ttl)
+      : key_(key), ttl_(ttl) {}
 
-  absl::optional<uint64_t> evaluate(const std::string&, const Http::HeaderMap& headers,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
-    if (value.empty() && ttl_ != std::chrono::seconds(0)) {
-      value = add_cookie(key_, ttl_);
+    if (value.empty() && ttl_.has_value()) {
+      value = add_cookie(key_, ttl_.value());
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -113,18 +116,26 @@ public:
 
 private:
   const std::string key_;
-  const std::chrono::seconds ttl_;
+  const absl::optional<std::chrono::seconds> ttl_;
 };
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  absl::optional<uint64_t> evaluate(const std::string& downstream_addr, const Http::HeaderMap&,
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
+                                    const Http::HeaderMap&,
                                     const HashPolicy::AddCookieCallback) const override {
-    absl::optional<uint64_t> hash;
-    if (!downstream_addr.empty()) {
-      hash = HashUtil::xxHash64(downstream_addr);
+    if (downstream_addr == nullptr) {
+      return absl::nullopt;
     }
-    return hash;
+    auto* downstream_ip = downstream_addr->ip();
+    if (downstream_ip == nullptr) {
+      return absl::nullopt;
+    }
+    const auto& downstream_addr_str = downstream_ip->addressAsString();
+    if (downstream_addr_str.empty()) {
+      return absl::nullopt;
+    }
+    return HashUtil::xxHash64(downstream_addr_str);
   }
 };
 
@@ -139,10 +150,14 @@ HashPolicyImpl::HashPolicyImpl(
     case envoy::api::v2::route::RouteAction::HashPolicy::kHeader:
       hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
       break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie:
-      hash_impls_.emplace_back(
-          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().ttl().seconds()));
+    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie: {
+      absl::optional<std::chrono::seconds> ttl;
+      if (hash_policy.cookie().has_ttl()) {
+        ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
+      }
+      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name(), ttl));
       break;
+    }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod());
@@ -155,9 +170,10 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-absl::optional<uint64_t> HashPolicyImpl::generateHash(const std::string& downstream_addr,
-                                                      const Http::HeaderMap& headers,
-                                                      const AddCookieCallback add_cookie) const {
+absl::optional<uint64_t>
+HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
+                             const Http::HeaderMap& headers,
+                             const AddCookieCallback add_cookie) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
     const absl::optional<uint64_t> new_hash =
@@ -227,9 +243,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
-      websocket_config_([&]() -> Extensions::NetworkFilters::TcpProxy::TcpProxyConfigSharedPtr {
+      websocket_config_([&]() -> TcpProxy::ConfigSharedPtr {
         return (PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), use_websocket, false))
-                   ? Http::WebSocket::tcpProxyConfig(route.route(), factory_context)
+                   ? Http::WebSocket::Config(route.route(), factory_context)
                    : nullptr;
       }()),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),

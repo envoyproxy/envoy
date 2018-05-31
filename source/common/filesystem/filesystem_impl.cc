@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <mutex>
 #include <sstream>
 #include <string>
 
@@ -19,6 +18,7 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
 #include "absl/strings/match.h"
@@ -98,7 +98,7 @@ FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
                    std::chrono::milliseconds flush_interval_msec)
     : path_(path), file_lock_(lock), flush_timer_(dispatcher.createTimer([this]() -> void {
         stats_.flushed_by_timer_.inc();
-        flush_event_.notify_one();
+        flush_event_.notifyOne();
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
       os_sys_calls_(Api::OsSysCallsSingleton::get()), flush_interval_msec_(flush_interval_msec),
@@ -120,9 +120,9 @@ void FileImpl::reopen() { reopen_file_ = true; }
 
 FileImpl::~FileImpl() {
   {
-    std::unique_lock<std::mutex> lock(write_lock_);
+    Thread::LockGuard lock(write_lock_);
     flush_thread_exit_ = true;
-    flush_event_.notify_one();
+    flush_event_.notifyOne();
   }
 
   if (flush_thread_ != nullptr) {
@@ -153,7 +153,7 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   //            actually flush to disk. In the future it would be nice if we did away with the cross
   //            process lock or had multiple locks.
   {
-    std::lock_guard<Thread::BasicLockable> lock(file_lock_);
+    Thread::LockGuard lock(file_lock_);
     for (Buffer::RawSlice& slice : slices) {
       ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
       ASSERT(rc == static_cast<ssize_t>(slice.len_));
@@ -168,22 +168,23 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
 void FileImpl::flushThreadFunc() {
 
   while (true) {
-    std::unique_lock<std::mutex> flush_lock;
+    std::unique_lock<Thread::BasicLockable> flush_lock;
 
     {
-      std::unique_lock<std::mutex> write_lock(write_lock_);
+      Thread::LockGuard write_lock(write_lock_);
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
       while (flush_buffer_.length() == 0 && !flush_thread_exit_) {
-        flush_event_.wait(write_lock);
+        // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
+        flush_event_.wait(write_lock_);
       }
 
       if (flush_thread_exit_) {
         return;
       }
 
-      flush_lock = std::unique_lock<std::mutex>(flush_lock_);
+      flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
       ASSERT(flush_buffer_.length() > 0);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
@@ -207,17 +208,17 @@ void FileImpl::flushThreadFunc() {
 }
 
 void FileImpl::flush() {
-  std::unique_lock<std::mutex> flush_buffer_lock;
+  std::unique_lock<Thread::BasicLockable> flush_buffer_lock;
 
   {
-    std::lock_guard<std::mutex> write_lock(write_lock_);
+    Thread::LockGuard write_lock(write_lock_);
 
     // flush_lock_ must be held while checking this or else it is
     // possible that flushThreadFunc() has already moved data from
     // flush_buffer_ to about_to_write_buffer_, has unlocked write_lock_,
     // but has not yet completed doWrite(). This would allow flush() to
     // return before the pending data has actually been written to disk.
-    flush_buffer_lock = std::unique_lock<std::mutex>(flush_lock_);
+    flush_buffer_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
 
     if (flush_buffer_.length() == 0) {
       return;
@@ -231,7 +232,7 @@ void FileImpl::flush() {
 }
 
 void FileImpl::write(absl::string_view data) {
-  std::lock_guard<std::mutex> lock(write_lock_);
+  Thread::LockGuard lock(write_lock_);
 
   if (flush_thread_ == nullptr) {
     createFlushStructures();
@@ -241,7 +242,7 @@ void FileImpl::write(absl::string_view data) {
   stats_.write_total_buffered_.add(data.length());
   flush_buffer_.add(data.data(), data.size());
   if (flush_buffer_.length() > MIN_FLUSH_SIZE) {
-    flush_event_.notify_one();
+    flush_event_.notifyOne();
   }
 }
 

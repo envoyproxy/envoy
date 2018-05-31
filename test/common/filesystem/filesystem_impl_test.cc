@@ -2,6 +2,7 @@
 #include <string>
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -128,7 +129,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   file.write("test");
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 1) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -149,7 +150,7 @@ TEST(FileSystemImpl, flushToLogFilePeriodically) {
   timer->callback_();
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 2) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -179,7 +180,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   file.flush();
   uint32_t expected_writes = 1;
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
@@ -195,14 +196,14 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   file.write("test");
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
   file.flush();
   expected_writes++;
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     EXPECT_EQ(expected_writes, os_sys_calls.num_writes_);
   }
 
@@ -222,7 +223,7 @@ TEST(FileSystemImpl, flushToLogFileOnDemand) {
   expected_writes++;
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != expected_writes) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -256,7 +257,7 @@ TEST(FileSystemImpl, reopenFile) {
   timer->callback_();
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 1) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -282,7 +283,7 @@ TEST(FileSystemImpl, reopenFile) {
   timer->callback_();
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 2) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -316,7 +317,7 @@ TEST(FilesystemImpl, reopenThrows) {
   file.write("test write");
   timer->callback_();
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 1) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -327,7 +328,7 @@ TEST(FilesystemImpl, reopenThrows) {
   timer->callback_();
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.open_mutex_);
+    Thread::LockGuard lock(os_sys_calls.open_mutex_);
     while (os_sys_calls.num_open_ != 2) {
       os_sys_calls.open_event_.wait(os_sys_calls.open_mutex_);
     }
@@ -361,7 +362,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
   file.write("a");
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 1) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }
@@ -384,7 +385,7 @@ TEST(FilesystemImpl, bigDataChunkShouldBeFlushedWithoutTimer) {
   file.write(big_string);
 
   {
-    std::unique_lock<Thread::BasicLockable> lock(os_sys_calls.write_mutex_);
+    Thread::LockGuard lock(os_sys_calls.write_mutex_);
     while (os_sys_calls.num_writes_ != 2) {
       os_sys_calls.write_event_.wait(os_sys_calls.write_mutex_);
     }

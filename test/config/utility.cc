@@ -132,7 +132,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std:
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (cluster->mutable_hosts(0)->has_socket_address()) {
+    if (!cluster->hosts().empty() && cluster->mutable_hosts(0)->has_socket_address()) {
       auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
       host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
     }
