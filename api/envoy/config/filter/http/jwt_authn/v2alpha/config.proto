@@ -184,23 +184,41 @@ message JwtHeader {
 }
 
 // This message specifies a Jwt requirement.
-message JwtRequirement {
-  // Specify the required issuer for the JwtProvider.
+message RequiredProvider {
+  // Specify the issuer for the required JwtProvider.
   string issuer = 1;
 
   // This audiences field overrides the one in JwtProvider if not empty.
   repeated string audiences = 2;
 }
 
-// This message specifies a per route based Jwt config.
+// This message specifies a Jwt requirement. It consists of multiple "or_jwt", each "or_jwt"
+// consists of multiple "and_jwt". Each "and_jwt" specifies a required provider.
+// If the message is empty, Jwt is not required.
+//
+// .. code-block:: yaml
+//
+//   or_jwt:
+//      - and_jwt:
+//         - issuer: issuer1
+//         - issuer: issuer2
+//           audiences: [audience1, audience2]
+//      - and_jwt:
+//         - issuer: issuer3
+//
+// Above example specifies this requirement: (issuer1 & issuer2) || (issuer3)
+//
 // Route.per_filter_config for jwt_authn filter uses this message.
-message PerRouteConfig {
-  // Specify list of required JwtProviders. If list is empty,  Jwt is NOT required.
-  // If any of required JwtProviders is missing, or its verification fails, the request will
-  // be rejected.
-  // If a Jwt is not required, but it is in the providers list, it will be verified.
-  // But it will not fail the request if its verification fails.
-  repeated JwtRequirement requires = 1;
+message JwtRequirement {
+  // Specify list of required JwtProviders. Their results are AND-ed;
+  // all of them must pass, if one of them fails or missing, it fails.
+  message AndRequirement {
+    repeated RequiredProvider and_jwt = 1;
+  }
+
+  // Specify list of AndRequirement. Their results are OR-ed;
+  // any one of them passes, the result is passed.
+  repeated AndRequirement or_jwt = 1;
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -221,12 +239,15 @@ message PerRouteConfig {
 //    - match:
 //         prefix: "/"
 //      requires:
-//         - issuer: jwt_issuer1
-//         - issuer: jwt_issuer2
-//           audiences: [audience1, audience2]
+//        or_jwt:
+//           - and_jwt:
+//             - issuer: jwt_issuer1
+//           - and_jwt:
+//             - issuer: jwt_issuer2
+//               audiences: [audience1, audience2]
 //
 // In above example, all requests (all requests matched "/" path prefix),
-// require jwt authentication from [jwt_issuer1, jwt_issuer2] and jwt_issuer2 has audiences
+// require jwt authentication from either jwt_issuer or jwt_issuer2 and jwt_issuer2 has audiences
 // override defined.
 message RequirementRule {
   // The route matching parameter. Only when the match is satisfied, the "requires" field will
@@ -241,12 +262,8 @@ message RequirementRule {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specify list of required JwtProviders. If list is empty,  Jwt is NOT required.
-  // If any of required JwtProviders is missing, or its verification fails, the request will
-  // be rejected.
-  // If a Jwt is not required, but it is in the providers list, it will be verified.
-  // But it will not fail the request if its verification fails.
-  repeated JwtRequirement requires = 2;
+  // Specify a Jwt Requirement. Please see comment from messaage JwtRequirement.
+  JwtRequirement requires = 2;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
@@ -277,14 +294,18 @@ message RequirementRule {
 //      - match:
 //          prefix: "/prefix"
 //        requires:
-//          - issuer: issuer1
-//            audiences: [audience_override]
+//          or_jwt:
+//            - and_jwt:
+//              - issuer: issuer1
+//                audiences: [audience_override]
 //
 //    # Jwt verification for issuer2 is required for all other requests.
 //      - match:
 //          prefix: "/"
 //        requires:
-//          - issuer: issuer2
+//          or_jwt:
+//            - and_jwt:
+//              - issuer: issuer2
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -307,10 +328,14 @@ message JwtAuthentication {
   //
   repeated JwtProvider providers = 1;
 
-  // DEPRECATED: Please use "routes" field. if "routes" field is not empty,
-  // this field will not be used.
-  // If true, the request is allowed if JWT is missing or JWT verification fails.
+  // If true, the request is allowed if JWT is mising or JWT verification fails.
   // Default is false, a request without JWT or failed JWT verification is not allowed.
+  // A typical usage is: this filter is used to only verify JWT and pass the verified JWT
+  // payload to another filter, the other filter will make decision.
+  // This flag has impact on the process flow. For example, if flag is false, for multiple
+  // "or_jwt" requirements, if the first requirement passes, the rest requiements will not be
+  // verified. But if this flag is true, all requirements will be verified even all of them
+  // passed.
   bool allow_missing_or_failed = 2;
 
   // Specifies requirements based on the route matches. The first matched requirement will be
@@ -327,7 +352,9 @@ message JwtAuthentication {
   //   - match:
   //       prefix: "/"
   //     requires:
-  //       - issuer: issuer1
+  //        or_jwt:
+  //           - and_jwt:
+  //             - issuer: issuer1
   //
   repeated RequirementRule rules = 3;
 }
