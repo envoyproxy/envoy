@@ -85,7 +85,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "84628d9585837154a96a369e4ef9e77cbe339639",
+        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
