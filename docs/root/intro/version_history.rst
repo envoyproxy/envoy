@@ -272,7 +272,7 @@ Version history
 * redis: the :ref:`redis proxy filter <config_network_filters_redis_proxy>` is now considered
   production ready.
 * redis: added :ref:`"drain close" <arch_overview_draining>` functionality.
-* router: added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded>` support.
+* router: added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>` support.
 * router: added :ref:`regex <envoy_api_field_route.RouteMatch.regex>` route matching.
 * router: added :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
   for upstream requests.
