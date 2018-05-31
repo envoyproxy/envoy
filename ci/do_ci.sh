@@ -182,6 +182,7 @@ elif [[ "$1" == "fix_format" ]]; then
 elif [[ "$1" == "check_format" ]]; then
   echo "check_format..."
   cd "${ENVOY_SRCDIR}"
+  ./tools/check_format_test_run_under_docker.py
   ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then
