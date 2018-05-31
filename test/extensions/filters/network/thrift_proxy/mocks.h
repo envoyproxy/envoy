@@ -52,6 +52,8 @@ public:
   MOCK_METHOD2(readDouble, bool(Buffer::Instance& buffer, double& value));
   MOCK_METHOD2(readString, bool(Buffer::Instance& buffer, std::string& value));
   MOCK_METHOD2(readBinary, bool(Buffer::Instance& buffer, std::string& value));
+
+  std::string name_{"mock"};
 };
 
 } // namespace ThriftProxy

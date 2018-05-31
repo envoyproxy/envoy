@@ -102,8 +102,6 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
 
 TEST(AutoProtocolTest, Delegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
-  EXPECT_CALL(*proto, name()).WillOnce(ReturnRef("auto"));
-
   AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 
