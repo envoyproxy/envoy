@@ -46,7 +46,7 @@ private:
 // clang-format on
 
 /**
- * Wrapper struct for RBAC filter stats. @see stats_macros.h
+ * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
  */
 struct JwtAuthnFilterStats {
   ALL_JWT_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)

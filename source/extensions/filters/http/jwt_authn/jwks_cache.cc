@@ -5,6 +5,7 @@
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
+#include "common/protobuf/utility.h"
 
 #include "jwt_verify_lib/check_audience.h"
 
@@ -63,9 +64,8 @@ private:
   std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
     auto expire = std::chrono::steady_clock::now();
     if (jwt_rule_.has_remote_jwks() && jwt_rule_.remote_jwks().has_cache_duration()) {
-      const auto& duration = jwt_rule_.remote_jwks().cache_duration();
-      expire +=
-          std::chrono::seconds(duration.seconds()) + std::chrono::nanoseconds(duration.nanos());
+      expire += std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(jwt_rule_.remote_jwks().cache_duration()));
     } else {
       expire += std::chrono::seconds(PubkeyCacheExpirationSec);
     }

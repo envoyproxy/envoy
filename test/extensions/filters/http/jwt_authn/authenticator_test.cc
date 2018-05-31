@@ -111,6 +111,8 @@ private:
   int called_count_{};
 };
 
+// This test validates a good JWT authentication with a remote Jwks.
+// It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.
 TEST_F(AuthenticatorTest, TestOkJWTandCache) {
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
@@ -136,67 +138,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
   EXPECT_EQ(mock_pubkey.called_count(), 1);
 }
 
-TEST_F(AuthenticatorTest, TestOkJWTPubkeyNoAlg) {
-  // Test OK pubkey with no "alg" claim.
-  std::string alg_claim = "  \"alg\": \"RS256\",";
-  std::string pubkey_no_alg = PublicKey;
-  std::size_t alg_pos = pubkey_no_alg.find(alg_claim);
-  while (alg_pos != std::string::npos) {
-    pubkey_no_alg.erase(alg_pos, alg_claim.length());
-    alg_pos = pubkey_no_alg.find(alg_claim);
-  }
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, pubkey_no_alg);
-
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-
-  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"),
-            "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
-            "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
-            "aWNlIn0");
-  // Verify the token is removed.
-  EXPECT_FALSE(headers.Authorization());
-
-  EXPECT_EQ(mock_pubkey.called_count(), 1);
-}
-
-TEST_F(AuthenticatorTest, TestOkJWTPubkeyNoKid) {
-  // Test OK pubkey with no "kid" claim.
-  std::string kid_claim1 = ",  \"kid\": \"62a93512c9ee4c7f8067b5a216dade2763d32a47\"";
-  std::string kid_claim2 = ",  \"kid\": \"b3319a147514df7ee5e4bcdee51350cc890cc89e\"";
-  std::string pubkey_no_kid = PublicKey;
-  std::size_t kid_pos = pubkey_no_kid.find(kid_claim1);
-  pubkey_no_kid.erase(kid_pos, kid_claim1.length());
-  kid_pos = pubkey_no_kid.find(kid_claim2);
-  pubkey_no_kid.erase(kid_pos, kid_claim2.length());
-
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, pubkey_no_kid);
-
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
-
-  MockAuthenticatorCallbacks mock_cb;
-  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  auth_->verify(headers, &mock_cb);
-
-  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"),
-            "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
-            "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
-            "aWNlIn0");
-  // Verify the token is removed.
-  EXPECT_FALSE(headers.Authorization());
-
-  EXPECT_EQ(mock_pubkey.called_count(), 1);
-}
-
+// This test verifies the Jwt is forwarded if "forward" flag is set.
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Confit forward_jwt flag
   proto_config_.mutable_rules(0)->set_forward(true);
@@ -218,6 +160,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   EXPECT_TRUE(headers.Authorization());
 }
 
+// This test verifies if Jwt is missing, proper status is called.
 TEST_F(AuthenticatorTest, TestMissedJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -229,6 +172,7 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies if Jwt is missing but allow_missing_or_fail is true, Status::OK is returned.
 TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is missing, the status should still be OK
   // because allow_missing_or_failed is true.
@@ -245,6 +189,8 @@ TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies if Jwt verifiecation fails but allow_missing_or_fail is true, Status::OK is
+// returned.
 TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
   // In this test, when JWT is invalid, the status should still be OK
   // because allow_missing_or_failed is true.
@@ -261,6 +207,7 @@ TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies if Jwt is invalid, JwtBadFormat status is returned.
 TEST_F(AuthenticatorTest, TestInvalidJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -272,6 +219,7 @@ TEST_F(AuthenticatorTest, TestInvalidJWT) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies if Authorization header has invalid prefix, JwtMissed status is returned
 TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -282,6 +230,7 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies when a JWT is expired, JwtExpired status is returned.
 TEST_F(AuthenticatorTest, TestExpiredJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -292,6 +241,7 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies when a JWT is with invalid audience, JwtAudienceNotAllowed is returned.
 TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -302,6 +252,7 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies when invalid cluster is configured for remote jwks, JwksFetchFail is returned.
 TEST_F(AuthenticatorTest, TestWrongCluster) {
   // Get returns nullptr
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, get(_))
@@ -319,6 +270,7 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies when Jwt issuer is not configured, JwtUnknownIssuer is returned.
 TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   // Create a config with an other issuer.
   proto_config_.mutable_rules(0)->set_issuer("other_issuer");
@@ -333,6 +285,7 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies that when Jwks fetching fails, JwksFetchFail status is returned.
 TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
   NiceMock<Http::MockAsyncClient> async_client;
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_))
@@ -369,6 +322,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
   callbacks->onSuccess(std::move(response_message));
 }
 
+// This test verifies when an invalid Jwks is fetched, JwksParseError status is returned.
 TEST_F(AuthenticatorTest, TestInvalidPubkey) {
   NiceMock<Http::MockAsyncClient> async_client;
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_))
@@ -406,6 +360,9 @@ TEST_F(AuthenticatorTest, TestInvalidPubkey) {
   callbacks->onSuccess(std::move(response_message));
 }
 
+// This test verifies when a Jwks fetching is not completed yet, but onDestory() is called,
+// onComplete() callback should not be called, but internal request->cancel() should be called.
+// Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
   NiceMock<Http::MockAsyncClient> async_client;
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_))
@@ -443,6 +400,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auth_->onDestroy();
 }
 
+// This test verifies if "forward_playload_header" is empty, payload is not forwarded.
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
   auto rule0 = proto_config_.mutable_rules(0);
