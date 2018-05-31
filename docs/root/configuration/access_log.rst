@@ -66,11 +66,6 @@ The following command operators are supported:
 
     %START_TIME(%s.%9f)%
 
-  .. attention::
-
-    Do not include **?** in START_TIME's specifier, since it is used internally as placeholder
-    for subseconds.
-
 %BYTES_RECEIVED%
   HTTP
     Body bytes received.

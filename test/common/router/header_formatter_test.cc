@@ -612,7 +612,7 @@ route:
       append: true
     - header:
         key: "x-request-start"
-        value: "%START_TIME(%s%3f)%"
+        value: "%START_TIME(%s.%3f)%"
       append: true
     - header:
         key: "x-request-start-f"
@@ -644,7 +644,7 @@ route:
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
   EXPECT_TRUE(headerMap.has("x-request-start"));
-  EXPECT_EQ("1522796769123", headerMap.get_("x-request-start"));
+  EXPECT_EQ("1522796769.123", headerMap.get_("x-request-start"));
   EXPECT_TRUE(headerMap.has("x-request-start-f"));
   EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
   EXPECT_TRUE(headerMap.has("x-request-start-default"));

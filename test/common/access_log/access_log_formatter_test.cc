@@ -414,11 +414,22 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format =
-        "%START_TIME(%s%3f)%|%START_TIME(%s%4f)%|%START_TIME(%s%5f)%|%START_TIME(%s%6f)%";
+        "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
     FormatterImpl formatter(format);
-    EXPECT_EQ("1522796769123|15227967691234|152279676912345|1522796769123456",
+    EXPECT_EQ("1522796769.123|1522796769.1234|1522796769.12345|1522796769.123456",
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
+    const std::string format =
+        "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|.%7f:segm4:%Y)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|.1234560:"
+              "segm4:2018",
               formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }

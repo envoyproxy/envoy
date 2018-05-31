@@ -27,7 +27,6 @@ namespace {
 
 class SubsecondConstantValues {
 public:
-  const size_t DEFAULT_SECONDS_LENGTH{10};
   const char PLACEHOLDER_CHAR{'?'};
   const std::string PLACEHOLDER{"?????????"};
   const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
@@ -40,6 +39,7 @@ typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
+    // A map is used to keep different formatted format strings at a given second.
     std::unordered_map<std::string, const std::string> formatted;
   };
   static thread_local CachedTime cached_time;
@@ -58,34 +58,50 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
-  if (subsecond_widths_.empty()) {
+  if (subseconds_.empty()) {
     return cached_time.formatted.at(format_string_);
   }
 
-  // Copy the cached formatted string, then replace its subseconds part.
+  // Copy the current cached formatted format string, then replace its subseconds part.
   std::string formatted = cached_time.formatted.at(format_string_);
   const std::string value = fmt::FormatInt(epoch_time_ns.count()).str();
-  for (const auto width : subsecond_widths_) {
-    const std::string subsecond =
-        value.substr(SubsecondConstants::get().DEFAULT_SECONDS_LENGTH, width);
-    const size_t placeholder_index = formatted.find(SubsecondConstants::get().PLACEHOLDER_CHAR);
-    ASSERT(placeholder_index != std::string::npos);
-    formatted.replace(placeholder_index, width, subsecond);
+  for (const auto subsecond : subseconds_) {
+    // TODO(dio): Infer the length of second from parsing step. Currently, it is defaulted to 10.
+    const std::string digits = value.substr(10, subsecond.width_);
+    formatted.replace(subsecond.position_, subsecond.width_, digits);
   }
 
+  // TODO(dio): Assert the formatted length.
   return formatted;
 }
 
 std::string DateFormatter::parse(const std::string& format_string) {
+  auto now = std::chrono::system_clock::now();
+  time_t current_time = std::chrono::system_clock::to_time_t(now);
+  tm current_tm;
+  gmtime_r(&current_time, &current_tm);
+
   std::string new_format_string = format_string;
-  std::smatch result;
-  while (regex_search(new_format_string, result, SubsecondConstants::get().PATTERN)) {
-    const std::string& width_specifier = result[1];
+  std::smatch matched;
+  size_t position = 0;
+  size_t previous = 0;
+  std::array<char, 1024> buf;
+  while (regex_search(new_format_string, matched, SubsecondConstants::get().PATTERN)) {
+    const std::string& width_specifier = matched[1];
     const size_t width = width_specifier.empty() ? SubsecondConstants::get().PLACEHOLDER.size()
                                                  : width_specifier.at(0) - '0';
-    subsecond_widths_.emplace_back(width);
-    new_format_string.replace(result.position(), result.length(),
+    new_format_string.replace(matched.position(), matched.length(),
                               SubsecondConstants::get().PLACEHOLDER.substr(0, width));
+
+    const std::string part = new_format_string.substr(previous, matched.position() - previous);
+    const size_t formatted_length = strftime(&buf[0], buf.size(), part.c_str(), &current_tm);
+
+    // Save subsecond's position and width to be used later at data path.
+    SubsecondSpecifier subsecond(position + formatted_length, width);
+    subseconds_.emplace_back(subsecond);
+
+    position += formatted_length + width;
+    previous = matched.position() + width;
   }
   return new_format_string;
 }

@@ -49,7 +49,15 @@ public:
 
 private:
   std::string parse(const std::string& format_string);
-  std::vector<size_t> subsecond_widths_;
+
+  struct SubsecondSpecifier {
+    SubsecondSpecifier(const size_t position, const size_t width)
+        : position_(position), width_(width) {}
+
+    const size_t position_;
+    const size_t width_;
+  };
+  std::vector<SubsecondSpecifier> subseconds_;
 
   const std::string format_string_;
 };
