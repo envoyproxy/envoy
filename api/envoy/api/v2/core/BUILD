@@ -52,15 +52,6 @@ api_proto_library(
     deps = [":base"],
 )
 
-api_proto_library(
-    name = "health_check_logging",
-    srcs = ["health_check_logging.proto"],
-    visibility = [
-        ":friends",
-    ],
-    deps = [":base"],
-)
-
 api_go_proto_library(
     name = "health_check",
     proto = ":health_check",

@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/api/v2/core/health_check_logging.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -72,14 +72,11 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure
-   * @param timeout supplies the configured health check timeout for this health check
-   * @param unhealthy_threshold supplied the configured unhealthy threshold for this health check
    */
-  virtual void logEjectUnhealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
-                                 const HostDescriptionConstSharedPtr& host,
-                                 envoy::api::v2::core::HealthCheckFailureType failure_type,
-                                 std::chrono::milliseconds timeout,
-                                 uint32_t unhealthy_threshold) PURE;
+  virtual void
+  logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                    const HostDescriptionConstSharedPtr& host,
+                    envoy::data::core::v2alpha::HealthCheckFailureType failure_type) PURE;
 
   /**
    * Log a healthy host addition event.
@@ -88,9 +85,8 @@ public:
    * @param healthy_threshold supplied the configured healthy threshold for this health check
    * @param first_check whether this is a fast path success on the first health check for this host
    */
-  virtual void logAddHealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
-                             const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
-                             bool first_check) PURE;
+  virtual void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                             const HostDescriptionConstSharedPtr& host, bool first_check) PURE;
 };
 
 typedef std::unique_ptr<HealthCheckEventLogger> HealthCheckEventLoggerPtr;

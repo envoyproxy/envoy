@@ -47,14 +47,14 @@ protected:
   class ActiveHealthCheckSession {
   public:
     virtual ~ActiveHealthCheckSession();
-    HealthTransition setUnhealthy(envoy::api::v2::core::HealthCheckFailureType type);
+    HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
     void start() { onIntervalBase(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess();
-    void handleFailure(envoy::api::v2::core::HealthCheckFailureType type);
+    void handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType type);
 
     HostSharedPtr host_;
 
@@ -79,7 +79,7 @@ protected:
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
-  virtual envoy::api::v2::core::HealthCheckerType healthCheckerType() const PURE;
+  virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
 
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
@@ -135,13 +135,11 @@ public:
 
   virtual ~HealthCheckEventLoggerImpl() {}
 
-  void logEjectUnhealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
+  void logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,
-                         envoy::api::v2::core::HealthCheckFailureType failure_type,
-                         std::chrono::milliseconds timeout, uint32_t unhealthy_threshold) override;
-  void logAddHealthy(envoy::api::v2::core::HealthCheckerType health_checker_type,
-                     const HostDescriptionConstSharedPtr& host, uint32_t healthy_threshold,
-                     bool first_check) override;
+                         envoy::data::core::v2alpha::HealthCheckFailureType failure_type) override;
+  void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                     const HostDescriptionConstSharedPtr& host, bool first_check) override;
 
 private:
   Filesystem::FileSharedPtr file_;

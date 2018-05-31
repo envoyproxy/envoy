@@ -55,7 +55,6 @@ PROTO_RST="
   /envoy/api/v2/core/config_source/envoy/api/v2/core/config_source.proto.rst
   /envoy/api/v2/core/grpc_service/envoy/api/v2/core/grpc_service.proto.rst
   /envoy/api/v2/core/health_check/envoy/api/v2/core/health_check.proto.rst
-  /envoy/api/v2/core/health_check_logging/envoy/api/v2/core/health_check_logging.proto.rst
   /envoy/api/v2/core/protocol/envoy/api/v2/core/protocol.proto.rst
   /envoy/api/v2/discovery/envoy/api/v2/discovery.proto.rst
   /envoy/api/v2/auth/cert/envoy/api/v2/auth/cert.proto.rst
@@ -99,6 +98,7 @@ PROTO_RST="
   /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
   /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
+  /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
   /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst

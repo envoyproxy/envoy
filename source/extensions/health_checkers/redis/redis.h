@@ -35,8 +35,8 @@ public:
   }
 
 protected:
-  envoy::api::v2::core::HealthCheckerType healthCheckerType() const override {
-    return envoy::api::v2::core::HealthCheckerType::REDIS;
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::REDIS;
   }
 
 private:

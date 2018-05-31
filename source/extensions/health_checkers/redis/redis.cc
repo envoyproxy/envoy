@@ -74,7 +74,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
-      handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
+      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
     }
     break;
   case Type::Ping:
@@ -82,7 +82,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asString() == "PONG") {
       handleSuccess();
     } else {
-      handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
+      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
     }
     break;
   default:
@@ -96,7 +96,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   current_request_ = nullptr;
-  handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
+  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {

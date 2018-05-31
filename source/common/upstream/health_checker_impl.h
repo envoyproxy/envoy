@@ -108,8 +108,8 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
   }
-  envoy::api::v2::core::HealthCheckerType healthCheckerType() const override {
-    return envoy::api::v2::core::HealthCheckerType::HTTP;
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::HTTP;
   }
 
   const std::string path_;
@@ -234,8 +234,8 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<TcpActiveHealthCheckSession>(*this, host);
   }
-  envoy::api::v2::core::HealthCheckerType healthCheckerType() const override {
-    return envoy::api::v2::core::HealthCheckerType::TCP;
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::TCP;
   }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
@@ -324,8 +324,8 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<GrpcActiveHealthCheckSession>(*this, host);
   }
-  envoy::api::v2::core::HealthCheckerType healthCheckerType() const override {
-    return envoy::api::v2::core::HealthCheckerType::GRPC;
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::GRPC;
   }
 
   const Protobuf::MethodDescriptor& service_method_;

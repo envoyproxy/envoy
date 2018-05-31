@@ -166,7 +166,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::St
 
   ENVOY_CONN_LOG(debug, "connection/stream error health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
-  handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
+  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
 bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded() {
@@ -196,7 +196,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   if (isHealthCheckSucceeded()) {
     handleSuccess();
   } else {
-    handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
+    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }
 
   if ((response_headers_->Connection() &&
@@ -289,7 +289,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
-    handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
+    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
   }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
@@ -502,7 +502,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onResetStream(Http::St
   // Http::StreamResetReason::RemoteReset or Http::StreamResetReason::ConnectionTermination (both
   // mean connection close), check if connection is not fresh (was used for at least 1 request)
   // and silently retry request on the fresh connection. This is also true for HTTP/1.1 healthcheck.
-  handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
+  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
@@ -510,7 +510,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onGoAway() {
                  HostUtility::healthFlagsToString(*host_));
   // Even if we have active health check probe, fail it on GOAWAY and schedule new one.
   if (request_encoder_) {
-    handleFailure(envoy::api::v2::core::HealthCheckFailureType::NETWORK);
+    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
     expect_reset_ = true;
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
@@ -537,7 +537,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onRpcComplete(
   if (isHealthCheckSucceeded(grpc_status)) {
     handleSuccess();
   } else {
-    handleFailure(envoy::api::v2::core::HealthCheckFailureType::ACTIVE);
+    handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }
 
   // |end_stream| will be false if we decided to stop healthcheck before HTTP stream has ended -

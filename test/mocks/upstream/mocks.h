@@ -197,12 +197,11 @@ public:
 
 class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
-  MOCK_METHOD5(logEjectUnhealthy,
-               void(envoy::api::v2::core::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-                    envoy::api::v2::core::HealthCheckFailureType, std::chrono::milliseconds,
-                    uint32_t));
-  MOCK_METHOD4(logAddHealthy, void(envoy::api::v2::core::HealthCheckerType,
-                                   const HostDescriptionConstSharedPtr&, uint32_t, bool));
+  MOCK_METHOD3(logEjectUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                       const HostDescriptionConstSharedPtr&,
+                                       envoy::data::core::v2alpha::HealthCheckFailureType));
+  MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                   const HostDescriptionConstSharedPtr&, bool));
 };
 
 class MockCdsApi : public CdsApi {
