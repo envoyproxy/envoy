@@ -27,6 +27,9 @@ message Router {
   // requests may be made for each downstream (inbound) request.
   repeated envoy.config.filter.accesslog.v2.AccessLog upstream_log = 3;
 
-  // Do not add any additional *x-envoy-* headers to requests or responses.
+  // Do not add any additional *x-envoy-* headers to requests or responses. This
+  // only affects the router filter generated *x-envoy-* headers, other Envoy
+  // filters and the HTTP connection manager may continue to set *x-envoy-*
+  // headers.
   bool suppress_envoy_headers = 4;
 }

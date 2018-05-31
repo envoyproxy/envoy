@@ -14,6 +14,16 @@
 
 namespace Envoy {
 namespace {
+
+std::string ipSuppressEnvoyHeadersTestParamsToString(
+    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+  return fmt::format(
+      "{}_{}",
+      TestUtility::ipTestParamsToString(
+          testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
+}
+
 void disableHeaderValueOptionAppend(
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
@@ -359,7 +369,8 @@ protected:
 
 INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Bool()));
+                                         testing::Bool()),
+                        ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
