@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 
+#include "common/common/fmt.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/types/optional.h"
@@ -64,10 +65,11 @@ public:
    *
    * @return std::string containing the transport name.
    */
-  virtual std::string name() const PURE;
+  virtual const std::string& name() const PURE;
 
   /*
    * decodeFrameStart decodes the start of a transport message, potentially invoking callbacks.
+   * If successful, the start of the frame is removed from the buffer.
    *
    * @param buffer the currently buffered thrift data.
    * @return bool true if a complete frame header was successfully consumed, false if more data
@@ -78,6 +80,7 @@ public:
 
   /*
    * decodeFrameEnd decodes the end of a transport message, potentially invoking callbacks.
+   * If successful, the end of the frame is removed from the buffer.
    *
    * @param buffer the currently buffered thrift data.
    * @return bool true if a complete frame trailer was successfully consumed, false if more data
@@ -112,7 +115,7 @@ public:
   FramedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
 
   // Transport
-  std::string name() const override { return TransportNames::get().FRAMED; }
+  const std::string& name() const override { return TransportNames::get().FRAMED; }
   bool decodeFrameStart(Buffer::Instance& buffer) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
 
@@ -128,7 +131,7 @@ public:
   UnframedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
 
   // Transport
-  std::string name() const override { return TransportNames::get().UNFRAMED; }
+  const std::string& name() const override { return TransportNames::get().UNFRAMED; }
   bool decodeFrameStart(Buffer::Instance&) override {
     onFrameStart(absl::optional<uint32_t>());
     return true;
@@ -146,15 +149,22 @@ public:
  */
 class AutoTransportImpl : public TransportImplBase {
 public:
-  AutoTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks){};
+  AutoTransportImpl(TransportCallbacks& callbacks)
+      : TransportImplBase(callbacks), name_(TransportNames::get().AUTO){};
 
   // Transport
-  std::string name() const override;
+  const std::string& name() const override { return name_; }
   bool decodeFrameStart(Buffer::Instance& buffer) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
 
 private:
+  void setTransport(TransportPtr&& transport) {
+    transport_ = std::move(transport);
+    name_ = fmt::format("{}({})", transport_->name(), TransportNames::get().AUTO);
+  }
+
   TransportPtr transport_{};
+  std::string name_;
 };
 
 } // namespace ThriftProxy

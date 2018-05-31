@@ -69,12 +69,13 @@ TEST(CompactProtocolTest, ReadMessageBegin) {
     int32_t seq_id = 1;
 
     // Message type is encoded in the 3 highest order bits of the second byte.
-    addInt16(buffer, static_cast<int16_t>(0x8201 | (MessageType::LastMessageType + 1) << 5));
+    int8_t invalid_msg_type = static_cast<int8_t>(MessageType::LastMessageType) + 1;
+    addInt16(buffer, static_cast<int16_t>(0x8201 | (invalid_msg_type << 5)));
     addRepeated(buffer, 2, 'x');
 
     EXPECT_THROW_WITH_MESSAGE(
         proto.readMessageBegin(buffer, name, msg_type, seq_id), EnvoyException,
-        fmt::format("invalid compact protocol message type {}", MessageType::LastMessageType + 1));
+        fmt::format("invalid compact protocol message type {}", invalid_msg_type));
     EXPECT_EQ(name, "-");
     EXPECT_EQ(msg_type, MessageType::Oneway);
     EXPECT_EQ(seq_id, 1);
@@ -1001,7 +1002,8 @@ TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
   CompactProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   std::string name = "-";
-  FieldType field_type = static_cast<FieldType>(FieldType::LastFieldType + 1);
+  int8_t invalid_field_type = static_cast<int8_t>(FieldType::LastFieldType) + 1;
+  FieldType field_type = static_cast<FieldType>(invalid_field_type);
   int16_t field_id = 0;
 
   addInt8(buffer, compact_field_type);

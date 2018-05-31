@@ -5,6 +5,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/byte_order.h"
 
+#include "extensions/filters/network/thrift_proxy/protocol.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -22,6 +24,10 @@ inline void addInt32(Buffer::Instance& buffer, int32_t value) {
 }
 
 inline void addInt8(Buffer::Instance& buffer, int8_t value) { buffer.add(&value, 1); }
+
+inline void addInt8(Buffer::Instance& buffer, MessageType value) { buffer.add(&value, 1); }
+
+inline void addInt8(Buffer::Instance& buffer, FieldType value) { buffer.add(&value, 1); }
 
 inline void addRepeated(Buffer::Instance& buffer, int n, int8_t value) {
   for (int i = 0; i < n; i++) {

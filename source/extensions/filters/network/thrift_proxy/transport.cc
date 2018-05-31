@@ -9,7 +9,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/byte_order.h"
-#include "common/common/fmt.h"
 #include "common/common/utility.h"
 
 #include "extensions/filters/network/thrift_proxy/binary_protocol.h"
@@ -43,14 +42,6 @@ bool FramedTransportImpl::decodeFrameEnd(Buffer::Instance&) {
   return true;
 }
 
-std::string AutoTransportImpl::name() const {
-  if (transport_ != nullptr) {
-    return fmt::format("{}({})", transport_->name(), TransportNames::get().AUTO);
-  }
-
-  return TransportNames::get().AUTO;
-}
-
 bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
   if (transport_ == nullptr) {
     // Not enough data to select a transport.
@@ -66,13 +57,13 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
       // is configurable, but defaults to 256 MB (0x1000000). THeaderTransport will take up to ~1GB
       // (0x3FFFFFFF) when it falls back to framed mode.
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
-        transport_ = std::make_unique<FramedTransportImpl>(callbacks_);
+        setTransport(std::make_unique<FramedTransportImpl>(callbacks_));
       }
     } else {
       // Check for sane unframed protocol.
       proto_start = static_cast<uint16_t>((size >> 16) & 0xFFFF);
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
-        transport_ = std::make_unique<UnframedTransportImpl>(callbacks_);
+        setTransport(std::make_unique<UnframedTransportImpl>(callbacks_));
       }
     }
 

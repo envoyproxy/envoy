@@ -17,6 +17,7 @@
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -101,6 +102,8 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
 
 TEST(AutoProtocolTest, Delegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  EXPECT_CALL(*proto, name()).WillOnce(ReturnRef("auto"));
+
   AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 

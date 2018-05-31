@@ -22,7 +22,7 @@ namespace ThriftProxy {
 class CompactProtocolImpl : public virtual Protocol {
 public:
   // Protocol
-  std::string name() const override { return ProtocolNames::get().COMPACT; }
+  const std::string& name() const override { return ProtocolNames::get().COMPACT; }
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
                         int32_t& seq_id) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;

@@ -28,7 +28,7 @@ public:
   ~MockProtocol();
 
   // ThriftProxy::Protocol
-  MOCK_CONST_METHOD0(name, std::string());
+  MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_METHOD4(readMessageBegin, bool(Buffer::Instance& buffer, std::string& name,
                                       MessageType& msg_type, int32_t& seq_id));
   MOCK_METHOD1(readMessageEnd, bool(Buffer::Instance& buffer));

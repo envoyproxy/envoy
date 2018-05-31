@@ -6,7 +6,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/byte_order.h"
-#include "common/common/fmt.h"
 #include "common/common/macros.h"
 
 #include "extensions/filters/network/thrift_proxy/binary_protocol.h"
@@ -18,14 +17,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-std::string AutoProtocolImpl::name() const {
-  if (protocol_ != nullptr) {
-    return fmt::format("{}({})", protocol_->name(), ProtocolNames::get().AUTO);
-  }
-
-  return ProtocolNames::get().AUTO;
-}
-
 bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
                                         MessageType& msg_type, int32_t& seq_id) {
   if (protocol_ == nullptr) {
@@ -35,9 +26,9 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
 
     uint16_t version = BufferHelper::peekU16(buffer);
     if (BinaryProtocolImpl::isMagic(version)) {
-      protocol_ = std::make_unique<BinaryProtocolImpl>();
+      setProtocol(std::make_unique<BinaryProtocolImpl>());
     } else if (CompactProtocolImpl::isMagic(version)) {
-      protocol_ = std::make_unique<CompactProtocolImpl>();
+      setProtocol(std::make_unique<CompactProtocolImpl>());
     } else {
       throw EnvoyException(
           fmt::format("unknown thrift auto protocol message start {:04x}", version));

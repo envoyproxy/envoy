@@ -35,7 +35,8 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string
 
   MessageType type = static_cast<MessageType>((version & ~MagicMask) >> 5);
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
-    throw EnvoyException(fmt::format("invalid compact protocol message type {}", type));
+    throw EnvoyException(
+        fmt::format("invalid compact protocol message type {}", static_cast<int8_t>(type)));
   }
 
   int id_size;
@@ -222,8 +223,8 @@ bool CompactProtocolImpl::readMapBegin(Buffer::Instance& buffer, FieldType& key_
   }
 
   uint8_t types = BufferHelper::peekI8(buffer, s_size);
-  FieldType ktype = convertCompactFieldType(static_cast<FieldType>(types >> 4));
-  FieldType vtype = convertCompactFieldType(static_cast<FieldType>(types & 0xF));
+  FieldType ktype = convertCompactFieldType(types >> 4);
+  FieldType vtype = convertCompactFieldType(types & 0xF);
 
   // Drain the size and the types byte.
   buffer.drain(s_size + 1);
@@ -268,7 +269,7 @@ bool CompactProtocolImpl::readListBegin(Buffer::Instance& buffer, FieldType& ele
     sz = static_cast<uint32_t>(s);
   }
 
-  elem_type = convertCompactFieldType(static_cast<FieldType>(size_and_type & 0x0F));
+  elem_type = convertCompactFieldType(size_and_type & 0x0F);
   size = sz;
 
   buffer.drain(s_size + 1);

@@ -38,7 +38,8 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string&
 
   MessageType type = static_cast<MessageType>(BufferHelper::peekI8(buffer, 3));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
-    throw EnvoyException(fmt::format("invalid binary protocol message type {}", type));
+    throw EnvoyException(
+        fmt::format("invalid binary protocol message type {}", static_cast<int8_t>(type)));
   }
 
   uint32_t name_len = BufferHelper::peekU32(buffer, 4);
@@ -274,7 +275,8 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::stri
 
   MessageType type = static_cast<MessageType>(BufferHelper::peekI8(buffer, name_len + 4));
   if (type < MessageType::Call || type > MessageType::LastMessageType) {
-    throw EnvoyException(fmt::format("invalid (lax) binary protocol message type {}", type));
+    throw EnvoyException(
+        fmt::format("invalid (lax) binary protocol message type {}", static_cast<int8_t>(type)));
   }
 
   buffer.drain(4);

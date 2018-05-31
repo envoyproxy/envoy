@@ -66,12 +66,13 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
 
     addInt16(buffer, 0x8001);
     addInt8(buffer, 'x');
-    addInt8(buffer, MessageType::LastMessageType + 1);
+    addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 8, 'x');
 
-    EXPECT_THROW_WITH_MESSAGE(
-        proto.readMessageBegin(buffer, name, msg_type, seq_id), EnvoyException,
-        fmt::format("invalid binary protocol message type {}", MessageType::LastMessageType + 1));
+    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id),
+                              EnvoyException,
+                              fmt::format("invalid binary protocol message type {}",
+                                          static_cast<int8_t>(MessageType::LastMessageType) + 1));
     EXPECT_EQ(name, "-");
     EXPECT_EQ(msg_type, MessageType::Oneway);
     EXPECT_EQ(seq_id, 1);
@@ -630,13 +631,13 @@ TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
     int32_t seq_id = 1;
 
     addInt32(buffer, 0);
-    addInt8(buffer, MessageType::LastMessageType + 1);
+    addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 4, 'x');
 
     EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id),
                               EnvoyException,
                               fmt::format("invalid (lax) binary protocol message type {}",
-                                          MessageType::LastMessageType + 1));
+                                          static_cast<int8_t>(MessageType::LastMessageType) + 1));
     EXPECT_EQ(name, "-");
     EXPECT_EQ(msg_type, MessageType::Oneway);
     EXPECT_EQ(seq_id, 1);

@@ -19,7 +19,7 @@ namespace ThriftProxy {
 class BinaryProtocolImpl : public virtual Protocol {
 public:
   // Protocol
-  std::string name() const override { return ProtocolNames::get().BINARY; }
+  const std::string& name() const override { return ProtocolNames::get().BINARY; }
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
                         int32_t& seq_id) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
@@ -56,7 +56,7 @@ private:
  */
 class LaxBinaryProtocolImpl : public BinaryProtocolImpl {
 public:
-  std::string name() const override { return ProtocolNames::get().LAX_BINARY; }
+  const std::string& name() const override { return ProtocolNames::get().LAX_BINARY; }
 
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
                         int32_t& seq_id) override;
