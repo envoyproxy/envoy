@@ -118,7 +118,7 @@ protected:
    */
   class Http2Options {
   public:
-    Http2Options();
+    Http2Options(const Http2Settings& http2_settings);
     ~Http2Options();
 
     const nghttp2_option* options() { return options_; }
