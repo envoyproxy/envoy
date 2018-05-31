@@ -78,33 +78,27 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "grpc_client_integration_test_harness_lib",
+    hdrs = ["grpc_client_integration_test_harness.h"],
+    deps = [
+        ":grpc_client_integration_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/http/http2:conn_pool_lib",
+        "//test/integration:integration_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/proto:helloworld_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "grpc_client_integration_test",
     srcs = ["grpc_client_integration_test.cc"],
     data = ["//test/config/integration/certs"],
     deps = [
-        ":grpc_client_integration_lib",
-        "//source/common/common:enum_to_int",
-        "//source/common/event:dispatcher_lib",
+        ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",
-        "//source/common/http/http2:conn_pool_lib",
-        "//source/common/network:connection_lib",
-        "//source/common/network:raw_buffer_socket_lib",
-        "//source/common/ssl:context_lib",
-        "//source/common/ssl:context_config_lib",
-        "//source/common/ssl:ssl_socket_lib",
-        "//source/common/stats:stats_lib",
         "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/example:config",
-        "//test/integration:integration_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/router:router_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/tracing:tracing_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
-        "//test/test_common:environment_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
