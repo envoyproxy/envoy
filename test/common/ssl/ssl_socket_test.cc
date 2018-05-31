@@ -678,6 +678,68 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
            GetParam());
 }
 
+TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
+           "ssl.fail_verify_error", false, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_certificate_expiration": true
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
+           "ssl.fail_verify_error", false, GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_certificate_expiration": false
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
   std::string client_ctx_json = R"EOF(
   {
