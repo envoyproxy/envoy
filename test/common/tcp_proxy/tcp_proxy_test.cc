@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/accesslog/v2/file.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
@@ -315,7 +317,7 @@ TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
-    envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
+    envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
@@ -325,7 +327,7 @@ TEST(ConfigTest, AccessLogConfig) {
   log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
   {
-    envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
+    envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     ProtobufWkt::Struct* custom_config = log->mutable_config();
     MessageUtil::jsonConvert(file_access_log, *custom_config);
@@ -364,7 +366,7 @@ public:
     envoy::config::filter::accesslog::v2::AccessLog* access_log =
         config.mutable_access_log()->Add();
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
-    envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
+    envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
     MessageUtil::jsonConvert(file_access_log, *access_log->mutable_config());
