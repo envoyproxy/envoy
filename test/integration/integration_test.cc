@@ -434,7 +434,7 @@ TEST_P(IntegrationTest, TestFailedBind) {
 
 ConfigHelper::HttpModifierFunction setVia(const std::string& via) {
   return
-      [&via](
+      [via](
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
         hcm.set_via(via);
       };
