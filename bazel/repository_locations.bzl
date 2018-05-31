@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "c386d2b324468137bcbf2e7a1020da7579f7ab48",  # chromium-66.0.3359.117
+        commit = "2a52ce799382c87cd3119f3b44fbbebf97061ab6",  # chromium-67.0.3396.62
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
@@ -85,7 +85,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
+        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(

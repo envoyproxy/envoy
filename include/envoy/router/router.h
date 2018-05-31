@@ -81,8 +81,10 @@ public:
    * example prefix rewriting for redirects etc. This should only be called ONCE
    * immediately prior to redirecting.
    * @param headers supplies the request headers, which may be modified during this call.
+   * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers) const PURE;
+  virtual void rewritePathHeader(Http::HeaderMap& headers,
+                                 bool insert_envoy_original_path) const PURE;
 };
 
 /**
@@ -424,9 +426,11 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param request_info holds additional information about the request.
+   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info) const PURE;
+                                      const RequestInfo::RequestInfo& request_info,
+                                      bool insert_envoy_original_path) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

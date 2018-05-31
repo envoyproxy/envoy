@@ -1,6 +1,6 @@
 #include "test/integration/tcp_proxy_integration_test.h"
 
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "common/filesystem/filesystem_impl.h"
@@ -221,7 +221,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
-    envoy::config::filter::accesslog::v2::FileAccessLog access_log_config;
+    envoy::config::accesslog::v2::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "

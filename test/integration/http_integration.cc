@@ -770,7 +770,8 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   EXPECT_STREQ("500", response->headers().Status()->value().c_str());
 }
 
-void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream) {
+void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
+                                                       const std::string& via) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -791,7 +792,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   codec_client_->sendData(*request_encoder_, 10, true);
   upstream_request_->waitForEndStream(*dispatcher_);
   // Verify the Expect header is stripped.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect) == nullptr);
+  EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
+  if (via.empty()) {
+    EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
+  } else {
+    EXPECT_STREQ(via.c_str(),
+                 upstream_request_->headers().get(Http::Headers::get().Via)->value().c_str());
+  }
 
   if (additional_continue_from_upstream) {
     // Make sure if upstream sends an 100-Continue Envoy doesn't send its own and proxy the one
@@ -805,7 +812,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   ASSERT_TRUE(response->complete());
   ASSERT(response->continue_headers() != nullptr);
   EXPECT_STREQ("100", response->continue_headers()->Status()->value().c_str());
+  EXPECT_EQ(nullptr, response->continue_headers()->Via());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  if (via.empty()) {
+    EXPECT_EQ(nullptr, response->headers().Via());
+  } else {
+    EXPECT_STREQ(via.c_str(), response->headers().Via()->value().c_str());
+  }
 }
 
 void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,

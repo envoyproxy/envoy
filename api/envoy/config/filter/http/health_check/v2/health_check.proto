@@ -21,6 +21,8 @@ message HealthCheck {
 
   // Specifies the incoming HTTP endpoint that should be considered the
   // health check endpoint. For example */healthcheck*.
+  // Note that this field is deprecated in favor of
+  // :ref:`headers <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`.
   string endpoint = 2 [deprecated = true];
 
   // If operating in pass through mode, the amount of time in milliseconds
