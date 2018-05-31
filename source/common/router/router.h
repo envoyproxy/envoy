@@ -79,7 +79,7 @@ public:
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
    * @param insert_envoy_expected_request_timeout_ms insert
-   *                                                 x-envoy-expected-request-timeout-ms?
+   *        x-envoy-expected-request-timeout-ms?
    * @return TimeoutData for both the global and per try timeouts.
    */
   static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,

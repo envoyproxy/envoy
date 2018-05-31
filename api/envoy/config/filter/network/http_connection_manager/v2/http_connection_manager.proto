@@ -180,7 +180,8 @@ message HttpConnectionManager {
   // when only an elision of XFF addition is intended.
   bool skip_xff_append = 21;
 
-  // Via header value to append to request and response headers.
+  // Via header value to append to request and response headers. If this is
+  // empty, no via header will be appended.
   string via = 22;
 
   // Whether the connection manager will generate the :ref:`x-request-id
