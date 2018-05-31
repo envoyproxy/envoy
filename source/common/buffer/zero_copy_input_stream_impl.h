@@ -42,9 +42,9 @@ public:
 protected:
   Buffer::InstancePtr buffer_;
   uint64_t position_{0};
+  bool finished_{false};
 
 private:
-  bool finished_{false};
   uint64_t byte_count_{0};
 };
 
