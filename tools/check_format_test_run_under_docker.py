@@ -4,9 +4,15 @@
 # check_format_test.py, or you are liable to get the wrong clang, and
 # all kinds of bad results.
 
+import argparse
 import os
 import shutil
 import subprocess
+
+loglevel = 1
+def logMessage(level, message):
+  if level < loglevel:
+    print message
 
 def getenvFallback(envvar, fallback):
   val = os.getenv(envvar)
@@ -33,7 +39,7 @@ def runCommand(command):
     status = e.returncode
     for line in e.output.splitlines():
       stdout.append(line)
-  print("%s" % command)
+  logMessage(1, "%s" % command)
   return status, stdout
 
 # Runs the 'check_format' operation, on the specified file, printing
@@ -81,16 +87,16 @@ def fixFileExpectingNoChange(file):
 
 def emitStdout(stdout):
   for line in stdout:
-    print("    %s" % line)
+    logMessage(1, "    %s" % line)
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
-    print("Expected failure, but succeeded")
+    logMessage(1, "Expected failure, but succeeded")
     return 1
   for line in stdout:
     if expected_substring in line:
       return 0
-  print("Could not find '%s' in:\n" % expected_substring)
+  logMessage(1, "Could not find '%s' in:\n" % expected_substring)
   emitStdout(stdout)
   return 1
 
@@ -105,11 +111,17 @@ def checkFileExpectingError(filename, expected_substring):
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
-    print("status=%d, output:\n" % status)
+    logMessage(1, "status=%d, output:\n" % status)
     emitStdout(stdout)
   return 0
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='tester for check_foramt.py.')
+  parser.add_argument('--loglevel', type=int, choices=[0, 1, 2], default=2,
+                      help="0==silent (exit status only), 1==pass/failure summary, 2==subcommands")
+  args = parser.parse_args()
+  loglevel = args.loglevel
+
   errors = 0
 
   # Now create a temp directory to copy the input files, so we can fix them
@@ -128,7 +140,6 @@ if __name__ == "__main__":
   errors += checkFileExpectingOK("ok_file.cc")
 
   if errors != 0:
-    print("%d FAILURES" % errors)
+    logMessage(1, "%d FAILURES" % errors)
     exit(1)
-  print("PASS")
-  exit(0)
+  logMessage(0, "PASS")

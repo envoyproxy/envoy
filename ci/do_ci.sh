@@ -180,9 +180,10 @@ elif [[ "$1" == "fix_format" ]]; then
   ./tools/check_format.py fix
   exit 0
 elif [[ "$1" == "check_format" ]]; then
-  echo "check_format..."
   cd "${ENVOY_SRCDIR}"
-  ./tools/check_format_test_run_under_docker.py
+  echo "check_format_test..."
+  ./tools/check_format_test_run_under_docker.py --loglevel=1
+  echo "check_format..."
   ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then
