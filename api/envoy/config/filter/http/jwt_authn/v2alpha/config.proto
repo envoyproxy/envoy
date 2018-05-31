@@ -186,24 +186,24 @@ message JwtHeader {
 // This message specifies a Jwt requirement.
 message RequiredProvider {
   // Specify the issuer for the required JwtProvider.
-  string issuer = 1;
+  string issuer = 1 [(validate.rules).string.min_bytes = 1];
 
   // This audiences field overrides the one in JwtProvider if not empty.
   repeated string audiences = 2;
 }
 
-// This message specifies a Jwt requirement. It consists of multiple "or_jwt", each "or_jwt"
-// consists of multiple "and_jwt". Each "and_jwt" specifies a required provider.
+// This message specifies a Jwt requirement. It consists of multiple "one_of", each "one_of"
+// consists of multiple "all_of". Each "all_of" specifies a required provider.
 // If the message is empty, Jwt is not required.
 //
 // .. code-block:: yaml
 //
-//   or_jwt:
-//      - and_jwt:
+//   one_of:
+//      - all_of:
 //         - issuer: issuer1
 //         - issuer: issuer2
 //           audiences: [audience1, audience2]
-//      - and_jwt:
+//      - all_of:
 //         - issuer: issuer3
 //
 // Above example specifies this requirement: (issuer1 & issuer2) || (issuer3)
@@ -212,13 +212,13 @@ message RequiredProvider {
 message JwtRequirement {
   // Specify list of required JwtProviders. Their results are AND-ed;
   // all of them must pass, if one of them fails or missing, it fails.
-  message AndRequirement {
-    repeated RequiredProvider and_jwt = 1;
+  message RequiredProviderSet {
+    repeated RequiredProvider all_of = 1 [(validate.rules).repeated .min_items = 1];
   }
 
   // Specify list of AndRequirement. Their results are OR-ed;
   // any one of them passes, the result is passed.
-  repeated AndRequirement or_jwt = 1;
+  repeated RequiredProviderSet one_of = 1;
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -239,10 +239,10 @@ message JwtRequirement {
 //    - match:
 //         prefix: "/"
 //      requires:
-//        or_jwt:
-//           - and_jwt:
+//        one_of:
+//           - all_of:
 //             - issuer: jwt_issuer1
-//           - and_jwt:
+//           - all_of:
 //             - issuer: jwt_issuer2
 //               audiences: [audience1, audience2]
 //
@@ -294,8 +294,8 @@ message RequirementRule {
 //      - match:
 //          prefix: "/prefix"
 //        requires:
-//          or_jwt:
-//            - and_jwt:
+//          one_of:
+//            - all_of:
 //              - issuer: issuer1
 //                audiences: [audience_override]
 //
@@ -303,8 +303,8 @@ message RequirementRule {
 //      - match:
 //          prefix: "/"
 //        requires:
-//          or_jwt:
-//            - and_jwt:
+//          one_of:
+//            - all_of:
 //              - issuer: issuer2
 //
 //// [#not-implemented-hide:]
@@ -333,7 +333,7 @@ message JwtAuthentication {
   // A typical usage is: this filter is used to only verify JWT and pass the verified JWT
   // payload to another filter, the other filter will make decision.
   // This flag has impact on the process flow. For example, if flag is false, for multiple
-  // "or_jwt" requirements, if the first requirement passes, the rest requiements will not be
+  // "one_of" requirements, if the first requirement passes, the rest requiements will not be
   // verified. But if this flag is true, all requirements will be verified even all of them
   // passed.
   bool allow_missing_or_failed = 2;
@@ -352,8 +352,8 @@ message JwtAuthentication {
   //   - match:
   //       prefix: "/"
   //     requires:
-  //        or_jwt:
-  //           - and_jwt:
+  //        one_of:
+  //           - all_of:
   //             - issuer: issuer1
   //
   repeated RequirementRule rules = 3;
