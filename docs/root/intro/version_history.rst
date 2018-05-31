@@ -108,6 +108,9 @@ Version history
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
+* tls: added support for disabling certificate expiration checks with
+  :ref:`verify_certificate_expiration <envoy_api_field_auth.CertificateValidationContext.verify_certificate_expiration>`
+  which defaults to true.
 
 1.6.0 (March 20, 2018)
 ======================
