@@ -12,6 +12,7 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -257,6 +258,8 @@ public:
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   uint32_t xffNumTrustedHops() const override { return 0; }
+  bool skipXffAppend() const override { return false; }
+  const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -1396,7 +1399,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
-              finalizeRequestHeaders(_, _));
+              finalizeRequestHeaders(_, _, _));
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
       .WillOnce(Return(true));
 
