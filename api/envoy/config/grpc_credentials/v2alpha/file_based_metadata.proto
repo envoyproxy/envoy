@@ -22,4 +22,3 @@ message FileBasedMetadataConfig {
   // if no prefix is set, the default is to use no prefix
   string header_prefix = 3;
 }
-
