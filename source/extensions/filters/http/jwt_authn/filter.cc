@@ -9,7 +9,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(FilterConfigSharedPtr config) : config_(config) {}
+Filter::Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth)
+    : stats_(stats), auth_(std::move(auth)) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
@@ -21,21 +22,13 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
-  // TODO: support per-route config.
-  // store_factory can be created in route::per_filter_config
-
-  // For now, only use config from filter.
-  if (!config_) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-  auth_ = Authenticator::create(config_);
-
   // Remove headers configured to pass payload
   auth_->sanitizePayloadHeaders(headers);
 
   state_ = Calling;
   stopped_ = false;
 
+  // TODO(qiwzhang): support per-route config.
   // Verify the JWT token, onComplete() will be called when completed.
   auth_->verify(headers, this);
   if (state_ == Complete) {
@@ -53,7 +46,7 @@ void Filter::onComplete(const Status& status) {
     return;
   }
   if (status != Status::Ok) {
-    config_->stats().denied_.inc();
+    stats_.denied_.inc();
     state_ = Responded;
     // verification failed
     Http::Code code = Http::Code::Unauthorized;
@@ -63,7 +56,7 @@ void Filter::onComplete(const Status& status) {
     return;
   }
 
-  config_->stats().allowed_.inc();
+  stats_.allowed_.inc();
   state_ = Complete;
   if (stopped_) {
     decoder_callbacks_->continueDecoding();

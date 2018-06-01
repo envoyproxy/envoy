@@ -3,6 +3,7 @@
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
+#include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -60,11 +61,6 @@ const std::string GoodToken =
     "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
 
 } // namespace
-
-class MockAuthenticatorCallbacks : public Authenticator::Callbacks {
-public:
-  MOCK_METHOD1(onComplete, void(const Status& status));
-};
 
 class AuthenticatorTest : public ::testing::Test {
 public:

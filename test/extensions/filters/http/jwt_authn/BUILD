@@ -17,6 +17,11 @@ envoy_cc_library(
     hdrs = ["test_common.h"],
 )
 
+envoy_cc_library(
+    name = "mock_lib",
+    hdrs = ["mock.h"],
+)
+
 envoy_extension_cc_test(
     name = "extractor_test",
     srcs = [
@@ -25,6 +30,20 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/extensions/filters/http/jwt_authn:extractor_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_test",
+    srcs = [
+        "filter_test.cc",
+    ],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        ":mock_lib",
+        "//source/extensions/filters/http/jwt_authn:filter_lib",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -63,6 +82,7 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
+        ":mock_lib",
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//test/mocks/server:server_mocks",
