@@ -384,7 +384,7 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
         cluster.name(), cluster_manager.pending_cluster_creations_, post_cluster_cb);
     cluster_manager.pending_cluster_creations_[cluster.name()] = cluster_handler;
     main_thread_dispatcher_.post(
-        [ this, cluster, version_info ]() -> void { addOrUpdateCluster(cluster, version_info); });
+        [ this, cluster, version_info ]()->void { addOrUpdateCluster(cluster, version_info); });
   }
 
   return cluster_handler;
