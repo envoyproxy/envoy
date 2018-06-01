@@ -68,6 +68,8 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
     return FilterPtr{new OrFilter(config.or_filter(), runtime, random)};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kHeaderFilter:
     return FilterPtr{new HeaderFilter(config.header_filter())};
+  case envoy::config::filter::accesslog::v2::AccessLogFilter::kResponseFlagFilter:
+    return FilterPtr{new ResponseFlagFilter()};
   default:
     NOT_REACHED;
   }
@@ -172,6 +174,11 @@ HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFil
 bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
                             const Http::HeaderMap& request_headers) {
   return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
+}
+
+bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, 
+                                  const Http::HeaderMap&) {
+  return info.getResponseFlag();
 }
 
 InstanceSharedPtr

@@ -724,6 +724,25 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
+TEST_F(AccessLogImplTest, ResponseFlagFilter) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  response_flag_filter: {}
+config:
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+
+  request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
+  EXPECT_CALL(*file_, write(_));
+  log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
+}
+
 } // namespace
 } // namespace AccessLog
 } // namespace Envoy

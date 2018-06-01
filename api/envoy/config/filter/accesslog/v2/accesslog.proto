@@ -338,6 +338,9 @@ message AccessLogFilter {
 
     // Header filter.
     HeaderFilter header_filter = 8;
+
+    // Response flag filter.
+    ResponseFlagFilter response_flag_filter = 9;
   }
 }
 
@@ -426,6 +429,12 @@ message HeaderFilter {
   // Only requests with a header which matches the specified HeaderMatcher will pass the filter
   // check.
   envoy.api.v2.route.HeaderMatcher header = 1 [(validate.rules).message.required = true];
+}
+
+// Filters requests that received responses with an Envoy response flag set.
+// All the response flags are listed
+// in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
+message ResponseFlagFilter{
 }
 
 // Custom configuration for an AccessLog that writes log entries directly to a file.

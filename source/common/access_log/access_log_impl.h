@@ -167,6 +167,18 @@ private:
 };
 
 /**
+ * Filter requests that had a response with an Envoy response flag set. 
+ */
+class ResponseFlagFilter : public Filter {
+public:
+  ResponseFlagFilter() {}
+
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
+};
+
+/**
  * Access log factory that reads the configuration from proto.
  */
 class AccessLogFactory {

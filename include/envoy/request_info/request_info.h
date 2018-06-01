@@ -209,6 +209,11 @@ public:
   virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
+   * @return whether any response flag is set or not.
+   */
+  virtual bool getResponseFlag() const PURE;
+
+  /**
    * @return upstream host description.
    */
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;

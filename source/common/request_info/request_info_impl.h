@@ -123,6 +123,8 @@ struct RequestInfoImpl : public RequestInfo {
 
   bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
+  bool getResponseFlag() const override { return response_flags_ != 0; }
+
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
