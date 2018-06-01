@@ -140,8 +140,7 @@ struct ClusterManagerStats {
   ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-class DynamicClusterHandlerImpl : public DynamicClusterHandler,
-                                  Logger::Loggable<Logger::Id::upstream> {
+class DynamicClusterHandlerImpl : public DynamicClusterHandler {
 public:
   DynamicClusterHandlerImpl(
       const std::string& cluster_name,

@@ -172,12 +172,10 @@ DynamicClusterHandlerImpl::DynamicClusterHandlerImpl(
       post_cluster_cb_(post_cluster_cb) {}
 
 void DynamicClusterHandlerImpl::cancel() {
-  ENVOY_LOG(debug, "cancelling dynamic cluster creation callback for cluster {}", cluster_name_);
   pending_clusters_.erase(cluster_name_);
 }
 
 void DynamicClusterHandlerImpl::onClusterCreationComplete() {
-  ENVOY_LOG(debug, "cluster {} creation complete. initiating post callback", cluster_name_);
   post_cluster_cb_();
   pending_clusters_.erase(cluster_name_);
 }
@@ -386,7 +384,6 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
     main_thread_dispatcher_.post(
         [ this, cluster, version_info ]()->void { addOrUpdateCluster(cluster, version_info); });
   }
-
   return cluster_handler;
 }
 
