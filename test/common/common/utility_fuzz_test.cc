@@ -8,22 +8,49 @@ namespace Envoy {
 namespace Fuzz {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-
   uint64_t out;
-  std::string stringBuffer(*buf, len);
-  absl::string_view abslString = stringBuffer;
-
-  if (len > 0) {
-    Envoy::StringUtil::atoul(stringBuffer.c_str(), out);
-    Envoy::StringUtil::escape(stringBuffer);
-    Envoy::StringUtil::endsWith(stringBuffer, stringBuffer);
-    Envoy::StringUtil::caseCompare(abslString, abslString);
-    Envoy::StringUtil::cropLeft(abslString, abslString);
-    Envoy::StringUtil::cropRight(abslString, abslString);
-    Envoy::StringUtil::toUpper(abslString);
-    Envoy::StringUtil::trim(abslString);
-    Envoy::StringUtil::ltrim(abslString);
-    Envoy::StringUtil::rtrim(abslString);
+  /**
+   * @param string_buffer.substr(len / 2, len / 2) denotes the part from half of the buffer till the end.
+   */
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::atoul(string_buffer.c_str(), out);
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::escape(string_buffer);
+  }
+  { 
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::endsWith(string_buffer, string_buffer.substr(len / 2, len / 2)); 
+  }
+  { 
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::toUpper(string_buffer);
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::trim(string_buffer);
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::ltrim(string_buffer);
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::rtrim(string_buffer);
   }
 }
 
