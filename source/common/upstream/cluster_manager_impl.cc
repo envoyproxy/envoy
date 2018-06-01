@@ -171,9 +171,7 @@ DynamicClusterHandlerImpl::DynamicClusterHandlerImpl(
     : cluster_name_(cluster_name), pending_clusters_(pending_clusters),
       post_cluster_cb_(post_cluster_cb) {}
 
-void DynamicClusterHandlerImpl::cancel() {
-  pending_clusters_.erase(cluster_name_);
-}
+void DynamicClusterHandlerImpl::cancel() { pending_clusters_.erase(cluster_name_); }
 
 void DynamicClusterHandlerImpl::onClusterCreationComplete() {
   post_cluster_cb_();
