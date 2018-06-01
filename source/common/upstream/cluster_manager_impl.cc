@@ -14,7 +14,6 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/config/utility.h"
@@ -399,7 +398,6 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
   // should be blocked.
-
   const std::string cluster_name = cluster.name();
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
