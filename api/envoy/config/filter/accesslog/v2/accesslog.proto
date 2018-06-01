@@ -434,7 +434,7 @@ message HeaderFilter {
 // Filters requests that received responses with an Envoy response flag set.
 // All the response flags are listed
 // in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
-message ResponseFlagFilter{
+message ResponseFlagFilter {
 }
 
 // Custom configuration for an AccessLog that writes log entries directly to a file.

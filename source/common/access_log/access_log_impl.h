@@ -167,7 +167,7 @@ private:
 };
 
 /**
- * Filter requests that had a response with an Envoy response flag set. 
+ * Filter requests that had a response with an Envoy response flag set.
  */
 class ResponseFlagFilter : public Filter {
 public:

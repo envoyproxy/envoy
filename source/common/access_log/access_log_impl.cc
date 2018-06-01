@@ -176,8 +176,7 @@ bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
   return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
-bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, 
-                                  const Http::HeaderMap&) {
+bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
   return info.getResponseFlag();
 }
 
