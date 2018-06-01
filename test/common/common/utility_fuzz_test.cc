@@ -10,7 +10,8 @@ namespace Fuzz {
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   uint64_t out;
   /**
-   * @param string_buffer.substr(len / 2, len / 2) denotes the part from half of the buffer till the end.
+   * @param string_buffer.substr(len / 2, len / 2) denotes the part from half of the buffer till the
+   * end.
    */
   {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
@@ -20,21 +21,24 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     Envoy::StringUtil::escape(string_buffer);
   }
-  { 
+  {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    Envoy::StringUtil::endsWith(string_buffer, string_buffer.substr(len / 2, len / 2)); 
-  }
-  { 
-    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+    Envoy::StringUtil::endsWith(string_buffer, string_buffer.substr(len / 2, len / 2));
   }
   {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2),
+                                   string_buffer.substr(len / 2, len / 2));
   }
   {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2), string_buffer.substr(len / 2, len / 2));
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2),
+                                   string_buffer.substr(len / 2, len / 2));
+  }
+  {
+    std::string string_buffer(reinterpret_cast<const char*>(buf), len);
+    Envoy::StringUtil::caseCompare(string_buffer.substr(0, len / 2),
+                                   string_buffer.substr(len / 2, len / 2));
   }
   {
     std::string string_buffer(reinterpret_cast<const char*>(buf), len);
