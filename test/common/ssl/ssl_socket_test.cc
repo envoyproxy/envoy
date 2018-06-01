@@ -699,45 +699,66 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"
-  }
-  )EOF";
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_expiration": true
-  }
-  )EOF";
+  // Check for expired certs
+  server_validation_ctx->set_disable_certificate_expiration_verification(false);
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
-           "ssl.fail_verify_error", false, GetParam());
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
-  std::string client_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem",
-    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"
-  }
-  )EOF";
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
-  std::string server_ctx_json = R"EOF(
-  {
-    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
-    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
-    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_expiration": false
-  }
-  )EOF";
+  // Don't check for expired certs
+  server_validation_ctx->set_disable_certificate_expiration_verification(true);
 
-  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
-           "ssl.handshake", true, GetParam());
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "ssl.handshake",
+             2, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {

@@ -135,7 +135,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
   // directly. However, our new callback is still calling X509_verify_cert() under
   // the hood. Therefore, to ignore cert expiration, we need to set the callback
   // for X509_verify_cert to ignore that error.
-  if (!config.verifyCertificateExpiration()) {
+  if (config.disableCertificateExpirationVerification()) {
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
     X509_STORE_set_verify_cb(store, ContextImpl::verifyIgnoreCertExpirationCallback);
   }

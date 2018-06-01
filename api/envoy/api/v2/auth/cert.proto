@@ -173,7 +173,7 @@ message CertificateValidationContext {
   core.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certs.
-  google.protobuf.BoolValue verify_certificate_expiration = 8;
+  bool disable_certificate_expiration_verification = 8;
 }
 
 // TLS context shared by both client and server TLS contexts.

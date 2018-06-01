@@ -95,7 +95,7 @@ public:
   /**
    * @return whether to ignore expired certificates (both too new and too old).
    */
-  virtual bool verifyCertificateExpiration() const PURE;
+  virtual bool disableCertificateExpirationVerification() const PURE;
 
   /**
    * @return The minimum TLS protocol version to negotiate.

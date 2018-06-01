@@ -109,8 +109,8 @@ Version history
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 * tls: added support for disabling certificate expiration checks with
-  :ref:`verify_certificate_expiration <envoy_api_field_auth.CertificateValidationContext.verify_certificate_expiration>`
-  which defaults to true.
+  :ref:`disable_certificate_expiration_verification <envoy_api_field_auth.CertificateValidationContext.disable_certificate_expiration_verification>`
+  which defaults to false.
 
 1.6.0 (March 20, 2018)
 ======================
