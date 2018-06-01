@@ -171,9 +171,13 @@ DynamicClusterHandlerImpl::DynamicClusterHandlerImpl(
     : cluster_name_(cluster_name), pending_clusters_(pending_clusters),
       post_cluster_cb_(post_cluster_cb) {}
 
-void DynamicClusterHandlerImpl::cancel() { pending_clusters_.erase(cluster_name_); }
+void DynamicClusterHandlerImpl::cancel() {
+  ENVOY_LOG(debug, "cancelling dynamic cluster creation callback for cluster {}", cluster_name_);
+  pending_clusters_.erase(cluster_name_);
+}
 
 void DynamicClusterHandlerImpl::onClusterCreationComplete() {
+  ENVOY_LOG(debug, "cluster {} creation complete. initiating post callback", cluster_name_);
   post_cluster_cb_();
   pending_clusters_.erase(cluster_name_);
 }
@@ -379,8 +383,10 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
     cluster_handler = std::make_shared<DynamicClusterHandlerImpl>(
         cluster.name(), cluster_manager.pending_cluster_creations_, post_cluster_cb);
     cluster_manager.pending_cluster_creations_[cluster.name()] = cluster_handler;
-    main_thread_dispatcher_.post(
-        [this, cluster, version_info]() -> void { addOrUpdateCluster(cluster, version_info); });
+    main_thread_dispatcher_.post([this, cluster, version_info]() -> void {
+      ENVOY_LOG(trace, "initating dynamic cluster {} creation", cluster.name());
+      addOrUpdateCluster(cluster, version_info);
+    });
   }
   return cluster_handler;
 }
