@@ -215,7 +215,7 @@ int StreamHandleWrapper::luaAddorUpdateCluster(lua_State* state) {
           state_ = State::Running;
           markLive();
           try {
-            coroutine_->resume(2, yield_callback_);
+            coroutine_->resume(0, yield_callback_);
             markDead();
           } catch (const Filters::Common::Lua::LuaException& e) {
             filter_.scriptError(e);
