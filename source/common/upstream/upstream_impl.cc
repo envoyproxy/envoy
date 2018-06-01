@@ -177,7 +177,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
-      !locality_weights_->empty()) {
+      !locality_weights_->empty() && !healthy_hosts_->empty()) {
     locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
     locality_entries_.clear();
     for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {

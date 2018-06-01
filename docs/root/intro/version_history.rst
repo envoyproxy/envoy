@@ -115,6 +115,7 @@ Version history
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
+* upstream: fixed crash during host selection from locality weighted clusters with no healthy hosts
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 
