@@ -122,12 +122,18 @@ public:
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
-            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
-            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
-            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
-            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
+    return {{"headers", static_luaHeaders},
+            {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},
+            {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},
+            {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},
+            {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},
+            {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical},
+            {"httpCall", static_luaHttpCall},
             {"respond", static_luaRespond},
             {"addOrUpdateCluster", static_luaAddorUpdateCluster}};
   }
