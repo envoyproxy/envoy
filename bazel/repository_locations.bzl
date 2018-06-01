@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "c386d2b324468137bcbf2e7a1020da7579f7ab48",  # chromium-66.0.3359.117
+        commit = "2a52ce799382c87cd3119f3b44fbbebf97061ab6",  # chromium-67.0.3396.62
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
@@ -26,14 +26,14 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/eile/tclap",
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "10a9f184d4d66f135093a08396d3b0a0ebe8d97b79f8b3ddb8559f75fe4fcbc3",
-        strip_prefix = "fmt-4.0.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
+        sha256 = "46628a2f068d0e33c716be0ed9dcae4370242df135aed663a180b9fd8e36733d",
+        strip_prefix = "fmt-4.1.0",
+        urls = ["https://github.com/fmtlib/fmt/archive/4.1.0.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "b88d7be261d9089c817fc8cee6c000d69f349b357828e4c7f66985bc5d5360b8",
-        strip_prefix = "spdlog-0.16.3",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.16.3.tar.gz"],
+        sha256 = "94f74fd1b3344733d1db3de2ec22e6cbeb769f93a8baa0d4a22b1f62dc7369f8",
+        strip_prefix = "spdlog-0.17.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v0.17.0.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
@@ -44,11 +44,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "bd44e485f69d70ca4095cea92decd98de3892aa6", # v1.11.0
+        commit = "bec3b5ada2c5e5d782dff0b7b5018df646b65cb0", # v1.12.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "900f9d9297a71ddf4a5dff2051a01493014c07c5", # v1.4.0
+        commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3", # v1.4.2
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
@@ -64,7 +64,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
-        commit = "d78a1b079cd985eea7d636f79124ab4fc44cb538",  # 2.9.6
+        commit = "78d2f672149e5b9b7d539c575d2c1bfc12db67a9",  # 2.10
         remote = "https://github.com/pallets/jinja",
     ),
     com_github_pallets_markupsafe = dict(
@@ -89,11 +89,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
+        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.10.3",
+        commit = "0.11.1",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     six_archive = dict(

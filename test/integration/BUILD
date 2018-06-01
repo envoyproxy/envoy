@@ -7,8 +7,8 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
-    "envoy_sh_test",
     "envoy_select_hot_restart",
+    "envoy_sh_test",
 )
 load(
     "//source/extensions:all_extensions.bzl",
@@ -52,7 +52,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_py",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_py",
     ],
 )
 
@@ -136,6 +136,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
@@ -403,7 +404,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 

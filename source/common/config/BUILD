@@ -113,6 +113,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/filters/http:well_known_names",
+        "@envoy_api//envoy/config/accesslog/v2:file_cc",
         "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
         "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
         "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",

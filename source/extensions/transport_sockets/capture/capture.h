@@ -3,7 +3,7 @@
 #include <fstream>
 
 #include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/extensions/common/tap/v2alpha/capture.pb.h"
+#include "envoy/data/tap/v2alpha/capture.pb.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -35,7 +35,7 @@ private:
   // long lived connections or large transfers. We could emit multiple capture
   // files with bounded size, with identical connection ID to allow later
   // reassembly.
-  envoy::extensions::common::tap::v2alpha::Trace trace_;
+  envoy::data::tap::v2alpha::Trace trace_;
   Network::TransportSocketPtr transport_socket_;
   Network::TransportSocketCallbacks* callbacks_{};
 };

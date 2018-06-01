@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library", "api_go_grpc_library")
+load("//bazel:api_build_system.bzl", "api_go_grpc_library", "api_proto_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -9,7 +9,7 @@ api_proto_library(
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
-        "//envoy/config/filter/accesslog/v2:accesslog",
+        "//envoy/data/accesslog/v2:accesslog",
     ],
 )
 
@@ -18,6 +18,6 @@ api_go_grpc_library(
     proto = ":als",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
-        "//envoy/config/filter/accesslog/v2:accesslog_go_proto",
+        "//envoy/data/accesslog/v2:accesslog_go_proto",
     ],
 )

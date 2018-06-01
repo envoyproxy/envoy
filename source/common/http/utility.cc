@@ -38,6 +38,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   header.append(address_as_string.c_str(), address_as_string.size());
 }
 
+void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+  HeaderString& header = headers.insertVia().value();
+  if (!header.empty()) {
+    header.append(", ", 2);
+  }
+  header.append(via.c_str(), via.size());
+}
+
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());

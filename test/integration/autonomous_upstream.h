@@ -62,7 +62,7 @@ public:
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
 
 private:
-  std::mutex headers_lock_;
+  Thread::MutexBasicLockable headers_lock_;
   std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
 };

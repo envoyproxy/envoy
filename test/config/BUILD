@@ -5,8 +5,8 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_sh_test",
     "envoy_select_hot_restart",
+    "envoy_sh_test",
 )
 
 envoy_package()

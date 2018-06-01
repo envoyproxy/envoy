@@ -124,6 +124,11 @@ more details on the supported API.
 
 .. _config_http_filters_lua_stream_handle_api:
 
+Complete example
+----------------
+
+A complete example using Docker is available in :repo:`/examples/lua`.
+
 Stream handle API
 -----------------
 
