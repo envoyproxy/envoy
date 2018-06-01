@@ -164,6 +164,24 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
   }
 }
 
+DynamicClusterHandlerImpl::DynamicClusterHandlerImpl(
+    const std::string& cluster_name,
+    std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>& pending_clusters,
+    PostClusterCreationCb post_cluster_cb)
+    : cluster_name_(cluster_name), pending_clusters_(pending_clusters),
+      post_cluster_cb_(post_cluster_cb) {}
+
+void DynamicClusterHandlerImpl::cancel() {
+  ENVOY_LOG(debug, "cancelling dynamic cluster creation callback for cluster {}", cluster_name_);
+  pending_clusters_.erase(cluster_name_);
+}
+
+void DynamicClusterHandlerImpl::onClusterCreationComplete() {
+  ENVOY_LOG(debug, "cluster {} creation complete. initiating post callback", cluster_name_);
+  post_cluster_cb_();
+  pending_clusters_.erase(cluster_name_);
+}
+
 ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                        ClusterManagerFactory& factory, Stats::Store& stats,
                                        ThreadLocal::Instance& tls, Runtime::Loader& runtime,
@@ -341,12 +359,46 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
+DynamicClusterHandlerPtr
+ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
+                                                  const std::string& version_info,
+                                                  PostClusterCreationCb post_cluster_cb) {
+  ASSERT(!tls_->isMainThread());
+
+  bool should_create_cluster = true;
+  if (active_clusters_.find(cluster.name()) != active_clusters_.end()) {
+    ENVOY_LOG(trace, "cluster {} already exists", cluster.name());
+    should_create_cluster = false;
+  }
+  if (cluster.type() != envoy::api::v2::Cluster::STATIC || cluster.hosts_size() < 1) {
+    ENVOY_LOG(warn, "dynamic cluster {} should be of type static and should have hosts",
+              cluster.name());
+    should_create_cluster = false;
+  }
+
+  DynamicClusterHandlerPtr cluster_handler;
+  if (should_create_cluster) {
+    ThreadLocalClusterManagerImpl& cluster_manager =
+        tls_->getTyped<ThreadLocalClusterManagerImpl>();
+    cluster_handler = std::make_shared<DynamicClusterHandlerImpl>(
+        cluster.name(), cluster_manager.pending_cluster_creations_, post_cluster_cb);
+    cluster_manager.pending_cluster_creations_[cluster.name()] = cluster_handler;
+    main_thread_dispatcher_.post(
+        [this, cluster, version_info]() -> void { addOrUpdateCluster(cluster, version_info); });
+  }
+
+  return cluster_handler;
+}
+
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                                             const std::string& version_info) {
+  ASSERT(tls_->isMainThread());
+
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
   // should be blocked.
+
   const std::string cluster_name = cluster.name();
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
@@ -408,46 +460,24 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  createOrUpdateThreadLocalClusterInternal(
-      [
-        this, new_cluster = cluster.cluster_->info(),
-        thread_aware_lb_factory = cluster.loadBalancerFactory()
-      ]()
-          ->void {
-            ThreadLocalClusterManagerImpl& cluster_manager =
-                tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_->info(),
+                         thread_aware_lb_factory = cluster.loadBalancerFactory()]() -> void {
+    ThreadLocalClusterManagerImpl& cluster_manager =
+        tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-            if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-              ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
-            } else {
-              ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
-            }
+    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+      ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+    } else {
+      ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+    }
 
-            auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-                cluster_manager, new_cluster, thread_aware_lb_factory);
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-            for (auto& cb : cluster_manager.update_callbacks_) {
-              cb->onClusterAddOrUpdate(*thread_local_cluster);
-            }
-          });
-}
-
-void ClusterManagerImpl::createOrUpdateThreadLocalClusterInternal(
-    std::function<void()> thread_local_clustercb) {
-  if (tls_->isMainThread()) {
-    tls_->runOnAllThreads(thread_local_clustercb);
-  } else {
-    Thread::CondVar tls_update_;
-    Thread::MutexBasicLockable tls_lock_;
-    Thread::ReleasableLockGuard lock(tls_lock_);
-    main_thread_dispatcher_.post([this, &thread_local_clustercb, &tls_update_]() -> void {
-      tls_->runOnAllThreads(thread_local_clustercb);
-      tls_update_.notifyOne(); // Ensures main thread is updated before we proceed.
-    });
-    // TODO(ramaraochavali): This is inefficient. On one worker thread, this gets called twice.
-    thread_local_clustercb();
-    tls_update_.wait(tls_lock_);
-  }
+    auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+        cluster_manager, new_cluster, thread_aware_lb_factory);
+    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+    for (auto& cb : cluster_manager.update_callbacks_) {
+      cb->onClusterAddOrUpdate(*thread_local_cluster);
+    }
+  });
 }
 
 bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
@@ -494,7 +524,6 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
                                      ClusterMap& cluster_map) {
   ClusterSharedPtr new_cluster =
       factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
-
   if (!added_via_api) {
     if (cluster_map.find(new_cluster->info()->name()) != cluster_map.end()) {
       throw EnvoyException(
@@ -582,33 +611,14 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
 
-  postThreadLocalClusterUpdateInternal([
-    this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-    hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-    locality_weights = host_set->localityWeights(), hosts_added, hosts_removed
-  ]() {
-    ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-        healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
-  });
-}
-
-void ClusterManagerImpl::postThreadLocalClusterUpdateInternal(
-    std::function<void()> thread_local_cluster_updatecb) {
-  if (tls_->isMainThread()) {
-    tls_->runOnAllThreads(thread_local_cluster_updatecb);
-  } else {
-    Thread::CondVar tls_update_;
-    Thread::MutexBasicLockable tls_lock_;
-    Thread::ReleasableLockGuard lock(tls_lock_);
-    main_thread_dispatcher_.post([this, &thread_local_cluster_updatecb, &tls_update_]() -> void {
-      tls_->runOnAllThreads(thread_local_cluster_updatecb);
-      tls_update_.notifyOne(); // Ensures main thread is updated here.
-    });
-    // TODO(ramaraochavali): This is inefficient. On one worker thread, this gets called twice.
-    thread_local_cluster_updatecb();
-    tls_update_.wait(tls_lock_);
-  }
+  tls_->runOnAllThreads(
+      [this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
+       hosts_per_locality_copy, healthy_hosts_per_locality_copy,
+       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed]() {
+        ThreadLocalClusterManagerImpl::updateClusterMembership(
+            name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+            healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
+      });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -812,6 +822,11 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   if (cluster_entry->lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     cluster_entry->lb_ = cluster_entry->lb_factory_->create();
+  }
+
+  if (config.pending_cluster_creations_.find(name) != config.pending_cluster_creations_.end()) {
+    auto handler = config.pending_cluster_creations_.find(name)->second;
+    handler->onClusterCreationComplete();
   }
 }
 

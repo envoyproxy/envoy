@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <list>
 #include <map>
 #include <memory>
@@ -139,6 +140,23 @@ struct ClusterManagerStats {
   ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+class DynamicClusterHandlerImpl : public DynamicClusterHandler,
+                                  Logger::Loggable<Logger::Id::upstream> {
+public:
+  DynamicClusterHandlerImpl(
+      const std::string& cluster_name,
+      std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>& pending_clusters,
+      PostClusterCreationCb post_cluster_cb);
+  const std::string& cluster() const override { return cluster_name_; };
+  void cancel() override;
+  void onClusterCreationComplete() override;
+
+private:
+  std::string cluster_name_;
+  std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>& pending_clusters_;
+  PostClusterCreationCb post_cluster_cb_;
+};
+
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
@@ -155,6 +173,10 @@ public:
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                           const std::string& version_info) override;
+  DynamicClusterHandlerPtr
+  addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
+                                const std::string& version_info,
+                                PostClusterCreationCb post_cluster_cb) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -286,6 +308,8 @@ private:
     std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
+    std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>
+        pending_cluster_creations_;
     const PrioritySet* local_priority_set_{};
   };
 
@@ -330,7 +354,6 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
-  void createOrUpdateThreadLocalClusterInternal(std::function<void()> thread_local_clustercb);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
   void loadCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
@@ -338,7 +361,6 @@ private:
   void onClusterInit(Cluster& cluster);
   void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                     const HostVector& hosts_added, const HostVector& hosts_removed);
-  void postThreadLocalClusterUpdateInternal(std::function<void()> thread_local_cluster_updatecb);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateGauges();
 

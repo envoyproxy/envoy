@@ -231,6 +231,163 @@ config:
   cleanup();
 }
 
+// Dynamic cluster creation.
+TEST_P(LuaIntegrationTest, DynamicCluster) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+       cluster_name = "dynamic_cluster"
+       cluster_template = "\
+       name: %s \
+       connect_timeout: 0.25s \
+       type: STATIC \
+       lb_policy: ROUND_ROBIN \
+       common_http_protocol_options: {idle_timeout: 120s} \
+       http2_protocol_options: {} \
+       hosts: \
+        socket_address: \
+           address: %s \
+           port_value: %s"
+    cluster_template = string.format(cluster_template,cluster_name,"127.0.0.1","5555")
+    request_handle:addOrUpdateCluster(cluster_template)
+    end
+)EOF";
+  initializeFilter(FILTER_AND_CODE);
+
+  // Send an empty request and verify the cluster is created.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-lyft-user-id", "123"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.dynamic_cluster.membership_change")->value());
+
+  cleanup();
+}
+
+// Dynamic cluster creation duplicate cluster.
+TEST_P(LuaIntegrationTest, DynamicClusterDuplicate) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+       cluster_name = "dynamic_cluster"
+       cluster_template = "\
+       name: %s \
+       connect_timeout: 0.25s \
+       type: STATIC \
+       lb_policy: ROUND_ROBIN \
+       common_http_protocol_options: {idle_timeout: 120s} \
+       http2_protocol_options: {} \
+       hosts: \
+        socket_address: \
+           address: %s \
+           port_value: %s"
+    cluster_template = string.format(cluster_template,cluster_name,"127.0.0.1","5555")
+    request_handle:addOrUpdateCluster(cluster_template)
+    end
+)EOF";
+  initializeFilter(FILTER_AND_CODE);
+
+  // Send an empty request and verify the cluster is created.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-lyft-user-id", "123"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.dynamic_cluster.membership_change")->value());
+
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_EQ(1, test_server_->counter("cluster.dynamic_cluster.membership_change")->value());
+
+  cleanup();
+}
+
+// Dynamic cluster creation with out hosts.
+TEST_P(LuaIntegrationTest, DynamicClusterInvalidHosts) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+       cluster_name = "dynamic_cluster"
+       cluster_template = "\
+       name: %s \
+       connect_timeout: 0.25s \
+       type: STATIC \
+       lb_policy: ROUND_ROBIN \
+       common_http_protocol_options: {idle_timeout: 120s} \
+       http2_protocol_options: {}"
+    cluster_template = string.format(cluster_template,cluster_name)
+    request_handle:addOrUpdateCluster(cluster_template)
+    end
+)EOF";
+  initializeFilter(FILTER_AND_CODE);
+
+  // Send an empty request and verify the cluster is not created.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-lyft-user-id", "123"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.dynamic_cluster.membership_change"));
+}
+
+// Dynamic cluster with reset.
+TEST_P(LuaIntegrationTest, DynamicClusterReset) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+       cluster_name = "dynamic_cluster"
+       cluster_template = "\
+       name: %s \
+       connect_timeout: 0.25s \
+       type: STATIC \
+       lb_policy: ROUND_ROBIN \
+       common_http_protocol_options: {idle_timeout: 120s} \
+       http2_protocol_options: {} \
+       hosts: \
+        socket_address: \
+           address: %s \
+           port_value: %s"
+    cluster_template = string.format(cluster_template,cluster_name,"127.0.0.1","5555")
+    request_handle:addOrUpdateCluster(cluster_template)
+    end
+)EOF";
+  initializeFilter(FILTER_AND_CODE);
+
+  // Start a request and reset it immediately and validate that cluster is not created.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  codec_client_->sendReset(encoder_decoder.first);
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.dynamic_cluster.membership_change"));
+
+  cleanup();
+}
+
 // Upstream call followed by immediate response.
 TEST_P(LuaIntegrationTest, UpstreamCallAndRespond) {
   const std::string FILTER_AND_CODE =

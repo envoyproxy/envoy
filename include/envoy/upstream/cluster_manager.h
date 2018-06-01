@@ -58,6 +58,37 @@ public:
 typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
 
 /**
+ * A cancellable handler returned to the caller who initiates the dynamic cluster creation on the
+ * request path.
+ */
+class DynamicClusterHandler {
+public:
+  virtual ~DynamicClusterHandler() {}
+
+  /**
+   * @return Cluster that this handle is created for.
+   */
+  virtual const std::string& cluster() const PURE;
+
+  /**
+   * Cancels the callback.
+   */
+  virtual void cancel() PURE;
+
+  /**
+   * Called when cluster creation is complete.
+   */
+  virtual void onClusterCreationComplete() PURE;
+};
+
+typedef std::shared_ptr<DynamicClusterHandler> DynamicClusterHandlerPtr;
+
+/**
+ * Callback invoked when a cross thread cluster creation is complete.
+ */
+typedef std::function<void()> PostClusterCreationCb;
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  */
@@ -78,6 +109,20 @@ public:
   virtual bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                                   const std::string& version_info) PURE;
 
+  /**
+   * Add a dynamic cluster via API on the request path. Currently this supports only STATIC type of
+   * clusters.
+   *
+   * @param cluster supplies the cluster configuration.
+   * @param version_info supplies the xDS version of the cluster.
+   * @param post_cluster_cb supplies the call back that allows the request to continue after the
+   *        cluster creation is done.
+   * @return DynamicClusterHandlerPtr that allows the caller to cancel if needed.
+   */
+  virtual DynamicClusterHandlerPtr
+  addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
+                                const std::string& version_info,
+                                PostClusterCreationCb post_cluster_cb) PURE;
   /**
    * Set a callback that will be invoked when all owned clusters have been initialized.
    */

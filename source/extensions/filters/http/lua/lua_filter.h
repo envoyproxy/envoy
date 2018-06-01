@@ -97,6 +97,8 @@ public:
     WaitForTrailers,
     // Lua script is blocked waiting for the result of an HTTP call.
     HttpCall,
+    // Lua script is blocked waiting for the result of Dynamic Cluster creation call.
+    DynamicCluster,
     // Lua script has done a direct response.
     Responded
   };
@@ -113,6 +115,10 @@ public:
       http_request_->cancel();
       http_request_ = nullptr;
     }
+    if (cluster_handler_) {
+      cluster_handler_->cancel();
+      cluster_handler_ = nullptr;
+    }
   }
 
   static ExportedFunctions exportedFunctions() {
@@ -122,7 +128,8 @@ public:
             {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
             {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+            {"respond", static_luaRespond},
+            {"addOrUpdateCluster", static_luaAddorUpdateCluster}};
   }
 
 private:
@@ -177,6 +184,11 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
+   * @return a handle to create a cluster on the request path.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaAddorUpdateCluster);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -224,6 +236,7 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  Upstream::DynamicClusterHandlerPtr cluster_handler_;
 };
 
 /**
