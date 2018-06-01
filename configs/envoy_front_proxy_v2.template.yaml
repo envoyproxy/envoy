@@ -122,16 +122,19 @@ static_resources:
         address: main_website.com
         protocol: TCP
         port_value: 443
+  {% for service, options in clusters.iteritems() -%}
+  - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
+  {% if not loop.last %}
+  {% endif %}
+  {% endfor %}
 cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
 flags_path: /etc/envoy/flags
-#uncomment this when interval_cluster_definition calls
-#to helper are added
-#rate_limit_service:
-#  grpc_service:
-#    envoy_grpc:
-#      cluster_name: ratelimit
+rate_limit_service:
+ grpc_service:
+   envoy_grpc:
+     cluster_name: ratelimit
 runtime:
   symlink_root: /srv/runtime_data/current
   subdirectory: envoy

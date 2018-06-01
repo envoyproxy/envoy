@@ -12,27 +12,31 @@
 {%- macro internal_cluster_definition(service, options) -%}
   name: {{ service }}
   connect_timeout: 0.250s
-  type: SDS
-  lb_type: LEAST_REQUEST
-  #need to mention http2
+  type: EDS
   eds_cluster_config:
+    eds_config:
+      api_config_source:
+        api_type: REST
+        cluster_names:
+        - main_website
+        refresh_delay: 30s
     service_name: {{ service }}
+  lb_policy: LEAST_REQUEST
   {% if 'max_requests' in options -%}
   circuit_breakers:
     thresholds:
-      - priority: DEFAULT
-        max_requests: {{ options['max_requests'] }}
+    - priority: DEFAULT
+      max_requests: {{ options['max_requests'] }}
   {% endif -%}
   health_checks:
-    type: http
+  - http_health_check:
+      path: /healthcheck
+      service_name: accidents
     timeout: 2s
     interval: 5s
-    interval_jitter: 5000
+    interval_jitter: 15s
     unhealthy_threshold: 2
     healthy_threshold: 2
-    http_health_check:
-      path: /healthcheck
-      service_name: {{ service }}
   outlier_detection:
     success_rate_stdev_factor: 1900
-{%- endmacro -%}
+{% endmacro -%}
