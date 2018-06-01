@@ -192,6 +192,10 @@ private:
   /**
    * @return a handle to create a cluster on the request path.
    */
+  /**
+   * Create a cluster on the request path. This call yields the script till cluster is created.
+   * @param 1 (string): Yaml representation of Cluster definition as per v2 APIs.
+   */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaAddorUpdateCluster);
 
   /**
