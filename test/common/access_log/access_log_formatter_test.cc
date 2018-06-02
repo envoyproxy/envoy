@@ -424,12 +424,12 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format =
-        "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|.%7f:segm4:%Y)%";
+        "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|%s-%3f-asdf-%9f|.%7f:segm5:%Y)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
     FormatterImpl formatter(format);
-    EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|.1234560:"
-              "segm4:2018",
+    EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|1522796769-"
+              "123-asdf-123456000|.1234560:segm5:2018",
               formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }
