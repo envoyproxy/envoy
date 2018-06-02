@@ -36,7 +36,7 @@ public:
    * @return Http::StreamDecoderFilterCallbacks& to be used by the handler to get HTTP request data
    * for streaming.
    */
-  virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
+  virtual Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
    * @return Http::HeaderMap& to be used by handler to parse header information sent with the

@@ -151,7 +151,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
 
   //  //std::string rolling_map = sink_->getStats().printRollingWindow();
   std::string rolling_map = sink_->printRollingWindows();
-  std::size_t pos = rolling_map.find("cluster.test_cluster1.total");
+  std::size_t pos = rolling_map.find("test_cluster1.total");
   EXPECT_NE(std::string::npos, pos);
 
   std::string data_message = TestUtility::bufferToString(buffer);

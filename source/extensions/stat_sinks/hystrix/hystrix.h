@@ -22,11 +22,7 @@ struct ClusterStatsCache {
   // the lookup.
   ClusterStatsCache(const std::string& cluster_name);
 
-  std::string errors_name_;
-  std::string success_name_;
-  std::string total_name_;
-  std::string timeouts_name_;
-  std::string rejected_name_;
+  std::string cluster_name_;
 
   // Rolling windows
   RollingWindow errors_;
@@ -34,6 +30,10 @@ struct ClusterStatsCache {
   RollingWindow total_;
   RollingWindow timeouts_;
   RollingWindow rejected_;
+
+  void printToStream(std::stringstream& out_str);
+  void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
+                          std::stringstream& out_str);
 };
 
 typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
@@ -70,8 +70,9 @@ public:
   /**
    * Generate the streams to be sent to hystrix dashboard.
    */
-  void getClusterStats(absl::string_view cluster_name, uint64_t max_concurrent_requests,
-                       uint64_t reporting_hosts, uint64_t rolling_window, std::stringstream& ss);
+  void addClusterStatsToStream(absl::string_view cluster_name, uint64_t max_concurrent_requests,
+                               uint64_t reporting_hosts, uint64_t rolling_window_ms,
+                               std::stringstream& ss);
 
   /**
    * Calculate values needed to create the stream and write into the map.
@@ -86,8 +87,6 @@ public:
    * Return string represnting current state of the map. for DEBUG.
    */
   const std::string printRollingWindows();
-  void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
-                          std::stringstream& out_str);
 
   /**
    * Get the statistic's value change over the rolling window time frame.
@@ -116,13 +115,14 @@ private:
    * Generate HystrixCommand event stream.
    */
   void addHystrixCommand(absl::string_view cluster_name, uint64_t max_concurrent_requests,
-                         uint64_t reporting_hosts, uint64_t rolling_window, std::stringstream& ss);
+                         uint64_t reporting_hosts, uint64_t rolling_window_ms,
+                         std::stringstream& ss);
 
   /**
    * Generate HystrixThreadPool event stream.
    */
   void addHystrixThreadPool(absl::string_view cluster_name, uint64_t queue_size,
-                            uint64_t reporting_hosts, uint64_t rolling_window,
+                            uint64_t reporting_hosts, uint64_t rolling_window_ms,
                             std::stringstream& ss);
 
   // HystrixStatCachePtr stats_;
