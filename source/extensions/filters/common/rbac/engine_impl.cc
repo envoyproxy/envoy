@@ -26,18 +26,26 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     : RoleBasedAccessControlEngineImpl(per_route_config.rbac(), per_route_config.disabled()) {}
 
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
-                                               const Envoy::Http::HeaderMap& headers) const {
+                                               const Envoy::Http::HeaderMap& headers,
+                                               bool& darklaunch_allowed) const {
   if (engine_disabled_) {
     return true;
   }
 
   bool matched = false;
+  bool darklaunch_matched_ = false;
   for (const auto& policy : policies_) {
     if (policy.matches(connection, headers)) {
-      matched = true;
-      break;
+      if (policy.mode() ==
+          envoy::config::rbac::v2alpha::PolicyEnforcementMode::POLICY_ENFORCEMENT_ENFORCED) {
+        matched = true;
+      }
+
+      darklaunch_matched_ = true;
     }
   }
+
+  darklaunch_allowed = darklaunch_matched_ == allowed_if_matched_;
 
   // only allowed if:
   //   - matched and ALLOW action

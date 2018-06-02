@@ -170,9 +170,6 @@ message RemoteJwks {
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.
   google.protobuf.Duration cache_duration = 2;
-
-  // The JWT public key content.
-  string jwt_pubkey = 3;
 }
 
 // This message specifies a header location to extract JWT token.

@@ -67,6 +67,14 @@ message RBAC {
   map<string, Policy> policies = 2;
 }
 
+// Policy enforcement mode, used to verify a new policy work as expected before rolling to prod.
+// RBAC filter results running from policies in dark launch mode, and discards result before return
+// to the user.
+enum PolicyEnforcementMode {
+  POLICY_ENFORCEMENT_ENFORCED = 0;
+  POLICY_ENFORCEMENT_DARKLAUNCH = 1;
+}
+
 // Policy specifies a role and the principals that are assigned/denied the role. A policy matches if
 // and only if at least one of its permissions match the action taking place AND at least one of its
 // principals match the downstream.
@@ -80,6 +88,9 @@ message Policy {
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
   repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
+
+  // Indicates the policy enforcement mode.
+  PolicyEnforcementMode mode = 3;
 }
 
 // Permission defines an action (or actions) that a principal can take.

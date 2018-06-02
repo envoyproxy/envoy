@@ -161,14 +161,18 @@ private:
 class PolicyMatcher : public Matcher {
 public:
   PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy)
-      : permissions_(policy.permissions()), principals_(policy.principals()) {}
+      : permissions_(policy.permissions()), principals_(policy.principals()), mode_(policy.mode()) {
+  }
 
   bool matches(const Network::Connection& connection,
                const Envoy::Http::HeaderMap& headers) const override;
 
+  envoy::config::rbac::v2alpha::PolicyEnforcementMode mode() const;
+
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
+  const envoy::config::rbac::v2alpha::PolicyEnforcementMode mode_;
 };
 
 } // namespace RBAC

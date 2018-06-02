@@ -19,7 +19,9 @@ namespace RBACFilter {
 // clang-format off
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
-  COUNTER(denied)
+  COUNTER(denied)                                                                                  \
+  COUNTER(darklaunch_allowed)                                                                                 \
+  COUNTER(darklaunch_denied)                                                                                  \
 // clang-format on
 
 /**
