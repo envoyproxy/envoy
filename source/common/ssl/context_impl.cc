@@ -135,7 +135,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
   // directly. However, our new callback is still calling X509_verify_cert() under
   // the hood. Therefore, to ignore cert expiration, we need to set the callback
   // for X509_verify_cert to ignore that error.
-  if (config.disableCertificateExpirationVerification()) {
+  if (config.allowExpiredCertificate()) {
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
     X509_STORE_set_verify_cb(store, ContextImpl::verifyIgnoreCertExpirationCallback);
   }
@@ -253,12 +253,13 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
 int ContextImpl::verifyIgnoreCertExpirationCallback(int ok, X509_STORE_CTX* ctx) {
   int err = X509_STORE_CTX_get_error(ctx);
 
-  if (err == X509_V_OK || err == X509_V_ERR_CERT_HAS_EXPIRED ||
-      err == X509_V_ERR_CERT_NOT_YET_VALID) {
-    return 1;
+  if (!ok) {
+    if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
+      return 1;
+    }
   }
 
-  // Otherwise, return the original value (always 0 in BoringSSL)
+  // Otherwise, return the original value
   return ok;
 }
 

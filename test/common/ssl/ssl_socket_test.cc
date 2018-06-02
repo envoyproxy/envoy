@@ -715,7 +715,7 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
   // Check for expired certs
-  server_validation_ctx->set_disable_certificate_expiration_verification(false);
+  server_validation_ctx->set_allow_expired_certificate(false);
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =
@@ -746,7 +746,7 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
   // Don't check for expired certs
-  server_validation_ctx->set_disable_certificate_expiration_verification(true);
+  server_validation_ctx->set_allow_expired_certificate(true);
 
   envoy::api::v2::auth::UpstreamTlsContext client;
   envoy::api::v2::auth::TlsCertificate* client_cert =

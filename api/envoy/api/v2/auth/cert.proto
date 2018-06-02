@@ -173,7 +173,7 @@ message CertificateValidationContext {
   core.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certs.
-  bool disable_certificate_expiration_verification = 8;
+  bool allow_expired_certificate = 8;
 }
 
 // TLS context shared by both client and server TLS contexts.
