@@ -46,9 +46,7 @@ public:
   const std::vector<std::string>& verifyCertificateHashList() const override {
     return verify_certificate_hash_list_;
   };
-  bool allowExpiredCertificate() const override {
-    return allow_expired_certificate_;
-  };
+  bool allowExpiredCertificate() const override { return allow_expired_certificate_; };
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
