@@ -10,7 +10,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
 #include "common/singleton/const_singleton.h"
@@ -27,7 +26,6 @@ namespace {
 
 class SubsecondConstantValues {
 public:
-  const char PLACEHOLDER_CHAR{'?'};
   const std::string PLACEHOLDER{"?????????"};
   const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
 };
@@ -129,6 +127,7 @@ DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
 
   size_t step = 0;
   int32_t previous = 0;
+  subsecond_offsets.reserve(subseconds_.size());
   for (const auto& subsecond : subseconds_) {
     ASSERT(step < format_string_.size());
     const std::string segment = format_string_.substr(step, subsecond.position_ - step);
