@@ -50,6 +50,10 @@ public:
 private:
   std::string parse(const std::string& format_string);
 
+  typedef std::vector<int32_t> SubsecondOffsets;
+  std::string fromTimeAndPrepareSubsecondOffsets(time_t time,
+                                                 SubsecondOffsets& subsecond_offsets) const;
+
   struct SubsecondSpecifier {
     SubsecondSpecifier(const size_t position, const size_t width)
         : position_(position), width_(width) {}
