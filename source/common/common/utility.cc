@@ -59,13 +59,14 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     time_t current_time = std::chrono::system_clock::to_time_t(time);
 
     CachedTime::Formatted formatted;
-    formatted.str =
-        subseconds_.empty()
-            ? fromTime(current_time)
-            : fromTimeAndPrepareSubsecondOffsets(current_time, formatted.subsecond_offsets);
+    if (subseconds_.empty()) {
+      formatted.str = fromTime(current_time);
+    } else {
+      formatted.str = fromTimeAndPrepareSubsecondOffsets(current_time, formatted.subsecond_offsets);
+      cached_time.seconds_length = fmt::FormatInt(epoch_time_seconds.count()).str().size();
+    }
 
     cached_time.formatted.emplace(std::make_pair(format_string_, formatted));
-    cached_time.seconds_length = fmt::FormatInt(epoch_time_seconds.count()).str().size();
     cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
