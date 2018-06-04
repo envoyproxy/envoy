@@ -9,7 +9,7 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
-* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>` to filter based on the presence of Envoy response flags.  
+* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>` to filter based on the presence of Envoy response flags. 
   to filter logs based on request headers.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
