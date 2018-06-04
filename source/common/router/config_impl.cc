@@ -371,7 +371,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   // Handle path rewrite
-  rewritePathHeader(headers, insert_envoy_original_path);
+  if (!getPathRewrite().empty()) {
+    rewritePathHeader(headers, insert_envoy_original_path);
+  }
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(
@@ -397,7 +399,7 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             const std::string& matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  const auto& rewrite = getPathRewrite();
   if (rewrite.empty()) {
     return;
   }

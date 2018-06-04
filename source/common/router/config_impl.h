@@ -342,6 +342,14 @@ protected:
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
+
+  /**
+   * returns the correct path rewrite string for this route.
+   */
+  const std::string& getPathRewrite() const {
+    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  }
+
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
