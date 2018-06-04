@@ -50,6 +50,10 @@ weight greater than 1.
   balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C,
   a host will never truly drain, though it will receive fewer requests over time.
 
+  .. note::
+    If all weights are not 1, but are the same (e.g., 42), Envoy will still use the weighted round
+    robin schedule instead of P2C.
+
 .. _arch_overview_load_balancing_types_ring_hash:
 
 Ring hash

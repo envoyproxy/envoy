@@ -484,7 +484,9 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHost(LoadBalancerContext*) {
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
   // whether to use EDF or do unweighted (fast) selection.
   // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-  // host set if any weights change.
+  // host set if any weights change. Additionally, it has the property that if all weights are
+  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
+  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
   if (stats_.max_host_weight_.value() != 1) {
     auto host = scheduler.edf_.pick();
     if (host != nullptr) {
