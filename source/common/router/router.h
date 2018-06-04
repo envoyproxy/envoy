@@ -214,7 +214,7 @@ public:
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
-        Http::Utility::makeSetCookieValue(key, cookie_value, max_age));
+        Http::Utility::makeSetCookieValue(key, cookie_value, max_age, true));
     return cookie_value;
   }
 
