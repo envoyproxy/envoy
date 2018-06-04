@@ -1337,6 +1337,61 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   factory_.tls_.shutdownThread();
 }
 
+class MockConnPoolWithDestroy : public Http::ConnectionPool::MockInstance {
+public:
+  ~MockConnPoolWithDestroy() { onDestroy(); }
+
+  MOCK_METHOD0(onDestroy, void());
+};
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
+// drain callback during CP destroy.
+TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
+  const std::string json = R"EOF(
+  {
+    "clusters": [
+    {
+      "name": "cluster_1",
+      "connect_timeout_ms": 250,
+      "type": "strict_dns",
+      "dns_resolvers": [ "1.2.3.4:80" ],
+      "lb_type": "round_robin",
+      "hosts": [{"url": "tcp://localhost:11001"}]
+    }]
+  }
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromJson(json));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
+
+  MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
+  EXPECT_CALL(factory_, allocateConnPool_(_)).WillOnce(Return(mock_cp));
+
+  Http::ConnectionPool::MockInstance* cp =
+      dynamic_cast<Http::ConnectionPool::MockInstance*>(cluster_manager_->httpConnPoolForCluster(
+          "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, nullptr));
+
+  // Remove the first host, this should lead to the cp being drained.
+  Http::ConnectionPool::Instance::DrainedCb drained_cb;
+  EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
+  dns_timer_->callback_();
+  dns_callback(TestUtility::makeDnsResponse({}));
+
+  // The drained callback might get called when the CP is being destroyed.
+  EXPECT_CALL(*mock_cp, onDestroy()).WillOnce(Invoke(drained_cb));
+  factory_.tls_.shutdownThread();
+}
+
 TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   const std::string json = R"EOF(
   {
