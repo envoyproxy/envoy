@@ -6,6 +6,7 @@ package envoy.service.auth.v2alpha;
 option go_package = "v2alpha";
 option java_generic_services = true;
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/type/http_status.proto";
 import "envoy/service/auth/v2alpha/attribute_context.proto";
 
@@ -31,7 +32,7 @@ message DeniedHttpResponse {
   envoy.type.HttpStatus status = 1 [(validate.rules).message.required = true];
 
   // Http entity headers.
-  map<string, string> headers = 2;
+  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
   
   // Http entity body.
   string body = 3;
@@ -40,7 +41,7 @@ message DeniedHttpResponse {
 // Http attributes for an ok response.
 message OkHttpResponse {
   // Http entity headers in addition to the original request headers.
-  map<string, string> headers = 2;
+  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
 }
 
 message CheckResponse {
@@ -51,7 +52,6 @@ message CheckResponse {
   // used when the authorization service needs to send custom responses to the
   // downstream client or, to modify/add request headers being dispatched to the upstream.
   oneof http_response {
-    
     // Supplies http attributes for denied responses.
     DeniedHttpResponse denied_response = 2;
     

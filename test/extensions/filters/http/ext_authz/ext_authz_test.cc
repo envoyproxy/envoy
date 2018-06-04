@@ -64,15 +64,20 @@ public:
 protected:
   Filters::Common::ExtAuthz::ResponsePtr
   makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status,
-                    Http::KeyValueHeaders&& headers = {}, std::string&& body = std::string{},
+                    Http::HeaderVector&& headers_to_append = {},
+                    Http::HeaderVector&& headers_to_add = {}, std::string&& body = std::string{},
                     Http::Code status_code = Http::Code::OK) {
     Filters::Common::ExtAuthz::ResponsePtr response =
         std::make_unique<Filters::Common::ExtAuthz::Response>();
     response->status = status;
     response->status_code = status_code;
 
-    if (!headers.empty()) {
-      response->headers = std::move(headers);
+    if (!headers_to_append.empty()) {
+      response->headers_to_append = std::move(headers_to_append);
+    }
+
+    if (!headers_to_add.empty()) {
+      response->headers_to_add = std::move(headers_to_add);
     }
 
     if (!body.empty()) {
@@ -261,7 +266,7 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponse) {
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
 
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied,
-                                                   {}, std::string{}, Http::Code::Forbidden));
+                                                   {}, {}, std::string{}, Http::Code::Forbidden));
 
   EXPECT_EQ(
       1U,

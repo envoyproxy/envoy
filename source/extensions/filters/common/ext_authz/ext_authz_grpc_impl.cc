@@ -49,19 +49,13 @@ void GrpcClientImpl::onSuccess(
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
-      for (const auto& header : response->ok_response().headers()) {
-        authz_response->headers.emplace_back(
-            std::make_pair(Http::LowerCaseString(header.first), header.second));
-      }
+      toAuthzResponseHeader(authz_response, response->ok_response().headers());
     }
   } else {
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceUnauthz);
     authz_response->status = CheckStatus::Denied;
     if (response->has_denied_response()) {
-      for (const auto& header : response->denied_response().headers()) {
-        authz_response->headers.emplace_back(
-            std::make_pair(Http::LowerCaseString(header.first), header.second));
-      }
+      toAuthzResponseHeader(authz_response, response->denied_response().headers());
       authz_response->status_code =
           static_cast<Http::Code>(response->denied_response().status().code());
       authz_response->body = response->denied_response().body();
@@ -81,6 +75,20 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   authz_response->status = CheckStatus::Error;
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
+}
+
+void GrpcClientImpl::toAuthzResponseHeader(
+    ResponsePtr& response,
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers) {
+  for (const auto& header : headers) {
+    if (header.append().value()) {
+      response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),
+                                               header.header().value());
+    } else {
+      response->headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
+                                            header.header().value());
+    }
+  }
 }
 
 } // namespace ExtAuthz

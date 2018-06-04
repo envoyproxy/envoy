@@ -13,6 +13,9 @@ message HttpService {
 
   // Sets an optional prefix to the value of authorization request header `path`.
   string path_prefix = 2;
+
+  // Sets a list of headers that should be not be sent from the authorization server to the upstream service.
+  repeated string response_headers_to_remove = 3;
 }
 
 message ExtAuthz {

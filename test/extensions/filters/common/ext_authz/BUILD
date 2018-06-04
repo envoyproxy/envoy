@@ -33,6 +33,7 @@ envoy_cc_test(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

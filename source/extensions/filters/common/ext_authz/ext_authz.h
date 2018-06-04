@@ -35,7 +35,9 @@ struct Response {
   // Call status.
   CheckStatus status;
   // Optional http headers used on either denied or ok responses.
-  Http::KeyValueHeaders headers;
+  Http::HeaderVector headers_to_append;
+  // Optional http headers used on either denied or ok responses.
+  Http::HeaderVector headers_to_add;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.

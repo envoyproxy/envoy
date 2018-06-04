@@ -111,7 +111,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     ENVOY_STREAM_LOG(debug, "Ext_authz rejected the request", *callbacks_);
     callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [& authz_headers = response->headers,
+        [& authz_headers = response->headers_to_add,
          &callbacks = *callbacks_ ](Http::HeaderMap & response_headers)
             ->void {
               for (const auto& header : authz_headers) {
@@ -132,12 +132,22 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     // Only send headers if the response is ok.
     if (response->status == CheckStatus::OK) {
-      for (const auto& header : response->headers) {
+      for (const auto& header : response->headers_to_add) {
         request_headers_->setReferenceKey(header.first, header.second);
-        ENVOY_STREAM_LOG(trace, "Ext_authz ok response header '{}':'{}'", *callbacks_,
+        ENVOY_STREAM_LOG(trace, "Ext_authz ok response added header '{}':'{}'", *callbacks_,
                          header.first.get(), header.second);
       }
+      for (const auto& header : response->headers_to_append) {
+        Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+        if (header_to_modify) {
+          header_to_modify->value().append(", ", 2);
+          header_to_modify->value().append(header.second.c_str(), header.second.size());
+          ENVOY_STREAM_LOG(trace, "Ext_authz ok response appended header '{}':'{}'", *callbacks_,
+                           header.first.get(), header.second);
+        }
+      }
     }
+
     if (!initiating_call_) {
       // We got completion async. Let the filter chain continue.
       callbacks_->continueDecoding();

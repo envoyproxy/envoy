@@ -38,6 +38,8 @@ public:
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
+        response_headers_to_remove_(config.http_service().response_headers_to_remove().begin(),
+                                    config.http_service().response_headers_to_remove().end()),
         failure_mode_allow_(config.failure_mode_allow()) {}
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
@@ -45,6 +47,9 @@ public:
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
+  std::vector<Http::LowerCaseString> responseHeadersToRemove() {
+    return response_headers_to_remove_;
+  }
   bool failureModeAllow() const { return failure_mode_allow_; }
 
 private:
@@ -53,6 +58,7 @@ private:
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   std::string cluster_name_;
+  std::vector<Http::LowerCaseString> response_headers_to_remove_;
   bool failure_mode_allow_;
 };
 
@@ -82,7 +88,7 @@ public:
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
 
 private:
-  void addResponseHeaders(Http::HeaderMap& header_map, const Http::KeyValueHeaders& headers);
+  void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   // State of this filter's communication with the external authorization service.
   // The filter has either not started calling the external service, in the middle of calling
   // it or has completed.
