@@ -186,16 +186,78 @@ message JwtHeader {
 // This message specifies a Jwt requirement.
 message RequiredProvider {
   // Specify the issuer for the required JwtProvider.
-  string issuer = 1;
+  string issuer = 1 [(validate.rules).string.min_bytes = 1];
 
   // This audiences field overrides the one in JwtProvider if not empty.
   repeated string audiences = 2;
 }
 
+// This message specifies a Jwt requirement
+//
+// For example: following match will match all requests.
+//
+// .. code-block:: yaml
+//
+//  # not required with an empty message
+//
+//  # require A
+//  requires: { issuer: "iss-A" }
+//
+//  # require A or B
+//  requires_any:
+//    requirements:
+//      - requires: { issuer: "iss-A" }
+//      - requires: { issuer: "iss-B" }
+//
+//  # require A and B
+//  requires_all:
+//    requirements:
+//      - requires: { issuer: "iss-A" }
+//      - requires: { issuer: "iss-B" }
+//
+//  # require A and (B or C)
+//  requires_all:
+//    requirements:
+//      - requires: { issuer: "iss-A" }
+//      - requires_any:
+//        requirements:
+//          - requires: { issuer: "iss-B" }
+//          - requires: { issuer: "iss-C" }
+//
+//  # require A or (B and C)
+//  requires_any:
+//    requirements:
+//      - requires: { issuer: "iss-A" }
+//      - requires_all:
+//        requirements:
+//          - requires: { issuer: "iss-B" }
+//          - requires: { issuer: "iss-C" }
+//
+message JwtRequirement {
+  oneof requires_type {
+    // Specify a single RequiredProvider.
+    RequiredProvider requires = 2;
+
+    // Specify list of JwtRequirement. Their results are OR-ed.
+    // If any one of them passes, the result is passed.
+    JwtRequirementOrList requires_any = 3;
+
+    // Specify list of JwtRequirement. Their results are AND-ed.
+    // All of them must pass, if one of them fails or missing, it fails.
+    JwtRequirementAndList requires_all = 4;
+  }
+}
+
 // This message specifies a list of RequiredProvider.
-message RequiredProviderList {
+message JwtRequirementOrList {
   // Specify a list of RequiredProvider.
-  repeated RequiredProvider list = 1;
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
+}
+
+// This message specifies a list of RequiredProvider.
+message JwtRequirementAndList {
+  // Specify a list of RequiredProvider.
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -232,29 +294,19 @@ message RequirementRule {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specify a Jwt Requirement. If the message is empty, Jwt is not required.
-  //
-  // .. code-block:: yaml
-  //
-  //   requires: { issuer: "iss-A" }
-  //
-  // or:
-  //   requires_any: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
-  //
-  // or:
-  //   requires_all: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
-  //
+  // Specify a Jwt Requirement. It is the same as message JwtRequirement.
+  // The reason to inline its fields is to reduce of one layer of nesting.
   oneof requires_type {
     // Specify a single RequiredProvider.
     RequiredProvider requires = 2;
 
     // Specify list of RequiredProvider. Their results are OR-ed.
     // If any one of them passes, the result is passed.
-    RequiredProviderList requires_any = 3;
+    JwtRequirementOrList requires_any = 3;
 
     // Specify list of RequiredProvider. Their results are AND-ed.
     // All of them must pass, if one of them fails or missing, it fails.
-    RequiredProviderList requires_all = 4;
+    JwtRequirementAndList requires_all = 4;
   }
 }
 
@@ -290,7 +342,10 @@ message RequirementRule {
 //      # Jwt verification for either issue1 or issuer2 is required for all other requests.
 //      - match:
 //          prefix: "/"
-//        requires_any: { list: [issuer: "issuer1"], [issuer: "issuer2"] }
+//        requires_any:
+//          requirements:
+//            - requires: { issuer: "issuer1" }
+//            - requires: { issuer: "issuer2" }
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -336,9 +391,15 @@ message JwtAuthentication {
   //   - match: { prefix: "/baz" }
   //     requires: { issuer: "iss-A" }
   //   - match: { prefix: "/foo" }
-  //     requires_any: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
+  //     requires_any:
+  //       requirements:
+  //         - requires: { issuer: "issuer1" }
+  //         - requires: { issuer: "issuer2" }
   //   - match: { prefix: "/bar" }
-  //     requires_all: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
+  //     requires_any:
+  //       requirements:
+  //         - requires: { issuer: "issuer1" }
+  //         - requires: { issuer: "issuer2" }
   //
   repeated RequirementRule rules = 3;
 }
