@@ -186,10 +186,16 @@ message JwtHeader {
 // This message specifies a Jwt requirement.
 message RequiredProvider {
   // Specify the issuer for the required JwtProvider.
-  string issuer = 1 [(validate.rules).string.min_bytes = 1];
+  string issuer = 1;
 
   // This audiences field overrides the one in JwtProvider if not empty.
   repeated string audiences = 2;
+}
+
+// This message specifies a list of RequiredProvider.
+message RequiredProviderList {
+  // Specify a list of RequiredProvider.
+  repeated RequiredProvider list = 1;
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -233,22 +239,22 @@ message RequirementRule {
   //   requires: { issuer: "iss-A" }
   //
   // or:
-  //   requires_any: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //   requires_any: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
   //
   // or:
-  //   requires_all: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //   requires_all: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
   //
-  oneof require_type {
+  oneof requires_type {
     // Specify a single RequiredProvider.
     RequiredProvider requires = 2;
 
     // Specify list of RequiredProvider. Their results are OR-ed.
     // If any one of them passes, the result is passed.
-    repeated RequiredProvider requires_any = 3;
-    
+    RequiredProviderList requires_any = 3;
+
     // Specify list of RequiredProvider. Their results are AND-ed.
     // All of them must pass, if one of them fails or missing, it fails.
-    repeated RequiredProvider requires_all = 4;
+    RequiredProviderList requires_all = 4;
   }
 }
 
@@ -284,7 +290,7 @@ message RequirementRule {
 //      # Jwt verification for either issue1 or issuer2 is required for all other requests.
 //      - match:
 //          prefix: "/"
-//        requires_any: { [issuer: "issuer1"], [issuer: "issuer2"] }
+//        requires_any: { list: [issuer: "issuer1"], [issuer: "issuer2"] }
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -330,9 +336,9 @@ message JwtAuthentication {
   //   - match: { prefix: "/baz" }
   //     requires: { issuer: "iss-A" }
   //   - match: { prefix: "/foo" }
-  //     requires_any: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //     requires_any: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
   //   - match: { prefix: "/bar" }
-  //     requires_all: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //     requires_all: { list: [{ issuer: "iss-A" }, { issuer: "iss-B" }] }
   //
   repeated RequirementRule rules = 3;
 }
