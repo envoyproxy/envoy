@@ -127,6 +127,39 @@ message CertificateValidationContext {
   // system CA locations.
   core.DataSource trusted_ca = 1;
 
+  // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
+  // SHA-256 of the DER-encoded Subject Public Key Information (SPKI) of the presented certificate
+  // matches one of the specified values.
+  //
+  // A base64-encoded SHA-256 of the Subject Public Key Information (SPKI) of the certificate
+  // can be generated with the following command:
+  //
+  // .. code-block:: bash
+  //
+  //   $ openssl x509 -in path/to/client.crt -noout -pubkey \
+  //     | openssl pkey -pubin -outform DER \
+  //     | openssl dgst -sha256 -binary \
+  //     | openssl enc -base64
+  //   NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=
+  //
+  // This is the format used in HTTP Public Key Pinning.
+  //
+  // When both:
+  // :ref:`verify_certificate_hash
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
+  // a hash matching value from either of the lists will result in the certificate being accepted.
+  //
+  // .. attention::
+  //
+  //   This option is preferred over :ref:`verify_certificate_hash
+  //   <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`,
+  //   because SPKI is tied to a private key, so it doesn't change when the certificate
+  //   is renewed using the same private key.
+  repeated string verify_certificate_spki = 3
+      [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
+
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
   //
@@ -155,32 +188,6 @@ message CertificateValidationContext {
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
-
-  // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
-  // SHA-256 of the DER-encoded Subject Public Key Information (SPKI) of the presented certificate
-  // matches one of the specified values.
-  //
-  // A base64-encoded SHA-256 of the Subject Public Key Information (SPKI) of the certificate
-  // can be generated with the following command:
-  //
-  // .. code-block:: bash
-  //
-  //   $ openssl x509 -in path/to/client.crt -noout -pubkey \
-  //     | openssl pkey -pubin -outform DER \
-  //     | openssl dgst -sha256 -binary \
-  //     | openssl enc -base64
-  //   NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=
-  //
-  // This is the format used in HTTP Public Key Pinning.
-  //
-  // When both:
-  // :ref:`verify_certificate_hash
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
-  // :ref:`verify_certificate_spki
-  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
-  // a hash matching value from either of the lists will result in the certificate being accepted.
-  repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
 
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
