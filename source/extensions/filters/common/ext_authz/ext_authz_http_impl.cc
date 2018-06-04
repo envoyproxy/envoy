@@ -98,9 +98,9 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
-  authz_response->status = CheckStatus::Error;
-  callbacks_->onComplete(std::move(authz_response));
+  Response authz_response{};
+  authz_response.status = CheckStatus::Error;
+  callbacks_->onComplete(std::make_unique<Response>(authz_response));
   callbacks_ = nullptr;
 }
 
