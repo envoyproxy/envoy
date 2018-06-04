@@ -8,49 +8,70 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 int8_t BufferHelper::peekI8(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 1);
+  if (buffer.length() < 1) {
+    throw EnvoyException("buffer underflow");
+  }
+
   int8_t i;
   buffer.copyOut(offset, 1, &i);
   return i;
 }
 
 int16_t BufferHelper::peekI16(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 2);
+  if (buffer.length() < 2) {
+    throw EnvoyException("buffer underflow");
+  }
+
   int16_t i;
   buffer.copyOut(offset, 2, &i);
   return be16toh(i);
 }
 
 int32_t BufferHelper::peekI32(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 4);
+  if (buffer.length() < 4) {
+    throw EnvoyException("buffer underflow");
+  }
+
   int32_t i;
   buffer.copyOut(offset, 4, &i);
   return be32toh(i);
 }
 
 int64_t BufferHelper::peekI64(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 8);
+  if (buffer.length() < 8) {
+    throw EnvoyException("buffer underflow");
+  }
+
   int64_t i;
   buffer.copyOut(offset, 8, &i);
   return be64toh(i);
 }
 
 uint16_t BufferHelper::peekU16(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 2);
+  if (buffer.length() < 2) {
+    throw EnvoyException("buffer underflow");
+  }
+
   uint16_t i;
   buffer.copyOut(offset, 2, &i);
   return be16toh(i);
 }
 
 uint32_t BufferHelper::peekU32(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 4);
+  if (buffer.length() < 4) {
+    throw EnvoyException("buffer underflow");
+  }
+
   uint32_t i;
   buffer.copyOut(offset, 4, &i);
   return be32toh(i);
 }
 
 uint64_t BufferHelper::peekU64(Buffer::Instance& buffer, size_t offset) {
-  ASSERT(buffer.length() >= 8);
+  if (buffer.length() < 8) {
+    throw EnvoyException("buffer underflow");
+  }
+
   uint64_t i;
   buffer.copyOut(offset, 8, &i);
   return be64toh(i);
@@ -93,8 +114,8 @@ uint64_t BufferHelper::drainU64(Buffer::Instance& buffer) {
 }
 
 double BufferHelper::drainDouble(Buffer::Instance& buffer) {
-  ASSERT(sizeof(double) == sizeof(uint64_t));
-  ASSERT(std::numeric_limits<double>::is_iec559);
+  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != size(uint64_t)");
+  static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
 
   // Cribbed from protobuf WireFormatLite.
   union {
@@ -108,10 +129,11 @@ double BufferHelper::drainDouble(Buffer::Instance& buffer) {
 // Thrift's var int encoding is described in
 // https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
 uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, size_t offset, int& size) {
-  ASSERT(buffer.length() >= offset + 1);
-
   // Need at most 10 bytes for a 64-bit var int.
   const uint64_t last = std::min(buffer.length() - offset, static_cast<uint64_t>(10));
+  if (last < 1) {
+    throw EnvoyException("buffer underflow");
+  }
 
   uint8_t shift = 0;
   uint64_t result = 0;
@@ -156,7 +178,6 @@ int32_t BufferHelper::peekVarIntI32(Buffer::Instance& buffer, size_t offset, int
 int64_t BufferHelper::peekZigZagI64(Buffer::Instance& buffer, size_t offset, int& size) {
   int underlying_size;
   uint64_t zz64 = peekVarInt(buffer, offset, underlying_size);
-  ASSERT(underlying_size != 0);
 
   if (underlying_size <= -10 || underlying_size > 10) {
     // Max size is 10, so this must be an invalid encoding.
@@ -177,7 +198,6 @@ int64_t BufferHelper::peekZigZagI64(Buffer::Instance& buffer, size_t offset, int
 int32_t BufferHelper::peekZigZagI32(Buffer::Instance& buffer, size_t offset, int& size) {
   int underlying_size;
   uint64_t zz64 = peekVarInt(buffer, offset, underlying_size);
-  ASSERT(underlying_size != 0);
 
   if (underlying_size <= -5 || underlying_size > 5) {
     // Max size is 5, so this must be an invalid encoding.

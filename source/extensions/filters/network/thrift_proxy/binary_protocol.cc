@@ -215,7 +215,7 @@ bool BinaryProtocolImpl::readInt64(Buffer::Instance& buffer, int64_t& value) {
 }
 
 bool BinaryProtocolImpl::readDouble(Buffer::Instance& buffer, double& value) {
-  ASSERT(sizeof(double) == sizeof(uint64_t));
+  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != size(uint64_t)");
 
   if (buffer.length() < 8) {
     return false;
