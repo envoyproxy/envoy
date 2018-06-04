@@ -91,6 +91,8 @@ public:
 
   // HttpHealthCheckerImpl
   MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+
+  Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
 
 class HttpHealthCheckerImplTest : public testing::Test {
@@ -1342,6 +1344,13 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
   respond(1, "200", false, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[1]->healthy());
+}
+
+TEST_F(HttpHealthCheckerImplTest, Http2ClusterUsesHttp2CodecClient) {
+  EXPECT_CALL(*cluster_->info_, features())
+      .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
+  setupNoServiceValidationHC();
+  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
