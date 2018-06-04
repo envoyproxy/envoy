@@ -117,10 +117,12 @@ double BufferHelper::drainDouble(Buffer::Instance& buffer) {
   static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
   static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
 
-  // Implementation based on: https://www.youtube.com/watch?v=sCjZuvtJd-k
-  // 1. Reinterpreting pointers falls astray of strict aliasing rules.
-  // 2. Using a union of uint64_t and double is undefined behavior in C++ (but not C11).
-  // 3. Using memcpy is also undefined, but probably more reliable, and can be optimizied to the
+  // Implementation based on:
+  // https://github.com/CppCon/CppCon2017/raw/master/Presentations/Type%20Punning%20In%20C%2B%2B17%20-%20Avoiding%20Pun-defined%20Behavior/Type%20Punning%20In%20C%2B%2B17%20-%20Avoiding%20Pun-defined%20Behavior%20-%20Scott%20Schurr%20-%20CppCon%202017.pdf
+  // The short version:
+  // 1. Reinterpreting uint64_t* to double* falls astray of strict aliasing rules.
+  // 2. Using union {uint64_t i; double d;} is undefined behavior in C++ (but not C11).
+  // 3. Using memcpy may be undefined, but probably reliable, and can be optimized to the
   //    same instructions as 1 and 2.
   // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
   uint64_t i = drainU64(buffer);
