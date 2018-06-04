@@ -353,7 +353,9 @@ message RouteAction {
 
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
-  // at a different path from those exposed at the reverse proxy layer.
+  // at a different path from those exposed at the reverse proxy layer. The router filter will
+  // place the original path before rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // .. attention::
   //
