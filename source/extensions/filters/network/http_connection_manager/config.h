@@ -91,6 +91,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
+  bool skipXffAppend() const override { return skip_xff_append_; }
+  const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -115,6 +117,8 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const uint32_t xff_num_trusted_hops_;
+  const bool skip_xff_append_;
+  const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;

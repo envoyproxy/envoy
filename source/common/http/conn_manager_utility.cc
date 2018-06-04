@@ -68,10 +68,12 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     if (final_remote_address == nullptr) {
       final_remote_address = connection.remoteAddress();
     }
-    if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
-      Utility::appendXff(request_headers, config.localAddress());
-    } else {
-      Utility::appendXff(request_headers, *connection.remoteAddress());
+    if (!config.skipXffAppend()) {
+      if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
+        Utility::appendXff(request_headers, config.localAddress());
+      } else {
+        Utility::appendXff(request_headers, *connection.remoteAddress());
+      }
     }
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
@@ -149,9 +151,14 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
       user_agent_header.value().setReference(config.userAgent().value());
     }
 
+    // TODO(htuch): should this be under the config.userAgent() condition or in the outer scope?
     if (!local_info.nodeName().empty()) {
       request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
     }
+  }
+
+  if (!config.via().empty()) {
+    Utility::appendVia(request_headers, config.via());
   }
 
   // If we are an external request, AND we are "using remote address" (see above), we set
@@ -259,12 +266,17 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers) {
+                                                     const Http::HeaderMap& request_headers,
+                                                     const std::string& via) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
+  }
+
+  if (!via.empty()) {
+    Utility::appendVia(response_headers, via);
   }
 }
 

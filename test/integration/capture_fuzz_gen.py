@@ -1,6 +1,6 @@
 """Convert from transport socket capture to fuzz test case.
 
-Converts from envoy.extensions.common.tap.v2alpha.Trace proto to
+Converts from envoy.data.tap.v2alpha.Trace proto to
 test.integration.CaptureFuzzTestCase.
 
 Usage: capture_fuzz_gen.py <listener capture> [<cluster capture>]
@@ -12,7 +12,7 @@ import sys
 from google.protobuf import empty_pb2
 from google.protobuf import text_format
 
-from envoy.extensions.common.tap.v2alpha import capture_pb2
+from envoy.data.tap.v2alpha import capture_pb2
 from test.integration import capture_fuzz_pb2
 
 # Collapse adjacent event in the trace that are of the same type.

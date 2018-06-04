@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "c386d2b324468137bcbf2e7a1020da7579f7ab48",  # chromium-66.0.3359.117
+        commit = "2a52ce799382c87cd3119f3b44fbbebf97061ab6",  # chromium-67.0.3396.62
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
@@ -26,9 +26,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/eile/tclap",
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "10a9f184d4d66f135093a08396d3b0a0ebe8d97b79f8b3ddb8559f75fe4fcbc3",
-        strip_prefix = "fmt-4.0.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/4.0.0/fmt-4.0.0.zip"],
+        sha256 = "46628a2f068d0e33c716be0ed9dcae4370242df135aed663a180b9fd8e36733d",
+        strip_prefix = "fmt-4.1.0",
+        urls = ["https://github.com/fmtlib/fmt/archive/4.1.0.tar.gz"],
     ),
     com_github_gabime_spdlog = dict(
         sha256 = "94f74fd1b3344733d1db3de2ec22e6cbeb769f93a8baa0d4a22b1f62dc7369f8",
@@ -60,7 +60,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
+        # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
+        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
+        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -85,7 +87,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
+        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(

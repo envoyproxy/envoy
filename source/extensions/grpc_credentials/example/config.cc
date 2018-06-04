@@ -16,12 +16,7 @@ AccessTokenExampleGrpcCredentialsFactory::getChannelCredentials(
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      grpc::SslCredentials(grpc::SslCredentialsOptions());
-  if (google_grpc.has_channel_credentials() &&
-      google_grpc.channel_credentials().has_ssl_credentials()) {
-    creds = grpc::SslCredentials(
-        Grpc::buildSslOptionsFromConfig(google_grpc.channel_credentials().ssl_credentials()));
-  }
+      defaultSslChannelCredentials(grpc_service_config, false);
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
