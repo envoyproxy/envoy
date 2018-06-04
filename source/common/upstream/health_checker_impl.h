@@ -106,7 +106,7 @@ private:
     return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
   }
 
-  Http::CodecClient::Type codecClientType(const Cluster& cluster);
+  Http::CodecClient::Type codecClientType(bool use_http2);
 
   const std::string path_;
   const std::string host_value_;

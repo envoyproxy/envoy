@@ -116,6 +116,28 @@ public:
 
   HttpHealthCheckerImplTest() : cluster_(new NiceMock<MockCluster>()) {}
 
+  void setupNoServiceValidationHCWithHttp2() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      use_http2: true
+    )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
   void setupNoServiceValidationHC() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -1347,9 +1369,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, Http2ClusterUsesHttp2CodecClient) {
-  EXPECT_CALL(*cluster_->info_, features())
-      .WillRepeatedly(Return(Upstream::ClusterInfo::Features::HTTP2));
-  setupNoServiceValidationHC();
+  setupNoServiceValidationHCWithHttp2();
   EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 

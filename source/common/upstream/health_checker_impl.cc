@@ -83,7 +83,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())),
-      codec_client_type_(codecClientType(cluster)) {
+      codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -207,8 +207,8 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   client_->close();
 }
 
-Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(const Cluster& cluster) {
-  if (cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) {
+Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
+  if (use_http2) {
     return Http::CodecClient::Type::HTTP2;
   } else {
     return Http::CodecClient::Type::HTTP1;
