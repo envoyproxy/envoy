@@ -39,13 +39,16 @@ weight greater than 1.
   picks the host which has fewer active requests (`Research
   <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
-  choices).
+  choices). The P2C load balancer has the property that a host with the highest number of active
+  requests in the cluster will never receive new requests. It will be allowed to drain until it is
+  less than or equal to all of the other hosts.
 * *all weights not 1*:  If any host in the cluster has a load balancing weight greater than 1, the
   load balancer shifts into a mode where it uses a weighted round robin schedule in which weights
-  are dynamically adjusted based on the host's request load at the time of selection. This
-  algorithm provides good balance at steady state but may not adapt to load imbalance as quickly.
-  Additionally, unlike P2C, a host will never truly drain, though it will receive fewer requests
-  over time.
+  are dynamically adjusted based on the host's request load at the time of selection (weight is
+  divided by the current active request count. For example, a host with weight 2 and an active
+  request count of 4 will have a synthetic weight of 2 / 4 = 0.5). This algorithm provides good
+  balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C,
+  a host will never truly drain, though it will receive fewer requests over time.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 

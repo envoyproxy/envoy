@@ -218,7 +218,7 @@ private:
  * instances.
  *
  * This base class also supports unweighted selection which derived classes can use to customize
- * behavior. Base classes can also override how host weight is determined when in weighted mode.
+ * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
 class EdfLoadBalancerBase : public LoadBalancer, public ZoneAwareLoadBalancerBase {
 public:
@@ -273,7 +273,7 @@ public:
 
 private:
   void refreshHostSource(const HostsSource& source) override {
-    // insert() is used here on purpose so that we don't overwrite the index of the host source
+    // insert() is used here on purpose so that we don't overwrite the index if the host source
     // already exists. Note that host sources will never be removed, but given how uncommon this
     // is it probably doesn't matter.
     rr_indexes_.insert({source, seed_});
@@ -323,7 +323,11 @@ private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
     // Here we scale host weight by the number of active requests at the time we do the pick. We
-    // always add 1 to avoid division by 0.
+    // always add 1 to avoid division by 0. Note that if all weights are 1, the EDF schedule is
+    // unlikely to yield the same result as P2C given the lack of randomness as well as the fact
+    // that hosts are always picked, regardless of their current request load at the time of pick.
+    // It might be posible to do better by picking two hosts off of the schedule, and selecting
+    // the one with fewer active requests at the time of selection.
     return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,

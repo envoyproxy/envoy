@@ -437,7 +437,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
-    // weighted 1. This is because currently we don't refresh host sets of only weights change.
+    // weighted 1. This is because currently we don't refresh host sets if only weights change.
     // We should probably change this to refresh at all times. See the comment in
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
