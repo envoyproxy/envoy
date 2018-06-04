@@ -137,7 +137,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
   // for X509_verify_cert to ignore that error.
   if (config.allowExpiredCertificate()) {
     X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
-    X509_STORE_set_verify_cb(store, ContextImpl::verifyIgnoreCertExpirationCallback);
+    X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
   }
 
   if (verify_mode != SSL_VERIFY_NONE) {
@@ -250,10 +250,9 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
-int ContextImpl::verifyIgnoreCertExpirationCallback(int ok, X509_STORE_CTX* ctx) {
-  int err = X509_STORE_CTX_get_error(ctx);
-
+int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx) {
   if (!ok) {
+    int err = X509_STORE_CTX_get_error(ctx);
     if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
       return 1;
     }
