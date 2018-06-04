@@ -361,16 +361,17 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const RequestInfo::RequestInfo& request_info,
                                                 bool insert_envoy_original_path) const {
-  UNREFERENCED_PARAMETER(insert_envoy_original_path);
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   request_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
-  if (host_rewrite_.empty()) {
-    return;
+  if (!host_rewrite_.empty()) {
+    headers.Host()->value(host_rewrite_);
   }
-  headers.Host()->value(host_rewrite_);
+
+  // Handle path rewrite
+  rewritePathHeader(headers, insert_envoy_original_path);
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(
@@ -599,14 +600,6 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                            Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context), prefix_(route.match().prefix()) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                  const RequestInfo::RequestInfo& request_info,
-                                                  bool insert_envoy_original_path) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
-
-  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
-}
-
 void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                              bool insert_envoy_original_path) const {
   finalizePathHeader(headers, prefix_, insert_envoy_original_path);
@@ -625,14 +618,6 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
                                        Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context), path_(route.match().path()) {}
-
-void PathRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                const RequestInfo::RequestInfo& request_info,
-                                                bool insert_envoy_original_path) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
-
-  finalizePathHeader(headers, path_, insert_envoy_original_path);
-}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -682,13 +667,6 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
   std::string matched_path(path.c_str(), query_string_start);
 
   finalizePathHeader(headers, matched_path, insert_envoy_original_path);
-}
-
-void RegexRouteEntryImpl::finalizeRequestHeaders(Http::HeaderMap& headers,
-                                                 const RequestInfo::RequestInfo& request_info,
-                                                 bool insert_envoy_original_path) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
-  rewritePathHeader(headers, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,

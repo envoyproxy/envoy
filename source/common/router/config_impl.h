@@ -532,11 +532,6 @@ public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                        Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return prefix_; }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
@@ -559,11 +554,6 @@ public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return path_; }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
@@ -585,11 +575,6 @@ class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                       Server::Configuration::FactoryContext& factory_context);
-
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return regex_str_; }
