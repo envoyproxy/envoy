@@ -374,15 +374,12 @@ bool ContextImpl::verifyCertificateSpkiList(
   if (pubkey == nullptr) {
     return false;
   }
-  // 1st pass to get the length, 2nd pass to write DER-encoded SPKI to the stack-allocated "spki".
-  const int len = i2d_X509_PUBKEY(pubkey, nullptr);
+  uint8_t* spki = nullptr;
+  const int len = i2d_X509_PUBKEY(pubkey, &spki);
   if (len < 0) {
     return false;
   }
-  uint8_t spki[len];
-  uint8_t* p = spki;
-  const int len2 = i2d_X509_PUBKEY(pubkey, &p);
-  RELEASE_ASSERT(len2 == len);
+  bssl::UniquePtr<uint8_t> free_spki(spki);
 
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   SHA256(spki, len, computed_hash.data());
