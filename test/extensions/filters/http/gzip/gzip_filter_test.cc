@@ -4,9 +4,15 @@
 
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::Return;
+using testing::ReturnRef;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +21,10 @@ namespace Gzip {
 
 class GzipFilterTest : public testing::Test {
 protected:
-  GzipFilterTest() {}
+  GzipFilterTest() {
+    ON_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))
+        .WillByDefault(Return(true));
+  }
 
   void SetUp() override {
     setUpFilter("{}");
@@ -54,7 +63,7 @@ protected:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
     MessageUtil::loadFromJson(json, gzip);
-    config_.reset(new GzipFilterConfig(gzip));
+    config_.reset(new GzipFilterConfig(gzip, runtime_));
     filter_.reset(new GzipFilter(config_));
   }
 
@@ -111,7 +120,16 @@ protected:
   Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
+  NiceMock<Runtime::MockLoader> runtime_;
 };
+
+// Test if Runtime Feature is Disabled
+TEST_F(GzipFilterTest, RuntimeDisabled) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))
+      .WillOnce(Return(false));
+  doRequest({{":method", "get"}, {"accept-encoding", "deflate, gzip"}}, false);
+  doResponseNoCompression({{":method", "get"}, {"content-length", "256"}});
+}
 
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
