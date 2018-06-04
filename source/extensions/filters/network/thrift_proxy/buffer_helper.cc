@@ -114,15 +114,18 @@ uint64_t BufferHelper::drainU64(Buffer::Instance& buffer) {
 }
 
 double BufferHelper::drainDouble(Buffer::Instance& buffer) {
-  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != size(uint64_t)");
+  static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
   static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
 
-  // Cribbed from protobuf WireFormatLite.
-  union {
-    double d;
-    uint64_t i;
-  };
-  i = drainU64(buffer);
+  // Implementation based on: https://www.youtube.com/watch?v=sCjZuvtJd-k
+  // 1. Reinterpreting pointers falls astray of strict aliasing rules.
+  // 2. Using a union of uint64_t and double is undefined behavior in C++ (but not C11).
+  // 3. Using memcpy is also undefined, but probably more reliable, and can be optimizied to the
+  //    same instructions as 1 and 2.
+  // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
+  uint64_t i = drainU64(buffer);
+  double d;
+  std::memcpy(&d, &i, 8);
   return d;
 }
 
