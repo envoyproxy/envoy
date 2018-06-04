@@ -192,35 +192,6 @@ message RequiredProvider {
   repeated string audiences = 2;
 }
 
-// This message specifies a Jwt requirement. It consists of multiple "one_of", each "one_of"
-// consists of multiple "all_of". Each "all_of" specifies a required provider.
-// If the message is empty, Jwt is not required.
-//
-// .. code-block:: yaml
-//
-//   one_of:
-//      - all_of:
-//         - issuer: issuer1
-//         - issuer: issuer2
-//           audiences: [audience1, audience2]
-//      - all_of:
-//         - issuer: issuer3
-//
-// Above example specifies this requirement: (issuer1 & issuer2) || (issuer3)
-//
-// Route.per_filter_config for jwt_authn filter uses this message.
-message JwtRequirement {
-  // Specify list of required JwtProviders. Their results are AND-ed;
-  // all of them must pass, if one of them fails or missing, it fails.
-  message RequiredProviderSet {
-    repeated RequiredProvider all_of = 1 [(validate.rules).repeated .min_items = 1];
-  }
-
-  // Specify list of AndRequirement. Their results are OR-ed;
-  // any one of them passes, the result is passed.
-  repeated RequiredProviderSet one_of = 1;
-}
-
 // This message specifies a Jwt requirement for a specific Route condition.
 // Example 1:
 //
@@ -238,17 +209,10 @@ message JwtRequirement {
 //
 //    - match:
 //         prefix: "/"
-//      requires:
-//        one_of:
-//           - all_of:
-//             - issuer: jwt_issuer1
-//           - all_of:
-//             - issuer: jwt_issuer2
-//               audiences: [audience1, audience2]
+//      requires: { issuer: "iss-A", audiences: [audience1, audience2]}
 //
 // In above example, all requests (all requests matched "/" path prefix),
-// require jwt authentication from either jwt_issuer or jwt_issuer2 and jwt_issuer2 has audiences
-// override defined.
+// require jwt authentication from "iss-A" with audiences override defined.
 message RequirementRule {
   // The route matching parameter. Only when the match is satisfied, the "requires" field will
   // apply.
@@ -262,8 +226,30 @@ message RequirementRule {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specify a Jwt Requirement. Please see comment from messaage JwtRequirement.
-  JwtRequirement requires = 2;
+  // Specify a Jwt Requirement. If the message is empty, Jwt is not required.
+  //
+  // .. code-block:: yaml
+  //
+  //   requires: { issuer: "iss-A" }
+  //
+  // or:
+  //   requires_any: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //
+  // or:
+  //   requires_all: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //
+  oneof require_type {
+    // Specify a single RequiredProvider.
+    RequiredProvider requires = 2;
+
+    // Specify list of RequiredProvider. Their results are OR-ed.
+    // If any one of them passes, the result is passed.
+    repeated RequiredProvider requires_any = 3;
+    
+    // Specify list of RequiredProvider. Their results are AND-ed.
+    // All of them must pass, if one of them fails or missing, it fails.
+    repeated RequiredProvider requires_all = 4;
+  }
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
@@ -293,19 +279,12 @@ message RequirementRule {
 //      # Jwt verification for issuer1 is required for path prefixed with "prefix"
 //      - match:
 //          prefix: "/prefix"
-//        requires:
-//          one_of:
-//            - all_of:
-//              - issuer: issuer1
-//                audiences: [audience_override]
+//        requires: {issuer: "issuer1", audiences: [audience_override]}
 //
-//    # Jwt verification for issuer2 is required for all other requests.
+//      # Jwt verification for either issue1 or issuer2 is required for all other requests.
 //      - match:
 //          prefix: "/"
-//        requires:
-//          one_of:
-//            - all_of:
-//              - issuer: issuer2
+//        requires_any: { [issuer: "issuer1"], [issuer: "issuer2"] }
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -347,14 +326,13 @@ message JwtAuthentication {
   // .. code-block:: yaml
   //
   // rules:
-  //   - match:
-  //       prefix: "/healthz"
-  //   - match:
-  //       prefix: "/"
-  //     requires:
-  //        one_of:
-  //           - all_of:
-  //             - issuer: issuer1
+  //   - match: { prefix: "/healthz" }
+  //   - match: { prefix: "/baz" }
+  //     requires: { issuer: "iss-A" }
+  //   - match: { prefix: "/foo" }
+  //     requires_any: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
+  //   - match: { prefix: "/bar" }
+  //     requires_all: [{ issuer: "iss-A" }, { issuer: "iss-B" }]
   //
   repeated RequirementRule rules = 3;
 }
