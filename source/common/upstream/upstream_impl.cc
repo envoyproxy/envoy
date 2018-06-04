@@ -174,10 +174,11 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   // locality in this priority. No scheduler is built if we don't have locality weights
   // (i.e. not using EDS) or when there are 0 healthy hosts in this priority.
   //
-  // Zero healthy hosts can only happen if the entire cluster is unhealthy, as this HostSet
-  // would not get selected if any other pirority has any healthy hosts. In this case we don't
-  // want a scheduler because we can't use locality weight routing anymore. Alternative routing
-  // mechanisms (e.g. panic mode) does not make use of the scheduler.
+  // We omit building a scheduler when there are zero healhty hosts in the priority as all
+  // the localities will have zero effective weight. At selection time, we'll only ever try
+  // to select a host from such a priority if all priorities have zero healthy hosts. At
+  // that point we'll rely on other mechanisms such as panic mode to select a host,
+  // none of which rely on the scheduler.
   //
   // TODO(htuch): if the underlying locality index ->
   // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
