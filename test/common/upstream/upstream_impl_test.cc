@@ -946,7 +946,8 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  host_set_.updateHosts({}, std::make_shared<const HostVector>(), hosts_per_locality,
+  auto hosts = std::make_shared<const HostVector>(hosts_per_locality->get()[0]);
+  host_set_.updateHosts(hosts, std::make_shared<const HostVector>(), hosts_per_locality,
                         hosts_per_locality, locality_weights, {}, {});
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
 }
@@ -956,8 +957,9 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  host_set_.updateHosts({}, std::make_shared<const HostVector>(hosts_per_locality->get()[0]),
-                        hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = std::make_shared<const HostVector>(hosts_per_locality->get()[0]);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
@@ -970,8 +972,9 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
 TEST_F(HostSetImplLocalityTest, Weighted) {
   HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-  host_set_.updateHosts({}, std::make_shared<const HostVector>(hosts_per_locality->get()[0]),
-                        hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = std::make_shared<const HostVector>(hosts_per_locality->get()[0]);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
@@ -985,8 +988,9 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 0, 1}};
-  host_set_.updateHosts({}, std::make_shared<const HostVector>(hosts_per_locality->get()[0]),
-                        hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = std::make_shared<const HostVector>(hosts_per_locality->get()[0]);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
@@ -1009,8 +1013,9 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
         makeHostsPerLocality({healthy_hosts, {hosts_[5]}});
 
     healthy_hosts.emplace_back(hosts_[5]);
-    host_set_.updateHosts({}, std::make_shared<const HostVector>(healthy_hosts), hosts_per_locality,
-                          healthy_hosts_per_locality, locality_weights, {}, {});
+    auto hosts = std::make_shared<const HostVector>(healthy_hosts);
+    host_set_.updateHosts(hosts, hosts, hosts_per_locality, healthy_hosts_per_locality,
+                          locality_weights, {}, {});
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {

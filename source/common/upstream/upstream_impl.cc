@@ -170,7 +170,15 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   hosts_per_locality_ = std::move(hosts_per_locality);
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
-  // Rebuild the locality scheduler.
+  // Rebuild the locality scheduler by computing the effective weight of each
+  // locality in this priority. No scheduler is built if we don't have locality weights
+  // (i.e. not using EDS) or when there are 0 healthy hosts in this priority.
+  //
+  // Zero healthy hosts can only happen if the entire cluster is unhealthy, as this HostSet
+  // would not get selected if any other pirority has any healthy hosts. In this case we don't
+  // want a scheduler because we can't use locality weight routing anymore. Alternative routing
+  // mechanisms (e.g. panic mode) does not make use of the scheduler.
+  //
   // TODO(htuch): if the underlying locality index ->
   // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
   // could just update locality_weight_ without rebuilding. Similar to how host
