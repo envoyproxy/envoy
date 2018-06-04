@@ -144,6 +144,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   // clang-format on
 
   virtual ~RetryPolicy() {}
