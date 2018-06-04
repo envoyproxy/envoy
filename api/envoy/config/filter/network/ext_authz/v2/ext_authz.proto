@@ -8,7 +8,8 @@ import "envoy/api/v2/core/grpc_service.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: Network External Authorization ]
-// The network layer external authorization service configuration :ref:`configuration overview <config_network_filters_ext_authz>`.
+// The network layer external authorization service configuration
+// :ref:`configuration overview <config_network_filters_ext_authz>`.
 
 // External Authorization filter calls out to an external service over the
 // gRPC Authorization API defined by
