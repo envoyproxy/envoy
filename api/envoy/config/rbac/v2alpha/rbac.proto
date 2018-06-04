@@ -7,6 +7,8 @@ import "envoy/api/v2/route/route.proto";
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
 
+// [#protodoc-title: Role Based Access Control (RBAC)]
+
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
 // service. RBAC policies are additive. The policies are examined in order. A request is allowed
 // once a matching policy is found (suppose the `action` is ALLOW).

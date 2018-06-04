@@ -78,9 +78,12 @@ public:
    * Determine the final timeout to use based on the route as well as the request headers.
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
+   * @param insert_envoy_expected_request_timeout_ms insert
+   *        x-envoy-expected-request-timeout-ms?
    * @return TimeoutData for both the global and per try timeouts.
    */
-  static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers);
+  static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
+                                  bool insert_envoy_expected_request_timeout_ms);
 };
 
 /**
@@ -91,11 +94,11 @@ public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats, bool start_child_span)
+               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        shadow_writer_(std::move(shadow_writer)) {}
+        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -103,7 +106,7 @@ public:
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span()) {
+                     config.start_child_span(), config.suppress_envoy_headers()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -119,6 +122,7 @@ public:
   FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
+  const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
 
 private:

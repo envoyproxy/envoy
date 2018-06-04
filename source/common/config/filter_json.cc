@@ -1,5 +1,7 @@
 #include "common/config/filter_json.h"
 
+#include "envoy/config/accesslog/v2/file.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/address_json.h"
@@ -104,7 +106,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_config,
                                     envoy::config::filter::accesslog::v2::AccessLog& proto_config) {
   json_config.validateSchema(Json::Schema::ACCESS_LOG_SCHEMA);
 
-  envoy::config::filter::accesslog::v2::FileAccessLog file_access_log;
+  envoy::config::accesslog::v2::FileAccessLog file_access_log;
 
   JSON_UTIL_SET_STRING(json_config, file_access_log, path);
   JSON_UTIL_SET_STRING(json_config, file_access_log, format);

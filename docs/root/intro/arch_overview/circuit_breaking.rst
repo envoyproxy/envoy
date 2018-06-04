@@ -34,5 +34,5 @@ and tracked on a per upstream cluster and per priority basis. This allows differ
 the distributed system to be tuned independently and have different limits.
 
 Note that circuit breaking will cause the :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded>` header to be set by the router filter in the
+<config_http_filters_router_x-envoy-overloaded_set>` header to be set by the router filter in the
 case of HTTP requests.

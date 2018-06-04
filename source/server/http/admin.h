@@ -17,6 +17,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
@@ -91,6 +92,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
   uint32_t xffNumTrustedHops() const override { return 0; }
+  bool skipXffAppend() const override { return false; }
+  const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }

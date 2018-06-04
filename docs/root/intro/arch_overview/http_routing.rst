@@ -34,7 +34,7 @@ request. The router filter supports the following features:
 * :ref:`Request retries <arch_overview_http_routing_retry>` specified either via HTTP header or via
   route configuration.
 * Request timeout specified either via :ref:`HTTP
-  header <config_http_filters_router_headers>` or via :ref:`route configuration
+  header <config_http_filters_router_headers_consumed>` or via :ref:`route configuration
   <config_http_conn_man_route_table_route_timeout>`.
 * Traffic shifting from one upstream cluster to another via :ref:`runtime values
   <config_http_conn_man_route_table_route_runtime>` (see :ref:`traffic shifting/splitting
@@ -69,7 +69,7 @@ Retry semantics
 
 Envoy allows retries to be configured both in the :ref:`route configuration
 <config_http_conn_man_route_table_route_retry>` as well as for specific requests via :ref:`request
-headers <config_http_filters_router_headers>`. The following configurations are possible:
+headers <config_http_filters_router_headers_consumed>`. The following configurations are possible:
 
 * **Maximum number of retries**: Envoy will continue to retry any number of times. An exponential
   backoff algorithm is used between each retry. Additionally, *all retries are contained within the
@@ -79,7 +79,7 @@ headers <config_http_filters_router_headers>`. The following configurations are 
   etc.
 
 Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded
-<config_http_filters_router_x-envoy-overloaded>`.
+<config_http_filters_router_x-envoy-overloaded_consumed>`.
 
 .. _arch_overview_http_routing_priority:
 

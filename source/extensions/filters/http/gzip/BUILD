@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/json:json_object_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/compressor:compressor_lib",
         "//source/common/http:header_map_lib",

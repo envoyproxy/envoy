@@ -34,7 +34,7 @@ public:
                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                    const Http::HeaderMap& request_headers);
+                                    const Http::HeaderMap& request_headers, const std::string& via);
 
 private:
   static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,

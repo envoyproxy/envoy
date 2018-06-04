@@ -29,6 +29,13 @@ public:
   static void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
 
   /**
+   * Append to via header.
+   * @param headers supplies the headers to append to.
+   * @param via supplies the via header to append.
+   */
+  static void appendVia(HeaderMap& headers, const std::string& via);
+
+  /**
    * Creates an SSL (https) redirect path based on the input host and path headers.
    * @param headers supplies the request headers.
    * @return std::string the redirect path.

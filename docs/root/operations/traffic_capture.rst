@@ -5,7 +5,7 @@ Traffic capture
 
 Envoy currently provides an experimental :ref:`transport socket extension
 <envoy_api_msg_core.TransportSocket>` that can intercept traffic and write to a :ref:`protobuf
-capture file <envoy_api_msg_extensions.common.tap.v2alpha.Trace>`.
+capture file <envoy_api_msg_data.tap.v2alpha.Trace>`.
 
 .. warning::
   This feature is experimental and has a known limitation that it will OOM for large traces on a
