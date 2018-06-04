@@ -1,4 +1,3 @@
-
 #ifdef ENVOY_GOOGLE_GRPC
 
 #include "envoy/config/grpc_credentials/v2alpha/file_based_metadata.pb.h"
@@ -134,8 +133,8 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
   request->sendReply();
   dispatcher_helper_.runDispatcher();
 }
-#endif
 
 } // namespace
 } // namespace Grpc
 } // namespace Envoy
+#endif
