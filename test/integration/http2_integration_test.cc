@@ -484,7 +484,7 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
         EXPECT_STREQ("200", response.headers().Status()->value().c_str());
         std::string value = response.headers().get(Http::Headers::get().SetCookie)->value().c_str();
         set_cookies.insert(value);
-        EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15"));
+        EXPECT_THAT(value, MatchesRegex("foo=.*; Max-Age=15; HttpOnly"));
       });
   EXPECT_EQ(set_cookies.size(), 1);
 }

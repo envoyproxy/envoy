@@ -305,10 +305,12 @@ public:
   /**
    * A callback used for requesting that a cookie be set with the given lifetime.
    * @param key the name of the cookie to be set
+   * @param path the path of the cookie, or the empty string if no path should be set.
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+  typedef std::function<std::string(const std::string& key, const std::string& path,
+                                    std::chrono::seconds ttl)>
       AddCookieCallback;
 
   /**

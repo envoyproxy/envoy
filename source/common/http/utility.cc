@@ -134,12 +134,13 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::chrono::seconds max_age, bool httponly) {
-  if (max_age == std::chrono::seconds::zero()) {
-    return fmt::format("{}=\"{}\"{}", key, value, httponly ? "; HttpOnly" : "");
-  }
-  return fmt::format("{}=\"{}\"; Max-Age={}{}", key, value, max_age.count(),
-                     httponly ? "; HttpOnly" : "");
+                                        const std::string& path, const std::chrono::seconds max_age,
+                                        bool httponly) {
+  return fmt::format("{}=\"{}\"{}{}{}{}", key, value,
+                     max_age == std::chrono::seconds::zero()
+                         ? ""
+                         : fmt::format("; {}{}", "Max-Age=", max_age.count()),
+                     path.empty() ? "" : "; Path=", path, httponly ? "; HttpOnly" : "");
 }
 
 bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
