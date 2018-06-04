@@ -432,7 +432,7 @@ message HeaderFilter {
 }
 
 // Filters requests that received responses with an Envoy response flag set.
-// All the response flags are listed
+// A list of the response flags can be found
 // in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
 message ResponseFlagFilter {
 }
