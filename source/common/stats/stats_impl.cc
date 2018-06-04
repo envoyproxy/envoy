@@ -8,6 +8,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/common/lock_guard.h"
 #include "common/common/perf_annotation.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
@@ -23,8 +24,8 @@ namespace {
 
 // Round val up to the next multiple of the natural alignment.
 // Note: this implementation only works because 8 is a power of 2.
-size_t roundUpMultipleNaturalAlignment(size_t val) {
-  const size_t multiple = alignof(RawStatData);
+uint64_t roundUpMultipleNaturalAlignment(uint64_t val) {
+  const uint64_t multiple = alignof(RawStatData);
   static_assert(multiple == 1 || multiple == 2 || multiple == 4 || multiple == 8 || multiple == 16,
                 "multiple must be a power of 2 for this algorithm to work");
   return (val + multiple - 1) & ~(multiple - 1);
@@ -36,23 +37,23 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
-size_t RawStatData::size() {
+uint64_t RawStatData::size() {
   // Normally the compiler would do this, but because name_ is a flexible-array-length
   // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
   // it's important that each element starts on the required alignment for the type.
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
 }
 
-size_t& RawStatData::initializeAndGetMutableMaxObjNameLength(size_t configured_size) {
+uint64_t& RawStatData::initializeAndGetMutableMaxObjNameLength(uint64_t configured_size) {
   // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
-  static size_t size = configured_size;
+  static uint64_t size = configured_size;
   return size;
 }
 
 void RawStatData::configure(Server::Options& options) {
-  const size_t configured = options.maxObjNameLength();
+  const uint64_t configured = options.maxObjNameLength();
   RELEASE_ASSERT(configured > 0);
-  size_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
+  uint64_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
 
   // If this fails, it means that this function was called too late during
   // startup because things were already using this size before it was set.
@@ -60,13 +61,14 @@ void RawStatData::configure(Server::Options& options) {
 }
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const size_t configured = options.maxObjNameLength();
+  const uint64_t configured = options.maxObjNameLength();
   initializeAndGetMutableMaxObjNameLength(configured) = configured;
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {
   std::string stats_name = name;
   std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
   return stats_name;
 }
 
@@ -159,10 +161,10 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   // storing the name twice. Performing a lookup on the set is similarly
   // expensive to performing a map lookup, since both require copying a truncated version of the
   // string before doing the hash lookup.
-  absl::ReleasableMutexLock lock(&mutex_);
+  Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
-  lock.Release();
+  lock.release();
 
   if (!ret.second) {
     ::free(data);
@@ -173,8 +175,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   }
 }
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config)
-    : TagProducerImpl() {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
   std::unordered_set<std::string> names = addDefaultExtractors(config);
@@ -280,7 +281,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
   size_t key_removed;
   {
-    absl::MutexLock lock(&mutex_);
+    Thread::LockGuard lock(mutex_);
     key_removed = stats_.erase(&data);
   }
 
@@ -299,7 +300,7 @@ void RawStatData::initialize(absl::string_view key) {
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
-  size_t xfer_size = std::min(nameSize() - 1, key.size());
+  uint64_t xfer_size = std::min(nameSize() - 1, key.size());
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
 }
@@ -335,6 +336,31 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   ASSERT(supportedQuantiles().size() == computed_quantiles_.size());
   hist_approx_quantile(new_histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
                        computed_quantiles_.data());
+}
+
+std::vector<CounterSharedPtr>& SourceImpl::cachedCounters() {
+  if (!counters_) {
+    counters_ = store_.counters();
+  }
+  return *counters_;
+}
+std::vector<GaugeSharedPtr>& SourceImpl::cachedGauges() {
+  if (!gauges_) {
+    gauges_ = store_.gauges();
+  }
+  return *gauges_;
+}
+std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
+  if (!histograms_) {
+    histograms_ = store_.histograms();
+  }
+  return *histograms_;
+}
+
+void SourceImpl::clearCache() {
+  counters_.reset();
+  gauges_.reset();
+  histograms_.reset();
 }
 
 } // namespace Stats

@@ -14,4 +14,3 @@ Common messages
   ../api/v2/core/http_uri.proto
   ../api/v2/auth/cert.proto
   ../api/v2/ratelimit/ratelimit.proto
-  ../extensions/common/tap/v2alpha/capture.proto

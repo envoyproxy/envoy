@@ -17,6 +17,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/json:json_object_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/compressor:compressor_lib",
         "//source/common/http:header_map_lib",
@@ -34,9 +35,8 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
     ],
 )

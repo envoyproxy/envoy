@@ -60,7 +60,9 @@ The Google C++ gRPC client is based on the reference implementation of gRPC
 provided by Google at https://github.com/grpc/grpc. It provides advanced gRPC
 features that are missing in the Envoy gRPC client. The Google C++ gRPC client
 performs its own load balancing, retries, timeouts, endpoint management, etc,
-independent of Envoy's cluster management.
+independent of Envoy's cluster management. The Google C++ gRPC client also
+supports `custom authentication plugins
+<https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms>`_.
 
 It is recommended to use the Envoy gRPC client in most cases, where the advanced
 features in the Google C++ gRPC client are not required. This provides

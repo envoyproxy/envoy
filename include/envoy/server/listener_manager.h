@@ -14,11 +14,32 @@ namespace Envoy {
 namespace Server {
 
 /**
+ * Interface for an LDS API provider.
+ */
+class LdsApi {
+public:
+  virtual ~LdsApi() {}
+
+  /**
+   * @return std::string the last received version by the xDS API for LDS.
+   */
+  virtual std::string versionInfo() const PURE;
+};
+
+typedef std::unique_ptr<LdsApi> LdsApiPtr;
+
+/**
  * Factory for creating listener components.
  */
 class ListenerComponentFactory {
 public:
   virtual ~ListenerComponentFactory() {}
+
+  /**
+   * @return an LDS API provider.
+   * @param lds_config supplies the management server configuration.
+   */
+  virtual LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
 
   /**
    * Creates a socket.
@@ -78,6 +99,7 @@ public:
    * will be gracefully drained once the new listener is ready to take traffic (e.g. when RDS has
    * been initialized).
    * @param config supplies the configuration proto.
+   * @param version_info supplies the xDS version of the listener.
    * @param modifiable supplies whether the added listener can be updated or removed. If the
    *        listener is not modifiable, future calls to this function or removeListener() on behalf
    *        of this listener will return false.
@@ -85,7 +107,16 @@ public:
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config, bool modifiable) PURE;
+  virtual bool addOrUpdateListener(const envoy::api::v2::Listener& config,
+                                   const std::string& version_info, bool modifiable) PURE;
+
+  /**
+   * Instruct the listener manager to create an LDS API provider. This is a separate operation
+   * during server initialization because the listener manager is created prior to several core
+   * pieces of the server existing.
+   * @param lds_config supplies the management server configuration.
+   */
+  virtual void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently

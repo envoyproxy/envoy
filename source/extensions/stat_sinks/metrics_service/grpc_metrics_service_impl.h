@@ -109,22 +109,12 @@ class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer);
-
-  void beginFlush() override { message_.clear_envoy_metrics(); }
-
-  void flushCounter(const Stats::Counter& counter, uint64_t) override;
-  void flushGauge(const Stats::Gauge& gauge, uint64_t value) override;
-  void flushHistogram(const Stats::ParentHistogram& histogram) override;
-
-  void endFlush() override {
-    grpc_metrics_streamer_->send(message_);
-    // for perf reasons, clear the identifer after the first flush.
-    if (message_.has_identifier()) {
-      message_.clear_identifier();
-    }
-  }
-
+  void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+  void flushCounter(const Stats::Counter& counter);
+  void flushGauge(const Stats::Gauge& gauge);
+  void flushHistogram(const Stats::ParentHistogram& histogram);
 
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;

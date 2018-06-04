@@ -2,11 +2,13 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
-    "envoy_sh_test",
+    "envoy_proto_library",
     "envoy_select_hot_restart",
+    "envoy_sh_test",
 )
 load(
     "//source/extensions:all_extensions.bzl",
@@ -40,6 +42,37 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
+    ],
+)
+
+py_binary(
+    name = "capture_fuzz_gen",
+    srcs = ["capture_fuzz_gen.py"],
+    licenses = ["notice"],  # Apache 2
+    visibility = ["//visibility:public"],
+    deps = [
+        ":capture_fuzz_proto_py",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_py",
+    ],
+)
+
+envoy_proto_library(
+    name = "capture_fuzz_proto",
+    srcs = [":capture_fuzz.proto"],
+    external_deps = ["well_known_protos"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_fuzz_test",
+    srcs = ["h1_capture_fuzz_test.cc"],
+    corpus = "h1_capture_corpus",
+    deps = [
+        ":capture_fuzz_proto",
+        ":http_integration_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
     ],
 )
 
@@ -103,6 +136,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
@@ -365,11 +399,12 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 
@@ -433,6 +468,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/test_common:utility_lib",
     ],

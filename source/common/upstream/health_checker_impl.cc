@@ -217,8 +217,11 @@ TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
   MatchSegments result;
 
   for (const auto& entry : byte_array) {
-    const std::string& hex_string = entry.text();
-    result.push_back(Hex::decode(hex_string));
+    const auto decoded = Hex::decode(entry.text());
+    if (decoded.size() == 0) {
+      throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
+    }
+    result.push_back(decoded);
   }
 
   return result;
@@ -362,7 +365,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::decodeHeaders(
         return;
       }
     }
-    onRpcComplete(Grpc::Common::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
+    onRpcComplete(Grpc::Utility::httpToGrpcStatus(http_response_status), "non-200 HTTP response",
                   end_stream);
     return;
   }

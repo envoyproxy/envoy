@@ -4,11 +4,26 @@ namespace Envoy {
 namespace Network {
 namespace LcTrie {
 
-template <class IpType, uint32_t address_size>
-const uint32_t LcTrie::LcTrieInternal<IpType, address_size>::MAXIMUM_CIDR_RANGE_ENTRIES;
-
 LcTrie::LcTrie(const std::vector<std::pair<std::string, std::vector<Address::CidrRange>>>& tag_data,
                double fill_factor, uint32_t root_branching_factor) {
+
+  // The LcTrie implementation uses 20-bit "pointers" in its compact internal representation,
+  // so it cannot hold more than 2^20 nodes. But the number of nodes can be greater than the
+  // number of supported prefixes. Given N prefixes in the tag_data input list, step 2 below
+  // can produce a new list of up to 2*N prefixes to insert in the LC trie. And the LC trie
+  // can use up to 2*N/fill_factor nodes.
+  size_t num_prefixes = 0;
+  for (const auto& tag : tag_data) {
+    num_prefixes += tag.second.size();
+  }
+  const size_t max_prefixes = MaxLcTrieNodes * fill_factor / 2;
+  if (num_prefixes > max_prefixes) {
+    throw EnvoyException(fmt::format("The input vector has '{0}' CIDR range entries. LC-Trie "
+                                     "can only support '{1}' CIDR ranges with the specified "
+                                     "fill factor.",
+                                     num_prefixes, max_prefixes));
+  }
+
   // Step 1: separate the provided prefixes by protocol (IPv4 vs IPv6),
   // and build a Binary Trie per protocol.
   //

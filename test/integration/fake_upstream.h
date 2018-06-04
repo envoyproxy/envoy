@@ -1,10 +1,8 @@
 #pragma once
 
-#include <condition_variable>
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "envoy/api/api.h"
@@ -18,6 +16,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -85,13 +84,13 @@ public:
     }
     waitForData(client_dispatcher, 5);
     {
-      std::unique_lock<std::mutex> lock(lock_);
+      Thread::LockGuard lock(lock_);
       EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
     }
     if (decoded_grpc_frames_.size() < 1) {
       waitForData(client_dispatcher, grpc_decoder_.length());
       {
-        std::unique_lock<std::mutex> lock(lock_);
+        Thread::LockGuard lock(lock_);
         EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
       }
     }
@@ -118,8 +117,8 @@ protected:
 private:
   FakeHttpConnection& parent_;
   Http::StreamEncoder& encoder_;
-  std::mutex lock_;
-  std::condition_variable decoder_event_;
+  Thread::MutexBasicLockable lock_;
+  Thread::CondVar decoder_event_;
   Http::HeaderMapPtr trailers_;
   bool end_stream_{};
   Buffer::OwnedImpl body_;
@@ -148,14 +147,14 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
   void set_parented() {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     parented_ = true;
   }
   Network::Connection& connection() const { return connection_; }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_ ||
                    (event != Network::ConnectionEvent::RemoteClose &&
                     event != Network::ConnectionEvent::LocalClose));
@@ -166,7 +165,7 @@ public:
 private:
   Network::Connection& connection_;
   bool parented_;
-  std::mutex lock_;
+  Thread::MutexBasicLockable lock_;
   bool allow_unexpected_disconnects_;
 };
 
@@ -197,6 +196,10 @@ public:
     connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
   }
   void enableHalfClose(bool enabled);
+  bool connected() const {
+    Thread::LockGuard lock(lock_);
+    return !disconnected_;
+  }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
@@ -204,8 +207,8 @@ protected:
         connection_wrapper_(std::move(connection_wrapper)) {}
 
   Network::Connection& connection_;
-  std::mutex lock_;
-  std::condition_variable connection_event_;
+  mutable Thread::MutexBasicLockable lock_;
+  Thread::CondVar connection_event_;
   bool disconnected_{};
   bool half_closed_{};
   bool initialized_{false};
@@ -285,7 +288,9 @@ typedef std::unique_ptr<FakeRawConnection> FakeRawConnectionPtr;
 /**
  * Provides a fake upstream server for integration testing.
  */
-class FakeUpstream : Logger::Loggable<Logger::Id::testing>, public Network::FilterChainFactory {
+class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
+                     public Network::FilterChainManager,
+                     public Network::FilterChainFactory {
 public:
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
@@ -296,7 +301,8 @@ public:
 
   FakeHttpConnection::Type httpType() { return http_type_; }
   FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
-  FakeRawConnectionPtr waitForRawConnection();
+  FakeRawConnectionPtr
+  waitForRawConnection(std::chrono::milliseconds wait_for_ms = std::chrono::milliseconds{10000});
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Wait for one of the upstreams to receive a connection
@@ -304,8 +310,15 @@ public:
   waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                         std::vector<std::unique_ptr<FakeUpstream>>& upstreams);
 
+  // Network::FilterChainManager
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+    return filter_chain_.get();
+  }
+
   // Network::FilterChainFactory
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
@@ -325,11 +338,9 @@ private:
 
   private:
     // Network::ListenerConfig
+    Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return *parent_.socket_; }
-    Network::TransportSocketFactory& transportSocketFactory() override {
-      return *parent_.transport_socket_factory_;
-    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -343,14 +354,13 @@ private:
 
   void threadRoutine();
 
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.
-  std::mutex lock_;
+  Thread::MutexBasicLockable lock_;
   Thread::ThreadPtr thread_;
-  std::condition_variable new_connection_event_;
+  Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
@@ -358,5 +368,6 @@ private:
   bool allow_unexpected_disconnects_;
   const bool enable_half_close_;
   FakeListener listener_;
+  const Network::FilterChainSharedPtr filter_chain_;
 };
 } // namespace Envoy

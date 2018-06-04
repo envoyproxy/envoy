@@ -147,13 +147,15 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are sent, this will be translated into a 500 from Envoy.
+  // limits are exceeded, this will be translated into a 500 from Envoy.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(1024 * 65, false);
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_NE(response->headers().GrpcStatus(), nullptr);
+  EXPECT_STREQ("2", response->headers().GrpcStatus()->value().c_str()); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -428,6 +430,43 @@ TEST_P(IntegrationTest, TestFailedBind) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
+}
+
+ConfigHelper::HttpModifierFunction setVia(const std::string& via) {
+  return
+      [via](
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.set_via(via);
+      };
+}
+
+// Validate in a basic header-only request we get via header insertion.
+TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
+  config_helper_.addConfigModifier(setVia("bar"));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":authority", "host"},
+                                                                   {"via", "foo"},
+                                                                   {"connection", "close"}});
+  waitForNextUpstreamRequest();
+  EXPECT_STREQ("foo, bar",
+               upstream_request_->headers().get(Http::Headers::get().Via)->value().c_str());
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+  response->waitForEndStream();
+  codec_client_->waitForDisconnect();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("bar", response->headers().Via()->value().c_str());
+}
+
+// Validate that 100-continue works as expected with via header addition on both request and
+// response path.
+TEST_P(IntegrationTest, ViaAppendWith100Continue) {
+  config_helper_.addConfigModifier(setVia("foo"));
 }
 
 } // namespace Envoy

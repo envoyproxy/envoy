@@ -3,7 +3,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
-#include "common/json/json_loader.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/utility.h"
@@ -152,6 +151,20 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
+  response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json&usedonly",
+                                         "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+  validateStatsJson(response->body(), 0);
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=blah",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -161,10 +174,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(response->body());
-  EXPECT_TRUE(statsjson->hasObject("stats"));
   EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 1);
 
   response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "GET", "/stats?format=prometheus", "", downstreamProtocol(), version_);
@@ -263,6 +275,46 @@ TEST_P(IntegrationAdminTest, Admin) {
     EXPECT_EQ(listener_it->get().socket().localAddress()->asString(),
               (*listener_info_it)->asString());
   }
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/config_dump", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("application/json", ContentType(response));
+  json = Json::Factory::loadFromString(response->body());
+  EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
+  EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
+  EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
+}
+
+TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
+  initialize();
+  bool test = true;
+
+  // add an handler which adds a callback to the list of callback called when connection is dropped.
+  auto callback = [&test](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+                          Server::AdminStream& admin_stream) -> Http::Code {
+    auto on_destroy_callback = [&test]() { test = false; };
+
+    // Add the on_destroy_callback to the admin_filter list of callbacks.
+    admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
+    return Http::Code::OK;
+  };
+
+  EXPECT_TRUE(
+      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+
+  // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/foo/bar", "", downstreamProtocol(), version_);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  // Check that the added callback was invoked.
+  EXPECT_EQ(test, false);
+
+  // Small test to cover new statsFlushInterval() on Instance.h.
+  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
 }
 
 // Successful call to startProfiler requires tcmalloc.

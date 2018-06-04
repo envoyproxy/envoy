@@ -2,8 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
     "envoy_basic_cc_library",
+    "envoy_cc_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -19,6 +19,7 @@ envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":network_utility_lib",
         "//include/envoy/server:options_interface",
@@ -38,6 +39,7 @@ envoy_cc_test_library(
     hdrs = ["network_utility.h"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
         "//source/common/network:raw_buffer_socket_lib",
@@ -83,6 +85,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

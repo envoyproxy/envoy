@@ -64,7 +64,7 @@ public:
     return getpid() * four_digit_prime + random_generator_.random() % four_digit_prime;
   }
 
-  char** argv() { return const_cast<char**>(&argv_[0]); }
+  const char* const* argv() { return &argv_[0]; }
   int argc() { return argv_.size() - 1; }
 
   // Adds an argument, assuring that argv remains null-terminated.

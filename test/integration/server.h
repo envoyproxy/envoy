@@ -4,12 +4,12 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <mutex>
 #include <string>
 
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"
+#include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/stats/stats_impl.h"
@@ -39,29 +39,31 @@ public:
         service_zone_("zone_name") {}
 
   // Server::Options
-  uint64_t baseId() override { return 0; }
-  uint32_t concurrency() override { return 1; }
-  const std::string& configPath() override { return config_path_; }
-  const std::string& configYaml() override { return config_yaml_; }
-  bool v2ConfigOnly() override { return false; }
-  const std::string& adminAddressPath() override { return admin_address_path_; }
-  Network::Address::IpVersion localAddressIpVersion() override { return local_address_ip_version_; }
-  std::chrono::seconds drainTime() override { return std::chrono::seconds(1); }
-  spdlog::level::level_enum logLevel() override { NOT_IMPLEMENTED; }
-  const std::string& logFormat() override { NOT_IMPLEMENTED; }
-  std::chrono::seconds parentShutdownTime() override { return std::chrono::seconds(2); }
-  const std::string& logPath() override { return log_path_; }
-  uint64_t restartEpoch() override { return 0; }
-  std::chrono::milliseconds fileFlushIntervalMsec() override {
+  uint64_t baseId() const override { return 0; }
+  uint32_t concurrency() const override { return 1; }
+  const std::string& configPath() const override { return config_path_; }
+  const std::string& configYaml() const override { return config_yaml_; }
+  bool v2ConfigOnly() const override { return false; }
+  const std::string& adminAddressPath() const override { return admin_address_path_; }
+  Network::Address::IpVersion localAddressIpVersion() const override {
+    return local_address_ip_version_;
+  }
+  std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
+  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED; }
+  const std::string& logFormat() const override { NOT_IMPLEMENTED; }
+  std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
+  const std::string& logPath() const override { return log_path_; }
+  uint64_t restartEpoch() const override { return 0; }
+  std::chrono::milliseconds fileFlushIntervalMsec() const override {
     return std::chrono::milliseconds(50);
   }
   Mode mode() const override { return Mode::Serve; }
-  const std::string& serviceClusterName() override { return service_cluster_name_; }
-  const std::string& serviceNodeName() override { return service_node_name_; }
-  const std::string& serviceZone() override { return service_zone_; }
-  uint64_t maxStats() override { return 16384; }
-  uint64_t maxObjNameLength() override { return 60; }
-  bool hotRestartDisabled() override { return false; }
+  const std::string& serviceClusterName() const override { return service_cluster_name_; }
+  const std::string& serviceNodeName() const override { return service_node_name_; }
+  const std::string& serviceZone() const override { return service_zone_; }
+  uint64_t maxStats() const override { return 16384; }
+  uint64_t maxObjNameLength() const override { return 60; }
+  bool hotRestartDisabled() const override { return false; }
 
   // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
   Server::TestOptionsImpl asConfigYaml();
@@ -108,36 +110,36 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(std::mutex& lock, ScopePtr wrapped_scope)
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopePtr wrapped_scope)
       : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
 
   ScopePtr createScope(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
   }
 
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
   Counter& counter(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return wrapped_scope_->counter(name);
   }
 
   Gauge& gauge(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return wrapped_scope_->gauge(name);
   }
 
   Histogram& histogram(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
   }
 
 private:
-  std::mutex& lock_;
+  Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
 };
 
@@ -147,37 +149,38 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
   Counter& counter(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return store_.counter(name);
   }
   ScopePtr createScope(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
   Histogram& histogram(const std::string& name) override {
-    std::unique_lock<std::mutex> lock(lock_);
+    Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
 
   // Stats::Store
-  std::list<CounterSharedPtr> counters() const override {
-    std::unique_lock<std::mutex> lock(lock_);
+  std::vector<CounterSharedPtr> counters() const override {
+    Thread::LockGuard lock(lock_);
     return store_.counters();
   }
-  std::list<GaugeSharedPtr> gauges() const override {
-    std::unique_lock<std::mutex> lock(lock_);
+  std::vector<GaugeSharedPtr> gauges() const override {
+    Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
 
-  std::list<ParentHistogramSharedPtr> histograms() const override {
-    std::unique_lock<std::mutex> lock(lock_);
+  std::vector<ParentHistogramSharedPtr> histograms() const override {
+    Thread::LockGuard lock(lock_);
     return store_.histograms();
   }
 
@@ -187,10 +190,12 @@ public:
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb) override {}
+  Source& source() override { return source_; }
 
 private:
-  mutable std::mutex lock_;
+  mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
+  SourceImpl source_;
 };
 
 } // namespace Stats
@@ -257,9 +262,9 @@ public:
     return TestUtility::findGauge(*stat_store_, name);
   }
 
-  std::list<Stats::CounterSharedPtr> counters() override { return stat_store_->counters(); }
+  std::vector<Stats::CounterSharedPtr> counters() override { return stat_store_->counters(); }
 
-  std::list<Stats::GaugeSharedPtr> gauges() override { return stat_store_->gauges(); }
+  std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store_->gauges(); }
 
   // TestHooks
   void onWorkerListenerAdded() override;
@@ -286,8 +291,8 @@ private:
 
   const std::string config_path_;
   Thread::ThreadPtr thread_;
-  std::condition_variable listeners_cv_;
-  std::mutex listeners_mutex_;
+  Thread::CondVar listeners_cv_;
+  Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;

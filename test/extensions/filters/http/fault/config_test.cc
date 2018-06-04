@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
+
 #include "extensions/filters/http/fault/config.h"
 
 #include "test/mocks/server/mocks.h"

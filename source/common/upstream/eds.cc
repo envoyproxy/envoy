@@ -46,7 +46,7 @@ void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *thi
 
 void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   typedef std::unique_ptr<HostVector> HostListPtr;
-  std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state(1);
+  std::vector<std::pair<HostListPtr, LocalityWeightsMap>> priority_state;
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -69,7 +69,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
     }
-    if (priority_state.size() <= priority) {
+    if (priority_state.size() <= priority + 1) {
       priority_state.resize(priority + 1);
     }
     if (priority_state[priority].first == nullptr) {
@@ -115,6 +115,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     const HostVector empty_hosts;
     LocalityWeightsMap empty_locality_map;
 
+    if (locality_weights_map_.size() <= i) {
+      locality_weights_map_.resize(i + 1);
+    }
     cluster_rebuilt |= updateHostsPerLocality(priority_set_.getOrCreateHostSet(i), empty_hosts,
                                               locality_weights_map_[i], empty_locality_map);
   }

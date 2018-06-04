@@ -31,10 +31,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "google_async_site_interface",
-    hdrs = ["google_async_site.h"],
-    external_deps = ["grpc"],
-    deps = ["@envoy_api//envoy/api/v2/core:grpc_service_cc"],
+    name = "google_grpc_creds_interface",
+    hdrs = ["google_grpc_creds.h"],
+    deps = [
+        "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/core:grpc_service_cc",
+    ],
 )
 
 envoy_cc_library(

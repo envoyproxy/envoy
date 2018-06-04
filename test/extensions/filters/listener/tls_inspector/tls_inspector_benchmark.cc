@@ -41,12 +41,18 @@ public:
 class FastMockConnectionSocket : public Network::MockConnectionSocket {
 public:
   int fd() const override { return 42; }
+  void setRequestedApplicationProtocols(const std::vector<absl::string_view>& protocols) override {
+    if (protocols.front() == "h2") {
+      got_alpn_ = true;
+    }
+  }
   void setRequestedServerName(absl::string_view server_name) override {
     if (server_name == "example.com") {
       got_server_name_ = true;
     }
   }
 
+  bool got_alpn_{false};
   bool got_server_name_{false};
 };
 
@@ -82,7 +88,8 @@ public:
 };
 
 static void BM_TlsInspector(benchmark::State& state) {
-  NiceMock<FastMockOsSysCalls> os_sys_calls(Tls::Test::generateClientHello("example.com"));
+  NiceMock<FastMockOsSysCalls> os_sys_calls(
+      Tls::Test::generateClientHello("example.com", "\x02h2\x08http/1.1"));
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
@@ -96,6 +103,8 @@ static void BM_TlsInspector(benchmark::State& state) {
     dispatcher.file_event_callback_(Event::FileReadyType::Read);
     RELEASE_ASSERT(socket.got_server_name_);
     socket.got_server_name_ = false;
+    RELEASE_ASSERT(socket.got_alpn_);
+    socket.got_alpn_ = false;
   }
 }
 

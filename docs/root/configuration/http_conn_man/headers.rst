@@ -155,9 +155,12 @@ address of the nearest client to the XFF list before proxying the request. Some 
 3. ``x-forwarded-for: 50.0.0.1, 10.0.0.1`` (internal proxy hop)
 
 Envoy will only append to XFF if the :ref:`use_remote_address
-<config_http_conn_man_use_remote_address>` HTTP connection manager option is set to true.
-This means that if *use_remote_address* is false (which is the default), the connection manager
-operates in a transparent mode where it does not modify XFF.
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
+HTTP connection manager option is set to true and the `skip_xff_append
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
+is set false: This means that if *use_remote_address* is false (which is the default) or
+*skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
+modify XFF.
 
 .. attention::
 
@@ -436,14 +439,6 @@ used to delimit variable names.
   the Envoy configuration must be ``100%%``.
 
 Supported variable names are:
-
-%CLIENT_IP%
-    The original client IP which is already added by Envoy as a
-    :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` request header.
-
-    .. attention::
-
-      This field is deprecated. Use **DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT** instead.
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
     Remote address of the downstream connection. If the address is an IP address the output does

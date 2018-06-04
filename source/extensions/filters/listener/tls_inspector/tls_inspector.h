@@ -25,6 +25,8 @@ namespace TlsInspector {
   COUNTER(read_timeout)                                                                            \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
+  COUNTER(alpn_found)                                                                              \
+  COUNTER(alpn_not_found)                                                                          \
   COUNTER(sni_found)                                                                               \
   COUNTER(sni_not_found)
 
@@ -71,6 +73,7 @@ private:
   void onRead();
   void onTimeout();
   void done(bool success);
+  void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
 
   ConfigSharedPtr config_;
@@ -80,6 +83,7 @@ private:
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};
+  bool alpn_found_{false};
   bool clienthello_success_{false};
 
   static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];

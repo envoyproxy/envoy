@@ -96,6 +96,10 @@ int64_t BufferHelper::removeInt64(Buffer::Instance& data) {
 
 std::string BufferHelper::removeString(Buffer::Instance& data) {
   int32_t length = removeInt32(data);
+  if (static_cast<uint32_t>(length) > data.length()) {
+    throw EnvoyException("invalid buffer size");
+  }
+
   char* start = reinterpret_cast<char*>(data.linearize(length));
   std::string ret(start);
   data.drain(length);
@@ -106,6 +110,10 @@ std::string BufferHelper::removeBinary(Buffer::Instance& data) {
   // Read out the subtype but do not store it for now.
   int32_t length = removeInt32(data);
   removeByte(data);
+  if (static_cast<uint32_t>(length) > data.length()) {
+    throw EnvoyException("invalid buffer size");
+  }
+
   char* start = reinterpret_cast<char*>(data.linearize(length));
   std::string ret(start, length);
   data.drain(length);

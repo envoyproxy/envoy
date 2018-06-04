@@ -6,14 +6,15 @@
 #include <list>
 #include <string>
 
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
-#include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
 
+#include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -26,28 +27,22 @@ namespace HttpConnectionManager {
  */
 class HttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Server::Configuration::NamedNetworkFilterConfigFactory {
+      public Common::FactoryBase<
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager> {
 public:
+  HttpConnectionManagerFilterConfigFactory()
+      : FactoryBase(NetworkFilterNames::get().HTTP_CONNECTION_MANAGER) {}
+
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config,
                       Server::Configuration::FactoryContext& context) override;
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::FactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::unique_ptr<
-        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
-        new envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager());
-  }
-  std::string name() override { return NetworkFilterNames::get().HTTP_CONNECTION_MANAGER; }
 
 private:
-  Network::FilterFactoryCb createFilter(
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::FactoryContext& context) override;
 };
 
 /**
@@ -96,6 +91,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
+  bool skipXffAppend() const override { return skip_xff_append_; }
+  const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -120,6 +117,8 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const uint32_t xff_num_trusted_hops_;
+  const bool skip_xff_append_;
+  const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;

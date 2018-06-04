@@ -2,16 +2,15 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "schema_validator_tool",
-    testonly = 1,
     deps = [":schema_validator_lib"],
 )
 

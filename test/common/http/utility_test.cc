@@ -14,6 +14,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::_;
 
@@ -74,6 +75,20 @@ TEST(HttpUtility, appendXff) {
     Network::Address::PipeInstance address("/foo");
     Utility::appendXff(headers, address);
     EXPECT_EQ("10.0.0.1", headers.get_("x-forwarded-for"));
+  }
+}
+
+TEST(HttpUtility, appendVia) {
+  {
+    TestHeaderMapImpl headers;
+    Utility::appendVia(headers, "foo");
+    EXPECT_EQ("foo", headers.get_("via"));
+  }
+
+  {
+    TestHeaderMapImpl headers{{"via", "foo"}};
+    Utility::appendVia(headers, "bar");
+    EXPECT_EQ("foo, bar", headers.get_("via"));
   }
 }
 
@@ -240,13 +255,35 @@ TEST(HttpUtility, TestHasSetCookieBadValues) {
   EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
 }
 
+TEST(HttpUtility, TestMakeSetCookieValue) {
+  EXPECT_EQ("name=\"value\"; Max-Age=10",
+            Utility::makeSetCookieValue("name", "value", std::chrono::seconds(10)));
+  EXPECT_EQ("name=\"value\"",
+            Utility::makeSetCookieValue("name", "value", std::chrono::seconds::zero()));
+}
+
 TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
-  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+}
+
+TEST(HttpUtility, SendLocalGrpcReply) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+
+  EXPECT_CALL(callbacks, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ(headers.Status()->value().c_str(), "200");
+        EXPECT_NE(headers.GrpcStatus(), nullptr);
+        EXPECT_STREQ(headers.GrpcStatus()->value().c_str(), "2"); // Unknown gRPC error.
+        EXPECT_NE(headers.GrpcMessage(), nullptr);
+        EXPECT_STREQ(headers.GrpcMessage()->value().c_str(), "large");
+      }));
+  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -257,7 +294,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
 TEST(HttpUtility, TestAppendHeader) {
