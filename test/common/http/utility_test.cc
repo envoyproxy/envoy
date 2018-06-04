@@ -78,6 +78,20 @@ TEST(HttpUtility, appendXff) {
   }
 }
 
+TEST(HttpUtility, appendVia) {
+  {
+    TestHeaderMapImpl headers;
+    Utility::appendVia(headers, "foo");
+    EXPECT_EQ("foo", headers.get_("via"));
+  }
+
+  {
+    TestHeaderMapImpl headers{{"via", "foo"}};
+    Utility::appendVia(headers, "bar");
+    EXPECT_EQ("foo, bar", headers.get_("via"));
+  }
+}
+
 TEST(HttpUtility, createSslRedirectPath) {
   {
     TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
