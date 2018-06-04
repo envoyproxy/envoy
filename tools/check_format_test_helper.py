@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-# Tests check_format.py. This must be run under docker via
-# check_format_test.py, or you are liable to get the wrong clang, and
-# all kinds of bad results.
+# Tests check_format.py. This must be run in a context where the clang
+# version and settings are compatible with the one in the Envoy
+# docker.  Normally this is run via check_format_test.sh, which
+# executes it in under docker.
 
 import argparse
 import os
