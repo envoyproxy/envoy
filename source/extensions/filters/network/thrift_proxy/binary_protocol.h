@@ -51,7 +51,7 @@ private:
 };
 
 /**
- * BinaryProtocolImpl implements the Thrift Binary protocol with non-strict (e.g. lax) message
+ * LaxBinaryProtocolImpl implements the Thrift Binary protocol with non-strict (e.g. lax) message
  * encoding. See https://github.com/apache/thrift/blob/master/doc/specs/thrift-binary-protocol.md
  */
 class LaxBinaryProtocolImpl : public BinaryProtocolImpl {
