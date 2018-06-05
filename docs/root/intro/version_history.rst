@@ -102,14 +102,14 @@ Version history
 * tls: added support for multiple
   :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   values.
+* tls: added support for allowing expired certificates with
+  :ref:`allow_expired_certificate <envoy_api_field_auth.CertificateValidationContext.allow_expired_certificate>`.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
-* tls: added support for allowing expired certificates with
-  :ref:`allow_expired_certificate <envoy_api_field_auth.CertificateValidationContext.allow_expired_certificate>`.
 
 1.6.0 (March 20, 2018)
 ======================

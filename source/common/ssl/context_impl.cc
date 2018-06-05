@@ -84,6 +84,14 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
+
+    // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
+    // directly. However, our new callback is still calling X509_verify_cert() under
+    // the hood. Therefore, to ignore cert expiration, we need to set the callback
+    // for X509_verify_cert to ignore that error.
+    if (config.allowExpiredCertificate()) {
+      X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
+    }
   }
 
   if (!config.certificateRevocationList().empty()) {
@@ -129,15 +137,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
       verify_certificate_hash_list_.push_back(decoded);
     }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-  }
-
-  // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
-  // directly. However, our new callback is still calling X509_verify_cert() under
-  // the hood. Therefore, to ignore cert expiration, we need to set the callback
-  // for X509_verify_cert to ignore that error.
-  if (config.allowExpiredCertificate()) {
-    X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
-    X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
   }
 
   if (verify_mode != SSL_VERIFY_NONE) {
