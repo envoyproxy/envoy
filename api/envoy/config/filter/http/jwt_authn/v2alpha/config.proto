@@ -18,7 +18,7 @@ import "validate/validate.proto";
 //
 // .. code-block:: yaml
 //
-//     id: example.com
+//     name: example.com
 //     issuer: https://example.com
 //     audiences:
 //     - bookstore_android.apps.googleusercontent.com
@@ -32,7 +32,7 @@ import "validate/validate.proto";
 //
 // [#not-implemented-hide:]
 message JwtProvider {
-  // A unique ID to uniquely identify a provider. It can be the same as "issuer".
+  // A name to uniquely identify a provider. It can be the same as "issuer".
   // If an issuer have different audiences or other configurations, multiple JwtProvider
   // can be used with different ids.
   //
@@ -40,20 +40,20 @@ message JwtProvider {
   //
   // .. code-block:: yaml
   //
-  //     id: example.com-bookstore-audience
+  //     name: example.com-bookstore-audience
   //     issuer: https://example.com
   //     local_jwks:
   //      - inline_string: "ACADADADADA"
   //     audiences:
   //     - bookstore
   //
-  //     id: example.com-any-audience
+  //     name: example.com-any-audience
   //     issuer: https://example.com
   //     local_jwks:
   //      - inline_string: "ACADADADADA"
   //
   // Use 9 as the proto index number to support backward compatibility.
-  string id = 9 [(validate.rules).string.min_bytes = 1];
+  string name = 9 [(validate.rules).string.min_bytes = 1];
 
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
@@ -207,51 +207,50 @@ message JwtHeader {
   string value_prefix = 2;
 }
 
-// This message specifies a Jwt requirement
-//
-// For example: following match will match all requests.
+// This message specifies a Jwt requirement. An empty message means JWT verification is not
+// required. Here are some config examples:
 //
 // .. code-block:: yaml
 //
-//  # not required with an empty message
+//  # Example 1: not required with an empty message
 //
-//  # require A
-//  provider_id: "iss-A"
+//  # Example 2: require A
+//  provider_name: "provider-A"
 //
-//  # require A or B
+//  # Example 3: require A or B
 //  requires_any:
 //    requirements:
-//      - provider_id: "iss-A"
-//      - provider_id: "iss-B"
+//      - provider_name: "provider-A"
+//      - provider_name: "provider-B"
 //
-//  # require A and B
+//  # Example 4: require A and B
 //  requires_all:
 //    requirements:
-//      - provider_id: "iss-A"
-//      - provider_id: "iss-B"
+//      - provider_name: "provider-A"
+//      - provider_name: "provider-B"
 //
-//  # require A and (B or C)
+//  # Example 5: require A and (B or C)
 //  requires_all:
 //    requirements:
-//      - provider_id: "iss-A"
+//      - provider_name: "provider-A"
 //      - requires_any:
 //        requirements:
-//          - provider_id: "iss-B"
-//          - provider_id: "iss-C"
+//          - provider_name: "provider-B"
+//          - provider_name: "provider-C"
 //
-//  # require A or (B and C)
+//  # Example 6: require A or (B and C)
 //  requires_any:
 //    requirements:
-//      - provider_id: "iss-A"
+//      - provider_name: "provider-A"
 //      - requires_all:
 //        requirements:
-//          - provider_id: "iss-B"
-//          - provider_id: "iss-C"
+//          - provider_name: "provider-B"
+//          - provider_name: "provider-C"
 //
 message JwtRequirement {
   oneof requires_type {
-    // Specify a required provider id.
-    string provider_id = 1;
+    // Specify a required provider name.
+    string provider_name = 1;
 
     // Specify list of JwtRequirement. Their results are OR-ed.
     // If any one of them passes, the result is passed.
@@ -264,14 +263,16 @@ message JwtRequirement {
 }
 
 // This message specifies a list of RequiredProvider.
+// Their results are OR-ed; if any one of them passes, the result is passed
 message JwtRequirementOrList {
-  // Specify a list of RequiredProvider.
+  // Specify a list of JwtRequirement.
   repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
 }
 
 // This message specifies a list of RequiredProvider.
+// Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.
 message JwtRequirementAndList {
-  // Specify a list of RequiredProvider.
+  // Specify a list of JwtRequirement.
   repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
 }
 
@@ -283,7 +284,7 @@ message JwtRequirementAndList {
 //    - match:
 //         prefix: "/healthz"
 //
-// In above example, There is no "requires" field for /healthz prefix match,
+// In above example, "requires" field is empty for /healthz prefix match,
 // it means that requrests matched the path prefix don't require jwt authentication.
 //
 // Example 2:
@@ -292,10 +293,10 @@ message JwtRequirementAndList {
 //
 //    - match:
 //         prefix: "/"
-//      requires: { provider_id: "iss-A", audiences: [audience1, audience2]}
+//      requires: { provider_name: "provider-A" }
 //
-// In above example, all requests (all requests matched "/" path prefix),
-// require jwt authentication from "iss-A" with audiences override defined.
+// In above example, all requests matched the path prefix require jwt authentication
+// from "provider-A".
 message RequirementRule {
   // The route matching parameter. Only when the match is satisfied, the "requires" field will
   // apply.
@@ -309,7 +310,7 @@ message RequirementRule {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specify a Jwt Requirement.
+  // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
   JwtRequirement requires = 2;
 }
 
@@ -320,7 +321,7 @@ message RequirementRule {
 // .. code-block:: yaml
 //
 //   providers:
-//      - id: provider1
+//      - name: provider1
 //        issuer: issuer1
 //        audiences:
 //        - audience1
@@ -329,7 +330,7 @@ message RequirementRule {
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
-//      - id: provider2
+//      - name: provider2
 //        issuer: issuer2
 //        local_jwks:
 //          inline_string: jwks_string
@@ -343,7 +344,7 @@ message RequirementRule {
 //      - match:
 //          prefix: "/prefix"
 //        requires:
-//          provider_id: "provider1"
+//          provider_name: "provider1"
 //
 //      # Jwt verification for either provider1 or provider2 is required for all other requests.
 //      - match:
@@ -351,8 +352,8 @@ message RequirementRule {
 //        requires:
 //          requires_any:
 //            requirements:
-//              - provider_id: "provider1"
-//              - provider_id: "provider2"
+//              - provider_name: "provider1"
+//              - provider_name: "provider2"
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -361,7 +362,7 @@ message JwtAuthentication {
   // .. code-block:: yaml
   //
   //   providers:
-  //      - id: provider1
+  //      - name: provider1
   //        issuer: issuer1
   //        audiences:
   //        - audience1
@@ -370,26 +371,17 @@ message JwtAuthentication {
   //          http_uri:
   //            uri: https://example.com/.well-known/jwks.json
   //            cluster: example_jwks_cluster
-  //      - id: provider2
+  //      - name: provider2
   //        issuer: provider2
   //        local_jwks:
   //          inline_string: jwks_string
   //
   repeated JwtProvider providers = 1;
 
-  // If true, the request is allowed if JWT is mising or JWT verification fails.
-  // Default is false, a request without JWT or failed JWT verification is not allowed.
-  // A typical usage is: this filter is used to only verify JWT and pass the verified JWT
-  // payload to another filter, the other filter will make decision.
-  // This flag has impact on the process flow. For example, if flag is false, for multiple
-  // "one_of" requirements, if the first requirement passes, the rest requiements will not be
-  // verified. But if this flag is true, all requirements will be verified even all of them
-  // passed.
-  bool allow_missing_or_failed = 2;
+  reserved 2;
 
   // Specifies requirements based on the route matches. The first matched requirement will be
   // applied. If there are overlapped match conditions, please put the most specific match first.
-  // If PerRouteConfig is specified for the selected route, this field will not be uesd.
   //
   // Examples
   //
@@ -399,19 +391,25 @@ message JwtAuthentication {
   //   - match: { prefix: "/healthz" }
   //   - match: { prefix: "/baz" }
   //     requires:
-  //       provider_id: "provider1"
+  //       provider_name: "provider1"
   //   - match: { prefix: "/foo" }
   //     requires:
   //       requires_any:
   //         requirements:
-  //           - provider_id: "provider1"
-  //           - provider_id: "provider2"
+  //           - provider_name: "provider1"
+  //           - provider_name: "provider2"
   //   - match: { prefix: "/bar" }
   //     requires:
   //       requires_all:
   //         requirements:
-  //           - provider_id: "provider1"
-  //           - provider_id: "provider2"
+  //           - provider_name: "provider1"
+  //           - provider_name: "provider2"
   //
+  // A special handling if rules is empty: all JWTs in a request will be verified, but the request
+  // will pass even the verifications fail. A typical usage is: this filter is used to only verify
+  // JWTs and pass the verified JWT payloads to another filter, the other filter will make decision.
+  // This usage has impact on the process flow. For example, normally for "requires_any"
+  // requirements, if the first requirement passes, the rest requiements will not be verified. But
+  // under this special usage, all requirements will be verified.
   repeated RequirementRule rules = 3;
 }
