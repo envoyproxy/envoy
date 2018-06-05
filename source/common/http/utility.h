@@ -77,12 +77,15 @@ public:
    * Produce the value for a Set-Cookie header with the given parameters.
    * @param key is the name of the cookie that is being set.
    * @param value the value to set the cookie to; this value is trusted.
+   * @param path the path for the cookie, or the empty string to not set a path.
    * @param max_age the length of time for which the cookie is valid, or zero
+   * @param httponly true if the cookie should have HttpOnly appended.
    * to create a session cookie.
    * @return std::string a valid Set-Cookie header value string
    */
   static std::string makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::chrono::seconds max_age);
+                                        const std::string& path, const std::chrono::seconds max_age,
+                                        bool httponly);
 
   /**
    * Get the response status from the response headers.

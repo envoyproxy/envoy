@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 
-# Tests check_format.py. This must be run under docker via
-# check_format_test.py, or you are liable to get the wrong clang, and
-# all kinds of bad results.
+# Tests check_format.py. This must be run in a context where the clang
+# version and settings are compatible with the one in the Envoy
+# docker.  Normally this is run via check_format_test.sh, which
+# executes it in under docker.
 
+import argparse
 import os
 import shutil
+import logging
 import subprocess
 
 def getenvFallback(envvar, fallback):
@@ -33,7 +36,7 @@ def runCommand(command):
     status = e.returncode
     for line in e.output.splitlines():
       stdout.append(line)
-  print("%s" % command)
+  logging.info("%s" % command)
   return status, stdout
 
 # Runs the 'check_format' operation, on the specified file, printing
@@ -79,19 +82,19 @@ def fixFileExpectingNoChange(file):
     return 1
   return 0
 
-def emitStdout(stdout):
+def emitStdoutAsError(stdout):
   for line in stdout:
-    print("    %s" % line)
+    logging.error("    %s" % line)
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
-    print("Expected failure, but succeeded")
+    logging.error("Expected failure, but succeeded")
     return 1
   for line in stdout:
     if expected_substring in line:
       return 0
-  print("Could not find '%s' in:\n" % expected_substring)
-  emitStdout(stdout)
+  logging.error("Could not find '%s' in:\n" % expected_substring)
+  emitStdoutAsError(stdout)
   return 1
 
 def fixFileExpectingFailure(filename, expected_substring):
@@ -105,11 +108,15 @@ def checkFileExpectingError(filename, expected_substring):
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
-    print("status=%d, output:\n" % status)
-    emitStdout(stdout)
+    logging.error("status=%d, output:\n" % status)
+    emitStdoutAsError(stdout)
   return 0
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='tester for check_foramt.py.')
+  parser.add_argument('--log', choices=['INFO', 'WARN', 'ERROR'], default='INFO')
+  args = parser.parse_args()
+  logging.basicConfig(format='%(message)s', level=args.log)
   errors = 0
 
   # Now create a temp directory to copy the input files, so we can fix them
@@ -128,7 +135,6 @@ if __name__ == "__main__":
   errors += checkFileExpectingOK("ok_file.cc")
 
   if errors != 0:
-    print("%d FAILURES" % errors)
+    logging.error("%d FAILURES" % errors)
     exit(1)
-  print("PASS")
-  exit(0)
+  logging.warn("PASS")

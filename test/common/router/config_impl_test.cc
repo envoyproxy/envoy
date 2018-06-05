@@ -1236,7 +1236,8 @@ virtual_hosts:
 class RouterMatcherHashPolicyTest : public testing::Test {
 public:
   RouterMatcherHashPolicyTest()
-      : add_cookie_nop_([](const std::string&, std::chrono::seconds) { return ""; }) {
+      : add_cookie_nop_(
+            [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
     std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -1369,23 +1370,23 @@ TEST_F(RouterMatcherCookieHashPolicyTest, DifferentCookies) {
 TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(42);
 
-  MockFunction<std::string(const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name,
+  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
+  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
                                       std::chrono::seconds ttl) -> std::string {
-    return mock_cookie_cb.Call(name, ttl.count());
+    return mock_cookie_cb.Call(name, path, ttl.count());
   };
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42));
     EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie));
   }
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     headers.addCopy("Cookie", "choco=late; su=gar");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", 42));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42));
     EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie));
   }
   {
@@ -1399,14 +1400,14 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       Router::RouteConstSharedPtr route = config().route(headers, 0);
-      EXPECT_CALL(mock_cookie_cb, Call("hash", 42)).WillOnce(Return("AAAAAAA"));
+      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42)).WillOnce(Return("AAAAAAA"));
       hash_1 =
           route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie).value();
     }
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
       Router::RouteConstSharedPtr route = config().route(headers, 0);
-      EXPECT_CALL(mock_cookie_cb, Call("hash", 42)).WillOnce(Return("BBBBBBB"));
+      EXPECT_CALL(mock_cookie_cb, Call("hash", "", 42)).WillOnce(Return("BBBBBBB"));
       hash_2 =
           route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie).value();
     }
@@ -1422,16 +1423,34 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
 TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
   firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
 
-  MockFunction<std::string(const std::string&, long)> mock_cookie_cb;
-  auto add_cookie = [&mock_cookie_cb](const std::string& name,
+  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
+  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
                                       std::chrono::seconds ttl) -> std::string {
-    return mock_cookie_cb.Call(name, ttl.count());
+    return mock_cookie_cb.Call(name, path, ttl.count());
   };
 
   {
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
-    EXPECT_CALL(mock_cookie_cb, Call("hash", 0));
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "", 0));
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie));
+  }
+}
+
+TEST_F(RouterMatcherCookieHashPolicyTest, SetCookiePath) {
+  firstRouteHashPolicy()->mutable_cookie()->mutable_ttl()->set_seconds(0);
+  firstRouteHashPolicy()->mutable_cookie()->set_path("/");
+
+  MockFunction<std::string(const std::string&, const std::string&, long)> mock_cookie_cb;
+  auto add_cookie = [&mock_cookie_cb](const std::string& name, const std::string& path,
+                                      std::chrono::seconds ttl) -> std::string {
+    return mock_cookie_cb.Call(name, path, ttl.count());
+  };
+
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_CALL(mock_cookie_cb, Call("hash", "/", 0));
     EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie));
   }
 }
