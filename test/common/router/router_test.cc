@@ -435,14 +435,14 @@ TEST_F(RouterTest, AddCookie) {
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
-        cookie_value = add_cookie("foo", std::chrono::seconds(1337));
+        cookie_value = add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
         EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().c_str()},
-                  "foo=\"" + cookie_value + "\"; Max-Age=1337");
+                  "foo=\"" + cookie_value + "\"; Max-Age=1337; HttpOnly");
       }));
   expectResponseTimerCreate();
 
@@ -482,7 +482,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
         // this should be ignored
-        add_cookie("foo", std::chrono::seconds(1337));
+        add_cookie("foo", "", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
 
@@ -529,16 +529,16 @@ TEST_F(RouterTest, AddMultipleCookies) {
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
       .WillOnce(Invoke([&](const Network::Address::Instance*, const Http::HeaderMap&,
                            const HashPolicy::AddCookieCallback add_cookie) {
-        choco_c = add_cookie("choco", std::chrono::seconds(15));
-        foo_c = add_cookie("foo", std::chrono::seconds(1337));
+        choco_c = add_cookie("choco", "", std::chrono::seconds(15));
+        foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337));
         return absl::optional<uint64_t>(10);
       }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
         MockFunction<void(const std::string&)> cb;
-        EXPECT_CALL(cb, Call("foo=\"" + foo_c + "\"; Max-Age=1337"));
-        EXPECT_CALL(cb, Call("choco=\"" + choco_c + "\"; Max-Age=15"));
+        EXPECT_CALL(cb, Call("foo=\"" + foo_c + "\"; Max-Age=1337; Path=/path; HttpOnly"));
+        EXPECT_CALL(cb, Call("choco=\"" + choco_c + "\"; Max-Age=15; HttpOnly"));
 
         headers.iterate(
             [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {

@@ -94,6 +94,8 @@ Version history
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.
+* router: added 'unavailable' to the retriable gRPC status codes that can be specified
+  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -108,6 +110,8 @@ Version history
 * stats: added support for histograms.
 * stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
 * stats: updated stats sink interface to flush through a single call.
+* tls: added support for
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
 * tls: added support for multiple
   :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   values.

@@ -524,6 +524,10 @@ message RouteAction {
       // not present. If the TTL is present and zero, the generated cookie will
       // be a session cookie.
       google.protobuf.Duration ttl = 2 [(gogoproto.stdduration) = true];
+
+      // The name of the path for the cookie. If no path is specified here, no path
+      // will be set for the cookie.
+      string path = 3;
     }
 
     message ConnectionProperties {
