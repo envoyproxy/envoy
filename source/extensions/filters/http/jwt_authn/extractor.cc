@@ -116,7 +116,8 @@ private:
 };
 
 ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
-  for (const auto& provider : config.providers()) {
+  for (const auto& it : config.providers()) {
+    const auto& provider = it.second;
     for (const auto& header : provider.from_headers()) {
       addHeaderConfig(provider.issuer(), LowerCaseString(header.name()), header.value_prefix());
     }
