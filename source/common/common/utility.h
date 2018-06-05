@@ -55,13 +55,18 @@ private:
                                                  SubsecondOffsets& subsecond_offsets) const;
 
   struct SubsecondSpecifier {
-    SubsecondSpecifier(const size_t position, const size_t width)
-        : position_(position), width_(width) {}
+    SubsecondSpecifier(const size_t position, const size_t width, const std::string& segment)
+        : position_(position), width_(width), segment_(segment) {}
 
     const size_t position_;
     const size_t width_;
+
+    const std::string segment_;
   };
   std::vector<SubsecondSpecifier> subseconds_;
+
+  // The last string segment after the last found subsecond pattern.
+  std::string last_segment_;
 
   const std::string format_string_;
 };

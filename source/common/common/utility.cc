@@ -54,9 +54,15 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
-  if (cached_time.formatted.find(format_string_) == cached_time.formatted.end() ||
-      cached_time.epoch_time_seconds != epoch_time_seconds) {
-    time_t current_time = std::chrono::system_clock::to_time_t(time);
+  const bool new_period = cached_time.epoch_time_seconds != epoch_time_seconds;
+  if (cached_time.formatted.find(format_string_) == cached_time.formatted.end() || new_period) {
+    if (new_period) {
+      // Caching is done only for a second long. We clear it every a new period of second is
+      // observed.
+      cached_time.formatted.clear();
+    }
+
+    const time_t current_time = std::chrono::system_clock::to_time_t(time);
 
     CachedTime::Formatted formatted;
     if (subseconds_.empty()) {
@@ -83,9 +89,9 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
   for (size_t i = 0; i < subseconds_.size(); ++i) {
     const auto& subsecond = subseconds_.at(i);
-    const std::string digits = nanoseconds.substr(cached_time.seconds_length, subsecond.width_);
+    absl::string_view digits = nanoseconds.substr(cached_time.seconds_length, subsecond.width_);
     formatted_str.replace(subsecond.position_ + formatted.subsecond_offsets.at(i), subsecond.width_,
-                          digits);
+                          digits.data());
   }
 
   ASSERT(formatted_str.size() == formatted.str.size());
@@ -95,14 +101,29 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 std::string DateFormatter::parse(const std::string& format_string) {
   std::string new_format_string = format_string;
   std::smatch matched;
+  size_t step = 0;
   while (regex_search(new_format_string, matched, SubsecondConstants::get().PATTERN)) {
     const std::string& width_specifier = matched[1];
     const size_t width = width_specifier.empty() ? SubsecondConstants::get().PLACEHOLDER.size()
                                                  : width_specifier.at(0) - '0';
     new_format_string.replace(matched.position(), matched.length(),
                               SubsecondConstants::get().PLACEHOLDER.substr(0, width));
-    SubsecondSpecifier subsecond(matched.position(), width);
+
+    ASSERT(step < new_format_string.size());
+
+    // This records matched position, the width of current subsecond pattern, and also the string
+    // segment before the matched position. These values will be used later at data path.
+    SubsecondSpecifier subsecond(matched.position(), width,
+                                 new_format_string.substr(step, matched.position() - step));
     subseconds_.emplace_back(subsecond);
+
+    step = subsecond.position_ + subsecond.width_;
+  }
+
+  // To capture the segment after the last subsecond pattern of a format string. E.g.
+  // %3f-this-is-the-last-%s-segment-%Y-until-this.
+  if (step < new_format_string.size()) {
+    last_segment_ = new_format_string.substr(step);
   }
 
   return new_format_string;
@@ -126,26 +147,23 @@ DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
   std::array<char, 1024> buf;
   std::string formatted;
 
-  size_t step = 0;
   int32_t previous = 0;
   subsecond_offsets.reserve(subseconds_.size());
   for (const auto& subsecond : subseconds_) {
-    ASSERT(step < format_string_.size());
-    const std::string segment = format_string_.substr(step, subsecond.position_ - step);
-    const size_t formatted_length = strftime(&buf[0], buf.size(), segment.c_str(), &current_tm);
+    const size_t formatted_length =
+        strftime(&buf[0], buf.size(), subsecond.segment_.c_str(), &current_tm);
     absl::StrAppend(&formatted, &buf[0],
-                    format_string_.substr(subsecond.position_, subsecond.width_));
+                    SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
 
-    const int32_t offset = formatted_length - segment.size();
+    // This computes and saves offset of each subsecond pattern to correct its position after the
+    // previous string segment is formatted.
+    const int32_t offset = formatted_length - subsecond.segment_.size();
     subsecond_offsets.emplace_back(previous + offset);
-
-    step = subsecond.position_ + subsecond.width_;
     previous += offset;
   }
 
-  if (step < format_string_.size()) {
-    const std::string last_segment = format_string_.substr(step);
-    strftime(&buf[0], buf.size(), last_segment.c_str(), &current_tm);
+  if (!last_segment_.empty()) {
+    strftime(&buf[0], buf.size(), last_segment_.c_str(), &current_tm);
     absl::StrAppend(&formatted, &buf[0]);
   }
 
