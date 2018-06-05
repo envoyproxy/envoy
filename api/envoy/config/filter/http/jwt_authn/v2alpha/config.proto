@@ -18,6 +18,7 @@ import "validate/validate.proto";
 //
 // .. code-block:: yaml
 //
+//     id: example.com
 //     issuer: https://example.com
 //     audiences:
 //     - bookstore_android.apps.googleusercontent.com
@@ -31,6 +32,29 @@ import "validate/validate.proto";
 //
 // [#not-implemented-hide:]
 message JwtProvider {
+  // A unique ID to uniquely identify a provider. It can be the same as "issuer".
+  // If an issuer have different audiences or other configurations, multiple JwtProvider
+  // can be used with different ids.
+  //
+  // Example of two providers of different audiences with the same issuer.
+  //
+  // .. code-block:: yaml
+  //
+  //     id: example.com-bookstore-audience
+  //     issuer: https://example.com
+  //     local_jwks:
+  //      - inline_string: "ACADADADADA"
+  //     audiences:
+  //     - bookstore
+  //
+  //     id: example.com-any-audience
+  //     issuer: https://example.com
+  //     local_jwks:
+  //      - inline_string: "ACADADADADA"
+  //
+  // Use 9 as the proto index number to support backward compatibility.
+  string id = 9 [(validate.rules).string.min_bytes = 1];
+
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
   //
@@ -183,15 +207,6 @@ message JwtHeader {
   string value_prefix = 2;
 }
 
-// This message specifies a Jwt requirement.
-message RequiredProvider {
-  // Specify the issuer for the required JwtProvider.
-  string issuer = 1 [(validate.rules).string.min_bytes = 1];
-
-  // This audiences field overrides the one in JwtProvider if not empty.
-  repeated string audiences = 2;
-}
-
 // This message specifies a Jwt requirement
 //
 // For example: following match will match all requests.
@@ -201,50 +216,50 @@ message RequiredProvider {
 //  # not required with an empty message
 //
 //  # require A
-//  requires: { issuer: "iss-A" }
+//  provider_id: "iss-A"
 //
 //  # require A or B
 //  requires_any:
 //    requirements:
-//      - requires: { issuer: "iss-A" }
-//      - requires: { issuer: "iss-B" }
+//      - provider_id: "iss-A"
+//      - provider_id: "iss-B"
 //
 //  # require A and B
 //  requires_all:
 //    requirements:
-//      - requires: { issuer: "iss-A" }
-//      - requires: { issuer: "iss-B" }
+//      - provider_id: "iss-A"
+//      - provider_id: "iss-B"
 //
 //  # require A and (B or C)
 //  requires_all:
 //    requirements:
-//      - requires: { issuer: "iss-A" }
+//      - provider_id: "iss-A"
 //      - requires_any:
 //        requirements:
-//          - requires: { issuer: "iss-B" }
-//          - requires: { issuer: "iss-C" }
+//          - provider_id: "iss-B"
+//          - provider_id: "iss-C"
 //
 //  # require A or (B and C)
 //  requires_any:
 //    requirements:
-//      - requires: { issuer: "iss-A" }
+//      - provider_id: "iss-A"
 //      - requires_all:
 //        requirements:
-//          - requires: { issuer: "iss-B" }
-//          - requires: { issuer: "iss-C" }
+//          - provider_id: "iss-B"
+//          - provider_id: "iss-C"
 //
 message JwtRequirement {
   oneof requires_type {
-    // Specify a single RequiredProvider.
-    RequiredProvider requires = 2;
+    // Specify a required provider id.
+    string provider_id = 1;
 
     // Specify list of JwtRequirement. Their results are OR-ed.
     // If any one of them passes, the result is passed.
-    JwtRequirementOrList requires_any = 3;
+    JwtRequirementOrList requires_any = 2;
 
     // Specify list of JwtRequirement. Their results are AND-ed.
     // All of them must pass, if one of them fails or missing, it fails.
-    JwtRequirementAndList requires_all = 4;
+    JwtRequirementAndList requires_all = 3;
   }
 }
 
@@ -277,7 +292,7 @@ message JwtRequirementAndList {
 //
 //    - match:
 //         prefix: "/"
-//      requires: { issuer: "iss-A", audiences: [audience1, audience2]}
+//      requires: { provider_id: "iss-A", audiences: [audience1, audience2]}
 //
 // In above example, all requests (all requests matched "/" path prefix),
 // require jwt authentication from "iss-A" with audiences override defined.
@@ -294,20 +309,8 @@ message RequirementRule {
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
-  // Specify a Jwt Requirement. It is the same as message JwtRequirement.
-  // The reason to inline its fields is to reduce of one layer of nesting.
-  oneof requires_type {
-    // Specify a single RequiredProvider.
-    RequiredProvider requires = 2;
-
-    // Specify list of RequiredProvider. Their results are OR-ed.
-    // If any one of them passes, the result is passed.
-    JwtRequirementOrList requires_any = 3;
-
-    // Specify list of RequiredProvider. Their results are AND-ed.
-    // All of them must pass, if one of them fails or missing, it fails.
-    JwtRequirementAndList requires_all = 4;
-  }
+  // Specify a Jwt Requirement.
+  JwtRequirement requires = 2;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
@@ -317,7 +320,8 @@ message RequirementRule {
 // .. code-block:: yaml
 //
 //   providers:
-//      - issuer: issuer1
+//      - id: provider1
+//        issuer: issuer1
 //        audiences:
 //        - audience1
 //        - audience2
@@ -325,7 +329,8 @@ message RequirementRule {
 //          http_uri:
 //            uri: https://example.com/.well-known/jwks.json
 //            cluster: example_jwks_cluster
-//      - issuer: issuer2
+//      - id: provider2
+//        issuer: issuer2
 //        local_jwks:
 //          inline_string: jwks_string
 //
@@ -334,18 +339,20 @@ message RequirementRule {
 //      - match:
 //          prefix: "/health"
 //
-//      # Jwt verification for issuer1 is required for path prefixed with "prefix"
+//      # Jwt verification for provider1 is required for path prefixed with "prefix"
 //      - match:
 //          prefix: "/prefix"
-//        requires: {issuer: "issuer1", audiences: [audience_override]}
+//        requires:
+//          provider_id: "provider1"
 //
-//      # Jwt verification for either issue1 or issuer2 is required for all other requests.
+//      # Jwt verification for either provider1 or provider2 is required for all other requests.
 //      - match:
 //          prefix: "/"
-//        requires_any:
-//          requirements:
-//            - requires: { issuer: "issuer1" }
-//            - requires: { issuer: "issuer2" }
+//        requires:
+//          requires_any:
+//            requirements:
+//              - provider_id: "provider1"
+//              - provider_id: "provider2"
 //
 //// [#not-implemented-hide:]
 message JwtAuthentication {
@@ -354,7 +361,8 @@ message JwtAuthentication {
   // .. code-block:: yaml
   //
   //   providers:
-  //      - issuer: issuer1
+  //      - id: provider1
+  //        issuer: issuer1
   //        audiences:
   //        - audience1
   //        - audience2
@@ -362,7 +370,8 @@ message JwtAuthentication {
   //          http_uri:
   //            uri: https://example.com/.well-known/jwks.json
   //            cluster: example_jwks_cluster
-  //      - issuer: issuer2
+  //      - id: provider2
+  //        issuer: provider2
   //        local_jwks:
   //          inline_string: jwks_string
   //
@@ -389,17 +398,20 @@ message JwtAuthentication {
   // rules:
   //   - match: { prefix: "/healthz" }
   //   - match: { prefix: "/baz" }
-  //     requires: { issuer: "iss-A" }
+  //     requires:
+  //       provider_id: "provider1"
   //   - match: { prefix: "/foo" }
-  //     requires_any:
-  //       requirements:
-  //         - requires: { issuer: "issuer1" }
-  //         - requires: { issuer: "issuer2" }
+  //     requires:
+  //       requires_any:
+  //         requirements:
+  //           - provider_id: "provider1"
+  //           - provider_id: "provider2"
   //   - match: { prefix: "/bar" }
-  //     requires_any:
-  //       requirements:
-  //         - requires: { issuer: "issuer1" }
-  //         - requires: { issuer: "issuer2" }
+  //     requires:
+  //       requires_all:
+  //         requirements:
+  //           - provider_id: "provider1"
+  //           - provider_id: "provider2"
   //
   repeated RequirementRule rules = 3;
 }
