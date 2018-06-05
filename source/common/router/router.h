@@ -160,8 +160,8 @@ public:
       if (hash_policy) {
         return hash_policy->generateHash(
             callbacks_->requestInfo().downstreamRemoteAddress().get(), *downstream_headers_,
-            [this](const std::string& key, std::chrono::seconds max_age) {
-              return addDownstreamSetCookie(key, max_age);
+            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age) {
+              return addDownstreamSetCookie(key, path, max_age);
             });
       }
     }
@@ -200,9 +200,11 @@ public:
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
    * @param max_age the lifetime of the cookie
+   * @param  path the path of the cookie, or ""
    * @return std::string the value of the new cookie
    */
-  std::string addDownstreamSetCookie(const std::string& key, std::chrono::seconds max_age) {
+  std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
+                                     std::chrono::seconds max_age) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
@@ -214,7 +216,7 @@ public:
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
-        Http::Utility::makeSetCookieValue(key, cookie_value, max_age));
+        Http::Utility::makeSetCookieValue(key, cookie_value, path, max_age, true));
     return cookie_value;
   }
 

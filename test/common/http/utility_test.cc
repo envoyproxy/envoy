@@ -257,9 +257,22 @@ TEST(HttpUtility, TestHasSetCookieBadValues) {
 
 TEST(HttpUtility, TestMakeSetCookieValue) {
   EXPECT_EQ("name=\"value\"; Max-Age=10",
-            Utility::makeSetCookieValue("name", "value", std::chrono::seconds(10)));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
   EXPECT_EQ("name=\"value\"",
-            Utility::makeSetCookieValue("name", "value", std::chrono::seconds::zero()));
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false));
+  EXPECT_EQ("name=\"value\"; Max-Age=10; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true));
+  EXPECT_EQ("name=\"value\"; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true));
+
+  EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false));
+  EXPECT_EQ("name=\"value\"; Path=/",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false));
+  EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true));
+  EXPECT_EQ("name=\"value\"; Path=/; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true));
 }
 
 TEST(HttpUtility, SendLocalReply) {

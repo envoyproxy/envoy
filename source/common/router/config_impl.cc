@@ -95,8 +95,9 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, const absl::optional<std::chrono::seconds>& ttl)
-      : key_(key), ttl_(ttl) {}
+  CookieHashMethod(const std::string& key, const std::string path,
+                   const absl::optional<std::chrono::seconds>& ttl)
+      : key_(key), path_(path), ttl_(ttl) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -105,7 +106,7 @@ public:
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
     if (value.empty() && ttl_.has_value()) {
-      value = add_cookie(key_, ttl_.value());
+      value = add_cookie(key_, path_, ttl_.value());
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -116,6 +117,7 @@ public:
 
 private:
   const std::string key_;
+  const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
 };
 
@@ -155,7 +157,8 @@ HashPolicyImpl::HashPolicyImpl(
       if (hash_policy.cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
       }
-      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name(), ttl));
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().path(), ttl));
       break;
     }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
