@@ -22,7 +22,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the int8_t at offset in buffer
    */
-  static int8_t peekI8(Buffer::Instance& buffer, size_t offset = 0);
+  static int8_t peekI8(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an int16_t from the buffer at the given offset.
@@ -30,7 +30,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the int16_t at offset in buffer
    */
-  static int16_t peekI16(Buffer::Instance& buffer, size_t offset = 0);
+  static int16_t peekI16(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an int32_t from the buffer at the given offset.
@@ -38,7 +38,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the int32_t at offset in buffer
    */
-  static int32_t peekI32(Buffer::Instance& buffer, size_t offset = 0);
+  static int32_t peekI32(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an int64_t from the buffer at the given offset.
@@ -46,7 +46,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the int64_t at offset in buffer
    */
-  static int64_t peekI64(Buffer::Instance& buffer, size_t offset = 0);
+  static int64_t peekI64(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an uint16_t from the buffer at the given offset.
@@ -54,7 +54,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the uint16_t at offset in buffer
    */
-  static uint16_t peekU16(Buffer::Instance& buffer, size_t offset = 0);
+  static uint16_t peekU16(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an uint32_t from the buffer at the given offset.
@@ -62,7 +62,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the uint32_t at offset in buffer
    */
-  static uint32_t peekU32(Buffer::Instance& buffer, size_t offset = 0);
+  static uint32_t peekU32(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads an uint64_t from the buffer at the given offset.
@@ -70,7 +70,7 @@ public:
    * @param offset offset into buffer to peek at
    * @return the uint64_t at offset in buffer
    */
-  static uint64_t peekU64(Buffer::Instance& buffer, size_t offset = 0);
+  static uint64_t peekU64(Buffer::Instance& buffer, uint64_t offset = 0);
 
   /**
    * Reads and drains an int8_t from a buffer.
@@ -135,7 +135,7 @@ public:
    * @throw EnvoyException if there is a buffer underflow, but more data would result in an integer
    *                       larger than 32 bits.
    */
-  static int32_t peekVarIntI32(Buffer::Instance& buffer, size_t offset, int& size);
+  static int32_t peekVarIntI32(Buffer::Instance& buffer, uint64_t offset, int& size);
 
   /**
    * Peeks at the zig-zag encoded int64_t at offset. Updates size with the same semantics as
@@ -149,7 +149,7 @@ public:
    * @throw EnvoyException if there is a buffer underflow, but more data would result in an integer
    *                       larger than 64 bits.
    */
-  static int64_t peekZigZagI64(Buffer::Instance& buffer, size_t offset, int& size);
+  static int64_t peekZigZagI64(Buffer::Instance& buffer, uint64_t offset, int& size);
 
   /**
    * Peeks at the zig-zag encoded int32_t at offset with the same semantics for the size parameter
@@ -163,7 +163,7 @@ public:
    * @throw EnvoyException if there is a buffer underflow, but more data would result in an integer
    *                       larger than 32 bits.
    */
-  static int32_t peekZigZagI32(Buffer::Instance& buffer, size_t offset, int& size);
+  static int32_t peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, int& size);
 
 private:
   /**
@@ -176,7 +176,7 @@ private:
    *        size) or the number of bytes examined before underflowing (negative values of size).
    * @return the decoded variable-length int64_t (if size > 0), otherwise 0.
    */
-  static uint64_t peekVarInt(Buffer::Instance& buffer, size_t offset, int& size);
+  static uint64_t peekVarInt(Buffer::Instance& buffer, uint64_t offset, int& size);
 };
 
 } // namespace ThriftProxy

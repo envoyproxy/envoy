@@ -16,79 +16,166 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(BufferHelperTest, PeekI8) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 0xFE});
-  EXPECT_EQ(BufferHelper::peekI8(buffer), 0);
-  EXPECT_EQ(BufferHelper::peekI8(buffer, 0), 0);
-  EXPECT_EQ(BufferHelper::peekI8(buffer, 1), 1);
-  EXPECT_EQ(BufferHelper::peekI8(buffer, 2), -2);
-  EXPECT_EQ(buffer.length(), 3);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 0xFE});
+    EXPECT_EQ(BufferHelper::peekI8(buffer), 0);
+    EXPECT_EQ(BufferHelper::peekI8(buffer, 0), 0);
+    EXPECT_EQ(BufferHelper::peekI8(buffer, 1), 1);
+    EXPECT_EQ(BufferHelper::peekI8(buffer, 2), -2);
+    EXPECT_EQ(buffer.length(), 3);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI8(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addInt8(buffer, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI8(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekI16) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekI16(buffer), 1);
-  EXPECT_EQ(BufferHelper::peekI16(buffer, 0), 1);
-  EXPECT_EQ(BufferHelper::peekI16(buffer, 1), 0x0102);
-  EXPECT_EQ(BufferHelper::peekI16(buffer, 2), 0x0203);
-  EXPECT_EQ(BufferHelper::peekI16(buffer, 4), -1);
-  EXPECT_EQ(buffer.length(), 6);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekI16(buffer), 1);
+    EXPECT_EQ(BufferHelper::peekI16(buffer, 0), 1);
+    EXPECT_EQ(BufferHelper::peekI16(buffer, 1), 0x0102);
+    EXPECT_EQ(BufferHelper::peekI16(buffer, 2), 0x0203);
+    EXPECT_EQ(BufferHelper::peekI16(buffer, 4), -1);
+    EXPECT_EQ(buffer.length(), 6);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI16(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 2, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI16(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekI32) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekI32(buffer), 0x00010203);
-  EXPECT_EQ(BufferHelper::peekI32(buffer, 0), 0x00010203);
-  EXPECT_EQ(BufferHelper::peekI32(buffer, 1), 0x010203FF);
-  EXPECT_EQ(BufferHelper::peekI32(buffer, 2), 0x0203FFFF);
-  EXPECT_EQ(BufferHelper::peekI32(buffer, 4), -1);
-  EXPECT_EQ(buffer.length(), 8);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekI32(buffer), 0x00010203);
+    EXPECT_EQ(BufferHelper::peekI32(buffer, 0), 0x00010203);
+    EXPECT_EQ(BufferHelper::peekI32(buffer, 1), 0x010203FF);
+    EXPECT_EQ(BufferHelper::peekI32(buffer, 2), 0x0203FFFF);
+    EXPECT_EQ(BufferHelper::peekI32(buffer, 4), -1);
+    EXPECT_EQ(buffer.length(), 8);
+  }
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI32(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 4, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI32(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekI64) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekI64(buffer), 0x0001020304050607);
-  EXPECT_EQ(BufferHelper::peekI64(buffer, 0), 0x0001020304050607);
-  EXPECT_EQ(BufferHelper::peekI64(buffer, 1), 0x01020304050607FF);
-  EXPECT_EQ(BufferHelper::peekI64(buffer, 2), 0x020304050607FFFF);
-  EXPECT_EQ(BufferHelper::peekI64(buffer, 8), -1);
-  EXPECT_EQ(buffer.length(), 16);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekI64(buffer), 0x0001020304050607);
+    EXPECT_EQ(BufferHelper::peekI64(buffer, 0), 0x0001020304050607);
+    EXPECT_EQ(BufferHelper::peekI64(buffer, 1), 0x01020304050607FF);
+    EXPECT_EQ(BufferHelper::peekI64(buffer, 2), 0x020304050607FFFF);
+    EXPECT_EQ(BufferHelper::peekI64(buffer, 8), -1);
+    EXPECT_EQ(buffer.length(), 16);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI64(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 8, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekI64(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekU16) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekU16(buffer), 1);
-  EXPECT_EQ(BufferHelper::peekU16(buffer, 0), 1);
-  EXPECT_EQ(BufferHelper::peekU16(buffer, 1), 0x0102);
-  EXPECT_EQ(BufferHelper::peekU16(buffer, 2), 0x0203);
-  EXPECT_EQ(BufferHelper::peekU16(buffer, 4), 0xFFFF);
-  EXPECT_EQ(buffer.length(), 6);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekU16(buffer), 1);
+    EXPECT_EQ(BufferHelper::peekU16(buffer, 0), 1);
+    EXPECT_EQ(BufferHelper::peekU16(buffer, 1), 0x0102);
+    EXPECT_EQ(BufferHelper::peekU16(buffer, 2), 0x0203);
+    EXPECT_EQ(BufferHelper::peekU16(buffer, 4), 0xFFFF);
+    EXPECT_EQ(buffer.length(), 6);
+  }
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU16(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 2, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU16(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekU32) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekU32(buffer), 0x00010203);
-  EXPECT_EQ(BufferHelper::peekU32(buffer, 0), 0x00010203);
-  EXPECT_EQ(BufferHelper::peekU32(buffer, 1), 0x010203FF);
-  EXPECT_EQ(BufferHelper::peekU32(buffer, 2), 0x0203FFFF);
-  EXPECT_EQ(BufferHelper::peekU32(buffer, 4), 0xFFFFFFFF);
-  EXPECT_EQ(buffer.length(), 8);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekU32(buffer), 0x00010203);
+    EXPECT_EQ(BufferHelper::peekU32(buffer, 0), 0x00010203);
+    EXPECT_EQ(BufferHelper::peekU32(buffer, 1), 0x010203FF);
+    EXPECT_EQ(BufferHelper::peekU32(buffer, 2), 0x0203FFFF);
+    EXPECT_EQ(BufferHelper::peekU32(buffer, 4), 0xFFFFFFFF);
+    EXPECT_EQ(buffer.length(), 8);
+  }
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU32(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 4, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU32(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekU64) {
-  Buffer::OwnedImpl buffer;
-  addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(BufferHelper::peekU64(buffer), 0x0001020304050607);
-  EXPECT_EQ(BufferHelper::peekU64(buffer, 0), 0x0001020304050607);
-  EXPECT_EQ(BufferHelper::peekU64(buffer, 1), 0x01020304050607FF);
-  EXPECT_EQ(BufferHelper::peekU64(buffer, 2), 0x020304050607FFFF);
-  EXPECT_EQ(BufferHelper::peekU64(buffer, 8), 0xFFFFFFFFFFFFFFFF);
-  EXPECT_EQ(buffer.length(), 16);
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+    EXPECT_EQ(BufferHelper::peekU64(buffer), 0x0001020304050607);
+    EXPECT_EQ(BufferHelper::peekU64(buffer, 0), 0x0001020304050607);
+    EXPECT_EQ(BufferHelper::peekU64(buffer, 1), 0x01020304050607FF);
+    EXPECT_EQ(BufferHelper::peekU64(buffer, 2), 0x020304050607FFFF);
+    EXPECT_EQ(BufferHelper::peekU64(buffer, 8), 0xFFFFFFFFFFFFFFFF);
+    EXPECT_EQ(buffer.length(), 16);
+  }
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU64(buffer, 0), EnvoyException, "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addRepeated(buffer, 8, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekU64(buffer, 1), EnvoyException, "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, DrainI8) {

@@ -7,8 +7,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-int8_t BufferHelper::peekI8(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 1) {
+int8_t BufferHelper::peekI8(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 1) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -17,8 +17,8 @@ int8_t BufferHelper::peekI8(Buffer::Instance& buffer, size_t offset) {
   return i;
 }
 
-int16_t BufferHelper::peekI16(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 2) {
+int16_t BufferHelper::peekI16(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 2) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -27,8 +27,8 @@ int16_t BufferHelper::peekI16(Buffer::Instance& buffer, size_t offset) {
   return be16toh(i);
 }
 
-int32_t BufferHelper::peekI32(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 4) {
+int32_t BufferHelper::peekI32(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 4) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -37,8 +37,8 @@ int32_t BufferHelper::peekI32(Buffer::Instance& buffer, size_t offset) {
   return be32toh(i);
 }
 
-int64_t BufferHelper::peekI64(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 8) {
+int64_t BufferHelper::peekI64(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 8) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -47,8 +47,8 @@ int64_t BufferHelper::peekI64(Buffer::Instance& buffer, size_t offset) {
   return be64toh(i);
 }
 
-uint16_t BufferHelper::peekU16(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 2) {
+uint16_t BufferHelper::peekU16(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 2) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -57,8 +57,8 @@ uint16_t BufferHelper::peekU16(Buffer::Instance& buffer, size_t offset) {
   return be16toh(i);
 }
 
-uint32_t BufferHelper::peekU32(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 4) {
+uint32_t BufferHelper::peekU32(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 4) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -67,8 +67,8 @@ uint32_t BufferHelper::peekU32(Buffer::Instance& buffer, size_t offset) {
   return be32toh(i);
 }
 
-uint64_t BufferHelper::peekU64(Buffer::Instance& buffer, size_t offset) {
-  if (buffer.length() < 8) {
+uint64_t BufferHelper::peekU64(Buffer::Instance& buffer, uint64_t offset) {
+  if (buffer.length() < offset + 8) {
     throw EnvoyException("buffer underflow");
   }
 
@@ -133,12 +133,14 @@ double BufferHelper::drainDouble(Buffer::Instance& buffer) {
 
 // Thrift's var int encoding is described in
 // https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
-uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, size_t offset, int& size) {
-  // Need at most 10 bytes for a 64-bit var int.
-  const uint64_t last = std::min(buffer.length() - offset, static_cast<uint64_t>(10));
-  if (last < 1) {
+uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, uint64_t offset, int& size) {
+  // Need at least 1 byte for a var int.
+  if (buffer.length() <= offset) {
     throw EnvoyException("buffer underflow");
   }
+
+  // Need at most 10 bytes for a 64-bit var int.
+  const uint64_t last = std::min(buffer.length() - offset, static_cast<uint64_t>(10));
 
   uint8_t shift = 0;
   uint64_t result = 0;
@@ -162,7 +164,7 @@ uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, size_t offset, int& 
   return 0;
 }
 
-int32_t BufferHelper::peekVarIntI32(Buffer::Instance& buffer, size_t offset, int& size) {
+int32_t BufferHelper::peekVarIntI32(Buffer::Instance& buffer, uint64_t offset, int& size) {
   int underlying_size;
   uint64_t v64 = peekVarInt(buffer, offset, underlying_size);
 
@@ -180,7 +182,7 @@ int32_t BufferHelper::peekVarIntI32(Buffer::Instance& buffer, size_t offset, int
 
 // Thrift's zig-zag int encoding is described in
 // https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
-int64_t BufferHelper::peekZigZagI64(Buffer::Instance& buffer, size_t offset, int& size) {
+int64_t BufferHelper::peekZigZagI64(Buffer::Instance& buffer, uint64_t offset, int& size) {
   int underlying_size;
   uint64_t zz64 = peekVarInt(buffer, offset, underlying_size);
 
@@ -200,7 +202,7 @@ int64_t BufferHelper::peekZigZagI64(Buffer::Instance& buffer, size_t offset, int
 
 // Thrift's zig-zag int encoding is described in
 // https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
-int32_t BufferHelper::peekZigZagI32(Buffer::Instance& buffer, size_t offset, int& size) {
+int32_t BufferHelper::peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, int& size) {
   int underlying_size;
   uint64_t zz64 = peekVarInt(buffer, offset, underlying_size);
 
