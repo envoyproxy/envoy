@@ -122,7 +122,7 @@ message DiscoveryResponse {
 //      ACKed Response.
 //   3. Spontaneous IncrementalDiscoveryRequest from the client.
 //      This can be done to dynamically add or remove elements from the tracked
-//      resource_names set.
+//      resource_names set. In this case response_nonce must be omitted.
 message IncrementalDiscoveryRequest {
   // The node making the request.
   core.Node node = 1;
@@ -141,12 +141,14 @@ message IncrementalDiscoveryRequest {
   // This map must be populated when the IncrementalDiscoveryRequest is the
   // first in a stream. The keys are know resources names to the xDS client and
   // the value is the corresponding resource level version info.
-  resource_versions map<string, string> = 5;
+  map<string, string> resource_versions = 5;
 
   // When the IncrementalDiscoveryRequest is a ACK or NACK message in response
   // to a previous IncrementalDiscoveryResponse, the response_nonce must be the
   // nonce in the IncrementalDiscoveryResponse.
+  // Otherwise response_nonce must be omitted.
   string response_nonce = 6;
+
   // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
   // failed to update configuration. The *message* field in *error_details*
   // provides the Envoy internal exception related to the failure.
@@ -160,6 +162,7 @@ message IncrementalDiscoveryResponse {
   // The response resources. These are typed resources that match the type url
   // in the IncrementalDiscoveryRequest.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
+
   // Resources names of resources that have be deleted and to be removed from the xDS Client.
   // Removed resources for missing resources can be ignored.
   repeated string removed_resources = 6;
