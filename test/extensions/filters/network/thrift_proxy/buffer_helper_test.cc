@@ -244,36 +244,53 @@ TEST(BufferHelperTest, DrainDouble) {
 }
 
 TEST(BufferHelperTest, PeekVarInt32) {
-  Buffer::OwnedImpl buffer;
-  addInt8(buffer, 0);
-  addInt8(buffer, 0x7F);
-  addSeq(buffer, {0xFF, 0x01});                   // 0xFF
-  addSeq(buffer, {0xFF, 0xFF, 0x03});             // 0xFFFF
-  addSeq(buffer, {0xFF, 0xFF, 0xFF, 0x07});       // 0xFFFFFF
-  addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x07}); // 0x7FFFFFFF
-  addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x0F}); // 0xFFFFFFFF
+  {
+    Buffer::OwnedImpl buffer;
+    addInt8(buffer, 0);
+    addInt8(buffer, 0x7F);
+    addSeq(buffer, {0xFF, 0x01});                   // 0xFF
+    addSeq(buffer, {0xFF, 0xFF, 0x03});             // 0xFFFF
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0x07});       // 0xFFFFFF
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x07}); // 0x7FFFFFFF
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x0F}); // 0xFFFFFFFF
 
-  int size = 0;
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 0, size), 0);
-  EXPECT_EQ(size, 1);
+    int size = 0;
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 0, size), 0);
+    EXPECT_EQ(size, 1);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 1, size), 0x7F);
-  EXPECT_EQ(size, 1);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 1, size), 0x7F);
+    EXPECT_EQ(size, 1);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 2, size), 0xFF);
-  EXPECT_EQ(size, 2);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 2, size), 0xFF);
+    EXPECT_EQ(size, 2);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 4, size), 0xFFFF);
-  EXPECT_EQ(size, 3);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 4, size), 0xFFFF);
+    EXPECT_EQ(size, 3);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 7, size), 0xFFFFFF);
-  EXPECT_EQ(size, 4);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 7, size), 0xFFFFFF);
+    EXPECT_EQ(size, 4);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 11, size), 0x7FFFFFFF);
-  EXPECT_EQ(size, 5);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 11, size), 0x7FFFFFFF);
+    EXPECT_EQ(size, 5);
 
-  EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 16, size), 0xFFFFFFFF);
-  EXPECT_EQ(size, 5);
+    EXPECT_EQ(BufferHelper::peekVarIntI32(buffer, 16, size), 0xFFFFFFFF);
+    EXPECT_EQ(size, 5);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    int size = 0;
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekVarIntI32(buffer, 0, size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    int size = 0;
+    addInt8(buffer, 0);
+    EXPECT_THROW_WITH_MESSAGE(BufferHelper::peekVarIntI32(buffer, 1, size), EnvoyException,
+                              "buffer underflow");
+  }
 }
 
 TEST(BufferHelperTest, PeekVarInt32BufferUnderflow) {
