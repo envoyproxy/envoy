@@ -115,6 +115,11 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& serverNameIndication() const PURE;
+
+  /**
+   * @return true if server-initiated TLS renegotiation will be allowed.
+   */
+  virtual bool allowRenegotiation() const PURE;
 };
 
 class ServerContextConfig : public virtual ContextConfig {

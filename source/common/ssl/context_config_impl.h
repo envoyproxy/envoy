@@ -89,9 +89,11 @@ public:
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
+  bool allowRenegotiation() const override { return allow_renegotiation_; }
 
 private:
   const std::string server_name_indication_;
+  const bool allow_renegotiation_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
