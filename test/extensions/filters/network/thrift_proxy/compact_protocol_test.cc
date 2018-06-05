@@ -24,7 +24,6 @@ TEST(CompactProtocolTest, Name) {
 }
 
 TEST(CompactProtocolTest, ReadMessageBegin) {
-  // TODO
   CompactProtocolImpl proto;
 
   // Insufficient data
