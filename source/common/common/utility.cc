@@ -55,9 +55,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
   // Remove all the expired cached items.
-  for (const auto& item : cached_time.formatted) {
-    if (item.second.epoch_time_seconds != epoch_time_seconds) {
-      cached_time.formatted.erase(item.first);
+  for (auto it = cached_time.formatted.cbegin(); it != cached_time.formatted.cend();) {
+    if (it->second.epoch_time_seconds != epoch_time_seconds) {
+      it = cached_time.formatted.erase(it);
+    } else {
+      it++;
     }
   }
 
