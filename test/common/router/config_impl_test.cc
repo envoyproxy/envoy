@@ -4340,6 +4340,38 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, RegexPrefixWithNoRewriteWorksWhenPathChanged) {
+
+  // setup regex route entry. the regex is trivial, thats ok as we only want to test that
+  // path change works.
+  std::string RegexRewrite = R"EOF(
+name: RegexNoMatch
+virtual_hosts:
+  - name: regex
+    domains: [regex.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route: { cluster: some-cluster }
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(RegexRewrite), factory_context, true);
+
+  {
+    // Get our regex route entry
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("regex.lyft.com", "/regex", true, false);
+    const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+
+    // simulate a filter changing the path
+    headers.remove(":path");
+    headers.addCopy(":path", "/not-the-original-regex");
+
+    // no re-write was specified; so this should not throw
+    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+    EXPECT_NO_THROW(route_entry->finalizeRequestHeaders(headers, request_info, false));
+  }
+}
+
 class PerFilterConfigsTest : public testing::Test {
 public:
   PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
