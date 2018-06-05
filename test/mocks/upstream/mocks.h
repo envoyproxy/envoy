@@ -149,9 +149,9 @@ public:
   MOCK_METHOD2(addOrUpdateCluster,
                bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info));
   MOCK_METHOD3(addOrUpdateClusterCrossThread,
-               DynamicClusterHandlerPtr(const envoy::api::v2::Cluster& cluster,
-                                        const std::string& version_info,
-                                        PostClusterCreationCb post_cluster_cb));
+               std::pair<ClusterResponseCode, DynamicClusterHandlerPtr>(
+                   const envoy::api::v2::Cluster& cluster, const std::string& version_info,
+                   PostClusterCreationCb post_cluster_cb));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));

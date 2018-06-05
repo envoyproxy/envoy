@@ -210,23 +210,26 @@ int StreamHandleWrapper::luaAddorUpdateCluster(lua_State* state) {
   envoy::api::v2::Cluster cluster;
   MessageUtil::loadFromYaml(cluster_template_yaml, cluster);
   cluster_handler_ =
-      filter_.clusterManager().addOrUpdateClusterCrossThread(cluster, "", [this]() -> void {
-        if (state_ == State::DynamicCluster) {
-          state_ = State::Running;
-          markLive();
-          try {
-            coroutine_->resume(0, yield_callback_);
-            markDead();
-          } catch (const Filters::Common::Lua::LuaException& e) {
-            filter_.scriptError(e);
-          }
+      filter_.clusterManager()
+          .addOrUpdateClusterCrossThread(cluster, "",
+                                         [this]() -> void {
+                                           if (state_ == State::DynamicCluster) {
+                                             state_ = State::Running;
+                                             markLive();
+                                             try {
+                                               coroutine_->resume(0, yield_callback_);
+                                               markDead();
+                                             } catch (const Filters::Common::Lua::LuaException& e) {
+                                               filter_.scriptError(e);
+                                             }
 
-          if (state_ == State::Running) {
-            headers_continued_ = true;
-            callbacks_.continueIteration();
-          }
-        }
-      });
+                                             if (state_ == State::Running) {
+                                               headers_continued_ = true;
+                                               callbacks_.continueIteration();
+                                             }
+                                           }
+                                         })
+          .second;
   if (cluster_handler_) {
     state_ = State::DynamicCluster;
     return lua_yield(state, 0);

@@ -89,6 +89,16 @@ typedef std::shared_ptr<DynamicClusterHandler> DynamicClusterHandlerPtr;
 typedef std::function<void()> PostClusterCreationCb;
 
 /**
+ * List of response codes returned by addOrUpdateClusterCrossThread API.
+ */
+enum ClusterResponseCode {
+  Accepted,
+  DuplicateCluster,
+  ClusterCreationInProgress,
+  NonStaticClusterNotAllowed
+};
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  */
@@ -116,10 +126,12 @@ public:
    * @param cluster supplies the cluster configuration.
    * @param version_info supplies the xDS version of the cluster.
    * @param post_cluster_cb supplies the call back that allows the request to continue after the
-   *        cluster creation is done.
-   * @return DynamicClusterHandlerPtr that allows the caller to cancel if needed.
+   *        cluster creation is done or will be called immediately if cluster already exists.
+   * @return std::pair<ClusterResponseCode,DynamicClusterHandlerPtr>. ClusterResponseCode provides
+   *         the status of the API and DynamicClusterHandlerPtr allows the caller to cancel if
+   * needed.
    */
-  virtual DynamicClusterHandlerPtr
+  virtual std::pair<ClusterResponseCode, DynamicClusterHandlerPtr>
   addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
                                 const std::string& version_info,
                                 PostClusterCreationCb post_cluster_cb) PURE;

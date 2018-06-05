@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <functional>
-#include <future>
 #include <list>
 #include <map>
 #include <memory>
@@ -173,7 +172,7 @@ public:
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                           const std::string& version_info) override;
-  DynamicClusterHandlerPtr
+  std::pair<ClusterResponseCode, DynamicClusterHandlerPtr>
   addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
                                 const std::string& version_info,
                                 PostClusterCreationCb post_cluster_cb) override;
@@ -369,6 +368,8 @@ private:
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Event::Dispatcher& main_thread_dispatcher_;
+  std::unordered_map<std::string, std::list<std::reference_wrapper<Event::Dispatcher>>>
+      pending_cluster_creations_;
   Runtime::RandomGenerator& random_;
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;

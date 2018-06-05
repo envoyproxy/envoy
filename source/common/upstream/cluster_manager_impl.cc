@@ -177,8 +177,9 @@ void DynamicClusterHandlerImpl::cancel() {
 
 void DynamicClusterHandlerImpl::onClusterCreationComplete() {
   ENVOY_LOG(debug, "cluster {} creation complete. initiating post callback", cluster_name_);
-  post_cluster_cb_();
-  pending_clusters_.erase(cluster_name_);
+  if (pending_clusters_.erase(cluster_name_) != 0) {
+    post_cluster_cb_();
+  }
 }
 
 ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -358,7 +359,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-DynamicClusterHandlerPtr
+std::pair<ClusterResponseCode,DynamicClusterHandlerPtr>
 ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
                                                   const std::string& version_info,
                                                   PostClusterCreationCb post_cluster_cb) {
@@ -368,11 +369,13 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
   if (active_clusters_.find(cluster.name()) != active_clusters_.end()) {
     ENVOY_LOG(trace, "cluster {} already exists", cluster.name());
     should_create_cluster = false;
+    return std::make_pair(ClusterResponseCode::DuplicateCluster, nullptr);
   }
   if (cluster.type() != envoy::api::v2::Cluster::STATIC || cluster.hosts_size() < 1) {
     ENVOY_LOG(warn, "dynamic cluster {} should be of type static and should have hosts",
               cluster.name());
     should_create_cluster = false;
+    return std::make_pair(ClusterResponseCode::NonStaticClusterNotAllowed, nullptr);
   }
 
   DynamicClusterHandlerPtr cluster_handler;
@@ -381,13 +384,15 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
         tls_->getTyped<ThreadLocalClusterManagerImpl>();
     cluster_handler = std::make_shared<DynamicClusterHandlerImpl>(
         cluster.name(), cluster_manager.pending_cluster_creations_, post_cluster_cb);
-    cluster_manager.pending_cluster_creations_[cluster.name()] = cluster_handler;
-    main_thread_dispatcher_.post([this, cluster, version_info]() -> void {
+    cluster_manager.pending_cluster_creations_[cluster.name()]=cluster_handler;
+    Event::Dispatcher& thread_local_dispatcher = cluster_manager.thread_local_dispatcher_;
+    main_thread_dispatcher_.post([this, cluster, version_info,&thread_local_dispatcher]() -> void {
       ENVOY_LOG(trace, "initating dynamic cluster {} creation", cluster.name());
+      pending_cluster_creations_[cluster.name()].push_back(thread_local_dispatcher);
       addOrUpdateCluster(cluster, version_info);
     });
   }
-  return cluster_handler;
+  return std::make_pair(ClusterResponseCode::Accepted, cluster_handler);
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -402,13 +407,14 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   const auto existing_active_cluster = active_clusters_.find(cluster_name);
   const auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   const uint64_t new_hash = MessageUtil::hash(cluster);
+  bool cluster_create = true;
   if ((existing_active_cluster != active_clusters_.end() &&
        existing_active_cluster->second->blockUpdate(new_hash)) ||
       (existing_warming_cluster != warming_clusters_.end() &&
        existing_warming_cluster->second->blockUpdate(new_hash))) {
-    return false;
+    cluster_create = false;
   }
-
+  if (cluster_create) {
   if (existing_active_cluster != active_clusters_.end() ||
       existing_warming_cluster != warming_clusters_.end()) {
     // The following init manager remove call is a NOP in the case we are already initialized. It's
@@ -455,7 +461,22 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
   }
 
   updateGauges();
-  return true;
+  }
+
+  // post the cluster create completion message to all registered dispathers both in success and failure
+  // cases so that they can unblock themselves and proceed with the request flow.
+  for (Event::Dispatcher& dispatcher : pending_cluster_creations_[cluster_name]) {
+    dispatcher.post([this,cluster_name]()->void {
+       ThreadLocalClusterManagerImpl& cluster_manager =
+                tls_->getTyped<ThreadLocalClusterManagerImpl>();
+         if (cluster_manager.pending_cluster_creations_.find(cluster_name) != cluster_manager.pending_cluster_creations_.end()) {
+           auto handler = cluster_manager.pending_cluster_creations_[cluster_name];
+            handler->onClusterCreationComplete();
+           }  
+    });
+  }
+  pending_cluster_creations_.erase(cluster_name);
+  return cluster_create;
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
@@ -828,10 +849,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     cluster_entry->lb_ = cluster_entry->lb_factory_->create();
   }
-
+    
   if (config.pending_cluster_creations_.find(name) != config.pending_cluster_creations_.end()) {
-    auto handler = config.pending_cluster_creations_.find(name)->second;
-    handler->onClusterCreationComplete();
+     auto handler = config.pending_cluster_creations_.find(name)->second;
+     handler->onClusterCreationComplete();
   }
 }
 
