@@ -665,9 +665,8 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                             bool insert_envoy_original_path) const {
   const Http::HeaderString& path = headers.Path()->value();
   const char* query_string_start = Http::Utility::findQueryStringStart(path);
-  // TODO(yuval-k): This ASSERT can happen in valid circumstances - if the path was changed by a
-  // filter without clearing the route cache. We should consider if ASSERT-ing is the correct
-  // behavior in this case.
+  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
+  // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
   std::string matched_path(path.c_str(), query_string_start);
 
