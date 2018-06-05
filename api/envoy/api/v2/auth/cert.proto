@@ -191,6 +191,12 @@ message CertificateValidationContext {
 
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
+  //
+  // .. attention::
+  //
+  //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
+  //   therefore this option must be used together with :ref:`trusted_ca
+  //   <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
   repeated string verify_subject_alt_name = 4;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
