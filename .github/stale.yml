@@ -39,3 +39,4 @@ issues:
  issues:
    exemptLabels:
      - help wanted
+     - tech debt
