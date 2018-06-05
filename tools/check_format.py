@@ -327,3 +327,5 @@ if __name__ == "__main__":
       print "ERROR: %s" % e
     print "ERROR: check format failed. run 'tools/check_format.py fix'"
     sys.exit(1)
+  if operation_type == "check":
+    print "PASS"
