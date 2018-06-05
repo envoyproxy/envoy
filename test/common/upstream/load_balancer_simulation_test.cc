@@ -36,29 +36,33 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
 TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   const uint64_t num_hosts = 4;
   const uint64_t weighted_subset_percent = 50;
-  const uint64_t weight = 2;
+  const uint64_t weight = 2;          // weighted_subset_percent of hosts will have this weight.
+  const uint64_t active_requests = 3; // weighted_subset_percent will have this active requests.
 
-  PrioritySetImpl priority_set_;
+  PrioritySetImpl priority_set;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  HostSet& host_set = priority_set_.getOrCreateHostSet(0);
+  HostSet& host_set = priority_set.getOrCreateHostSet(0);
   HostVector hosts;
   for (uint64_t i = 0; i < num_hosts; i++) {
     const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
     hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
                                  should_weight ? weight : 1));
+    if (should_weight) {
+      hosts.back()->stats().rq_active_.set(active_requests);
+    }
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
   host_set.updateHosts(updated_hosts, updated_hosts, updated_locality_hosts, updated_locality_hosts,
                        {}, hosts, {});
 
-  Stats::IsolatedStoreImpl stats_store_;
-  ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
-  stats_.max_host_weight_.set(weight);
-  NiceMock<Runtime::MockLoader> runtime_;
-  Runtime::RandomGeneratorImpl random_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
-  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
+  stats.max_host_weight_.set(weight);
+  NiceMock<Runtime::MockLoader> runtime;
+  Runtime::RandomGeneratorImpl random;
+  envoy::api::v2::Cluster::CommonLbConfig common_config;
+  LeastRequestLoadBalancer lb_{priority_set, nullptr, stats, runtime, random, common_config};
 
   std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
   const uint64_t total_requests = 100;
