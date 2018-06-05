@@ -359,7 +359,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-std::pair<ClusterResponseCode,DynamicClusterHandlerPtr>
+std::pair<ClusterResponseCode, DynamicClusterHandlerPtr>
 ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
                                                   const std::string& version_info,
                                                   PostClusterCreationCb post_cluster_cb) {
@@ -384,9 +384,9 @@ ClusterManagerImpl::addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster&
         tls_->getTyped<ThreadLocalClusterManagerImpl>();
     cluster_handler = std::make_shared<DynamicClusterHandlerImpl>(
         cluster.name(), cluster_manager.pending_cluster_creations_, post_cluster_cb);
-    cluster_manager.pending_cluster_creations_[cluster.name()]=cluster_handler;
+    cluster_manager.pending_cluster_creations_[cluster.name()] = cluster_handler;
     Event::Dispatcher& thread_local_dispatcher = cluster_manager.thread_local_dispatcher_;
-    main_thread_dispatcher_.post([this, cluster, version_info,&thread_local_dispatcher]() -> void {
+    main_thread_dispatcher_.post([this, cluster, version_info, &thread_local_dispatcher]() -> void {
       ENVOY_LOG(trace, "initating dynamic cluster {} creation", cluster.name());
       pending_cluster_creations_[cluster.name()].push_back(thread_local_dispatcher);
       addOrUpdateCluster(cluster, version_info);
@@ -415,52 +415,53 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
     cluster_create = false;
   }
   if (cluster_create) {
-  if (existing_active_cluster != active_clusters_.end() ||
-      existing_warming_cluster != warming_clusters_.end()) {
-    // The following init manager remove call is a NOP in the case we are already initialized. It's
-    // just kept here to avoid additional logic.
-    init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
-    cm_stats_.cluster_modified_.inc();
-  } else {
-    cm_stats_.cluster_added_.inc();
-  }
+    if (existing_active_cluster != active_clusters_.end() ||
+        existing_warming_cluster != warming_clusters_.end()) {
+      // The following init manager remove call is a NOP in the case we are already initialized.
+      // It's just kept here to avoid additional logic.
+      init_helper_.removeCluster(*existing_active_cluster->second->cluster_);
+      cm_stats_.cluster_modified_.inc();
+    } else {
+      cm_stats_.cluster_added_.inc();
+    }
 
-  // There are two discrete paths here depending on when we are adding/updating a cluster.
-  // 1) During initial server load we use the init manager which handles complex logic related to
-  //    primary/secondary init, static/CDS init, warming all clusters, etc.
-  // 2) After initial server load, we handle warming independently for each cluster in the warming
-  //    map.
-  // Note: It's likely possible that all warming logic could be centralized in the init manager, but
-  //       a decision was made to split the logic given how complex the init manager already is. In
-  //       the future we may decide to undergo a refactor to unify the logic but the effort/risk to
-  //       do that right now does not seem worth it given that the logic is generally pretty clean
-  //       and easy to understand.
-  const bool use_active_map =
-      init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized;
-  loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
+    // There are two discrete paths here depending on when we are adding/updating a cluster.
+    // 1) During initial server load we use the init manager which handles complex logic related to
+    //    primary/secondary init, static/CDS init, warming all clusters, etc.
+    // 2) After initial server load, we handle warming independently for each cluster in the warming
+    //    map.
+    // Note: It's likely possible that all warming logic could be centralized in the init manager,
+    // but
+    //       a decision was made to split the logic given how complex the init manager already is.
+    //       In the future we may decide to undergo a refactor to unify the logic but the
+    //       effort/risk to do that right now does not seem worth it given that the logic is
+    //       generally pretty clean and easy to understand.
+    const bool use_active_map =
+        init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized;
+    loadCluster(cluster, version_info, true, use_active_map ? active_clusters_ : warming_clusters_);
 
-  if (use_active_map) {
-    ENVOY_LOG(info, "add/update cluster {} during init", cluster_name);
-    auto& cluster_entry = active_clusters_.at(cluster_name);
-    createOrUpdateThreadLocalCluster(*cluster_entry);
-    init_helper_.addCluster(*cluster_entry->cluster_);
-  } else {
-    auto& cluster_entry = warming_clusters_.at(cluster_name);
-    ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
-    cluster_entry->cluster_->initialize([this, cluster_name] {
-      auto warming_it = warming_clusters_.find(cluster_name);
-      auto& cluster_entry = *warming_it->second;
-      active_clusters_[cluster_name] = std::move(warming_it->second);
-      warming_clusters_.erase(warming_it);
+    if (use_active_map) {
+      ENVOY_LOG(info, "add/update cluster {} during init", cluster_name);
+      auto& cluster_entry = active_clusters_.at(cluster_name);
+      createOrUpdateThreadLocalCluster(*cluster_entry);
+      init_helper_.addCluster(*cluster_entry->cluster_);
+    } else {
+      auto& cluster_entry = warming_clusters_.at(cluster_name);
+      ENVOY_LOG(info, "add/update cluster {} starting warming", cluster_name);
+      cluster_entry->cluster_->initialize([this, cluster_name] {
+        auto warming_it = warming_clusters_.find(cluster_name);
+        auto& cluster_entry = *warming_it->second;
+        active_clusters_[cluster_name] = std::move(warming_it->second);
+        warming_clusters_.erase(warming_it);
 
-      ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
-      createOrUpdateThreadLocalCluster(cluster_entry);
-      onClusterInit(*cluster_entry.cluster_);
-      updateGauges();
-    });
-  }
+        ENVOY_LOG(info, "warming cluster {} complete", cluster_name);
+        createOrUpdateThreadLocalCluster(cluster_entry);
+        onClusterInit(*cluster_entry.cluster_);
+        updateGauges();
+      });
+    }
 
-  updateGauges();
+    updateGauges();
   }
 
   // post the cluster create completion message to all registered dispathers both in success and failure
@@ -849,10 +850,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
     cluster_entry->lb_ = cluster_entry->lb_factory_->create();
   }
-    
+
   if (config.pending_cluster_creations_.find(name) != config.pending_cluster_creations_.end()) {
-     auto handler = config.pending_cluster_creations_.find(name)->second;
-     handler->onClusterCreationComplete();
+    auto handler = config.pending_cluster_creations_.find(name)->second;
+    handler->onClusterCreationComplete();
   }
 }
 
