@@ -145,6 +145,7 @@ public:
     const std::string Cancelled{"cancelled"};
     const std::string DeadlineExceeded{"deadline-exceeded"};
     const std::string ResourceExhausted{"resource-exhausted"};
+    const std::string Unavailable{"unavailable"};
   } EnvoyRetryOnGrpcValues;
 
   struct {

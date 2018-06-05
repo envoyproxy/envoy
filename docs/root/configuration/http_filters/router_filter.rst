@@ -126,6 +126,9 @@ deadline-exceeded
 resource-exhausted
   Envoy will attempt a retry if the gRPC status code in the response headers is "resource-exhausted" (8)
 
+unavailable
+  Envoy will attempt a retry if the gRPC status code in the response headers is "unavailable" (14)
+
 As with the x-envoy-retry-grpc-on header, the number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header
 
