@@ -113,7 +113,7 @@ def checkFileExpectingOK(filename):
   return 0
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='tester for check_foramt.py.')
+  parser = argparse.ArgumentParser(description='tester for check_format.py.')
   parser.add_argument('--log', choices=['INFO', 'WARN', 'ERROR'], default='INFO')
   args = parser.parse_args()
   logging.basicConfig(format='%(message)s', level=args.log)
