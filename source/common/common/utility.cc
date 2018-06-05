@@ -37,11 +37,11 @@ typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
     size_t seconds_length;
-    std::chrono::seconds epoch_time_seconds;
 
     struct Formatted {
-      SubsecondOffsets subsecond_offsets;
       std::string str;
+      SubsecondOffsets subsecond_offsets;
+      std::chrono::seconds epoch_time_seconds;
     };
     // A map is used to keep different formatted format strings at a given second.
     std::unordered_map<std::string, const Formatted> formatted;
@@ -54,16 +54,18 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
 
-  const bool new_period = cached_time.epoch_time_seconds != epoch_time_seconds;
-  if (cached_time.formatted.find(format_string_) == cached_time.formatted.end() || new_period) {
-    if (new_period) {
-      // Caching is done only for a second long. We clear it every a new period of second is
-      // observed.
-      cached_time.formatted.clear();
+  // Remove all the expired cached items.
+  for (const auto& item : cached_time.formatted) {
+    if (item.second.epoch_time_seconds != epoch_time_seconds) {
+      cached_time.formatted.erase(item.first);
     }
+  }
 
+  const auto& item = cached_time.formatted.find(format_string_);
+  if (item == cached_time.formatted.end()) {
     const time_t current_time = std::chrono::system_clock::to_time_t(time);
 
+    // Build a new formatted format string at current time.
     CachedTime::Formatted formatted;
     if (subseconds_.empty()) {
       formatted.str = fromTime(current_time);
@@ -72,8 +74,9 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       cached_time.seconds_length = fmt::FormatInt(epoch_time_seconds.count()).str().size();
     }
 
+    // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
+    formatted.epoch_time_seconds = epoch_time_seconds;
     cached_time.formatted.emplace(std::make_pair(format_string_, formatted));
-    cached_time.epoch_time_seconds = epoch_time_seconds;
   }
 
   const auto& formatted = cached_time.formatted.at(format_string_);
