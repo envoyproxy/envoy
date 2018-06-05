@@ -234,7 +234,8 @@ private:
     PendingMessage(const Protobuf::Message& request, bool end_stream)
         : buf_([](const Protobuf::Message& request) -> absl::optional<grpc::ByteBuffer> {
             grpc::ByteBuffer buffer;
-            grpc::ProtoBufferWriter writer(&buffer, 1024, request.ByteSize());
+            grpc::ProtoBufferWriter writer(&buffer, grpc::kProtoBufferWriterMaxBufferLength,
+                                           request.ByteSize());
             return request.SerializeToZeroCopyStream(&writer)
                        ? absl::make_optional<grpc::ByteBuffer>(buffer)
                        : absl::nullopt;
