@@ -89,9 +89,8 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   const std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
   for (size_t i = 0; i < subseconds_.size(); ++i) {
     const auto& subsecond = subseconds_.at(i);
-    absl::string_view digits = nanoseconds.substr(cached_time.seconds_length, subsecond.width_);
     formatted_str.replace(subsecond.position_ + formatted.subsecond_offsets.at(i), subsecond.width_,
-                          digits.data());
+                          nanoseconds.substr(cached_time.seconds_length, subsecond.width_));
   }
 
   ASSERT(formatted_str.size() == formatted.str.size());
