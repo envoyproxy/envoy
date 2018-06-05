@@ -3,20 +3,24 @@
 External Authorization
 ======================
 
-* External authorization service overview :ref:`architecture overview <arch_overview_ext_authz>`
+* External authorization :ref:`architecture overview <arch_overview_ext_authz>`
 * :ref:`Network filter v2 API reference <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
 
-The external authorization network filter calls an external authorization service to check if the incoming request is authorized or not.
-If the request is deemed unauthorized by the network filter then the connection will be closed.
+The external authorization network filter calls an external authorization service to check if the
+incoming request is authorized or not. If the request is deemed unauthorized by the network filter
+then the connection will be closed.
 
 .. tip::
-  It is recommended that this filter is configured first in the filter chain so that requests are authorized prior to rest of the filters running through the request.
+  It is recommended that this filter is configured first in the filter chain so that requests are
+  authorized prior to rest of the filters processing the request.
 
-The content of the request that are passed to an authorization service is specified by :ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`
+The content of the request that are passed to an authorization service is specified by
+:ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
 
 .. _config_network_filters_ext_authz_network_configuration:
 
-The network filter, gRPC service, can be configured as follows. You can see all the configuration options at :ref:`Network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`
+The network filter, gRPC service, can be configured as follows. You can see all the configuration
+options at :ref:`Network filter <envoy_api_msg_config.filter.network.ext_authz.v2.ExtAuthz>`.
 
 Example
 -------
@@ -51,7 +55,8 @@ The network filter outputs statistics in the *config.ext_authz.* namespace.
   total, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic. 
-  failure_mode_allow, Counter, Total requests that were error(s) but were allowed through because of failure_mode_allow set to true.
+  failure_mode_allow, Counter, "Total requests that were error(s) but were allowed through
+  because of failure_mode_allow set to true."
   ok, Counter, Total responses from the authorization service that were to allow the traffic.
   cx_closed, Counter, Total connections that were closed.
   active, Gauge, Total currently active requests in transit to the authorization service.
