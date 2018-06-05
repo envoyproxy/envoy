@@ -64,12 +64,12 @@ def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
     print "FAILED:"
-    emitStdout(stdout)
+    emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
     print "FAILED:"
-    emitStdout(stdout)
+    emitStdoutAsError(stdout)
     return 1
   return 0
 
@@ -83,8 +83,7 @@ def fixFileExpectingNoChange(file):
   return 0
 
 def emitStdoutAsError(stdout):
-  for line in stdout:
-    logging.error("    %s" % line)
+  logging.error("\n".join(stdout))
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
