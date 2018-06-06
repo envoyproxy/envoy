@@ -111,9 +111,11 @@ public:
 #else
 
       if (absl::Symbolize(stack_trace_[i].addr, out, 200)) {
-        ENVOY_LOG(critical, "thr<{}> #{} {}", thread_id, stack_trace_[i].idx, out);
+        ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx,
+                  stack_trace_[i].addr, out);
       } else {
-        ENVOY_LOG(critical, "thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
+        ENVOY_LOG(critical, "thr<{}> #{} (unknown)", thread_id, stack_trace_[i].idx,
+                  stack_trace_[i].addr);
       }
 #endif
     }
