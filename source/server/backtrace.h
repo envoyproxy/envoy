@@ -86,12 +86,12 @@ public:
 #ifdef __APPLE__
     // The stack_decode.py script uses addr2line which isn't readily available and doesn't seem to
     // work when installed.
-    ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}>:", obj_name, thread_id);
+    ENVOY_LOG(critical, "Backtrace thr<{}> obj<{}>:", thread_id, obj_name);
 #else
     char out[200];
     ENVOY_LOG(critical,
-              "Backtrace obj<{}> thr<{}> (If unsymbolized, use tools/stack_decode.py):", obj_name,
-              thread_id);
+              "Backtrace thr<{}> obj<{}> (If unsymbolized, use tools/stack_decode.py):", thread_id,
+              obj_name);
 #endif
 
     // Backtrace gets tagged by ASAN when we try the object name resolution for the last
@@ -109,12 +109,11 @@ public:
       ENVOY_LOG(critical, "thr<{}> #{} {}: {}", thread_id, stack_trace_[i].idx,
                 stack_trace_[i].addr, trace.object_function);
 #else
-
-      if (absl::Symbolize(stack_trace_[i].addr, out, 200)) {
+      if (absl::Symbolize(stack_trace_[i].addr, out, sizeof(out))) {
         ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx,
                   stack_trace_[i].addr, out);
       } else {
-        ENVOY_LOG(critical, "thr<{}> #{} (unknown)", thread_id, stack_trace_[i].idx,
+        ENVOY_LOG(critical, "thr<{}> #{} {} (unknown)", thread_id, stack_trace_[i].idx,
                   stack_trace_[i].addr);
       }
 #endif
