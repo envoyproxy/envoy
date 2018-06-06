@@ -305,7 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -609,6 +609,10 @@ message RouteAction {
   CorsPolicy cors = 17;
 
   reserved 21;
+
+  // When the request is a gRPC request, use the 'grpc-timeout' header, or it's default value
+  // (infinity) instead of 'timeout'.
+  bool use_grpc_timeout = 23;
 }
 
 message RedirectAction {

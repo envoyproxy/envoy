@@ -94,6 +94,10 @@ Version history
   generate session cookies.
 * router: added START_TIME as one of supported variables in :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
+* router: added a :ref:`use_grpc_timeout <envoy_api_field_route.RouteAction.use_grpc_timeout>`
+  config option to use gRPC header field `grpc-timeout`, or its default value (infinity), for gRPC
+  requests instead of the normal request `timeout` or its default. This allows gRPC streaming
+  be proxied successfully also when responses arrive later than typical for the non-streamed case.
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.

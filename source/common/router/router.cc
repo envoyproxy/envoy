@@ -65,7 +65,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // infinity when gRPC headers have no timeout, or the default from the route config for
   // non-gRPC requests.
   TimeoutData timeout;
-  if (grpc_request) {
+  if (grpc_request && route.useGrpcTimeout()) {
     timeout.global_timeout_ = std::chrono::milliseconds(0);
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
 

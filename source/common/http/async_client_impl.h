@@ -191,6 +191,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    bool useGrpcTimeout() const override { return false; }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }

@@ -468,6 +468,11 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return bool if the timeout should be derived from the headers of a gRPC request.
+   */
+  virtual bool useGrpcTimeout() const PURE;
+
+  /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
    * @return the virtual cluster or nullptr if there is no match.
