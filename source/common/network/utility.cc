@@ -5,6 +5,9 @@
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_ipv6/ip6_tables.h>
+#include <netinet/in.h>
+#include <net/if.h>
 #endif
 
 #include <netinet/ip.h>
@@ -292,11 +295,18 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+
+  int status;
+  switch (orig_addr.ss_family) {
+      case AF_INET:
+        status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+      case AF_INET6:
+        status = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  }
 
   if (status == 0) {
     // TODO(mattklein123): IPv6 support. See github issue #1094.
-    ASSERT(orig_addr.ss_family == AF_INET);
+    // ASSERT(orig_addr.ss_family == AF_INET);
     return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
   } else {
