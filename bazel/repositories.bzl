@@ -407,6 +407,10 @@ def _com_google_absl():
         name = "abseil_synchronization",
         actual = "@com_google_absl//absl/synchronization:synchronization",
     )
+    native.bind(
+        name = "abseil_symbolize",
+        actual = "@com_google_absl//absl/debugging:symbolize",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
