@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
+#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
@@ -257,6 +258,16 @@ HeaderMapImpl::StaticLookupTable::find(const char* key) const {
   return current->cb_;
 }
 
+void HeaderMapImpl::appendToHeader(HeaderString& header, const std::string& data) {
+  if (data.empty()) {
+    return;
+  }
+  if (!header.empty()) {
+    header.append(",", 1);
+  }
+  header.append(data.c_str(), data.size());
+}
+
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
@@ -304,13 +315,9 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
   if (cb) {
-    // TODO(mattklein123): Currently, for all of the inline headers, we don't support appending. The
-    // only inline header where we should be converting multiple headers into a comma delimited
-    // list is XFF. This is not a crisis for now but we should allow an inline header to indicate
-    // that it should be appended to. In that case, we would do an append here. We can do this in
-    // a follow up.
     key.clear();
     StaticLookupResponse ref_lookup_response = cb(*this);
+    ASSERT(*ref_lookup_response.entry_ == nullptr); // This function doesn't handle append.
     maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
   } else {
     std::list<HeaderEntryImpl>::iterator i =
@@ -320,7 +327,14 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
 }
 
 void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
-  insertByKey(std::move(key), std::move(value));
+  // If this is an inline header, we can't addViaMove, because we'll overwrite
+  // the existing value.
+  auto* entry = getExistingInline(key.c_str());
+  if (entry) {
+    appendToHeader(entry->value(), value.c_str());
+  } else {
+    insertByKey(std::move(key), std::move(value));
+  }
 }
 
 void HeaderMapImpl::addReference(const LowerCaseString& key, const std::string& value) {
@@ -346,6 +360,11 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::strin
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
+  auto* entry = getExistingInline(key.get().c_str());
+  if (entry) {
+    appendToHeader(entry->value(), fmt::format("{}", value));
+    return;
+  }
   HeaderString new_key;
   new_key.setCopy(key.get().c_str(), key.get().size());
   HeaderString new_value;
@@ -356,6 +375,11 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
+  auto* entry = getExistingInline(key.get().c_str());
+  if (entry) {
+    appendToHeader(entry->value(), value);
+    return;
+  }
   HeaderString new_key;
   new_key.setCopy(key.get().c_str(), key.get().size());
   HeaderString new_value;
@@ -509,6 +533,15 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
+}
+
+HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(const char* key) {
+  StaticLookupEntry::EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key);
+  if (cb) {
+    StaticLookupResponse ref_lookup_response = cb(*this);
+    return *ref_lookup_response.entry_;
+  }
+  return nullptr;
 }
 
 void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
