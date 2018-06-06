@@ -33,31 +33,28 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
     StringUtil::rtrim(string_buffer);
   }
-  if (len > 4) {
-    int split_point = *reinterpret_cast<const uint32_t*>(buf) % len;
-    //  (string_buffer.substr(0, split_point), string_buffer.substr(split_point + 1,
-    //  std::string::npos))
+  if (len > 0) {
+    const size_t split_point = *reinterpret_cast<const uint8_t*>(buf) % len;
+    //  (string_buffer.substr(0, split_point), string_buffer.substr(split_point))
     //  @param1: substring of buffer from beginning to split_point
     //  @param2: substring of buffer from split_point to end of the string
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-      StringUtil::endsWith(string_buffer.substr(0, split_point),
-                           string_buffer.substr(split_point + 1, std::string::npos));
+      StringUtil::endsWith(string_buffer.substr(0, split_point), string_buffer.substr(split_point));
     }
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
       StringUtil::caseCompare(string_buffer.substr(0, split_point),
-                              string_buffer.substr(split_point + 1, std::string::npos));
+                              string_buffer.substr(split_point));
     }
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-      StringUtil::cropLeft(string_buffer.substr(0, split_point),
-                           string_buffer.substr(split_point + 1, std::string::npos));
+      StringUtil::cropLeft(string_buffer.substr(0, split_point), string_buffer.substr(split_point));
     }
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
       StringUtil::cropRight(string_buffer.substr(0, split_point),
-                            string_buffer.substr(split_point + 1, std::string::npos));
+                            string_buffer.substr(split_point));
     }
   }
 }
