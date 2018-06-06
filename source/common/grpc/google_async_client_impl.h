@@ -13,6 +13,7 @@
 
 #include "grpc++/generic/generic_stub.h"
 #include "grpc++/grpc++.h"
+#include "grpcpp/support/proto_buffer_writer.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -230,22 +231,19 @@ private:
   // point-in-time, so we queue pending writes here.
   struct PendingMessage {
     // We serialize the message to a grpc::ByteBuffer prior to queueing.
-    // TODO(htuch): We shouldn't need to do a string serialization & copy steps here (effectively,
-    // two copies!), this can be done more efficiently with SerializeToZeroCopyStream as done by
-    // TensorFlow
-    // https://github.com/tensorflow/tensorflow/blob/f9462e82ac3981d7a3b5bf392477a585fb6e6912/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h#L189
-    // at the cost of some additional implementation complexity.
-    // Also see
-    // https://github.com/grpc/grpc/blob/5e82dddc056bd488e0ba1ba0057247ab23e442d4/include/grpc%2B%2B/impl/codegen/proto_utils.h#L42
-    // which gives us what we want for zero copy, but relies on grpc::internal details; we can't get
-    // a grpc_byte_buffer from grpc::ByteBuffer to use this.
     PendingMessage(const Protobuf::Message& request, bool end_stream)
-        : slice_(request.SerializeAsString()), buf_(grpc::ByteBuffer(&slice_, 1)),
+        : buf_([](const Protobuf::Message& request) -> absl::optional<grpc::ByteBuffer> {
+            grpc::ByteBuffer buffer;
+            grpc::ProtoBufferWriter writer(&buffer, grpc::kProtoBufferWriterMaxBufferLength,
+                                           request.ByteSize());
+            return request.SerializeToZeroCopyStream(&writer)
+                       ? absl::make_optional<grpc::ByteBuffer>(buffer)
+                       : absl::nullopt;
+          }(request)),
           end_stream_(end_stream) {}
     // End-of-stream with no additional message.
     PendingMessage() : end_stream_(true) {}
 
-    const grpc::Slice slice_;
     const absl::optional<grpc::ByteBuffer> buf_;
     const bool end_stream_;
   };
