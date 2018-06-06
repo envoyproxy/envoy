@@ -4,11 +4,14 @@
 
 #include "extensions/filters/network/thrift_proxy/binary_protocol.h"
 
+#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -16,12 +19,14 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(BinaryProtocolTest, Name) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   EXPECT_EQ(proto.name(), "binary");
 }
 
 TEST(BinaryProtocolTest, ReadMessageBegin) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -92,6 +97,7 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
     addInt32(buffer, 0);
     addInt32(buffer, 1234);
 
+    EXPECT_CALL(cb, messageStart(absl::string_view(""), MessageType::Call, 1234));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(msg_type, MessageType::Call);
@@ -133,6 +139,7 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
     addString(buffer, "the_name");
     addInt32(buffer, 5678);
 
+    EXPECT_CALL(cb, messageStart(absl::string_view("the_name"), MessageType::Call, 5678));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "the_name");
     EXPECT_EQ(msg_type, MessageType::Call);
@@ -143,26 +150,34 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
 
 TEST(BinaryProtocolTest, ReadMessageEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  EXPECT_CALL(cb, messageComplete());
   EXPECT_TRUE(proto.readMessageEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadStructBegin) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   std::string name = "-";
+  EXPECT_CALL(cb, structBegin(absl::string_view("")));
   EXPECT_TRUE(proto.readStructBegin(buffer, name));
   EXPECT_EQ(name, "");
 }
 
 TEST(BinaryProtocolTest, ReadStructEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  EXPECT_CALL(cb, structEnd());
   EXPECT_TRUE(proto.readStructEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadFieldBegin) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -186,6 +201,7 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
 
     addInt8(buffer, FieldType::Stop);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::Stop, 0));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::Stop);
@@ -218,6 +234,7 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
     addInt8(buffer, FieldType::I32);
     addInt16(buffer, 99);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::I32, 99));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::I32);
@@ -228,12 +245,14 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
 
 TEST(BinaryProtocolTest, ReadFieldEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readFieldEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadMapBegin) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -291,12 +310,14 @@ TEST(BinaryProtocolTest, ReadMapBegin) {
 
 TEST(BinaryProtocolTest, ReadMapEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readMapEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadListBegin) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -346,12 +367,14 @@ TEST(BinaryProtocolTest, ReadListBegin) {
 
 TEST(BinaryProtocolTest, ReadListEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readListEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadSetBegin) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Test only the happy path, since this method is just delegated to readListBegin()
   Buffer::OwnedImpl buffer;
@@ -369,12 +392,14 @@ TEST(BinaryProtocolTest, ReadSetBegin) {
 
 TEST(BinaryProtocolTest, ReadSetEnd) {
   Buffer::OwnedImpl buffer;
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readSetEnd(buffer));
 }
 
 TEST(BinaryProtocolTest, ReadIntegerTypes) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Bool
   {
@@ -492,7 +517,8 @@ TEST(BinaryProtocolTest, ReadIntegerTypes) {
 }
 
 TEST(BinaryProtocolTest, ReadDouble) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -520,7 +546,8 @@ TEST(BinaryProtocolTest, ReadDouble) {
 }
 
 TEST(BinaryProtocolTest, ReadString) {
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
 
   // Insufficient data to read length
   {
@@ -587,7 +614,8 @@ TEST(BinaryProtocolTest, ReadString) {
 
 TEST(BinaryProtocolTest, ReadBinary) {
   // Test only the happy path, since this method is just delegated to readString()
-  BinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
   Buffer::OwnedImpl buffer;
   std::string value = "-";
 
@@ -600,12 +628,14 @@ TEST(BinaryProtocolTest, ReadBinary) {
 }
 
 TEST(LaxBinaryProtocolTest, Name) {
-  LaxBinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  LaxBinaryProtocolImpl proto(cb);
   EXPECT_EQ(proto.name(), "binary/non-strict");
 }
 
 TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
-  LaxBinaryProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  LaxBinaryProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -655,6 +685,7 @@ TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
     addInt8(buffer, MessageType::Call);
     addInt32(buffer, 1234);
 
+    EXPECT_CALL(cb, messageStart(absl::string_view(""), MessageType::Call, 1234));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(msg_type, MessageType::Call);
@@ -692,6 +723,7 @@ TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
     addInt8(buffer, MessageType::Call);
     addInt32(buffer, 5678);
 
+    EXPECT_CALL(cb, messageStart(absl::string_view("the_name"), MessageType::Call, 5678));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "the_name");
     EXPECT_EQ(msg_type, MessageType::Call);

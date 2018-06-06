@@ -4,12 +4,15 @@
 
 #include "extensions/filters/network/thrift_proxy/compact_protocol.h"
 
+#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::NiceMock;
+using testing::StrictMock;
 using testing::TestWithParam;
 using testing::Values;
 
@@ -19,12 +22,14 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(CompactProtocolTest, Name) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   EXPECT_EQ(proto.name(), "compact");
 }
 
 TEST(CompactProtocolTest, ReadMessageBegin) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -165,6 +170,7 @@ TEST(CompactProtocolTest, ReadMessageBegin) {
     addInt8(buffer, 32);
     addInt8(buffer, 0);
 
+    EXPECT_CALL(cb, messageStart(absl::string_view(""), MessageType::Call, 32));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(msg_type, MessageType::Call);
@@ -222,6 +228,7 @@ TEST(CompactProtocolTest, ReadMessageBegin) {
     addInt8(buffer, 8);
     addString(buffer, "the_name");
 
+    EXPECT_CALL(cb, messageStart(absl::string_view("the_name"), MessageType::Call, 0x0102));
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "the_name");
     EXPECT_EQ(msg_type, MessageType::Call);
@@ -232,17 +239,22 @@ TEST(CompactProtocolTest, ReadMessageBegin) {
 
 TEST(CompactProtocolTest, ReadMessageEnd) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  EXPECT_CALL(cb, messageComplete());
   EXPECT_TRUE(proto.readMessageEnd(buffer));
 }
 
 TEST(CompactProtocolTest, ReadStruct) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   std::string name = "-";
+  EXPECT_CALL(cb, structBegin(absl::string_view("")));
   EXPECT_TRUE(proto.readStructBegin(buffer, name));
   EXPECT_EQ(name, "");
 
+  EXPECT_CALL(cb, structEnd());
   EXPECT_TRUE(proto.readStructEnd(buffer));
 
   EXPECT_THROW_WITH_MESSAGE(proto.readStructEnd(buffer), EnvoyException,
@@ -250,7 +262,8 @@ TEST(CompactProtocolTest, ReadStruct) {
 }
 
 TEST(CompactProtocolTest, ReadFieldBegin) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -274,6 +287,7 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
 
     addInt8(buffer, 0xF0);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::Stop, 0));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::Stop);
@@ -368,6 +382,7 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
     addInt8(buffer, 0x05);
     addInt8(buffer, 0x04);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::I32, 2));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::I32);
@@ -384,6 +399,7 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
 
     addInt8(buffer, 0xF5);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::I32, 17));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::I32);
@@ -394,12 +410,14 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
 
 TEST(CompactProtocolTest, ReadFieldEnd) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readFieldEnd(buffer));
 }
 
 TEST(CompactProtocolTest, ReadMapBegin) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -539,12 +557,14 @@ TEST(CompactProtocolTest, ReadMapBegin) {
 
 TEST(CompactProtocolTest, ReadMapEnd) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readMapEnd(buffer));
 }
 
 TEST(CompactProtocolTest, ReadListBegin) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -652,12 +672,14 @@ TEST(CompactProtocolTest, ReadListBegin) {
 
 TEST(CompactProtocolTest, ReadListEnd) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readListEnd(buffer));
 }
 
 TEST(CompactProtocolTest, ReadSetBegin) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Test only the happy path, since this method is just delegated to readListBegin()
   Buffer::OwnedImpl buffer;
@@ -674,12 +696,14 @@ TEST(CompactProtocolTest, ReadSetBegin) {
 
 TEST(CompactProtocolTest, ReadSetEnd) {
   Buffer::OwnedImpl buffer;
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   EXPECT_TRUE(proto.readSetEnd(buffer));
 }
 
 TEST(CompactProtocolTest, ReadBool) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Bool field values are encoded in the field type
   {
@@ -692,6 +716,7 @@ TEST(CompactProtocolTest, ReadBool) {
     addInt8(buffer, 0x01);
     addInt8(buffer, 0x04);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::Bool, 2));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::Bool);
@@ -708,6 +733,7 @@ TEST(CompactProtocolTest, ReadBool) {
     addInt8(buffer, 0x02);
     addInt8(buffer, 0x06);
 
+    EXPECT_CALL(cb, structField(absl::string_view(""), FieldType::Bool, 3));
     EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
     EXPECT_EQ(name, "");
     EXPECT_EQ(field_type, FieldType::Bool);
@@ -743,7 +769,8 @@ TEST(CompactProtocolTest, ReadBool) {
 }
 
 TEST(CompactProtocolTest, ReadIntegerTypes) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Byte
   {
@@ -874,7 +901,8 @@ TEST(CompactProtocolTest, ReadIntegerTypes) {
 }
 
 TEST(CompactProtocolTest, ReadDouble) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -904,7 +932,8 @@ TEST(CompactProtocolTest, ReadDouble) {
 }
 
 TEST(CompactProtocolTest, ReadString) {
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
 
   // Insufficient data
   {
@@ -981,7 +1010,8 @@ TEST(CompactProtocolTest, ReadString) {
 
 TEST(CompactProtocolTest, ReadBinary) {
   // Test only the happy path, since this method is just delegated to readString()
-  CompactProtocolImpl proto;
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   Buffer::OwnedImpl buffer;
   std::string value = "-";
 
@@ -998,7 +1028,8 @@ class CompactProtocolFieldTypeTest : public TestWithParam<uint8_t> {};
 TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
   uint8_t compact_field_type = GetParam();
 
-  CompactProtocolImpl proto;
+  NiceMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
   Buffer::OwnedImpl buffer;
   std::string name = "-";
   int8_t invalid_field_type = static_cast<int8_t>(FieldType::LastFieldType) + 1;

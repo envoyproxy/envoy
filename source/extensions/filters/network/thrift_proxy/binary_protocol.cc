@@ -58,22 +58,26 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string&
   msg_type = type;
   seq_id = BufferHelper::drainI32(buffer);
 
+  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
 bool BinaryProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
+  onMessageComplete();
   return true;
 }
 
 bool BinaryProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
   UNREFERENCED_PARAMETER(buffer);
   name.clear(); // binary protocol does not transmit struct names
+  onStructBegin(absl::string_view(name));
   return true;
 }
 
 bool BinaryProtocolImpl::readStructEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
+  onStructEnd();
   return true;
 }
 
@@ -100,6 +104,7 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
   name.clear(); // binary protocol does not transmit field names
   field_type = type;
 
+  onStructField(absl::string_view(name), field_type, field_id);
   return true;
 }
 
@@ -289,8 +294,9 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::stri
 
   msg_type = type;
   seq_id = BufferHelper::peekI32(buffer, 1);
-
   buffer.drain(5);
+
+  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
