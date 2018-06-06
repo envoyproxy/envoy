@@ -35,12 +35,23 @@ typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
 
 std::string DateFormatter::fromTime(const SystemTime& time) const {
   struct CachedTime {
+    // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length
+    // is 10.
     size_t seconds_length;
 
+    // A container object to hold a strftime'd string, its timestamp (in seconds) and a list
+    // of position offsets for each subsecond specifier found in a format string.
     struct Formatted {
+      // The resulted string after format string is passed to strftime at a given point in time.
       std::string str;
-      SubsecondOffsets subsecond_offsets;
+
+      // A timestamp (in seconds) when this object is created.
       std::chrono::seconds epoch_time_seconds;
+
+      // List of offsets for each subsecond specifier found in a format string. This is needed to
+      // compensate the position of each recorded subsecond specifier due to the possible size
+      // change of the previous segment (after strftime'd).
+      SubsecondOffsets subsecond_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
     std::unordered_map<std::string, const Formatted> formatted;
