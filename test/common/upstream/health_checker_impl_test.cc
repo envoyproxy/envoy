@@ -1373,6 +1373,90 @@ TEST_F(HttpHealthCheckerImplTest, Http2ClusterUsesHttp2CodecClient) {
   EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 
+class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
+  public:
+  using ProdHttpHealthCheckerImpl::ProdHttpHealthCheckerImpl;
+
+  std::unique_ptr<Http::CodecClient> createCodecClientForTest(std::unique_ptr<Network::ClientConnection>&& connection) {
+    Upstream::Host::CreateConnectionData data;
+    data.connection_ = std::move(connection);
+    data.host_description_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    return std::unique_ptr<Http::CodecClient>(createCodecClient(data));
+  }
+};
+
+class ProdHttpHealthCheckerTest : public HttpHealthCheckerImplTest {
+  public:
+  void setupNoServiceValidationHCWithHttp2() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      use_http2: true
+    )EOF";
+
+    health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
+  void setupNoServiceValidationHC() {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+    )EOF";
+
+    health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                        dispatcher_, runtime_, random_));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
+  std::unique_ptr<Network::MockClientConnection> connection_ = std::make_unique<Network::MockClientConnection>();
+  std::shared_ptr<TestProdHttpHealthChecker> health_checker_;
+};
+
+TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(_));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection_, addReadFilter(_));
+  EXPECT_CALL(*connection_, noDelay(_));
+  EXPECT_CALL(*connection_, bufferLimit());
+
+  setupNoServiceValidationHC();
+  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->createCodecClientForTest(std::move(connection_))->type());
+}
+
+TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
+  EXPECT_CALL(*connection_, connect());
+  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(_));
+  EXPECT_CALL(*connection_, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection_, addReadFilter(_));
+  EXPECT_CALL(*connection_, noDelay(_));
+
+  setupNoServiceValidationHCWithHttp2();
+  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->createCodecClientForTest(std::move(connection_))->type());
+}
+
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload> repeated_payload;
