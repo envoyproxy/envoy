@@ -6,6 +6,7 @@
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/router/router.h"
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -31,9 +32,17 @@ namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public Envoy::Router::Filter {
 public:
-  TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
+  TestLoadBalancerContext(const Network::Connection* connection, Router::FilterConfig& config)
+      : Filter(config), connection_(connection) {}
+
+  Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, Http::HeaderMap&,
+                                         const Upstream::ClusterInfo&, Runtime::Loader&,
+                                         Runtime::RandomGenerator&, Event::Dispatcher&,
+                                         Upstream::ResourcePriority) override {
+    return nullptr;
+  }
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
@@ -144,7 +153,8 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   // No downstream connection => no host.
   {
-    TestLoadBalancerContext lb_context(nullptr);
+    std::shared_ptr<Router::FilterConfig> filter_config;
+    TestLoadBalancerContext lb_context(nullptr, *filter_config);
     OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
@@ -154,7 +164,8 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   // Downstream connection is not using original dst => no host.
   {
     NiceMock<Network::MockConnection> connection;
-    TestLoadBalancerContext lb_context(&connection);
+    std::shared_ptr<Router::FilterConfig> filter_config;
+    TestLoadBalancerContext lb_context(&connection, *filter_config);
 
     EXPECT_CALL(connection, localAddressRestored()).WillOnce(Return(false));
     // First argument is normally the reference to the ThreadLocalCluster's HostSet, but in these
@@ -169,7 +180,8 @@ TEST_F(OriginalDstClusterTest, NoContext) {
   // No host for non-IP address
   {
     NiceMock<Network::MockConnection> connection;
-    TestLoadBalancerContext lb_context(&connection);
+    std::shared_ptr<Router::FilterConfig> filter_config;
+    TestLoadBalancerContext lb_context(&connection, *filter_config);
     connection.local_address_ = std::make_shared<Network::Address::PipeInstance>("unix://foo");
     EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
@@ -206,7 +218,8 @@ TEST_F(OriginalDstClusterTest, Membership) {
   // Host gets the local address of the downstream connection.
 
   NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
+  std::shared_ptr<Router::FilterConfig> filter_config;
+  TestLoadBalancerContext lb_context(&connection, *filter_config);
   connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
@@ -295,12 +308,13 @@ TEST_F(OriginalDstClusterTest, Membership2) {
   // Host gets the local address of the downstream connection.
 
   NiceMock<Network::MockConnection> connection1;
-  TestLoadBalancerContext lb_context1(&connection1);
+  std::shared_ptr<Router::FilterConfig> filter_config;
+  TestLoadBalancerContext lb_context1(&connection1, *filter_config);
   connection1.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
   EXPECT_CALL(connection1, localAddressRestored()).WillRepeatedly(Return(true));
 
   NiceMock<Network::MockConnection> connection2;
-  TestLoadBalancerContext lb_context2(&connection2);
+  TestLoadBalancerContext lb_context2(&connection2, *filter_config);
   connection2.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12");
   EXPECT_CALL(connection2, localAddressRestored()).WillRepeatedly(Return(true));
 
@@ -387,7 +401,8 @@ TEST_F(OriginalDstClusterTest, Connection) {
 
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
+  std::shared_ptr<Router::FilterConfig> filter_config;
+  TestLoadBalancerContext lb_context(&connection, *filter_config);
   connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 
@@ -436,7 +451,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
 
   // Connection to the host is made to the downstream connection's local address.
   NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
+  std::shared_ptr<Router::FilterConfig> filter_config;
+  TestLoadBalancerContext lb_context(&connection, *filter_config);
   connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("FD00::1");
   EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
 

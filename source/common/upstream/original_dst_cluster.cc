@@ -9,6 +9,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/router.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -40,6 +41,23 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, Cluste
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
+    // Check if request has a override host header set, if directly return the host using it.
+    Envoy::Router::Filter* filter = dynamic_cast<Envoy::Router::Filter*>(context);
+    const std::string& request_override_host =
+        filter->downStreamHeader("x-envoy-original-dst-override-host");
+    if (!request_override_host.empty()) {
+      ENVOY_LOG(info, "Using request override host {}.", request_override_host);
+      Network::Address::InstanceConstSharedPtr overridehost_ip_port(
+          Network::Utility::parseInternetAddressAndPort(request_override_host, false));
+      HostSharedPtr override_host_ptr;
+      override_host_ptr.reset(new HostImpl(
+          info_, info_->name() + overridehost_ip_port->asString(), std::move(overridehost_ip_port),
+          envoy::api::v2::core::Metadata::default_instance(), 1,
+          envoy::api::v2::core::Locality().default_instance(),
+          envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
+      return override_host_ptr;
+    }
+
     const Network::Connection* connection = context->downstreamConnection();
 
     // The local address of the downstream connection is the original destination address,

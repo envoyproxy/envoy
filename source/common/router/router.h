@@ -214,6 +214,15 @@ public:
     return cookie_value;
   }
 
+  std::string downStreamHeader(const std::string& key) {
+    const Http::LowerCaseString header_key{key};
+    std::string header_value;
+    if (downstream_headers_ != nullptr && downstream_headers_->get(header_key) != nullptr) {
+      header_value = downstream_headers_->get(header_key)->value().c_str();
+    }
+    return header_value;
+  }
+
 protected:
   RetryStatePtr retry_state_;
 
