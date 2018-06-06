@@ -170,7 +170,7 @@ DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
     absl::StrAppend(&formatted, &buf[0], std::string(subsecond.width_, '?'));
 
     // This computes and saves offset of each subsecond pattern to correct its position after the
-    // previous string segment is formatted.
+    // previous string segment is formatted. An offset can be a negative value.
     const int32_t offset = formatted_length - subsecond.segment_.size();
     subsecond_offsets.emplace_back(previous + offset);
     previous += offset;
