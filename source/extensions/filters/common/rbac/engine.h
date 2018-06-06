@@ -24,8 +24,8 @@ public:
    * @param headers    the headers of the incoming request used to identify the action/principal. An
    *                   empty map should be used if there are no headers available.
    */
-  virtual bool allowed(const Network::Connection& connection,
-                       const Envoy::Http::HeaderMap& headers) const PURE;
+  virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+                       bool& darklaunch_allowed) const PURE;
 };
 
 } // namespace RBAC

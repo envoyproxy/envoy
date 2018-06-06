@@ -133,6 +133,7 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
   return permissions_.matches(connection, headers) && principals_.matches(connection, headers);
 }
 
+envoy::config::rbac::v2alpha::PolicyEnforcementMode PolicyMatcher::mode() const { return mode_; }
 } // namespace RBAC
 } // namespace Common
 } // namespace Filters

@@ -18,8 +18,8 @@ public:
   RoleBasedAccessControlEngineImpl(
       const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
 
-  bool allowed(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               bool& darklaunch_allowed) const override;
 
 private:
   // Indicates that the engine will not evaluate an action and just return true for calls to
