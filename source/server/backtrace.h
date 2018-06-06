@@ -88,6 +88,7 @@ public:
     // work when installed.
     ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}>:", obj_name, thread_id);
 #else
+    char out[200];
     ENVOY_LOG(critical,
               "Backtrace obj<{}> thr<{}> (If unsymbolized, use tools/stack_decode.py):", obj_name,
               thread_id);
@@ -95,7 +96,6 @@ public:
 
     // Backtrace gets tagged by ASAN when we try the object name resolution for the last
     // frame on stack, so skip the last one. It has no useful info anyway.
-    char out[200];
 
     for (unsigned int i = 0; i < stack_trace_.size() - 1; ++i) {
       backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
