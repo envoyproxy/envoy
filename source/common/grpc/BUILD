@@ -109,5 +109,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
+        "//source/common/config:datasource_lib",
     ],
 )
