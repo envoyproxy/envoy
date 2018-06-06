@@ -148,7 +148,8 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
 
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
-                                        const std::string& method_name) {
+                                        const std::string& method_name,
+                                        const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   message->headers().insertPath().value().append("/", 1);
@@ -156,10 +157,30 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                                  service_full_name.size());
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
+  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
   message->headers().insertHost().value(upstream_cluster);
+  if (timeout) {
+    uint64_t time = timeout.value().count();
+    static const char units[] = "mSMH";
+    const char* unit = units; // start with milliseconds
+    static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
+    if (time > MAX_GRPC_TIMEOUT_VALUE) {
+      time /= 1000; // Convert from milliseconds to seconds
+      unit++;
+    }
+    while (time > MAX_GRPC_TIMEOUT_VALUE) {
+      if (*unit == 'H') {
+        time = MAX_GRPC_TIMEOUT_VALUE; // No bigger unit available, clip to max 8 digit hours.
+      } else {
+        time /= 60; // Convert from seconds to minutes to hours
+        unit++;
+      }
+    }
+    message->headers().insertGrpcTimeout().value(time);
+    message->headers().insertGrpcTimeout().value().append(unit, 1);
+  }
   message->headers().insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Grpc);
-  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
   return message;
 }

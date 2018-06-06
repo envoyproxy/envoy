@@ -111,7 +111,8 @@ public:
    */
   static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
                                          const std::string& service_full_name,
-                                         const std::string& method_name);
+                                         const std::string& method_name,
+                                         const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.

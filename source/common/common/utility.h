@@ -153,6 +153,12 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
+   * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
+   */
+  static const char* strtoul(const char* str, uint64_t& out, int base = 10);
+
+  /**
+   * Convert a string to an unsigned long, checking for error.
    * @param return true if successful, false otherwise.
    */
   static bool atoul(const char* str, uint64_t& out, int base = 10);

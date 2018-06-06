@@ -59,12 +59,51 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 
 FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
-                            bool insert_envoy_expected_request_timeout_ms) {
-  // See if there is a user supplied timeout in a request header. If there is we take that,
-  // otherwise we use the default.
+                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request) {
+  // See if there is a user supplied timeout in a request header. If there is we take that.
+  // Otherwise we check if the request is gRPC and use the timeout in the gRPC headers or
+  // infinity when gRPC headers have no timeout, or the default from the route config for
+  // non-gRPC requests.
   TimeoutData timeout;
-  timeout.global_timeout_ = route.timeout();
-  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
+  if (grpc_request) {
+    timeout.global_timeout_ = std::chrono::milliseconds(0);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+
+    Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+    if (header_grpc_timeout_entry) {
+      uint64_t header_grpc_timeout;
+      const char* unit =
+          StringUtil::strtoul(header_grpc_timeout_entry->value().c_str(), header_grpc_timeout);
+      if (unit != nullptr && *unit != '\0') {
+        switch (*unit) {
+        case 'H':
+          timeout.global_timeout_ = std::chrono::hours(header_grpc_timeout);
+          break;
+        case 'M':
+          timeout.global_timeout_ = std::chrono::minutes(header_grpc_timeout);
+          break;
+        case 'S':
+          timeout.global_timeout_ = std::chrono::seconds(header_grpc_timeout);
+          break;
+        case 'm':
+          timeout.global_timeout_ = std::chrono::milliseconds(header_grpc_timeout);
+          break;
+        case 'u':
+          timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::microseconds(header_grpc_timeout));
+          break;
+        case 'n':
+          timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::nanoseconds(header_grpc_timeout));
+          break;
+        }
+      }
+    }
+  } else {
+    timeout.global_timeout_ = route.timeout();
+    timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
+  }
+
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
@@ -264,7 +303,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_);
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
+                                         grpc_request_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
