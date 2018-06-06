@@ -166,11 +166,12 @@ message Cluster {
   //
   // .. attention::
   //
-  //   Setting this allows CDS static/DNS assignments to contain embedded EDS equivalent
+  //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
   //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   //
   // [#not-implemented-hide:]
+  // [#comment:TODO(dio): Deprecate hosts once load_assignment is implemented]
   ClusterLoadAssignment load_assignment = 33;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
