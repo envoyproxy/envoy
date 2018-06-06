@@ -1374,10 +1374,11 @@ TEST_F(HttpHealthCheckerImplTest, Http2ClusterUsesHttp2CodecClient) {
 }
 
 class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
-  public:
+public:
   using ProdHttpHealthCheckerImpl::ProdHttpHealthCheckerImpl;
 
-  std::unique_ptr<Http::CodecClient> createCodecClientForTest(std::unique_ptr<Network::ClientConnection>&& connection) {
+  std::unique_ptr<Http::CodecClient>
+  createCodecClientForTest(std::unique_ptr<Network::ClientConnection>&& connection) {
     Upstream::Host::CreateConnectionData data;
     data.connection_ = std::move(connection);
     data.host_description_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -1386,7 +1387,7 @@ class TestProdHttpHealthChecker : public ProdHttpHealthCheckerImpl {
 };
 
 class ProdHttpHealthCheckerTest : public HttpHealthCheckerImplTest {
-  public:
+public:
   void setupNoServiceValidationHCWithHttp2() {
     const std::string yaml = R"EOF(
     timeout: 1s
@@ -1430,7 +1431,8 @@ class ProdHttpHealthCheckerTest : public HttpHealthCheckerImplTest {
         });
   }
 
-  std::unique_ptr<Network::MockClientConnection> connection_ = std::make_unique<Network::MockClientConnection>();
+  std::unique_ptr<Network::MockClientConnection> connection_ =
+      std::make_unique<Network::MockClientConnection>();
   std::shared_ptr<TestProdHttpHealthChecker> health_checker_;
 };
 
@@ -1443,7 +1445,8 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
   EXPECT_CALL(*connection_, bufferLimit());
 
   setupNoServiceValidationHC();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->createCodecClientForTest(std::move(connection_))->type());
+  EXPECT_EQ(Http::CodecClient::Type::HTTP1,
+            health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
@@ -1454,7 +1457,8 @@ TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
   EXPECT_CALL(*connection_, noDelay(_));
 
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->createCodecClientForTest(std::move(connection_))->type());
+  EXPECT_EQ(Http::CodecClient::Type::HTTP2,
+            health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
