@@ -26,7 +26,6 @@ namespace {
 
 class SubsecondConstantValues {
 public:
-  const std::string PLACEHOLDER{"?????????"};
   const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
 };
 
@@ -108,10 +107,10 @@ std::string DateFormatter::parse(const std::string& format_string) {
   size_t step = 0;
   while (regex_search(new_format_string, matched, SubsecondConstants::get().PATTERN)) {
     const std::string& width_specifier = matched[1];
-    const size_t width = width_specifier.empty() ? SubsecondConstants::get().PLACEHOLDER.size()
-                                                 : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(),
-                              SubsecondConstants::get().PLACEHOLDER.substr(0, width));
+
+    // When %f is the specifier, the width value should be 9 (the number of nanosecond digits).
+    const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
+    new_format_string.replace(matched.position(), matched.length(), std::string(width, '?'));
 
     ASSERT(step < new_format_string.size());
 
@@ -151,13 +150,12 @@ DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
   std::array<char, 1024> buf;
   std::string formatted;
 
-  int32_t previous = 0;
+  size_t previous = 0;
   subsecond_offsets.reserve(subseconds_.size());
   for (const auto& subsecond : subseconds_) {
     const size_t formatted_length =
         strftime(&buf[0], buf.size(), subsecond.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, &buf[0],
-                    SubsecondConstants::get().PLACEHOLDER.substr(0, subsecond.width_));
+    absl::StrAppend(&formatted, &buf[0], std::string(subsecond.width_, '?'));
 
     // This computes and saves offset of each subsecond pattern to correct its position after the
     // previous string segment is formatted.
