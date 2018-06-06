@@ -11,19 +11,30 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: RBAC]
 // Role-Based Access Control :ref:`configuration overview <config_http_filters_rbac>`.
 
+// RBAC filter config.
+// User sees the shadow rules as replacement to the enforced rules.
+// For example, policy A runs in prod in enforced mode, user wants
+// to test policy B; in the config, rules contains {A.mode=enforced},
+// shadow_rules contains {A.mode=shadow, B.mode=shadow}.
+// This will allow users to test policy replacement/deletion scenarios.
 message RBAC {
-  // Specify the RBAC rules to be applied globally
-  config.rbac.v2alpha.RBAC rules = 1 [(validate.rules).message.required = true];
+  // Specify the enforced RBAC rules to be applied globally.
+  // Filter's decision based on enforced rules has impact on user experience.
+  // Disable the filter for enforcement mode if rules isn't set.
+  config.rbac.v2alpha.RBAC rules = 1;
+
+  // Specify the shadow RBAC rules to be applied globally.
+  // Filter's decision based on shadow rules doesn't impact on user experience,
+  // just log decision.
+  // Disable the filter for shadow mode if shadow_rules isn't set.
+  config.rbac.v2alpha.RBAC shadow_rules = 2;
 }
 
 message RBACPerRoute {
-  oneof override {
-    option (validate.required) = true;
+  reserved 1;
 
-    // Disable the filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool.const = true];
+  reserved "disabled";
 
-    // Override the global configuration of the filter with this new config.
-    RBAC rbac = 2 [(validate.rules).message.required = true];
-  }
+  // Override the global configuration of the filter with this new config.
+  RBAC rbac = 2;
 }
