@@ -50,17 +50,14 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       try {
         Network::Address::InstanceConstSharedPtr overridehost_ip_port(
             Network::Utility::parseInternetAddressAndPort(request_override_host, false));
-        ENVOY_LOG(info, "Using request override host {}.", request_override_host);
+        ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
         return HostSharedPtr{new HostImpl(
             info_, info_->name() + overridehost_ip_port->asString(),
             std::move(overridehost_ip_port), envoy::api::v2::core::Metadata::default_instance(), 1,
             envoy::api::v2::core::Locality().default_instance(),
             envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())};
       } catch (const Envoy::EnvoyException& e) {
-        ENVOY_LOG(
-            warn,
-            "original_dst_load_balancer: Override header exists but has malformed ip address. {}",
-            e.what());
+        ENVOY_LOG(warn, "original_dst_load_balancer: invalid override header value. {}", e.what());
       }
     }
 
