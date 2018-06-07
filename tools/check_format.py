@@ -95,64 +95,65 @@ def hasInvalidAngleBracketDirectory(line):
   subdir = path[0:slash]
   return subdir in SUBDIR_SET
 
-def checkOrFixFileContents(file_path, try_to_fix):
+def checkFileContents(file_path, checker):
   error_messages = []
-  isBuild = isBuildFile(file_path)
-  line_number = 0
-  for line in fileinput.input(file_path, inplace=try_to_fix):
-    line_number += 1
+  for line_number, line in enumerate(fileinput.input(file_path)):
     def reportError(message):
-      error_messages.append("%s:%d: %s" % (file_path, line_number, message))
-
-    # Some of the errors can be fixed automatically, if requested by the user.
-    if try_to_fix:
-      # Strip double space after '.'  This may prove overenthusiastic and need to
-      # be restricted to comments and metadata files but works for now.
-      line = line.replace('.  ', '. ')
-
-      if hasInvalidAngleBracketDirectory(line):
-        line = line.replace('<', '"').replace(">", '"')
-
-      # Fix incorrect protobuf namespace references.
-      for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
-        line = line.replace(invalid_construct, valid_construct)
-
-      sys.stdout.write(str(line))
-
-
-    # If a fix is not requested by the user, just report those fixable errors.
-    else:
-      if line.find(".  ") != -1:
-        reportError("over-enthusiastic spaces")
-      if hasInvalidAngleBracketDirectory(line):
-        reportError("envoy includes should not have angle brackets")
-      for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
-        if invalid_construct in line:
-          reportError("incorrect protobuf type reference %s; "
-                      "should be %s" % (invalid_construct, valid_construct))
-
-    # Some errors cannot be fixed automatically, and actionable, consistent,
-    # navigable messages should be emitted to make it easy to find and fix
-    # the errors by hand.
-    if not whitelistedForProtobufDeps(file_path):
-      if isBuild:
-        if '"protobuf"' in text:
-          reportError("unexpected direct external dependency on protobuf, use "
-                      "//source/common/protobuf instead.")
-      else:
-        if '"google/protobuf' in line or "google::protobuf" in line:
-          reportError("unexpected direct dependency on google.protobuf, use "
-                      "the definitions in common/protobuf/protobuf.h instead.")
-    if line.startswith('#include <mutex>') or line.startswith('^#include <condition_variable>'):
-      # We don't check here for std::mutex because that may legitimately show up in
-      # comments, for example this one.
-      reportError("Don't use <mutex> or <condition_variable, switch to "
-                  "Thread::MutexBasicLockable in source/common/common/thread.h")
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+    checker(line, file_path, reportError)
   return error_messages
 
+
+def fixSourceLine(line):
+  # Strip double space after '.'  This may prove overenthusiastic and need to
+  # be restricted to comments and metadata files but works for now.
+  while True:
+    out = line.replace('.  ', '. ')
+    if out == line:
+      break         # Make sure we eliminate all the extra spaces after a period.
+    line = out
+
+  if hasInvalidAngleBracketDirectory(out):
+    out = out.replace('<', '"').replace(">", '"')
+
+  # Fix incorrect protobuf namespace references.
+  for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+    out = out.replace(invalid_construct, valid_construct)
+
+  return out
+
+def checkSourceLine(line, file_path, reportError):
+  # Check fixable errors. These may have been fixed already.
+  if line.find(".  ") != -1:
+    reportError("over-enthusiastic spaces")
+  if hasInvalidAngleBracketDirectory(line):
+    reportError("envoy includes should not have angle brackets")
+  for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+    if invalid_construct in line:
+      reportError("incorrect protobuf type reference %s; "
+                  "should be %s" % (invalid_construct, valid_construct))
+
+  # Some errors cannot be fixed automatically, and actionable, consistent,
+  # navigable messages should be emitted to make it easy to find and fix
+  # the errors by hand.
+  if not whitelistedForProtobufDeps(file_path):
+    if '"google/protobuf' in line or "google::protobuf" in line:
+      reportError("unexpected direct dependency on google.protobuf, use "
+                  "the definitions in common/protobuf/protobuf.h instead.")
+  if line.startswith('#include <mutex>') or line.startswith('^#include <condition_variable>'):
+    # We don't check here for std::mutex because that may legitimately show up in
+    # comments, for example this one.
+    reportError("Don't use <mutex> or <condition_variable>, switch to "
+                "Thread::MutexBasicLockable in source/common/common/thread.h")
+
+def checkBuildLine(line, file_path, reportError):
+  if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
+    reportError("unexpected direct external dependency on protobuf, use "
+                "//source/common/protobuf instead.")
+
 def checkOrFixBuildPath(file_path, try_to_fix):
-  notApi = not isApiFile(file_path)
   error_messages = []
+  notApi = not isApiFile(file_path)
   if try_to_fix:
     # TODO(htuch): Add API specific BUILD fixer script.
     if notApi:
@@ -169,10 +170,13 @@ def checkOrFixBuildPath(file_path, try_to_fix):
 
     command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
     error_messages += executeCommand(command, "buildifier check failed", file_path)
+  error_messages += checkFileContents(file_path, checkBuildLine)
   return error_messages
 
-def checkOrFixFilePath(file_path, try_to_fix):
-  error_messages = checkOrFixFileContents(file_path, try_to_fix)
+def checkOrFixSourcePath(file_path, try_to_fix):
+  for line in fileinput.input(file_path, inplace=try_to_fix):
+    sys.stdout.write(fixSourceLine(line))
+  error_messages = checkFileContents(file_path, checkSourceLine)
 
   if file_path.endswith(DOCS_SUFFIX):
     return error_messages
@@ -236,7 +240,7 @@ def checkFormat(file_path):
   if isBuildFile(file_path):
     error_messages = checkOrFixBuildPath(file_path, try_to_fix)
   else:
-    error_messages = checkOrFixFilePath(file_path, try_to_fix)
+    error_messages = checkOrFixSourcePath(file_path, try_to_fix)
 
   if error_messages:
     return ["From %s" % file_path] + error_messages
@@ -271,9 +275,10 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Check or fix file format.')
   parser.add_argument('operation_type', type=str, choices=['check', 'fix'],
                       help="specify if the run should 'check' or 'fix' format.")
-  parser.add_argument('target_path', type=str, nargs="?", default=".", help="specify the root directory"
-                                                                            " for the script to recurse over. Default '.'.")
-  parser.add_argument('--add-excluded-prefixes', type=str, nargs="+", help="exclude additional prefixes.")
+  parser.add_argument('target_path', type=str, nargs="?", default=".",
+                      help="specify the root directory for the script to recurse over. Default '.'.")
+  parser.add_argument('--add-excluded-prefixes', type=str, nargs="+",
+                      help="exclude additional prefixes.")
   parser.add_argument('-j', '--num-workers', type=int, default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument('--api-prefix', type=str, default='./api/', help="path of the API tree")
