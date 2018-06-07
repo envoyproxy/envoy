@@ -72,8 +72,8 @@ TEST(GrpcCommonTest, ChargeStats) {
 
 TEST(GrpcCommonTest, PrepareHeaders) {
   {
-    Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
-                                                      absl::optional<std::chrono::milliseconds>());
+    Http::MessagePtr message =
+        Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
 
     EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
     EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
