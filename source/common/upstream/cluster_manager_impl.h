@@ -139,6 +139,23 @@ struct ClusterManagerStats {
   ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+class DynamicClusterHandlerImpl : public DynamicClusterHandler,
+                                  Logger::Loggable<Logger::Id::upstream> {
+public:
+  DynamicClusterHandlerImpl(
+      const std::string& cluster_name,
+      std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>& pending_clusters,
+      PostClusterCreationCb post_cluster_cb);
+  const std::string& cluster() const override { return cluster_name_; };
+  void cancel() override;
+  void onClusterCreationComplete() override;
+
+private:
+  std::string cluster_name_;
+  std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>& pending_clusters_;
+  PostClusterCreationCb post_cluster_cb_;
+};
+
 /**
  * Implementation of ClusterManager that reads from a proto configuration, maintains a central
  * cluster list, as well as thread local caches of each cluster and associated connection pools.
@@ -155,6 +172,10 @@ public:
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                           const std::string& version_info) override;
+  std::pair<ClusterResponseCode, DynamicClusterHandlerPtr>
+  addOrUpdateClusterCrossThread(const envoy::api::v2::Cluster& cluster,
+                                const std::string& version_info,
+                                PostClusterCreationCb post_cluster_cb) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
@@ -286,6 +307,8 @@ private:
     std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
+    std::unordered_map<std::string, Envoy::Upstream::DynamicClusterHandlerPtr>
+        pending_cluster_creations_;
     const PrioritySet* local_priority_set_{};
   };
 
@@ -344,6 +367,9 @@ private:
   Runtime::Loader& runtime_;
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  std::unordered_map<std::string, std::list<std::reference_wrapper<Event::Dispatcher>>>
+      pending_cluster_creations_;
   Runtime::RandomGenerator& random_;
   ClusterMap active_clusters_;
   ClusterMap warming_clusters_;

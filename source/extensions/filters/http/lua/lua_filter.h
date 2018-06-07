@@ -97,6 +97,8 @@ public:
     WaitForTrailers,
     // Lua script is blocked waiting for the result of an HTTP call.
     HttpCall,
+    // Lua script is blocked waiting for the result of Dynamic Cluster creation call.
+    DynamicCluster,
     // Lua script has done a direct response.
     Responded
   };
@@ -113,16 +115,27 @@ public:
       http_request_->cancel();
       http_request_ = nullptr;
     }
+    if (cluster_handler_) {
+      cluster_handler_->cancel();
+      cluster_handler_ = nullptr;
+    }
   }
 
   static ExportedFunctions exportedFunctions() {
-    return {{"headers", static_luaHeaders},         {"body", static_luaBody},
-            {"bodyChunks", static_luaBodyChunks},   {"trailers", static_luaTrailers},
-            {"metadata", static_luaMetadata},       {"logTrace", static_luaLogTrace},
-            {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
-            {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
-            {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+    return {{"headers", static_luaHeaders},
+            {"body", static_luaBody},
+            {"bodyChunks", static_luaBodyChunks},
+            {"trailers", static_luaTrailers},
+            {"metadata", static_luaMetadata},
+            {"logTrace", static_luaLogTrace},
+            {"logDebug", static_luaLogDebug},
+            {"logInfo", static_luaLogInfo},
+            {"logWarn", static_luaLogWarn},
+            {"logErr", static_luaLogErr},
+            {"logCritical", static_luaLogCritical},
+            {"httpCall", static_luaHttpCall},
+            {"respond", static_luaRespond},
+            {"addOrUpdateCluster", static_luaAddorUpdateCluster}};
   }
 
 private:
@@ -177,6 +190,15 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
+   * @return a handle to create a cluster on the request path.
+   */
+  /**
+   * Create a cluster on the request path. This call yields the script till cluster is created.
+   * @param 1 (string): Yaml representation of Cluster definition as per v2 APIs.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaAddorUpdateCluster);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -224,6 +246,7 @@ private:
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
+  Upstream::DynamicClusterHandlerPtr cluster_handler_;
 };
 
 /**

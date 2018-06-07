@@ -56,6 +56,11 @@ public:
   virtual void runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) PURE;
 
   /**
+   * Returns true if the thread is main dispatcher otherwise false.
+   */
+  virtual bool isMainThread() PURE;
+
+  /**
    * Set thread local data on all threads previously registered via registerThread().
    * @param initializeCb supplies the functor that will be called *on each thread*. The functor
    *                     returns the thread local object which is then stored. The storage is via
