@@ -89,3 +89,15 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "filter_integration_test",
+    srcs = ["filter_integration_test.cc"],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        ":test_common_lib",
+        "//source/extensions/filters/http/jwt_authn:config",
+        "//test/config:utility_lib",
+        "//test/integration:http_protocol_integration_lib",
+    ],
+)
