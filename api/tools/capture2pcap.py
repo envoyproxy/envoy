@@ -27,7 +27,7 @@ import time
 
 from google.protobuf import text_format
 
-from envoy.extensions.common.tap.v2alpha import capture_pb2
+from envoy.data.tap.v2alpha import capture_pb2
 
 
 def DumpEvent(direction, timestamp, data):

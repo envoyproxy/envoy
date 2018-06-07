@@ -359,6 +359,21 @@ TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
 }
 
+// Validate that values other than a base64-encoded SHA-256 fail config validation.
+TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      // Not a base64-encoded string.
+      ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ClientContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException, "Invalid base64-encoded SHA-256 .*");
+}
+
 // Multiple TLS certificates are not yet supported.
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {

@@ -26,7 +26,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 9;
+const uint64_t SharedMemory::VERSION = 10;
 
 static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   BlockMemoryHashSetOptions hash_set_options;

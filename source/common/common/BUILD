@@ -159,6 +159,7 @@ envoy_cc_library(
         ":hash_lib",
         "//include/envoy/common:interval_set_interface",
         "//include/envoy/common:time_interface",
+        "//source/common/singleton:const_singleton",
     ],
 )
 

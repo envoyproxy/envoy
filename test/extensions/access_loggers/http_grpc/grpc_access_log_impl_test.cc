@@ -415,10 +415,10 @@ http_logs:
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<RequestInfo::MockRequestInfo> request_info;
   ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
-  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log;
+  envoy::data::accesslog::v2::AccessLogCommon common_access_log;
   HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
 
-  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log_expected;
+  envoy::data::accesslog::v2::AccessLogCommon common_access_log_expected;
   common_access_log_expected.mutable_response_flags()->set_failed_local_healthcheck(true);
   common_access_log_expected.mutable_response_flags()->set_no_healthy_upstream(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_request_timeout(true);
@@ -432,7 +432,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_fault_injected(true);
   common_access_log_expected.mutable_response_flags()->set_rate_limited(true);
   common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-      envoy::config::filter::accesslog::v2::ResponseFlags_Unauthorized_Reason::
+      envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());

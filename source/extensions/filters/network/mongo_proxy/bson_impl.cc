@@ -16,7 +16,7 @@ namespace NetworkFilters {
 namespace MongoProxy {
 namespace Bson {
 
-int32_t BufferHelper::peakInt32(Buffer::Instance& data) {
+int32_t BufferHelper::peekInt32(Buffer::Instance& data) {
   if (data.length() < sizeof(int32_t)) {
     throw EnvoyException("invalid buffer size");
   }
@@ -77,7 +77,7 @@ double BufferHelper::removeDouble(Buffer::Instance& data) {
 }
 
 int32_t BufferHelper::removeInt32(Buffer::Instance& data) {
-  int32_t ret = peakInt32(data);
+  int32_t ret = peekInt32(data);
   data.drain(sizeof(int32_t));
   return ret;
 }

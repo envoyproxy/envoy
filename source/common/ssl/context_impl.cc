@@ -9,6 +9,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 
@@ -127,6 +128,17 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
         throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
       }
       verify_certificate_hash_list_.push_back(decoded);
+    }
+    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  }
+
+  if (!config.verifyCertificateSpkiList().empty()) {
+    for (auto hash : config.verifyCertificateSpkiList()) {
+      const auto decoded = Base64::decode(hash);
+      if (decoded.size() != SHA256_DIGEST_LENGTH) {
+        throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
+      }
+      verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
     }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
@@ -263,10 +275,18 @@ int ContextImpl::verifyCertificate(X509* cert) {
     return 0;
   }
 
-  if (!verify_certificate_hash_list_.empty() &&
-      !verifyCertificateHashList(cert, verify_certificate_hash_list_)) {
-    stats_.fail_verify_cert_hash_.inc();
-    return 0;
+  if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
+    const bool valid_certificate_hash =
+        !verify_certificate_hash_list_.empty() &&
+        verifyCertificateHashList(cert, verify_certificate_hash_list_);
+    const bool valid_certificate_spki =
+        !verify_certificate_spki_list_.empty() &&
+        verifyCertificateSpkiList(cert, verify_certificate_spki_list_);
+
+    if (!valid_certificate_hash && !valid_certificate_spki) {
+      stats_.fail_verify_cert_hash_.inc();
+      return 0;
+    }
   }
 
   return 1;
@@ -334,13 +354,37 @@ bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) 
 }
 
 bool ContextImpl::verifyCertificateHashList(
-    X509* cert, const std::vector<std::vector<uint8_t>>& certificate_hash_list) {
+    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
 
-  for (const auto& expected_hash : certificate_hash_list) {
+  for (const auto& expected_hash : expected_hashes) {
+    if (computed_hash == expected_hash) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ContextImpl::verifyCertificateSpkiList(
+    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
+  X509_PUBKEY* pubkey = X509_get_X509_PUBKEY(cert);
+  if (pubkey == nullptr) {
+    return false;
+  }
+  uint8_t* spki = nullptr;
+  const int len = i2d_X509_PUBKEY(pubkey, &spki);
+  if (len < 0) {
+    return false;
+  }
+  bssl::UniquePtr<uint8_t> free_spki(spki);
+
+  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+  SHA256(spki, len, computed_hash.data());
+
+  for (const auto& expected_hash : expected_hashes) {
     if (computed_hash == expected_hash) {
       return true;
     }
@@ -574,6 +618,14 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
 
     // verify_certificate_hash_ can only be set with a ca_cert
     for (const auto& hash : verify_certificate_hash_list_) {
+      rc = EVP_DigestUpdate(&md, hash.data(),
+                            hash.size() *
+                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+      RELEASE_ASSERT(rc == 1);
+    }
+
+    // verify_certificate_spki_ can only be set with a ca_cert
+    for (const auto& hash : verify_certificate_spki_list_) {
       rc = EVP_DigestUpdate(&md, hash.data(),
                             hash.size() *
                                 sizeof(std::remove_reference<decltype(hash)>::type::value_type));

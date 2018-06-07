@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -266,6 +267,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -295,82 +297,19 @@ TEST(HeaderParserTest, TestParseInternal) {
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
-      // Un-terminated variable expressions with arguments.
-      {"%VAR(no array)%",
+      // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
+      // generic %VAR are not checked anymore. Find a way to get the same granularity as before for
+      // following cases.
+      {"%UPSTREAM_METADATA(no array)%",
        {},
-       {"Invalid header configuration. Expecting JSON array of arguments after "
-        "'VAR(', but found 'n'"}},
-      {"%VAR( no array)%",
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA(no array), because JSON supplied is not valid. "
+        "Error(offset 1, line 1): Invalid value.\n"}},
+      {"%UPSTREAM_METADATA( no array)%",
        {},
-       {"Invalid header configuration. Expecting JSON array of arguments after "
-        "'VAR( ', but found 'n'"}},
-      {"%VAR([)",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ')'"}},
-      {"%VAR([ )",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([ ', but found "
-        "')'"}},
-      {"%VAR([\"x\")%",
-       {},
-       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
-        "'VAR([\"x\"', but found ')'"}},
-      {"%VAR([\"x\" )%",
-       {},
-       {"Invalid header configuration. Expecting ',', ']', or whitespace after "
-        "'VAR([\"x\" ', but found ')'"}},
-      {"%VAR([\"x\\",
-       {},
-       {"Invalid header configuration. Un-terminated backslash in JSON string after 'VAR([\"x'"}},
-      {"%VAR([\"x\"]!",
-       {},
-       {"Invalid header configuration. Expecting ')' or whitespace after "
-        "'VAR([\"x\"]', but found '!'"}},
-      {"%VAR([\"x\"] !",
-       {},
-       {"Invalid header configuration. Expecting ')' or whitespace after "
-        "'VAR([\"x\"] ', but found '!'"}},
-      {"%VAR([\"x\"])!",
-       {},
-       {"Invalid header configuration. Expecting '%' or whitespace after "
-        "'VAR([\"x\"])', but found '!'"}},
-      {"%VAR([\"x\"]) !",
-       {},
-       {"Invalid header configuration. Expecting '%' or whitespace after "
-        "'VAR([\"x\"]) ', but found '!'"}},
-
-      // Argument errors
-      {"%VAR()%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "')'"}},
-      {"%VAR( )%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR( ', but found "
-        "')'"}},
-      {"%VAR([])%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([', but found ']'"}},
-      {"%VAR( [ ] )%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ ', but found "
-        "']'"}},
-      {"%VAR([\"ns\",])%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR([\"ns\",', but "
-        "found ']'"}},
-      {"%VAR( [ \"ns\" , ] )%",
-       {},
-       {"Invalid header configuration. Expecting '\"' or whitespace after 'VAR( [ \"ns\" , ', but "
-        "found ']'"}},
-      {"%VAR({\"ns\": \"key\"})%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "'{'"}},
-      {"%VAR(\"ns\", \"key\")%",
-       {},
-       {"Invalid header configuration. Expecting JSON array of arguments after 'VAR(', but found "
-        "'\"'"}},
+       {"Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+        "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
+        "Error(offset 2, line 1): Invalid value.\n"}},
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -399,6 +338,10 @@ TEST(HeaderParserTest, TestParseInternal) {
             key: value
       )EOF");
   ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+
+  // "2018-04-03T23:06:09.123Z".
+  const SystemTime start_time(std::chrono::milliseconds(1522796769123));
+  ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -591,6 +534,18 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {
         "key": "x-client-ip",
         "value": "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+      },
+      {
+        "key": "x-request-start",
+        "value": "%START_TIME(%s%3f)%"
+      },
+      {
+        "key": "x-request-start-default",
+        "value": "%START_TIME%"
+      },
+      {
+        "key": "x-request-start-range",
+        "value": "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
       }
     ]
   }
@@ -600,6 +555,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
   envoy::api::v2::route::RouteAction route_action = parseRouteFromJson(json).route();
   route_action.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
   route_action.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
+  route_action.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route_action.request_headers_to_add());
@@ -607,11 +563,21 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+  EXPECT_CALL(request_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
+
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("static-header"));
   EXPECT_EQ("static-value", headerMap.get_("static-header"));
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_EQ("127.0.0.1", headerMap.get_("x-client-ip"));
+  EXPECT_TRUE(headerMap.has("x-request-start"));
+  EXPECT_EQ("1522796769123", headerMap.get_("x-request-start"));
+  EXPECT_TRUE(headerMap.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
+  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+  EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
+            headerMap.get_("x-request-start-range"));
 
   typedef std::map<std::string, int> CountMap;
   CountMap counts;
@@ -631,6 +597,7 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
 
   EXPECT_EQ(1, counts["static-header"]);
   EXPECT_EQ(1, counts["x-client-ip"]);
+  EXPECT_EQ(1, counts["x-request-start"]);
 }
 
 TEST(HeaderParserTest, EvaluateResponseHeaders) {
@@ -643,6 +610,22 @@ route:
         key: "x-client-ip"
         value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
       append: true
+    - header:
+        key: "x-request-start"
+        value: "%START_TIME(%s.%3f)%"
+      append: true
+    - header:
+        key: "x-request-start-f"
+        value: "%START_TIME(f)%"
+      append: true
+    - header:
+        key: "x-request-start-range"
+        value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
+      append: true
+    - header:
+        key: "x-request-start-default"
+        value: "%START_TIME%"
+      append: true
   response_headers_to_remove: ["x-nope"]
 )EOF";
 
@@ -651,10 +634,24 @@ route:
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
+  const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+  EXPECT_CALL(request_info, startTime()).Times(4).WillRepeatedly(Return(start_time));
+
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
+  EXPECT_TRUE(headerMap.has("x-request-start"));
+  EXPECT_EQ("1522796769.123", headerMap.get_("x-request-start"));
+  EXPECT_TRUE(headerMap.has("x-request-start-f"));
+  EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
+  EXPECT_TRUE(headerMap.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
+  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+  EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
+            headerMap.get_("x-request-start-range"));
 }
 
 } // namespace Router

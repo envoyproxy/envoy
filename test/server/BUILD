@@ -103,6 +103,7 @@ envoy_cc_test(
     srcs = ["options_impl_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
+        "//source/common/stats:stats_lib",
         "//source/server:options_lib",
         "//test/test_common:utility_lib",
     ],

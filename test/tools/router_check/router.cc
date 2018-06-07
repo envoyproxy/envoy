@@ -169,7 +169,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   std::string actual = "";
   Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+                                                             true);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
   return compareResults(actual, expected, "path_rewrite");
@@ -179,7 +180,8 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   std::string actual = "";
   Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+                                                             true);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
   return compareResults(actual, expected, "host_rewrite");
@@ -206,7 +208,8 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
   Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
   request_info.downstream_remote_address_ = Network::Utility::getCanonicalIpv4LoopbackAddress();
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info);
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+                                                             true);
     actual = tool_config.headers_->get_(field);
   }
   return compareResults(actual, expected, "custom_header");

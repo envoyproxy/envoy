@@ -35,7 +35,7 @@ PROTOBUF_TYPE_ERRORS = {
     # Well-known types should be referenced from the ProtobufWkt namespace.
     "Protobuf::Any":                    "ProtobufWkt::Any",
     "Protobuf::Empty":                  "ProtobufWkt::Empty",
-    "Protobuf::ListValue":              "ProtobufWkt:ListValue",
+    "Protobuf::ListValue":              "ProtobufWkt::ListValue",
     "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
     "Protobuf::StringValue":            "ProtobufWkt::StringValue",
     "Protobuf::Struct":                 "ProtobufWkt::Struct",
@@ -304,3 +304,5 @@ if __name__ == "__main__":
       print "ERROR: %s" % e
     print "ERROR: check format failed. run 'tools/check_format.py fix'"
     sys.exit(1)
+  if operation_type == "check":
+    print "PASS"
