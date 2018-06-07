@@ -6,7 +6,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
