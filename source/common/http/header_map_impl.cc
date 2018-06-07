@@ -313,8 +313,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     StaticLookupResponse ref_lookup_response = cb(*this);
     maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
   } else {
-    std::list<HeaderEntryImpl>::iterator i =
-        headers_.emplace(headers_.end(), std::move(key), std::move(value));
+    std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
   }
 }
@@ -491,7 +490,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
     return **entry;
   }
 
-  std::list<HeaderEntryImpl>::iterator i = headers_.emplace(headers_.end(), key);
+  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key);
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -505,7 +504,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
     return **entry;
   }
 
-  std::list<HeaderEntryImpl>::iterator i = headers_.emplace(headers_.end(), key, std::move(value));
+  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key, std::move(value));
   i->entry_ = i;
   *entry = &(*i);
   return **entry;

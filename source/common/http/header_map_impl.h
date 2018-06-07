@@ -119,6 +119,77 @@ protected:
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
   };
 
+  /**
+   * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
+   * of the list (as required by nghttp2) and otherwise maintains insertion order.
+   */
+  class HeaderList {
+  public:
+    HeaderList() : pseudo_headers_end_(headers_.end()) {}
+
+    std::list<HeaderEntryImpl>::iterator insert(HeaderString&& key, HeaderString&& value) {
+      bool is_pseudo_header = key.c_str()[0] == ':';
+      std::list<HeaderEntryImpl>::iterator i =
+          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(), std::move(key),
+                           std::move(value));
+      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
+        pseudo_headers_end_ = i;
+      }
+      return i;
+    }
+
+    std::list<HeaderEntryImpl>::iterator insert(const LowerCaseString& key, HeaderString&& value) {
+      bool is_pseudo_header = key.get().c_str()[0] == ':';
+      std::list<HeaderEntryImpl>::iterator i = headers_.emplace(
+          is_pseudo_header ? pseudo_headers_end_ : headers_.end(), key, std::move(value));
+      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
+        pseudo_headers_end_ = i;
+      }
+      return i;
+    }
+
+    std::list<HeaderEntryImpl>::iterator insert(const LowerCaseString& key) {
+      bool is_pseudo_header = key.get().c_str()[0] == ':';
+      std::list<HeaderEntryImpl>::iterator i =
+          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(), key);
+      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
+        pseudo_headers_end_ = i;
+      }
+      return i;
+    }
+
+    std::list<HeaderEntryImpl>::iterator erase(std::list<HeaderEntryImpl>::iterator i) {
+      if (pseudo_headers_end_ == i) {
+        pseudo_headers_end_++;
+      }
+      return headers_.erase(i);
+    }
+
+    template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
+      headers_.remove_if([&](const HeaderEntryImpl& entry) {
+        bool to_remove = p(entry);
+        if (to_remove) {
+          if (pseudo_headers_end_ == entry.entry_) {
+            pseudo_headers_end_++;
+          }
+        }
+        return to_remove;
+      });
+    }
+
+    std::list<HeaderEntryImpl>::iterator begin() { return headers_.begin(); }
+    std::list<HeaderEntryImpl>::iterator end() { return headers_.end(); }
+    std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
+    std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
+    std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
+    std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
+    size_t size() const { return headers_.size(); }
+
+  private:
+    std::list<HeaderEntryImpl> headers_;
+    std::list<HeaderEntryImpl>::iterator pseudo_headers_end_;
+  };
+
   void insertByKey(HeaderString&& key, HeaderString&& value);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
@@ -126,7 +197,7 @@ protected:
   void removeInline(HeaderEntryImpl** entry);
 
   AllInlineHeaders inline_headers_;
-  std::list<HeaderEntryImpl> headers_;
+  HeaderList headers_;
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
