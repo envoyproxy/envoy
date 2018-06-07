@@ -43,6 +43,15 @@ inline void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t
 
 inline void addString(Buffer::Instance& buffer, const std::string& s) { buffer.add(s); }
 
+inline std::string bufferToString(Buffer::Instance& buffer) {
+  if (buffer.length() == 0) {
+    return "";
+  }
+
+  char* data = static_cast<char*>(buffer.linearize(buffer.length()));
+  return std::string(data, buffer.length());
+}
+
 } // namespace
 } // namespace ThriftProxy
 } // namespace NetworkFilters

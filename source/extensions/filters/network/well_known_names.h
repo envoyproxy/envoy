@@ -28,6 +28,8 @@ public:
   const std::string TCP_PROXY = "envoy.tcp_proxy";
   // Authorization filter
   const std::string EXT_AUTHORIZATION = "envoy.ext_authz";
+  // Thrift filter
+  const std::string THRIFT = "envoy.thrift";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;
