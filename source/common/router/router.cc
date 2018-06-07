@@ -66,45 +66,8 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // non-gRPC requests.
   TimeoutData timeout;
   if (grpc_request && route.useGrpcTimeout()) {
-    timeout.global_timeout_ = std::chrono::milliseconds(0);
+    timeout.global_timeout_ = Grpc::Common::getGrpcTimeout(request_headers);
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
-
-    Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
-    if (header_grpc_timeout_entry) {
-      uint64_t header_grpc_timeout;
-      const char* unit =
-          StringUtil::strtoul(header_grpc_timeout_entry->value().c_str(), header_grpc_timeout);
-      if (unit != nullptr && *unit != '\0') {
-        switch (*unit) {
-        case 'H':
-          timeout.global_timeout_ = std::chrono::hours(header_grpc_timeout);
-          break;
-        case 'M':
-          timeout.global_timeout_ = std::chrono::minutes(header_grpc_timeout);
-          break;
-        case 'S':
-          timeout.global_timeout_ = std::chrono::seconds(header_grpc_timeout);
-          break;
-        case 'm':
-          timeout.global_timeout_ = std::chrono::milliseconds(header_grpc_timeout);
-          break;
-        case 'u':
-          timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::microseconds(header_grpc_timeout));
-          if (timeout.global_timeout_ < std::chrono::microseconds(header_grpc_timeout)) {
-            timeout.global_timeout_++;
-          }
-          break;
-        case 'n':
-          timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::nanoseconds(header_grpc_timeout));
-          if (timeout.global_timeout_ < std::chrono::nanoseconds(header_grpc_timeout)) {
-            timeout.global_timeout_++;
-          }
-          break;
-        }
-      }
-    }
   } else {
     timeout.global_timeout_ = route.timeout();
     timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
