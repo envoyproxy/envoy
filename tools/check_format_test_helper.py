@@ -135,6 +135,12 @@ if __name__ == "__main__":
   errors += fixFileExpectingSuccess("license.BUILD")
   errors += fixFileExpectingFailure("no_namespace_envoy.cc",
                                     "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += fixFileExpectingFailure("mutex.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
+  errors += fixFileExpectingFailure("condition_variable.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
+  errors += fixFileExpectingFailure("condition_variable_any.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
 
   errors += fixFileExpectingNoChange("ok_file.cc")
 

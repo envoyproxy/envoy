@@ -140,10 +140,10 @@ def checkSourceLine(line, file_path, reportError):
     if '"google/protobuf' in line or "google::protobuf" in line:
       reportError("unexpected direct dependency on google.protobuf, use "
                   "the definitions in common/protobuf/protobuf.h instead.")
-  if line.startswith('#include <mutex>') or line.startswith('^#include <condition_variable>'):
+  if line.startswith('#include <mutex>') or line.startswith('#include <condition_variable'):
     # We don't check here for std::mutex because that may legitimately show up in
     # comments, for example this one.
-    reportError("Don't use <mutex> or <condition_variable>, switch to "
+    reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
 
 def checkBuildLine(line, file_path, reportError):
