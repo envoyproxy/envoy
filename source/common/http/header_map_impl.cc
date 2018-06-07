@@ -330,7 +330,7 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   // If this is an inline header, we can't addViaMove, because we'll overwrite
   // the existing value.
   auto* entry = getExistingInline(key.c_str());
-  if (entry) {
+  if (entry != nullptr) {
     appendToHeader(entry->value(), value.c_str());
   } else {
     insertByKey(std::move(key), std::move(value));
@@ -361,8 +361,10 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::strin
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   auto* entry = getExistingInline(key.get().c_str());
-  if (entry) {
-    appendToHeader(entry->value(), fmt::format("{}", value));
+  if (entry != nullptr) {
+    char buf[32];
+    StringUtil::itoa(buf, sizeof(buf), value);
+    appendToHeader(entry->value(), buf);
     return;
   }
   HeaderString new_key;
@@ -376,7 +378,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
   auto* entry = getExistingInline(key.get().c_str());
-  if (entry) {
+  if (entry != nullptr) {
     appendToHeader(entry->value(), value);
     return;
   }

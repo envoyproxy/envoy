@@ -545,6 +545,9 @@ TEST(HeaderMapImplTest, AddCopy) {
   EXPECT_STREQ("max-age=1345,public", headers.get(cache_control)->value().c_str());
   headers.addCopy(cache_control, 123);
   EXPECT_STREQ("max-age=1345,public,123", headers.get(cache_control)->value().c_str());
+  headers.addCopy(cache_control, std::numeric_limits<uint64_t>::max());
+  EXPECT_STREQ("max-age=1345,public,123,18446744073709551615",
+               headers.get(cache_control)->value().c_str());
 }
 
 TEST(HeaderMapImplTest, Equality) {
