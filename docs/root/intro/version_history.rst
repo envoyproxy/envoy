@@ -69,14 +69,17 @@ Version history
 * listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
   :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
 * listeners: removed restriction on all filter chains having identical filters.
-* load balancing: added :ref:`weighted round robin
+* load balancer: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
 * load balancer: ability to configure zone aware load balancer settings :ref:`through the API
-  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`.
+* load balancer: the :ref:`weighted least request
+  <arch_overview_load_balancing_types_least_request>` load balancing algorithm has been improved
+  to have better balance when operating in weighted mode.
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
