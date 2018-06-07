@@ -170,14 +170,23 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   hosts_per_locality_ = std::move(hosts_per_locality);
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
-  // Rebuild the locality scheduler.
+  // Rebuild the locality scheduler by computing the effective weight of each
+  // locality in this priority. No scheduler is built if we don't have locality weights
+  // (i.e. not using EDS) or when there are 0 healthy hosts in this priority.
+  //
+  // We omit building a scheduler when there are zero healhty hosts in the priority as all
+  // the localities will have zero effective weight. At selection time, we'll only ever try
+  // to select a host from such a priority if all priorities have zero healthy hosts. At
+  // that point we'll rely on other mechanisms such as panic mode to select a host,
+  // none of which rely on the scheduler.
+  //
   // TODO(htuch): if the underlying locality index ->
   // envoy::api::v2::core::Locality hasn't changed in hosts_/healthy_hosts_, we
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
-      !locality_weights_->empty()) {
+      !locality_weights_->empty() && !healthy_hosts_->empty()) {
     locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
     locality_entries_.clear();
     for (uint32_t i = 0; i < hosts_per_locality_->get().size(); ++i) {

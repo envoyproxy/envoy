@@ -102,10 +102,8 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
         // Search for first argument string
         state = ParserState::ExpectString;
       } else if (!isspace(ch)) {
-        throw EnvoyException(fmt::format(
-            "Invalid header configuration. Expecting JSON array of arguments after '{}', but "
-            "found '{}'",
-            absl::StrCat(format.substr(start, pos - start)), ch));
+        // Consume it as a string argument.
+        state = ParserState::String;
       }
       break;
 
@@ -145,6 +143,8 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
 
         // Skip escaped char.
         pos++;
+      } else if (ch == ')') {
+        state = ParserState::ExpectVariableEnd;
       } else if (ch == '"') {
         state = ParserState::ExpectArrayDelimiterOrEnd;
       }

@@ -5,7 +5,7 @@
 
 #include "common/config/datasource.h"
 
-#include "grpc++/grpc++.h"
+#include "grpcpp/grpcpp.h"
 
 namespace Envoy {
 namespace Grpc {

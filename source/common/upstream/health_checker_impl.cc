@@ -82,7 +82,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
-          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())) {
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())),
+      codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
   }
@@ -206,9 +207,17 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   client_->close();
 }
 
+Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {
+  if (use_http2) {
+    return Http::CodecClient::Type::HTTP2;
+  } else {
+    return Http::CodecClient::Type::HTTP1;
+  }
+}
+
 Http::CodecClient*
 ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return new Http::CodecClientProd(Http::CodecClient::Type::HTTP1, std::move(data.connection_),
+  return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
                                    data.host_description_, dispatcher_);
 }
 

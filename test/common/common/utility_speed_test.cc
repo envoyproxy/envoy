@@ -43,6 +43,38 @@ static void BM_AccessLogDateTimeFormatter(benchmark::State& state) {
 }
 BENCHMARK(BM_AccessLogDateTimeFormatter);
 
+// This benchmark is basically similar with the above BM_AccessLogDateTimeFormatter, the only
+// difference is the format string input for the Envoy::DateFormatter.
+static void BM_DateTimeFormatterWithSubseconds(benchmark::State& state) {
+  int outputBytes = 0;
+
+  Envoy::SystemTime time(std::chrono::seconds(1522796769));
+  std::mt19937 prng(1);
+  std::uniform_int_distribution<long> distribution(-10, 20);
+  Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s.%3f");
+  for (auto _ : state) {
+    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    outputBytes += date_formatter.fromTime(time).length();
+  }
+  benchmark::DoNotOptimize(outputBytes);
+}
+BENCHMARK(BM_DateTimeFormatterWithSubseconds);
+
+static void BM_DateTimeFormatterWithoutSubseconds(benchmark::State& state) {
+  int outputBytes = 0;
+
+  Envoy::SystemTime time(std::chrono::seconds(1522796769));
+  std::mt19937 prng(1);
+  std::uniform_int_distribution<long> distribution(-10, 20);
+  Envoy::DateFormatter date_formatter("%Y-%m-%dT%H:%M:%s");
+  for (auto _ : state) {
+    time += std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    outputBytes += date_formatter.fromTime(time).length();
+  }
+  benchmark::DoNotOptimize(outputBytes);
+}
+BENCHMARK(BM_DateTimeFormatterWithoutSubseconds);
+
 static void BM_RTrimStringView(benchmark::State& state) {
   int accum = 0;
   for (auto _ : state) {

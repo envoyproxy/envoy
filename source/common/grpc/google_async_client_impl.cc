@@ -6,6 +6,8 @@
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
+#include "grpcpp/support/proto_buffer_reader.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -298,26 +300,9 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
-    std::vector<grpc::Slice> slices;
-    // Assuming this only fails due to OOM.
-    RELEASE_ASSERT(read_buf_.Dump(&slices).ok());
-    // TODO(htuch): As with PendingMessage serialization, the deserialization
-    // here is not optimal, as we are converting between string representation
-    // and have unnecessary copies. We should use ParseFromCodedStream as done
-    // by TensorFlow
-    // https://github.com/tensorflow/tensorflow/blob/f9462e82ac3981d7a3b5bf392477a585fb6e6912/tensorflow/core/distributed_runtime/rpc/grpc_serialization_traits.h#L210
-    // at the cost of some additional implementation complexity.
-    // Also see
-    // https://github.com/grpc/grpc/blob/5e82dddc056bd488e0ba1ba0057247ab23e442d4/include/grpc%2B%2B/impl/codegen/proto_utils.h#L113
-    // which gives us what we want for zero copy, but relies on grpc::internal details; we can't get
-    // a grpc_byte_buffer from grpc::ByteBuffer to use this.
-    grpc::string buf;
-    buf.reserve(read_buf_.Length());
-    for (const auto& slice : slices) {
-      buf.append(reinterpret_cast<const char*>(slice.begin()), slice.size());
-    }
     ProtobufTypes::MessagePtr response = callbacks_.createEmptyResponse();
-    if (!response->ParseFromString(buf)) {
+    grpc::ProtoBufferReader reader(&read_buf_);
+    if (!response->ParseFromZeroCopyStream(&reader)) {
       // This is basically streamError in Grpc::AsyncClientImpl.
       notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
