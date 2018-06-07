@@ -117,9 +117,6 @@ message DiscoveryResponse {
 //   2. As a ACK or NACK response to a previous IncrementalDiscoveryResponse.
 //      In this case the response_nonce is set to the nonce value in the Response.
 //      ACK or NACK is determined by the absence or presence of error_detail.
-//      In the case of a ACK the system_version_info must match the value in the
-//      associated Response. Otherwise it must be set the value of the most recently
-//      ACKed Response.
 //   3. Spontaneous IncrementalDiscoveryRequest from the client.
 //      This can be done to dynamically add or remove elements from the tracked
 //      resource_names set. In this case response_nonce must be omitted.
@@ -133,14 +130,26 @@ message IncrementalDiscoveryRequest {
   // required for ADS.
   string type_url = 2;
 
+  // IncrementalDiscoveryRequests allow the client to add or remove individual
+  // resources to the set of tracked resources in the context of a stream.
+  // All resource names in the resource_names_subscribe list are added to the
+  // set of tracked resources and all resource names in the resource_names_unsubscribe
+  // list are removed from the set of tracked resources.
+  // Unlike in non incremental xDS, an empty resource_names_subscribe or
+  // resource_names_unsubscribe list simply means that no resources are to be
+  // added or removed to the resource list.
+  // These two fields can be set for all types of IncrementalDiscoveryRequests
+  // (initial, ACK/NACK or spontaneous).
+  //
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
   // This map must be populated when the IncrementalDiscoveryRequest is the
-  // first in a stream. The keys are know resources names to the xDS client and
-  // the value is the corresponding resource level version info.
+  // first in a stream. The keys are the resources names of the xDS resources
+  // known to the xDS client. The values in the map are the associated resource
+  // level version info.
   map<string, string> resource_versions = 5;
 
   // When the IncrementalDiscoveryRequest is a ACK or NACK message in response
