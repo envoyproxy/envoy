@@ -328,6 +328,10 @@ private:
     // that hosts are always picked, regardless of their current request load at the time of pick.
     // It might be posible to do better by picking two hosts off of the schedule, and selecting
     // the one with fewer active requests at the time of selection.
+    // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
+    // be the only/best way of doing this. Essentially, it makes weight and active requests equally
+    // important. Are they equally important in practice? There is no right answer here and we might
+    // want to iterate on this as we gain more experience.
     return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
