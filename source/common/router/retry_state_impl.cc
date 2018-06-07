@@ -24,6 +24,7 @@ const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
+const uint32_t RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
 
 RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Http::HeaderMap& request_headers,
@@ -116,6 +117,8 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
       ret |= RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.ResourceExhausted) {
       ret |= RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnGrpcValues.Unavailable) {
+      ret |= RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE;
     }
   }
 
@@ -215,7 +218,8 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
 
   if (retry_on_ &
           (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
-           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED) &&
+           RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED |
+           RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE) &&
       response_headers) {
     absl::optional<Grpc::Status::GrpcStatus> status =
         Grpc::Common::getGrpcStatus(*response_headers);
@@ -225,7 +229,9 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
           (status.value() == Grpc::Status::DeadlineExceeded &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED)) ||
           (status.value() == Grpc::Status::ResourceExhausted &&
-           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED))) {
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED)) ||
+          (status.value() == Grpc::Status::Unavailable &&
+           (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE))) {
         return true;
       }
     }

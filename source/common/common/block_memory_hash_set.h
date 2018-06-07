@@ -216,8 +216,8 @@ public:
    * Computes a version signature based on the options and the hash function.
    */
   std::string version() {
-    return fmt::format("options={} hash={}", control_->options.toString(),
-                       control_->hash_signature);
+    return fmt::format("options={} hash={} size={}", control_->options.toString(),
+                       control_->hash_signature, numBytes());
   }
 
 private:

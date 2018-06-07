@@ -59,7 +59,7 @@ TEST_F(HotRestartImplTest, versionString) {
   // Tests that the version-string will be consistent and SharedMemory::VERSION,
   // between multiple instantiations.
   std::string version;
-  uint64_t max_stats;
+  uint64_t max_stats, max_obj_name_length;
 
   // The mocking infrastructure requires a test setup and teardown every time we
   // want to re-instantiate HotRestartImpl.
@@ -68,6 +68,7 @@ TEST_F(HotRestartImplTest, versionString) {
     version = hot_restart_->version();
     EXPECT_TRUE(absl::StartsWith(version, fmt::format("{}.", SharedMemory::VERSION))) << version;
     max_stats = options_.maxStats(); // Save this so we can double it below.
+    max_obj_name_length = options_.maxObjNameLength();
     TearDown();
   }
 
@@ -80,7 +81,15 @@ TEST_F(HotRestartImplTest, versionString) {
   {
     ON_CALL(options_, maxStats()).WillByDefault(Return(2 * max_stats));
     setup();
-    EXPECT_NE(version, hot_restart_->version()) << "Version changes when options change";
+    EXPECT_NE(version, hot_restart_->version()) << "Version changes when max-stats change";
+    TearDown();
+  }
+
+  {
+    ON_CALL(options_, maxObjNameLength()).WillByDefault(Return(2 * max_obj_name_length));
+    setup();
+    EXPECT_NE(version, hot_restart_->version())
+        << "Version changes when max-obj-name-length changes";
     // TearDown is called automatically at end of test.
   }
 }

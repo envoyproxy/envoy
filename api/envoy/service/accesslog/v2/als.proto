@@ -5,9 +5,11 @@ option go_package = "v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/config/filter/accesslog/v2/accesslog.proto";
+import "envoy/data/accesslog/v2/accesslog.proto";
 
 import "validate/validate.proto";
+
+// [#protodoc-title: gRPC Access Log Service (ALS)]
 
 // Service for streaming access logs from Envoy to an access log server.
 service AccessLogService {
@@ -22,12 +24,9 @@ service AccessLogService {
 }
 
 // Empty response for the StreamAccessLogs API. Will never be sent. See below.
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message StreamAccessLogsResponse {
 }
 
-// [#proto-status: experimental]
-// [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // Stream message for the StreamAccessLogs API. Envoy will open a stream to the server and stream
 // access logs without ever expecting a response.
 message StreamAccessLogsMessage {
@@ -35,7 +34,8 @@ message StreamAccessLogsMessage {
     // The node sending the access log messages over the stream.
     envoy.api.v2.core.Node node = 1 [(validate.rules).message.required = true];
 
-    // The friendly name of the log configured in AccessLogServiceConfig.
+    // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
+    // <envoy_api_msg_config.accesslog.v2.CommonGrpcAccessLogConfig>`.
     string log_name = 2 [(validate.rules).string.min_bytes = 1];
   }
 
@@ -45,22 +45,25 @@ message StreamAccessLogsMessage {
 
   // Wrapper for batches of HTTP access log entries.
   message HTTPAccessLogEntries {
-    repeated envoy.config.filter.accesslog.v2.HTTPAccessLogEntry log_entry = 1
+    repeated envoy.data.accesslog.v2.HTTPAccessLogEntry log_entry = 1
         [(validate.rules).repeated .min_items = 1];
   }
 
+  // [#not-implemented-hide:]
   // Wrapper for batches of TCP access log entries.
   message TCPAccessLogEntries {
-    repeated envoy.config.filter.accesslog.v2.TCPAccessLogEntry log_entry = 1
+    repeated envoy.data.accesslog.v2.TCPAccessLogEntry log_entry = 1
         [(validate.rules).repeated .min_items = 1];
   }
 
   // Batches of log entries of a single type. Generally speaking, a given stream should only
-  // ever incude one type of log entry.
+  // ever include one type of log entry.
   oneof log_entries {
     option (validate.required) = true;
 
     HTTPAccessLogEntries http_logs = 2;
+
+    // [#not-implemented-hide:]
     TCPAccessLogEntries tcp_logs = 3;
   }
 }

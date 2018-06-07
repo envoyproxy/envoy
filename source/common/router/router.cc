@@ -57,8 +57,9 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
   return true;
 }
 
-FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
-                                                       Http::HeaderMap& request_headers) {
+FilterUtility::TimeoutData
+FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
+                            bool insert_envoy_expected_request_timeout_ms) {
   // See if there is a user supplied timeout in a request header. If there is we take that,
   // otherwise we use the default.
   TimeoutData timeout;
@@ -92,7 +93,7 @@ FilterUtility::TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
     expected_timeout = timeout.global_timeout_.count();
   }
 
-  if (expected_timeout > 0) {
+  if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
     request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
   }
 
@@ -204,7 +205,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   const auto* direct_response = route_->directResponseEntry();
   if (direct_response != nullptr) {
     config_.stats_.rq_direct_response_.inc();
-    direct_response->rewritePathHeader(headers);
+    direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
         [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
@@ -247,8 +248,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
     callbacks_->sendLocalReply(
-        Http::Code::ServiceUnavailable, "maintenance mode", [](Http::HeaderMap& headers) {
-          headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+        Http::Code::ServiceUnavailable, "maintenance mode", [this](Http::HeaderMap& headers) {
+          if (!config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
         });
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
@@ -261,7 +264,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers);
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
@@ -269,7 +272,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo());
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->requestInfo(),
+                                       !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers, *cluster_);
 
   // Ensure an http transport scheme is selected before continuing with decoding.
@@ -498,8 +502,8 @@ void Filter::onUpstreamReset(UpstreamResetType type,
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body, [dropped](Http::HeaderMap& headers) {
-      if (dropped) {
+    callbacks_->sendLocalReply(code, body, [dropped, this](Http::HeaderMap& headers) {
+      if (dropped && !config_.suppress_envoy_headers_) {
         headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
       }
     });
@@ -595,7 +599,9 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     MonotonicTime response_received_time = std::chrono::steady_clock::now();
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
-    headers->insertEnvoyUpstreamServiceTime().value(ms.count());
+    if (!config_.suppress_envoy_headers_) {
+      headers->insertEnvoyUpstreamServiceTime().value(ms.count());
+    }
   }
 
   upstream_request_->upstream_canary_ =

@@ -55,7 +55,7 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
 TEST(BufferHelperTest, InvalidSize) {
   {
     Buffer::OwnedImpl buffer;
-    EXPECT_THROW(BufferHelper::peakInt32(buffer), EnvoyException);
+    EXPECT_THROW(BufferHelper::peekInt32(buffer), EnvoyException);
     EXPECT_THROW(BufferHelper::removeByte(buffer), EnvoyException);
     EXPECT_THROW(BufferHelper::removeBytes(buffer, nullptr, 1), EnvoyException);
     EXPECT_THROW(BufferHelper::removeCString(buffer), EnvoyException);

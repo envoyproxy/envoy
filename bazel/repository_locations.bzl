@@ -60,7 +60,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_nodejs_http_parser = dict(
-        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
+        # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
+        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
+        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
@@ -85,7 +87,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
-        commit = "e4f58aa07b9002befa493a0a82e10f2e98b51fc6",
+        commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(

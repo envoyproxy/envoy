@@ -224,6 +224,19 @@ public:
   virtual uint32_t xffNumTrustedHops() const PURE;
 
   /**
+   * @return bool don't append the remote address to XFF? This overrides the behavior of
+   *              useRemoteAddress() and may be used when XFF should not be modified but we still
+   *              want to avoid trusting incoming XFF in remote IP determination.
+   */
+  virtual bool skipXffAppend() const PURE;
+
+  /**
+   * @return const absl::optional<std::string>& value of via header to add to requests and response
+   *                                            headers if set.
+   */
+  virtual const std::string& via() const PURE;
+
+  /**
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() PURE;

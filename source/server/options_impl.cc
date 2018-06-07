@@ -139,13 +139,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-  if (hot_restart_version_option.getValue()) {
-    std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength(),
-                                        !hot_restart_disabled_);
-    throw NoServingException();
-  }
 
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
@@ -196,5 +189,14 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_obj_name_length_ = max_obj_name_len.getValue();
+
+  if (hot_restart_version_option.getValue()) {
+    Stats::RawStatData::configure(*this);
+    std::cerr << hot_restart_version_cb(max_stats.getValue(),
+                                        max_obj_name_len.getValue() +
+                                            Stats::RawStatData::maxStatSuffixLength(),
+                                        !hot_restart_disabled_);
+    throw NoServingException();
+  }
 }
 } // namespace Envoy

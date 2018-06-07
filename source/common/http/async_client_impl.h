@@ -172,7 +172,8 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
+    void finalizeRequestHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&,
+                                bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {
     }
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
