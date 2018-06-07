@@ -35,7 +35,7 @@ PROTOBUF_TYPE_ERRORS = {
     # Well-known types should be referenced from the ProtobufWkt namespace.
     "Protobuf::Any":                    "ProtobufWkt::Any",
     "Protobuf::Empty":                  "ProtobufWkt::Empty",
-    "Protobuf::ListValue":              "ProtobufWkt:ListValue",
+    "Protobuf::ListValue":              "ProtobufWkt::ListValue",
     "Protobuf::NULL_VALUE":             "ProtobufWkt::NULL_VALUE",
     "Protobuf::StringValue":            "ProtobufWkt::StringValue",
     "Protobuf::Struct":                 "ProtobufWkt::Struct",
