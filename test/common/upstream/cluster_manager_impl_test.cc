@@ -2418,6 +2418,35 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
 
+// Verify that configured upstream filters are added to client connections.
+TEST_F(ClusterManagerImplTest, AddUpstreamFilters) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      filters:
+      - name: envoy.echo
+  )EOF";
+
+  create(parseBootstrapFromV2Yaml(yaml));
+  Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection, addReadFilter(_)).Times(1); // echo is a read filter.
+  EXPECT_CALL(*connection, addWriteFilter(_)).Times(0);
+  EXPECT_CALL(*connection, addFilter(_)).Times(0);
+  EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillOnce(Return(connection));
+  auto conn_data = cluster_manager_->tcpConnForCluster("cluster_1", nullptr, nullptr);
+  EXPECT_EQ(connection, conn_data.connection_.get());
+  factory_.tls_.shutdownThread();
+}
+
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));

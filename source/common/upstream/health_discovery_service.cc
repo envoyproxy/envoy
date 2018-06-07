@@ -236,7 +236,7 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
 
   return std::make_unique<ClusterInfoImpl>(params.cluster_, params.bind_config_, params.runtime_,
                                            std::move(socket_factory), std::move(scope),
-                                           params.added_via_api_);
+                                           params.added_via_api_, factory_context);
 }
 
 void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,

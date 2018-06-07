@@ -33,3 +33,26 @@ api_go_proto_library(
     name = "outlier_detection",
     proto = ":outlier_detection",
 )
+
+api_proto_library_internal(
+    name = "filter",
+    srcs = ["filter.proto"],
+    visibility = [
+        "//envoy/api/v2:__pkg__",
+    ],
+    deps = [
+        "//envoy/api/v2/auth:cert",
+        "//envoy/api/v2/core:address",
+        "//envoy/api/v2/core:base",
+    ],
+)
+
+api_go_proto_library(
+    name = "filter",
+    proto = ":filter",
+    deps = [
+        "//envoy/api/v2/auth:cert_go_proto",
+        "//envoy/api/v2/core:address_go_proto",
+        "//envoy/api/v2/core:base_go_proto",
+    ],
+)

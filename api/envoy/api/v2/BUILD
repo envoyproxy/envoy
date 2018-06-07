@@ -67,6 +67,7 @@ api_proto_library_internal(
         ":eds",
         "//envoy/api/v2/auth:cert",
         "//envoy/api/v2/cluster:circuit_breaker",
+        "//envoy/api/v2/cluster:filter",
         "//envoy/api/v2/cluster:outlier_detection",
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
