@@ -92,6 +92,7 @@ public:
   const LowerCaseString XB3Flags{"x-b3-flags"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString OriginalDstHostOverride{"x-envoy-original-dst-override-host"};
 
   struct {
     const std::string Close{"close"};

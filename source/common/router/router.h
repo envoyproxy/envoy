@@ -191,6 +191,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }
+  const Http::HeaderMap* downStreamHeaders() const override { return downstream_headers_; }
 
   /**
    * Set a computed cookie to be sent with the downstream headers.
@@ -212,15 +213,6 @@ public:
     downstream_set_cookies_.emplace_back(
         Http::Utility::makeSetCookieValue(key, cookie_value, max_age));
     return cookie_value;
-  }
-
-  std::string downStreamHeader(const std::string& key) {
-    const Http::LowerCaseString header_key{key};
-    std::string header_value;
-    if (downstream_headers_ != nullptr && downstream_headers_->get(header_key) != nullptr) {
-      header_value = downstream_headers_->get(header_key)->value().c_str();
-    }
-    return header_value;
   }
 
 protected:
