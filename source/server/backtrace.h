@@ -106,7 +106,7 @@ public:
 
 #ifdef __APPLE__
       // In the absence of stack_decode.py, print the function name.
-      ENVOY_LOG(critical, "thr<{}> #{} {}: {}", thread_id, stack_trace_[i].idx,
+      ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx,
                 stack_trace_[i].addr, trace.object_function);
 #else
       if (absl::Symbolize(stack_trace_[i].addr, out, sizeof(out))) {
