@@ -939,6 +939,22 @@ message HeaderMatcher {
     // If specified, header match will be be performed based on whether the header is in the
     // request.
     bool present_match = 7;
+
+    // If specified, header match will be performed based on the prefix of the header value.
+    //
+    // Examples:
+    //
+    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
+    // * The empty prefix is also valid and matches any value.
+    string prefix_match = 9;
+
+    // If specified, header match will be performed based on the suffix of the header value.
+    //
+    // Examples:
+    //
+    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
+    // * The empty suffix is also valid and matches any value.
+    string suffix_match = 10;
   }
 
   // If specified, the match result will be inverted before before checking. Defaults to false.
