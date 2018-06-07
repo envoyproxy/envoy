@@ -1432,30 +1432,17 @@ public:
   }
 
   std::unique_ptr<Network::MockClientConnection> connection_ =
-      std::make_unique<Network::MockClientConnection>();
+      std::make_unique<NiceMock<Network::MockClientConnection>>();
   std::shared_ptr<TestProdHttpHealthChecker> health_checker_;
 };
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
-  EXPECT_CALL(*connection_, connect());
-  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(_));
-  EXPECT_CALL(*connection_, addConnectionCallbacks(_));
-  EXPECT_CALL(*connection_, addReadFilter(_));
-  EXPECT_CALL(*connection_, noDelay(_));
-  EXPECT_CALL(*connection_, bufferLimit());
-
   setupNoServiceValidationHC();
   EXPECT_EQ(Http::CodecClient::Type::HTTP1,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
-  EXPECT_CALL(*connection_, connect());
-  EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(_));
-  EXPECT_CALL(*connection_, addConnectionCallbacks(_));
-  EXPECT_CALL(*connection_, addReadFilter(_));
-  EXPECT_CALL(*connection_, noDelay(_));
-
   setupNoServiceValidationHCWithHttp2();
   EXPECT_EQ(Http::CodecClient::Type::HTTP2,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
