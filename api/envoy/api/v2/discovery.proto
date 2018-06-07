@@ -138,6 +138,9 @@ message IncrementalDiscoveryRequest {
   // Unlike in non incremental xDS, an empty resource_names_subscribe or
   // resource_names_unsubscribe list simply means that no resources are to be
   // added or removed to the resource list.
+  // The xDS server must send updates for all tracked resources but can also
+  // send updates for resources the client has not subscribed to. This behavior
+  // is similar to non incremental xDS.
   // These two fields can be set for all types of IncrementalDiscoveryRequests
   // (initial, ACK/NACK or spontaneous).
   //
@@ -150,7 +153,7 @@ message IncrementalDiscoveryRequest {
   // first in a stream. The keys are the resources names of the xDS resources
   // known to the xDS client. The values in the map are the associated resource
   // level version info.
-  map<string, string> resource_versions = 5;
+  map<string, string> initial_resource_versions = 5;
 
   // When the IncrementalDiscoveryRequest is a ACK or NACK message in response
   // to a previous IncrementalDiscoveryResponse, the response_nonce must be the
