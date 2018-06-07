@@ -534,6 +534,11 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   * Create network filters on a new upstream connection.
+   */
+  virtual void createNetworkFilters(Network::Connection& connection) const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

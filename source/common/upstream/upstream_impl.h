@@ -16,6 +16,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
+
+#include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
@@ -307,7 +309,8 @@ private:
  * Implementation of ClusterInfo that reads from JSON.
  */
 class ClusterInfoImpl : public ClusterInfo,
-                        public Server::Configuration::TransportSocketFactoryContext {
+                        public Server::Configuration::TransportSocketFactoryContext,
+                        protected Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
@@ -362,6 +365,8 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
+  void createNetworkFilters(Network::Connection&) const;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -401,6 +406,10 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+
+  class FactoryContextImpl;
+  std::unique_ptr<FactoryContextImpl> factory_context_;
+  std::vector<Network::FilterFactoryCb> filter_factories_;
 };
 
 /**
