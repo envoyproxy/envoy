@@ -11,8 +11,8 @@
 #include "common/common/thread_annotations.h"
 #include "common/tracing/http_tracer_impl.h"
 
-#include "grpc++/generic/generic_stub.h"
-#include "grpc++/grpc++.h"
+#include "grpcpp/generic/generic_stub.h"
+#include "grpcpp/grpcpp.h"
 #include "grpcpp/support/proto_buffer_writer.h"
 
 namespace Envoy {
