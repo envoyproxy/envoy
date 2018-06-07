@@ -70,14 +70,16 @@ public:
   /**
    * Generate the streams to be sent to hystrix dashboard.
    */
-  void addClusterStatsToStream(absl::string_view cluster_name, uint64_t max_concurrent_requests,
-                               uint64_t reporting_hosts, uint64_t rolling_window_ms,
-                               std::stringstream& ss);
+  void addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache,
+                               absl::string_view cluster_name, uint64_t max_concurrent_requests,
+                               uint64_t reporting_hosts,
+                               std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
 
   /**
    * Calculate values needed to create the stream and write into the map.
    */
-  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info);
+  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
+                              ClusterStatsCache& cluster_stats_cache);
   /**
    * Clear map.
    */
@@ -114,15 +116,15 @@ private:
   /**
    * Generate HystrixCommand event stream.
    */
-  void addHystrixCommand(absl::string_view cluster_name, uint64_t max_concurrent_requests,
-                         uint64_t reporting_hosts, uint64_t rolling_window_ms,
-                         std::stringstream& ss);
+  void addHystrixCommand(ClusterStatsCache& cluster_stats_cache, absl::string_view cluster_name,
+                         uint64_t max_concurrent_requests, uint64_t reporting_hosts,
+                         std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
 
   /**
    * Generate HystrixThreadPool event stream.
    */
   void addHystrixThreadPool(absl::string_view cluster_name, uint64_t queue_size,
-                            uint64_t reporting_hosts, uint64_t rolling_window_ms,
+                            uint64_t reporting_hosts, std::chrono::milliseconds rolling_window_ms,
                             std::stringstream& ss);
 
   // HystrixStatCachePtr stats_;
