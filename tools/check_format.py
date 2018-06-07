@@ -101,23 +101,21 @@ def checkFileContents(file_path, checker):
     checker(line, file_path, reportError)
   return error_messages
 
+DOT_MULTI_SPACE_REGEX = re.compile('\\. +')
+
 def fixSourceLine(line):
   # Strip double space after '.'  This may prove overenthusiastic and need to
   # be restricted to comments and metadata files but works for now.
-  while True:
-    out = line.replace('.  ', '. ')
-    if out == line:
-      break         # Make sure we eliminate all the extra spaces after a period.
-    line = out
+  line = re.sub(DOT_MULTI_SPACE_REGEX, '. ', line)
 
-  if hasInvalidAngleBracketDirectory(out):
-    out = out.replace('<', '"').replace(">", '"')
+  if hasInvalidAngleBracketDirectory(line):
+    line = line.replace('<', '"').replace(">", '"')
 
   # Fix incorrect protobuf namespace references.
   for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
-    out = out.replace(invalid_construct, valid_construct)
+    line = line.replace(invalid_construct, valid_construct)
 
-  return out
+  return line
 
 def checkSourceLine(line, file_path, reportError):
   # Check fixable errors. These may have been fixed already.
