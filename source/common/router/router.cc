@@ -91,10 +91,16 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
         case 'u':
           timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
               std::chrono::microseconds(header_grpc_timeout));
+          if (timeout.global_timeout_ < std::chrono::microseconds(header_grpc_timeout)) {
+            timeout.global_timeout_++;
+          }
           break;
         case 'n':
           timeout.global_timeout_ = std::chrono::duration_cast<std::chrono::milliseconds>(
               std::chrono::nanoseconds(header_grpc_timeout));
+          if (timeout.global_timeout_ < std::chrono::nanoseconds(header_grpc_timeout)) {
+            timeout.global_timeout_++;
+          }
           break;
         }
       }
