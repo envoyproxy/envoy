@@ -29,7 +29,7 @@ def decode_stacktrace_log(input_source):
   # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
   trace_begin_re = re.compile(
-      "^(.+)%s Backtrace thr<(\d+).*obj<(.+)>" % backtrace_marker)
+      "^(.+)%s Backtrace thr<(\d+)> obj<(.+)>" % backtrace_marker)
   stackaddr_re = re.compile("%s thr<(\d+)> #\d+ (0x[0-9a-fA-F]+) " % backtrace_marker)
   new_object_re = re.compile("%s thr<(\d+)> obj<(.+)>$" % backtrace_marker)
   trace_end_re = re.compile("%s end backtrace thread (\d+)" % backtrace_marker)
