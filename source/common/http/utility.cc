@@ -29,6 +29,7 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
+  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
   if (!header.empty()) {
     header.append(", ", 2);
