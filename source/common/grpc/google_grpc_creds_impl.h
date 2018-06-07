@@ -2,7 +2,7 @@
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
 
-#include "grpc++/grpc++.h"
+#include "grpcpp/grpcpp.h"
 
 namespace Envoy {
 namespace Grpc {
