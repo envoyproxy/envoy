@@ -108,8 +108,8 @@ destination address of the incoming connection was before the connection was red
 Envoy. New destinations are added to the cluster by the load balancer on-demand, and the cluster
 :ref:`periodically <config_cluster_manager_cluster_cleanup_interval_ms>` cleans out unused hosts
 from the cluster. No other :ref:`load balancing type <config_cluster_manager_cluster_lb_type>` can
-be used with original destination clusters. Upstream host selection can also be overrided on a per
-request by specifying the host ip address in the header ``x-envoy-original-dst-override-host``.
+be used with original destination clusters. Upstream host selection can also be overriden on a per
+request basis by specifying the host ip address in the header ``x-envoy-original-dst-override-host``.
 
 .. _arch_overview_load_balancing_panic_threshold:
 

@@ -37,17 +37,17 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
       : connection_(connection) {
-    downstream_headers_ = new Http::TestHeaderMapImpl{{key, value}};
+    downstream_headers_ = Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{key, value}}};
   }
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Http::HeaderMap* downStreamHeaders() const override { return downstream_headers_; }
+  const Http::HeaderMap* downStreamHeaders() const override { return downstream_headers_.get(); }
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
-  Http::HeaderMap* downstream_headers_{};
+  Http::HeaderMapPtr downstream_headers_;
 };
 
 class OriginalDstClusterTest : public testing::Test {
@@ -165,6 +165,16 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ("127.0.0.1:5555", host->address()->asString());
+  }
+
+  // Request host override empty ip => no host.
+  {
+    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().OriginalDstHostOverride.get(),
+                                       "");
+    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
+    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    HostConstSharedPtr host = lb.chooseHost(&lb_context);
+    EXPECT_EQ(host, nullptr);
   }
 
   // Downstream connection is not using original dst => no host.

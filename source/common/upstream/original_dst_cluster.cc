@@ -43,23 +43,24 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   if (context) {
     // Check if request has a override host header set, if directly return the host using it.
     const Http::HeaderMap* downstream_headers = context->downStreamHeaders();
-    if (downstream_headers) {
-
-      if (downstream_headers->get(Http::Headers::get().OriginalDstHostOverride) != nullptr) {
-        const std::string& request_override_host =
-            downstream_headers->get(Http::Headers::get().OriginalDstHostOverride)->value().c_str();
-        if (!request_override_host.empty()) {
-          ENVOY_LOG(info, "Using request override host {}.", request_override_host);
-          Network::Address::InstanceConstSharedPtr overridehost_ip_port(
-              Network::Utility::parseInternetAddressAndPort(request_override_host, false));
-          HostSharedPtr override_host_ptr;
-          override_host_ptr.reset(new HostImpl(
-              info_, info_->name() + overridehost_ip_port->asString(),
-              std::move(overridehost_ip_port), envoy::api::v2::core::Metadata::default_instance(),
-              1, envoy::api::v2::core::Locality().default_instance(),
-              envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-          return override_host_ptr;
-        }
+    if (downstream_headers &&
+        downstream_headers->get(Http::Headers::get().OriginalDstHostOverride) != nullptr) {
+      const std::string& request_override_host =
+          downstream_headers->get(Http::Headers::get().OriginalDstHostOverride)->value().c_str();
+      try {
+        Network::Address::InstanceConstSharedPtr overridehost_ip_port(
+            Network::Utility::parseInternetAddressAndPort(request_override_host, false));
+        ENVOY_LOG(info, "Using request override host {}.", request_override_host);
+        return HostSharedPtr{new HostImpl(
+            info_, info_->name() + overridehost_ip_port->asString(),
+            std::move(overridehost_ip_port), envoy::api::v2::core::Metadata::default_instance(), 1,
+            envoy::api::v2::core::Locality().default_instance(),
+            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())};
+      } catch (const Envoy::EnvoyException& e) {
+        ENVOY_LOG(
+            warn,
+            "original_dst_load_balancer: Override header exists but has malformed ip address. {}",
+            e.what());
       }
     }
 
