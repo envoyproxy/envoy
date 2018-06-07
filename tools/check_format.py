@@ -50,7 +50,6 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
 
-
 def checkNamespace(file_path):
   with open(file_path) as f:
     text = f.read()
@@ -58,7 +57,6 @@ def checkNamespace(file_path):
        not 'NOLINT(namespace-envoy)' in text:
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
   return []
-
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
@@ -102,7 +100,6 @@ def checkFileContents(file_path, checker):
       error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
     checker(line, file_path, reportError)
   return error_messages
-
 
 def fixSourceLine(line):
   # Strip double space after '.'  This may prove overenthusiastic and need to
@@ -151,49 +148,50 @@ def checkBuildLine(line, file_path, reportError):
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
 
-def checkOrFixBuildPath(file_path, try_to_fix):
+def fixBuildPath(file_path):
   error_messages = []
-  notApi = not isApiFile(file_path)
-  if try_to_fix:
-    # TODO(htuch): Add API specific BUILD fixer script.
-    if notApi:
-      if os.system(
-          "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-        error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
+  # TODO(htuch): Add API specific BUILD fixer script.
+  if not isApiFile(file_path):
+    if os.system(
+        "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+      error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
     if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
       error_messages += ["buildifier rewrite failed for file: %s" % file_path]
-  else:
-    if notApi:
-      command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
-      error_messages += executeCommand(
-          command, "envoy_build_fixer check failed", file_path)
+  return error_messages
 
-    command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
-    error_messages += executeCommand(command, "buildifier check failed", file_path)
+def checkBuildPath(file_path):
+  error_messages = []
+  if not isApiFile(file_path):
+    command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
+    error_messages += executeCommand(
+        command, "envoy_build_fixer check failed", file_path)
+
+  command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
+  error_messages += executeCommand(command, "buildifier check failed", file_path)
   error_messages += checkFileContents(file_path, checkBuildLine)
   return error_messages
 
-def checkOrFixSourcePath(file_path, try_to_fix):
-  for line in fileinput.input(file_path, inplace=try_to_fix):
+def fixSourcePath(file_path):
+  for line in fileinput.input(file_path, inplace=True):
     sys.stdout.write(fixSourceLine(line))
-  error_messages = checkFileContents(file_path, checkSourceLine)
 
-  if file_path.endswith(DOCS_SUFFIX):
-    return error_messages
-
-  if not file_path.endswith(PROTO_SUFFIX):
-    error_messages += checkNamespace(file_path)
-    if try_to_fix:
-      error_messages += fixHeaderOrder(file_path)
-      error_messages += clangFormat(file_path)
-    else:
-      command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
-      error_messages += executeCommand(command, "header_order.py check failed", file_path)
-      command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
-      error_messages += executeCommand(command, "clang-format check failed", file_path)
-
+  error_messages = []
+  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
+    error_messages += fixHeaderOrder(file_path)
+    error_messages += clangFormat(file_path)
   return error_messages
 
+def checkSourcePath(file_path):
+  error_messages = checkFileContents(file_path, checkSourceLine)
+
+  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
+    error_messages += checkNamespace(file_path)
+    command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
+    error_messages += executeCommand(command, "header_order.py check failed", file_path)
+    command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
+    error_messages += executeCommand(command, "clang-format check failed", file_path)
+
+  return error_messages
 
 # Example target outputs are:
 #   - "26,27c26"
@@ -236,11 +234,17 @@ def checkFormat(file_path):
     return []
 
   error_messages = []
+  # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
+  # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
   if isBuildFile(file_path):
-    error_messages = checkOrFixBuildPath(file_path, try_to_fix)
+    if try_to_fix:
+      error_messages += fixBuildPath(file_path)
+    error_messages += checkBuildPath(file_path)
   else:
-    error_messages = checkOrFixSourcePath(file_path, try_to_fix)
+    if try_to_fix:
+      error_messages += fixSourcePath(file_path)
+    error_messages += checkSourcePath(file_path)
 
   if error_messages:
     return ["From %s" % file_path] + error_messages
