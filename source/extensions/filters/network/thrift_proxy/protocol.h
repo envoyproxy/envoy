@@ -79,6 +79,48 @@ enum class FieldType {
 };
 
 /**
+ * ProtocolCallbacks are Thrift protocol-level callbacks.
+ */
+class ProtocolCallbacks {
+public:
+  virtual ~ProtocolCallbacks() {}
+
+  /**
+   * Indicates that the start of a Thrift protocol message was detected.
+   * @param name the name of the message, if available
+   * @param msg_type the type of the message
+   * @param seq_id the message sequence id
+   */
+  virtual void messageStart(const absl::string_view name, MessageType msg_type,
+                            int32_t seq_id) PURE;
+
+  /**
+   * Indicates that the start of a Thrift protocol struct was detected.
+   * @param name the name of the struct, if available
+   */
+  virtual void structBegin(const absl::string_view name) PURE;
+
+  /**
+   * Indicates that that start of Thrift protocol struct field was detected.
+   * @param name the name of the field, if available
+   * @param field_type the type of the field
+   * @param field_id the field id
+   */
+  virtual void structField(const absl::string_view name, FieldType field_type,
+                           int16_t field_id) PURE;
+
+  /**
+   * Indicates that the end of a Thrift protocol struct was detected.
+   */
+  virtual void structEnd() PURE;
+
+  /**
+   * Indicates that the end of a Thrift protocol message was detected.
+   */
+  virtual void messageComplete() PURE;
+};
+
+/**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md
  */
@@ -301,14 +343,36 @@ public:
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
 
+/*
+ * ProtocolImplBase provides a base class for Protocol implementations.
+ */
+class ProtocolImplBase : public virtual Protocol {
+public:
+  ProtocolImplBase(ProtocolCallbacks& callbacks) : callbacks_(callbacks) {}
+
+protected:
+  void onMessageStart(const absl::string_view name, MessageType msg_type, int32_t seq_id) const {
+    callbacks_.messageStart(name, msg_type, seq_id);
+  }
+  void onStructBegin(const absl::string_view name) const { callbacks_.structBegin(name); }
+  void onStructField(const absl::string_view name, FieldType field_type, int16_t field_id) const {
+    callbacks_.structField(name, field_type, field_id);
+  }
+  void onStructEnd() const { callbacks_.structEnd(); }
+  void onMessageComplete() const { callbacks_.messageComplete(); }
+
+  ProtocolCallbacks& callbacks_;
+};
+
 /**
  * AutoProtocolImpl attempts to distinguish between the Thrift binary (strict mode only) and
  * compact protocols and then delegates subsequent decoding operations to the appropriate Protocol
  * implementation.
  */
-class AutoProtocolImpl : public virtual Protocol {
+class AutoProtocolImpl : public ProtocolImplBase {
 public:
-  AutoProtocolImpl() : Protocol(), name_(ProtocolNames::get().AUTO) {}
+  AutoProtocolImpl(ProtocolCallbacks& callbacks)
+      : ProtocolImplBase(callbacks), name_(ProtocolNames::get().AUTO) {}
 
   // Protocol
   const std::string& name() const override { return name_; }

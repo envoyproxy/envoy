@@ -12,8 +12,13 @@ namespace ThriftProxy {
 MockTransportCallbacks::MockTransportCallbacks() {}
 MockTransportCallbacks::~MockTransportCallbacks() {}
 
-MockProtocol::MockProtocol() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockTransport::MockTransport() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockTransport::~MockTransport() {}
 
+MockProtocolCallbacks::MockProtocolCallbacks() {}
+MockProtocolCallbacks::~MockProtocolCallbacks() {}
+
+MockProtocol::MockProtocol() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
 MockProtocol::~MockProtocol() {}
 
 } // namespace ThriftProxy

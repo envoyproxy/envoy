@@ -26,9 +26,9 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
 
     uint16_t version = BufferHelper::peekU16(buffer);
     if (BinaryProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<BinaryProtocolImpl>());
+      setProtocol(std::make_unique<BinaryProtocolImpl>(callbacks_));
     } else if (CompactProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<CompactProtocolImpl>());
+      setProtocol(std::make_unique<CompactProtocolImpl>(callbacks_));
     } else {
       throw EnvoyException(
           fmt::format("unknown thrift auto protocol message start {:04x}", version));

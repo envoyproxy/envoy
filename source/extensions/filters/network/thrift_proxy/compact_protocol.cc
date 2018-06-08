@@ -70,11 +70,13 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string
   msg_type = type;
   seq_id = id;
 
+  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
 bool CompactProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
+  onMessageComplete();
   return true;
 }
 
@@ -86,6 +88,8 @@ bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string&
   // tracked in a stack to handle nested structs.
   last_field_id_stack_.push(last_field_id_);
   last_field_id_ = 0;
+
+  onStructBegin(absl::string_view(name));
   return true;
 }
 
@@ -99,6 +103,7 @@ bool CompactProtocolImpl::readStructEnd(Buffer::Instance& buffer) {
   last_field_id_ = last_field_id_stack_.top();
   last_field_id_stack_.pop();
 
+  onStructEnd();
   return true;
 }
 
@@ -116,6 +121,8 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
     field_id = 0;
     field_type = FieldType::Stop;
     buffer.drain(1);
+
+    onStructField(absl::string_view(name), field_type, field_id);
     return true;
   }
 
@@ -156,6 +163,8 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
   last_field_id_ = compact_field_id;
 
   buffer.drain(id_size + 1);
+
+  onStructField(absl::string_view(name), field_type, field_id);
   return true;
 }
 
