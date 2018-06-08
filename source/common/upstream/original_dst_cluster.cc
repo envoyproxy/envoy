@@ -41,32 +41,20 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, Cluste
 
 HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
-    // Check if request has a override host header set, if directly return the host using it.
-    const Http::HeaderMap* downstream_headers = context->downStreamHeaders();
-    if (downstream_headers &&
-        downstream_headers->get(Http::Headers::get().OriginalDstHostOverride) != nullptr) {
-      const std::string& request_override_host =
-          downstream_headers->get(Http::Headers::get().OriginalDstHostOverride)->value().c_str();
-      try {
-        Network::Address::InstanceConstSharedPtr overridehost_ip_port(
-            Network::Utility::parseInternetAddressAndPort(request_override_host, false));
-        ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
-        return HostSharedPtr{new HostImpl(
-            info_, info_->name() + overridehost_ip_port->asString(),
-            std::move(overridehost_ip_port), envoy::api::v2::core::Metadata::default_instance(), 1,
-            envoy::api::v2::core::Locality().default_instance(),
-            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())};
-      } catch (const Envoy::EnvoyException& e) {
-        ENVOY_LOG(warn, "original_dst_load_balancer: invalid override header value. {}", e.what());
+
+    // Check if override host header is present, if yes use it otherwise check local address.
+    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+    if (dst_host == nullptr) {
+      const Network::Connection* connection = context->downstreamConnection();
+      // The local address of the downstream connection is the original destination address,
+      // if localAddressRestored() returns 'true'.
+      if (connection && connection->localAddressRestored()) {
+        dst_host = connection->localAddress();
       }
     }
 
-    const Network::Connection* connection = context->downstreamConnection();
-
-    // The local address of the downstream connection is the original destination address,
-    // if localAddressRestored() returns 'true'.
-    if (connection && connection->localAddressRestored()) {
-      const Network::Address::Instance& dst_addr = *connection->localAddress();
+    if (dst_host) {
+      const Network::Address::Instance& dst_addr = *dst_host.get();
 
       // Check if a host with the destination address is already in the host set.
       HostSharedPtr host = host_map_.find(dst_addr);
@@ -112,6 +100,24 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 
   ENVOY_LOG(warn, "original_dst_load_balancer: No downstream connection or no original_dst.");
   return nullptr;
+}
+
+Network::Address::InstanceConstSharedPtr
+OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* context) {
+  Network::Address::InstanceConstSharedPtr request_host;
+  const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
+  if (downstream_headers &&
+      downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
+    const std::string& request_override_host =
+        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)->value().c_str();
+    try {
+      request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
+      ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
+    } catch (const Envoy::EnvoyException& e) {
+      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
+    }
+  }
+  return request_host;
 }
 
 OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,

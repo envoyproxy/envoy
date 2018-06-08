@@ -191,7 +191,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection();
   }
-  const Http::HeaderMap* downStreamHeaders() const override { return downstream_headers_; }
+  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
   /**
    * Set a computed cookie to be sent with the downstream headers.

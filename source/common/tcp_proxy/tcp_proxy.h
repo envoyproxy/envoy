@@ -159,7 +159,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  const Http::HeaderMap* downStreamHeaders() const override { return nullptr; }
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.

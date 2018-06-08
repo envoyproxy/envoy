@@ -42,7 +42,7 @@ public:
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
    * balancing.
    */
-  virtual const Http::HeaderMap* downStreamHeaders() const PURE;
+  virtual const Http::HeaderMap* downstreamHeaders() const PURE;
 };
 
 /**

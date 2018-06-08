@@ -44,7 +44,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-  const Http::HeaderMap* downStreamHeaders() const override { return downstream_headers_.get(); }
+  const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
   Http::HeaderMapPtr downstream_headers_;
@@ -159,18 +159,29 @@ TEST_F(OriginalDstClusterTest, NoContext) {
 
   // Request host override => overridden host.
   {
-    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().OriginalDstHostOverride.get(),
+    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                        "127.0.0.1:5555");
     OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
-    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    Event::PostCb post_cb;
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ("127.0.0.1:5555", host->address()->asString());
   }
 
   // Request host override empty ip => no host.
   {
-    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().OriginalDstHostOverride.get(),
+    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().EnvoyOriginalDstHost.get(),
                                        "");
+    OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
+    EXPECT_CALL(dispatcher_, post(_)).Times(0);
+    HostConstSharedPtr host = lb.chooseHost(&lb_context);
+    EXPECT_EQ(host, nullptr);
+  }
+
+  // Request host override malformed ip => no host.
+  {
+    TestLoadBalancerContext lb_context(nullptr, Http::Headers::get().EnvoyOriginalDstHost.get(),
+                                       "blah");
     OriginalDstCluster::LoadBalancer lb(cluster_->prioritySet(), cluster_);
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
