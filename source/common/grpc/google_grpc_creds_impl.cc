@@ -9,16 +9,8 @@
 namespace Envoy {
 namespace Grpc {
 
-std::shared_ptr<grpc::ChannelCredentials>
-defaultSslChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
-                             bool allow_insecure) {
-  const auto& google_grpc = grpc_service_config.google_grpc();
-  std::shared_ptr<grpc::ChannelCredentials> creds = nullptr;
-  if (allow_insecure) {
-    creds = grpc::InsecureChannelCredentials();
-  } else {
-    creds = grpc::SslCredentials(grpc::SslCredentialsOptions());
-  }
+std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
+    const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
   if (google_grpc.has_channel_credentials() &&
       google_grpc.channel_credentials().has_ssl_credentials()) {
     const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
@@ -29,16 +21,22 @@ defaultSslChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_servi
     };
     return grpc::SslCredentials(ssl_credentials_options);
   }
-  return creds;
+  return nullptr;
 }
 
-std::shared_ptr<grpc::ChannelCredentials>
-defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
-                          bool allow_insecure) {
-  std::shared_ptr<grpc::ChannelCredentials> creds =
-      defaultSslChannelCredentials(grpc_service_config, allow_insecure);
-  std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
-  for (const auto& credential : grpc_service_config.google_grpc().call_credentials()) {
+std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultSslChannelCredentials(
+    const envoy::api::v2::core::GrpcService& grpc_service_config) {
+  auto creds = sslChannelCredentials(grpc_service_config.google_grpc());
+  if (creds != nullptr) {
+    return creds;
+  }
+  return grpc::SslCredentials({});
+}
+
+std::vector<std::shared_ptr<grpc::CallCredentials>>
+CredsUtility::callCredentials(const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
+  std::vector<std::shared_ptr<grpc::CallCredentials>> creds;
+  for (const auto& credential : google_grpc.call_credentials()) {
     std::shared_ptr<grpc::CallCredentials> new_call_creds;
     switch (credential.credential_specifier_case()) {
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kAccessToken: {
@@ -68,18 +66,34 @@ defaultChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_
       // We don't handle plugin credentials here, callers can do so instead if they want.
       continue;
     }
+    // Any of the above creds creation can fail, if they do they return nullptr
+    // and we ignore them.
     if (new_call_creds != nullptr) {
-      if (call_creds == nullptr) {
-        call_creds = new_call_creds;
-      } else {
-        call_creds = grpc::CompositeCallCredentials(call_creds, new_call_creds);
-      }
+      creds.emplace_back(new_call_creds);
     }
   }
-  if (call_creds != nullptr) {
-    return grpc::CompositeChannelCredentials(creds, call_creds);
-  }
   return creds;
+}
+
+std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultChannelCredentials(
+    const envoy::api::v2::core::GrpcService& grpc_service_config) {
+  std::shared_ptr<grpc::ChannelCredentials> channel_creds =
+      sslChannelCredentials(grpc_service_config.google_grpc());
+  // Call credentials aren't supported on insecure channels (it would be bad
+  // placing a token in clear text, plus the gRPC core doesn't support it
+  // https://github.com/grpc/grpc/issues/8142).
+  if (channel_creds == nullptr) {
+    return grpc::InsecureChannelCredentials();
+  }
+  auto call_creds_vec = callCredentials(grpc_service_config.google_grpc());
+  if (call_creds_vec.empty()) {
+    return channel_creds;
+  }
+  std::shared_ptr<grpc::CallCredentials> call_creds = call_creds_vec[0];
+  for (uint32_t i = 1; i < call_creds_vec.size(); ++i) {
+    call_creds = grpc::CompositeCallCredentials(call_creds, call_creds_vec[i]);
+  }
+  return grpc::CompositeChannelCredentials(channel_creds, call_creds);
 }
 
 /**
@@ -94,7 +108,7 @@ class DefaultGoogleGrpcCredentialsFactory : public GoogleGrpcCredentialsFactory 
 public:
   std::shared_ptr<grpc::ChannelCredentials>
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override {
-    return defaultChannelCredentials(grpc_service_config);
+    return CredsUtility::defaultChannelCredentials(grpc_service_config);
   }
 
   std::string name() const override { return "envoy.grpc_credentials.default"; }
