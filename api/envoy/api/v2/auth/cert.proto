@@ -117,6 +117,8 @@ message CertificateValidationContext {
   // verified. By default, a client certificate is optional, unless one of the additional
   // options (:ref:`require_client_certificate
   // <envoy_api_field_auth.DownstreamTlsContext.require_client_certificate>`,
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`, or
   // :ref:`verify_subject_alt_name
