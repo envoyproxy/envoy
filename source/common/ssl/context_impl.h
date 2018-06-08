@@ -92,12 +92,22 @@ protected:
    * certificate.
    *
    * @param ssl the certificate to verify
-   * @param certificate_hash_list the configured list of certificate hashes to match
+   * @param expected_hashes the configured list of certificate hashes to match
    * @return true if the verification succeeds
    */
-  static bool
-  verifyCertificateHashList(X509* cert,
-                            const std::vector<std::vector<uint8_t>>& certificate_hash_list);
+  static bool verifyCertificateHashList(X509* cert,
+                                        const std::vector<std::vector<uint8_t>>& expected_hashes);
+
+  /**
+   * Verifies certificate hash for pinning. The hash is a base64-encoded SHA-256 of the DER-encoded
+   * Subject Public Key Information (SPKI) of the certificate.
+   *
+   * @param ssl the certificate to verify
+   * @param expected_hashes the configured list of certificate hashes to match
+   * @return true if the verification succeeds
+   */
+  static bool verifyCertificateSpkiList(X509* cert,
+                                        const std::vector<std::vector<uint8_t>>& expected_hashes);
 
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols);
   static SslStats generateStats(Stats::Scope& scope);
@@ -110,6 +120,7 @@ protected:
   bssl::UniquePtr<SSL_CTX> ctx_;
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
+  std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
   Stats::Scope& scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;

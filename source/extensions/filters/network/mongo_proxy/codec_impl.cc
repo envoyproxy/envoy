@@ -349,7 +349,7 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     return false;
   }
 
-  uint32_t message_length = Bson::BufferHelper::peakInt32(data);
+  uint32_t message_length = Bson::BufferHelper::peekInt32(data);
   ENVOY_LOG(trace, "message is {} bytes", message_length);
   if (data.length() < message_length) {
     return false;

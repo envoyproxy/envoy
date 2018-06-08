@@ -126,6 +126,9 @@ deadline-exceeded
 resource-exhausted
   Envoy will attempt a retry if the gRPC status code in the response headers is "resource-exhausted" (8)
 
+unavailable
+  Envoy will attempt a retry if the gRPC status code in the response headers is "unavailable" (14)
+
 As with the x-envoy-retry-grpc-on header, the number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header
 
@@ -182,6 +185,8 @@ requests. This timeout must be <= the global route timeout (see
 caller to set a tight per try timeout to allow for retries while maintaining a reasonable overall
 timeout.
 
+.. _config_http_filters_router_x-envoy-immediate-health-check-fail:
+
 x-envoy-immediate-health-check-fail
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -233,8 +238,6 @@ timeout, e.g., early exit. This is set on internal requests and is either taken 
 :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` header or the :ref:`route timeout
 <config_http_conn_man_route_table_route_timeout>`, in that order.
 
-.. _config_http_filters_router_x-envoy-original-path:
-
 x-envoy-upstream-service-time
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -242,7 +245,7 @@ Contains the time in milliseconds spent by the upstream host processing the requ
 if the client wants to determine service time compared to network latency. This header is set on
 responses.
 
-.. _config_http_filters_router_x-envoy-immediate-health-check-fail:
+.. _config_http_filters_router_x-envoy-original-path:
 
 x-envoy-original-path
 ^^^^^^^^^^^^^^^^^^^^^

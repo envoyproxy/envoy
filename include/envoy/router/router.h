@@ -144,6 +144,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -305,10 +306,12 @@ public:
   /**
    * A callback used for requesting that a cookie be set with the given lifetime.
    * @param key the name of the cookie to be set
+   * @param path the path of the cookie, or the empty string if no path should be set.
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+  typedef std::function<std::string(const std::string& key, const std::string& path,
+                                    std::chrono::seconds ttl)>
       AddCookieCallback;
 
   /**

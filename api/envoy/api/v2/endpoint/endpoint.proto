@@ -19,6 +19,14 @@ option (gogoproto.equal_all) = true;
 // Upstream host identifier.
 message Endpoint {
   // The upstream host address.
+  //
+  // .. attention::
+  //
+  //   The form of host address depends on the given cluster type. For STATIC,
+  //   it is expected to be a direct IP address (or something resolvable by the
+  //   specified :ref:`resolver <envoy_api_field_core.SocketAddress.resolver_name>`
+  //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
+  //   and will be resolved via DNS.
   core.Address address = 1;
 
   // [#not-implemented-hide:] The optional health check configuration.

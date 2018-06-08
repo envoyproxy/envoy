@@ -342,6 +342,14 @@ protected:
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
+
+  /**
+   * returns the correct path rewrite string for this route.
+   */
+  const std::string& getPathRewrite() const {
+    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  }
+
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
@@ -532,11 +540,6 @@ public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                        Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return prefix_; }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
@@ -559,11 +562,6 @@ public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return path_; }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
@@ -585,11 +583,6 @@ class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                       Server::Configuration::FactoryContext& factory_context);
-
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return regex_str_; }

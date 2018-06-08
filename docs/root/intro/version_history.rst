@@ -9,6 +9,7 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers.
+* access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
@@ -31,6 +32,7 @@ Version history
 * cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
 * cluster: fixed bug preventing the deletion of all endpoints in a priority
+* debug: added symbolized stack traces (where supported)
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -44,6 +46,7 @@ Version history
   to trigger health check response. Deprecated the
   :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: health check connections can now be configured to use http/2.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -60,6 +63,8 @@ Version history
 * http: added a :ref:`configuration option
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
   to elide *x-forwarded-for* header modifications.
+* http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
+  encountering inline headers with multiple instances.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
@@ -67,14 +72,17 @@ Version history
 * listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
   :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
 * listeners: removed restriction on all filter chains having identical filters.
-* load balancing: added :ref:`weighted round robin
+* load balancer: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
 * load balancer: ability to configure zone aware load balancer settings :ref:`through the API
-  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`.
+* load balancer: the :ref:`weighted least request
+  <arch_overview_load_balancing_types_least_request>` load balancing algorithm has been improved
+  to have better balance when operating in weighted mode.
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
@@ -91,9 +99,13 @@ Version history
   which supports inverting all other match types to match based on headers which are not a desired value.
 * router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
   generate session cookies.
+* router: added START_TIME as one of supported variables in :ref:`header
+  formatters <config_http_conn_man_headers_custom_request_headers>`.
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.
+* router: added 'unavailable' to the retriable gRPC status codes that can be specified
+  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -108,6 +120,8 @@ Version history
 * stats: added support for histograms.
 * stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
 * stats: updated stats sink interface to flush through a single call.
+* tls: added support for
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
 * tls: added support for multiple
   :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   values.
