@@ -329,7 +329,21 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
-                          "^Failed to load CRL from .* without trusted CA certificates$");
+                          "^Failed to load CRL from .* without trusted CA$");
+}
+
+TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "verify_subject_alt_name": [ "spiffe://lyft.com/testclient" ]
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
+                            "SAN-based verification of peer certificates without trusted CA "
+                            "is insecure and not allowed");
 }
 
 // Validate that empty SNI (according to C string rules) fails config validation.
