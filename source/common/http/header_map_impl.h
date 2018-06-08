@@ -37,6 +37,14 @@ public:                                                                         
  */
 class HeaderMapImpl : public HeaderMap {
 public:
+  /**
+   * Appends data to header. If header already has a value, the string ',' is added between the
+   * existing value and data.
+   * @param header the header to append to.
+   * @param data to append to the header.
+   */
+  static void appendToHeader(HeaderString& header, const std::string& data);
+
   HeaderMapImpl();
   HeaderMapImpl(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
   HeaderMapImpl(const HeaderMap& rhs);
@@ -123,6 +131,8 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
+  HeaderEntryImpl* getExistingInline(const char* key);
+
   void removeInline(HeaderEntryImpl** entry);
 
   AllInlineHeaders inline_headers_;

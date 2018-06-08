@@ -63,6 +63,8 @@ Version history
 * http: added a :ref:`configuration option
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
   to elide *x-forwarded-for* header modifications.
+* http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
+  encountering inline headers with multiple instances.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`

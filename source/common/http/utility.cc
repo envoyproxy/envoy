@@ -30,6 +30,7 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
+  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
   if (!header.empty()) {
     header.append(", ", 2);
@@ -331,16 +332,6 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
-}
-
-void Utility::appendToHeader(HeaderString& header, const std::string& data) {
-  if (data.empty()) {
-    return;
-  }
-  if (!header.empty()) {
-    header.append(",", 1);
-  }
-  header.append(data.c_str(), data.size());
 }
 
 } // namespace Http
