@@ -9,6 +9,7 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers.
+* access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
@@ -91,6 +92,8 @@ Version history
   which supports inverting all other match types to match based on headers which are not a desired value.
 * router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
   generate session cookies.
+* router: added START_TIME as one of supported variables in :ref:`header
+  formatters <config_http_conn_man_headers_custom_request_headers>`.
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.

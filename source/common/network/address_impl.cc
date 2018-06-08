@@ -331,9 +331,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
   }
 }
 
-bool PipeInstance::operator==(const Instance& rhs) const {
-  return asString() == rhs.asString();
-}
+bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 int PipeInstance::bind(int fd) const {
   if (abstract_namespace_) {
