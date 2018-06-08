@@ -130,6 +130,94 @@ private:
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
 
+// Encapsulates various state and functionality related to sharing a Connection object across
+// threads. With FakeUpstream fabricated objects, we have a Connection that is associated with a
+// dispatcher on a thread managed by FakeUpstream. We want to be able to safely invoke methods on
+// this object from other threads (e.g. the main test thread) and be able to track connection state
+// (e.g. are we disconnected and the Connection is now possibly deleted). We managed this via a
+// SharedConnectionWrapper that lives from when the Connection is added to the accepted connection
+// queue and then through the lifetime of the Fake{Raw,Http}Connection that manages the Connection
+// through activeu use.
+class SharedConnectionWrapper : public Network::ConnectionCallbacks {
+public:
+  using DisconnectCallback = std::function<void()>;
+
+  SharedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
+      : connection_(connection), allow_unexpected_disconnects_(allow_unexpected_disconnects) {
+    connection_.addConnectionCallbacks(*this);
+  }
+
+  void addDisconnectCallback(DisconnectCallback callback) {
+    Thread::LockGuard lock(lock_);
+    disconnect_callbacks_.emplace_back(callback);
+  }
+
+  // Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override {
+    // Throughout this entire function, we know that the connection_ cannot disappear, since this
+    // callback is invoked prior to connection_ deferred delete. We also know by locking below, that
+    // elsewhere where we also hold lock_, that the connection cannot disappear inside the locked
+    // scope.
+    Thread::LockGuard lock(lock_);
+    disconnected_ = true;
+    if (event == Network::ConnectionEvent::RemoteClose ||
+        event == Network::ConnectionEvent::LocalClose) {
+      for (const auto& disconnect_callback : disconnect_callbacks_) {
+        disconnect_callback();
+      }
+    }
+  }
+
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  bool connected() {
+    Thread::LockGuard lock(lock_);
+    return !disconnected_;
+  }
+
+  // This provides direct access to the underlying connection, but only to const methods.
+  // Stateful connection related methods should happen on the connection's dispatcher via
+  // executeOnDispatcher.
+  // TODO(htuch): This seems a sketchy pattern; even if we're using const methods, there may be
+  // thread safety violations when crossing between the test thread and FakeUpstream thread.
+  Network::Connection& connection() const { return connection_; }
+
+  // Execute some function on the connection's dispatcher. This involves a cross-thread post and
+  // wait-for-completion. If the connection is disconnected, either prior to post or when the
+  // dispatcher schedules the callback, we silently ignore, unless panic_on_unexpected_disconnect_
+  // is set.
+  void executeOnDispatcher(std::function<void(Network::Connection&)> f) {
+    Thread::LockGuard lock(lock_);
+    if (disconnected_) {
+      return;
+    }
+    Thread::CondVar callback_ready_event;
+    connection_.dispatcher().post([this, f, &callback_ready_event]() -> void {
+      // The use of connected() here, vs. !disconnected_, is because we want to use the lock_
+      // acquisition to briefly serialize. This avoids us entering this completion and issuing a
+      // notifyOne() until the wait() is ready to receive it below.
+      if (connected()) {
+        f(connection_);
+      } else {
+        RELEASE_ASSERT(allow_unexpected_disconnects_);
+      }
+      callback_ready_event.notifyOne();
+    });
+    callback_ready_event.wait(lock_);
+  }
+
+private:
+  Network::Connection& connection_;
+  Thread::MutexBasicLockable lock_;
+  std::vector<DisconnectCallback> disconnect_callbacks_ GUARDED_BY(lock_);
+  bool disconnected_ GUARDED_BY(lock_){};
+  const bool allow_unexpected_disconnects_;
+};
+
+class QueuedConnectionWrapper;
+typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
+
 /**
  * Wraps a raw Network::Connection in a safe way, such that the connection can
  * be placed in a queue for an arbitrary amount of time. It handles disconnects
@@ -139,44 +227,37 @@ typedef std::unique_ptr<FakeStream> FakeStreamPtr;
  * TODO(htuch): We can simplify the storage lifetime by destructing if/when
  * removeConnectionCallbacks is added.
  */
-class QueuedConnectionWrapper : public Network::ConnectionCallbacks {
+class QueuedConnectionWrapper {
 public:
   QueuedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
-      : connection_(connection), parented_(false),
+      : shared_connection_(connection, allow_unexpected_disconnects), parented_(false),
         allow_unexpected_disconnects_(allow_unexpected_disconnects) {
-    connection_.addConnectionCallbacks(*this);
+    shared_connection_.addDisconnectCallback([this] {
+      Thread::LockGuard lock(lock_);
+      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_);
+    });
   }
+
   void set_parented() {
     Thread::LockGuard lock(lock_);
     parented_ = true;
   }
-  Network::Connection& connection() const { return connection_; }
 
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override {
-    Thread::LockGuard lock(lock_);
-    RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_ ||
-                   (event != Network::ConnectionEvent::RemoteClose &&
-                    event != Network::ConnectionEvent::LocalClose));
-  }
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  SharedConnectionWrapper& shared_connection() { return shared_connection_; }
 
 private:
-  Network::Connection& connection_;
-  bool parented_;
+  SharedConnectionWrapper shared_connection_;
   Thread::MutexBasicLockable lock_;
-  bool allow_unexpected_disconnects_;
+  bool parented_ GUARDED_BY(lock_);
+  const bool allow_unexpected_disconnects_;
 };
-
-typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
 
 /**
  * Base class for both fake raw connections and fake HTTP connections.
  */
-class FakeConnectionBase : public Network::ConnectionCallbacks {
+class FakeConnectionBase {
 public:
-  ~FakeConnectionBase() { ASSERT(initialized_); }
+  virtual ~FakeConnectionBase() { ASSERT(initialized_); }
   void close();
   void readDisable(bool disable);
   // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
@@ -185,33 +266,27 @@ public:
   void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose(bool ignore_spurious_events = false);
 
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-
-  void initialize() {
+  virtual void initialize() {
     initialized_ = true;
     connection_wrapper_->set_parented();
-    connection_.dispatcher().post([this]() -> void { connection_.addConnectionCallbacks(*this); });
+    shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
   }
   void enableHalfClose(bool enabled);
-  bool connected() const {
-    Thread::LockGuard lock(lock_);
-    return !disconnected_;
-  }
+  SharedConnectionWrapper& shared_connection() { return shared_connection_; }
+  // The same caveats apply here as in SharedConnectionWrapper::connection().
+  Network::Connection& connection() const { return shared_connection_.connection(); }
+  bool connected() const { return shared_connection_.connected(); }
 
 protected:
   FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
-      : connection_(connection_wrapper->connection()),
+      : shared_connection_(connection_wrapper->shared_connection()),
         connection_wrapper_(std::move(connection_wrapper)) {}
 
-  Network::Connection& connection_;
-  mutable Thread::MutexBasicLockable lock_;
+  SharedConnectionWrapper& shared_connection_;
+  bool initialized_{};
   Thread::CondVar connection_event_;
-  bool disconnected_{};
-  bool half_closed_{};
-  bool initialized_{false};
+  Thread::MutexBasicLockable lock_;
+  bool half_closed_ GUARDED_BY(lock_){};
 
 private:
   // We hold on to this as connection callbacks live for the entire life of the
@@ -227,7 +302,6 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
-  Network::Connection& connection() { return connection_; }
   // By default waitForNewStream assumes the next event is a new stream and
   // fails an assert if an unexpected event occurs. If a caller truly wishes to
   // wait for a new stream, set ignore_spurious_events = true.
@@ -263,12 +337,17 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
   FakeRawConnection(QueuedConnectionWrapperPtr connection_wrapper)
-      : FakeConnectionBase(std::move(connection_wrapper)) {
-    connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
-  }
+      : FakeConnectionBase(std::move(connection_wrapper)) {}
 
   std::string waitForData(uint64_t num_bytes);
   void write(const std::string& data, bool end_stream = false);
+
+  void initialize() override {
+    shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
+      connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+    });
+    FakeConnectionBase::initialize();
+  }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

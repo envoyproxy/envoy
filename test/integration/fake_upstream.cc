@@ -149,38 +149,32 @@ FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wra
                                        Stats::Store& store, Type type)
     : FakeConnectionBase(std::move(connection_wrapper)) {
   if (type == Type::HTTP1) {
-    codec_.reset(new Http::Http1::ServerConnectionImpl(connection_, *this, Http::Http1Settings()));
+    codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
+                                                       Http::Http1Settings()));
   } else {
-    codec_.reset(
-        new Http::Http2::ServerConnectionImpl(connection_, *this, store, Http::Http2Settings()));
+    codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
+                                                       store, Http::Http2Settings()));
     ASSERT(type == Type::HTTP2);
   }
 
-  connection_.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+  shared_connection_.connection().addReadFilter(
+      Network::ReadFilterSharedPtr{new ReadFilter(*this)});
 }
 
 void FakeConnectionBase::close() {
-  // Make sure that a close didn't already come in and destroy the connection.
-  Thread::LockGuard lock(lock_);
-  if (!disconnected_) {
-    connection_.dispatcher().post([this]() -> void {
-      if (!disconnected_) {
-        connection_.close(Network::ConnectionCloseType::FlushWrite);
-      }
-    });
-  }
+  shared_connection_.executeOnDispatcher([](Network::Connection& connection) {
+    connection.close(Network::ConnectionCloseType::FlushWrite);
+  });
 }
 
 void FakeConnectionBase::readDisable(bool disable) {
-  Thread::LockGuard lock(lock_);
-  RELEASE_ASSERT(!disconnected_);
-  connection_.dispatcher().post([this, disable]() -> void { connection_.readDisable(disable); });
+  shared_connection_.executeOnDispatcher(
+      [disable](Network::Connection& connection) { connection.readDisable(disable); });
 }
 
 void FakeConnectionBase::enableHalfClose(bool enable) {
-  Thread::LockGuard lock(lock_);
-  RELEASE_ASSERT(!disconnected_);
-  connection_.dispatcher().post([this, enable]() -> void { connection_.enableHalfClose(enable); });
+  shared_connection_.executeOnDispatcher(
+      [enable](Network::Connection& connection) { connection.enableHalfClose(enable); });
 }
 
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
@@ -190,18 +184,9 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
   return *new_streams_.back();
 }
 
-void FakeConnectionBase::onEvent(Network::ConnectionEvent event) {
-  Thread::LockGuard lock(lock_);
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    disconnected_ = true;
-    connection_event_.notifyOne();
-  }
-}
-
 void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   Thread::LockGuard lock(lock_);
-  while (!disconnected_) {
+  while (shared_connection_.connected()) {
     connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
     // The default behavior of waitForDisconnect is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
@@ -213,7 +198,7 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
     }
   }
 
-  ASSERT(disconnected_);
+  ASSERT(!shared_connection_.connected());
 }
 
 void FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events) {
@@ -406,13 +391,9 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
 }
 
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
-  Thread::LockGuard lock(lock_);
-  ASSERT_FALSE(disconnected_);
-  connection_.dispatcher().post([data, end_stream, this]() -> void {
-    Thread::LockGuard lock(lock_);
-    ASSERT_FALSE(disconnected_);
+  shared_connection_.executeOnDispatcher([&data, end_stream](Network::Connection& connection) {
     Buffer::OwnedImpl to_write(data);
-    connection_.write(to_write, end_stream);
+    connection.write(to_write, end_stream);
   });
 }
 

@@ -59,8 +59,10 @@ public:
         break;
       }
     }
-    if (fake_upstream_connection != nullptr && fake_upstream_connection->connected()) {
-      fake_upstream_connection->close();
+    if (fake_upstream_connection != nullptr) {
+      if (fake_upstream_connection->connected()) {
+        fake_upstream_connection->close();
+      }
       fake_upstream_connection->waitForDisconnect(true);
     }
     tcp_client->close();
