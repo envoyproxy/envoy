@@ -392,6 +392,66 @@ TEST(AddressFromSockAddr, Pipe) {
 #endif
 }
 
+// Test comparisons between all the different (known) test classes.
+TEST(MixedAddresses, Equality) {
+  enum InstanceType { kIpv4, kIpv6, kPipe };
+  struct TestCase {
+    enum InstanceType type;
+    std::string address;
+    uint32_t port;                // Ignored for kPipe
+  } test_cases[] = {
+    {kIpv4, "1.2.3.4", 1},
+    {kIpv4, "1.2.3.4", 2},
+    {kIpv4, "1.2.3.5", 1},
+    {kIpv6, "[01:023::00ef]", 1},
+    {kIpv6, "[01:023::00ef]", 2},
+    {kIpv6, "[01:023::00ed]", 1},
+    {kPipe, "/path/to/pipe/1", 0},
+    {kPipe, "/path/to/pipe/2", 0}
+  };
+  for (size_t i = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
+    InstanceConstSharedPtr lhs;
+    switch (test_cases[i].type) {
+      case kIpv4:
+        lhs = std::make_shared<Ipv4Instance>(test_cases[i].address, test_cases[i].port);
+        break;
+      case kIpv6:
+        lhs = std::make_shared<Ipv6Instance>(test_cases[i].address, test_cases[i].port);
+        break;
+      case kPipe:
+        lhs = std::make_shared<PipeInstance>(test_cases[i].address);
+        break;
+      default:
+        FAIL();
+    }
+    for (size_t j = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
+      InstanceConstSharedPtr rhs;
+      switch (test_cases[j].type) {
+        case kIpv4:
+          lhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
+          break;
+        case kIpv6:
+          lhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
+          break;
+        case kPipe:
+          lhs = std::make_shared<PipeInstance>(test_cases[j].address);
+          break;
+        default:
+          FAIL();
+      }
+      if (i == j) {
+        EXPECT_EQ(*lhs, *rhs);
+      } else {
+        EXPECT_NE(*lhs, *rhs);
+      }
+    }
+  }
+
+  EXPECT_EQ(Ipv4Instance("1.2.3.4:1"), Ipv4Instance("1.2.3.4:1"));
+  EXPECT_EQ(Ipv6Instance("[01:023::00ef]:1"), Ipv6Instance("[01:023::00ef]:1"));
+  EXPECT_EQ(PipeInstance("/path/to/pipe/1"), PipeInstance("/path/to/pipe/1"));
+}
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy
