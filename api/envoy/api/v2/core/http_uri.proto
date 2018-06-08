@@ -7,8 +7,9 @@ import "gogoproto/gogo.proto";
 
 import "validate/validate.proto";
 
+// [#protodoc-title: HTTP Service URI ]
+
 // Envoy external URI descriptor
-// [#not-implemented-hide:]
 message HttpUri {
   // The HTTP server URI. It should be a full FQDN with protocol, host and path.
   //
