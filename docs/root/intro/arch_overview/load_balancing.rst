@@ -17,8 +17,8 @@ Supported load balancers
 
 .. _arch_overview_load_balancing_types_round_robin:
 
-Round robin
-^^^^^^^^^^^
+Weighted round robin
+^^^^^^^^^^^^^^^^^^^^
 
 This is a simple policy in which each healthy upstream host is selected in round
 robin order. If :ref:`weights
@@ -32,15 +32,27 @@ effective weighting.
 Weighted least request
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The least request load balancer uses an O(1) algorithm which selects two random healthy hosts and
-picks the host which has fewer active requests
-(`Research <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
-approach is nearly as good as an O(N) full scan). If any host in the cluster has a load balancing
-weight greater than 1, the load balancer shifts into a mode where it randomly picks a host and then
-uses that host <weight> times. This algorithm is simple and sufficient for load testing. It should
-not be used where true weighted least request behavior is desired (generally if request durations
-are variable and long in length). We may add a true full scan weighted least request variant in the
-future to cover this use case.
+The least request load balancer uses different algorithms depending on whether any of the hosts have
+weight greater than 1.
+
+* *all weights 1*: An O(1) algorithm which selects two random healthy hosts and
+  picks the host which has fewer active requests (`Research
+  <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
+  approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
+  choices). The P2C load balancer has the property that a host with the highest number of active
+  requests in the cluster will never receive new requests. It will be allowed to drain until it is
+  less than or equal to all of the other hosts.
+* *all weights not 1*:  If any host in the cluster has a load balancing weight greater than 1, the
+  load balancer shifts into a mode where it uses a weighted round robin schedule in which weights
+  are dynamically adjusted based on the host's request load at the time of selection (weight is
+  divided by the current active request count. For example, a host with weight 2 and an active
+  request count of 4 will have a synthetic weight of 2 / 4 = 0.5). This algorithm provides good
+  balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C,
+  a host will never truly drain, though it will receive fewer requests over time.
+
+  .. note::
+    If all weights are not 1, but are the same (e.g., 42), Envoy will still use the weighted round
+    robin schedule instead of P2C.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 

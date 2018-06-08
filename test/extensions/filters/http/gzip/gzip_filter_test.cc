@@ -11,8 +11,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

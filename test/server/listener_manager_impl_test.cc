@@ -216,6 +216,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
     "ssl_context" : {
       "cert_chain_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
       "private_key_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
+      "ca_cert_file" : "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
       "verify_subject_alt_name" : [
         "localhost",
         "127.0.0.1"
@@ -2158,8 +2159,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "^Failed to load CRL from .* without trusted CA certificates$");
+                          EnvoyException, "^Failed to load CRL from .* without trusted CA$");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            verify_subject_alt_name: "spiffe://lyft.com/testclient"
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "SAN-based verification of peer certificates without trusted CA "
+                            "is insecure and not allowed");
 }
 
 } // namespace Server
