@@ -257,12 +257,33 @@ public:
   MOCK_METHOD1(addAcceptFilter_, void(Network::ListenerFilterPtr&));
 };
 
+class MockFilterChain : public FilterChain {
+public:
+  MockFilterChain();
+  ~MockFilterChain();
+
+  // Network::FilterChain
+  MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
+  MOCK_CONST_METHOD0(networkFilterFactories, const std::vector<FilterFactoryCb>&());
+};
+
+class MockFilterChainManager : public FilterChainManager {
+public:
+  MockFilterChainManager();
+  ~MockFilterChainManager();
+
+  // Network::FilterChainManager
+  MOCK_CONST_METHOD1(findFilterChain, const FilterChain*(const ConnectionSocket& socket));
+};
+
 class MockFilterChainFactory : public FilterChainFactory {
 public:
   MockFilterChainFactory();
   ~MockFilterChainFactory();
 
-  MOCK_METHOD1(createNetworkFilterChain, bool(Connection& connection));
+  MOCK_METHOD2(createNetworkFilterChain,
+               bool(Connection& connection,
+                    const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD1(createListenerFilterChain, bool(ListenerFilterManager& listener));
 };
 
@@ -327,9 +348,9 @@ public:
   MockListenerConfig();
   ~MockListenerConfig();
 
+  MOCK_METHOD0(filterChainManager, FilterChainManager&());
   MOCK_METHOD0(filterChainFactory, FilterChainFactory&());
   MOCK_METHOD0(socket, Socket&());
-  MOCK_METHOD0(transportSocketFactory, TransportSocketFactory&());
   MOCK_METHOD0(bindToPort, bool());
   MOCK_CONST_METHOD0(handOffRestoredDestinationConnections, bool());
   MOCK_METHOD0(perConnectionBufferLimitBytes, uint32_t());
@@ -363,6 +384,17 @@ public:
   MOCK_METHOD1(removeListeners, void(uint64_t listener_tag));
   MOCK_METHOD1(stopListeners, void(uint64_t listener_tag));
   MOCK_METHOD0(stopListeners, void());
+};
+
+class MockIp : public Address::Ip {
+public:
+  MOCK_CONST_METHOD0(addressAsString, const std::string&());
+  MOCK_CONST_METHOD0(isAnyAddress, bool());
+  MOCK_CONST_METHOD0(isUnicastAddress, bool());
+  MOCK_CONST_METHOD0(ipv4, Address::Ipv4*());
+  MOCK_CONST_METHOD0(ipv6, Address::Ipv6*());
+  MOCK_CONST_METHOD0(port, uint32_t());
+  MOCK_CONST_METHOD0(version, Address::IpVersion());
 };
 
 class MockResolvedAddress : public Address::Instance {

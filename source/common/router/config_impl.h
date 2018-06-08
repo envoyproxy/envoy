@@ -70,7 +70,7 @@ public:
   // Router::DirectResponseEntry
   void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
   std::string newPath(const Http::HeaderMap& headers) const override;
-  void rewritePathHeader(Http::HeaderMap&) const override {}
+  void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return Http::Code::MovedPermanently; }
   const std::string& responseBody() const override { return EMPTY_STRING; }
 };
@@ -222,14 +222,14 @@ public:
                      hash_policy);
 
   // Router::HashPolicy
-  absl::optional<uint64_t> generateHash(const std::string& downstream_addr,
+  absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,
                                         const Http::HeaderMap& headers,
                                         const AddCookieCallback add_cookie) const override;
 
   class HashMethod {
   public:
     virtual ~HashMethod() {}
-    virtual absl::optional<uint64_t> evaluate(const std::string& downstream_addr,
+    virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                               const Http::HeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
   };
@@ -292,7 +292,8 @@ public:
   }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info) const override;
+                              const RequestInfo::RequestInfo& request_info,
+                              bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::HeaderMap& headers,
                                const RequestInfo::RequestInfo& request_info) const override;
   const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
@@ -324,7 +325,7 @@ public:
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
-  void rewritePathHeader(Http::HeaderMap&) const override {}
+  void rewritePathHeader(Http::HeaderMap&, bool) const override {}
   Http::Code responseCode() const override { return direct_response_code_.value(); }
   const std::string& responseBody() const override { return direct_response_body_; }
 
@@ -341,7 +342,16 @@ protected:
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
-  void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path) const;
+
+  /**
+   * returns the correct path rewrite string for this route.
+   */
+  const std::string& getPathRewrite() const {
+    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  }
+
+  void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
+                          bool insert_envoy_original_path) const;
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
 
@@ -363,8 +373,9 @@ private:
     }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const RequestInfo::RequestInfo& request_info) const override {
-      return parent_->finalizeRequestHeaders(headers, request_info);
+                                const RequestInfo::RequestInfo& request_info,
+                                bool insert_envoy_original_path) const override {
+      return parent_->finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::HeaderMap& headers,
                                  const RequestInfo::RequestInfo& request_info) const override {
@@ -446,9 +457,10 @@ private:
     }
 
     void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                const RequestInfo::RequestInfo& request_info) const override {
+                                const RequestInfo::RequestInfo& request_info,
+                                bool insert_envoy_original_path) const override {
       request_headers_parser_->evaluateHeaders(headers, request_info);
-      DynamicRouteEntry::finalizeRequestHeaders(headers, request_info);
+      DynamicRouteEntry::finalizeRequestHeaders(headers, request_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::HeaderMap& headers,
                                  const RequestInfo::RequestInfo& request_info) const override {
@@ -528,10 +540,6 @@ public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                        Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return prefix_; }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
@@ -540,7 +548,7 @@ public:
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
-  void rewritePathHeader(Http::HeaderMap& headers) const override;
+  void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
   const std::string prefix_;
@@ -554,10 +562,6 @@ public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return path_; }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
@@ -566,7 +570,7 @@ public:
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
-  void rewritePathHeader(Http::HeaderMap& headers) const override;
+  void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
   const std::string path_;
@@ -580,10 +584,6 @@ public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                       Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return regex_str_; }
   PathMatchType matchType() const override { return PathMatchType::Regex; }
@@ -592,7 +592,7 @@ public:
   RouteConstSharedPtr matches(const Http::HeaderMap& headers, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
-  void rewritePathHeader(Http::HeaderMap& headers) const override;
+  void rewritePathHeader(Http::HeaderMap& headers, bool insert_envoy_original_path) const override;
 
 private:
   const std::regex regex_;

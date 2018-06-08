@@ -68,10 +68,7 @@ service Bookstore {
   }
   rpc BookstoreOptions(GetShelfRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
-      custom {
-        kind: "OPTIONS"
-        path: "/shelves/{shelf}"
-      }
+      custom {kind: "OPTIONS" path: "/shelves/{shelf}"}
     };
   }
   // Returns a specific author.

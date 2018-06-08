@@ -12,6 +12,7 @@ filters.
 
   client_ssl_auth_filter
   echo_filter
+  ext_authz_filter
   mongo_proxy_filter
   rate_limit_filter
   redis_proxy_filter

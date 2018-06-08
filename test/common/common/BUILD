@@ -26,6 +26,13 @@ envoy_cc_fuzz_test(
     deps = ["//source/common/common:base64_lib"],
 )
 
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = ["//source/common/common:utility_lib"],
+)
+
 envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
@@ -137,9 +144,10 @@ envoy_cc_binary(
 )
 
 envoy_cc_test(
-    name = "thread_test",
-    srcs = ["thread_test.cc"],
+    name = "lock_guard_test",
+    srcs = ["lock_guard_test.cc"],
     deps = [
+        "//source/common/common:lock_guard_lib",
         "//source/common/common:thread_lib",
     ],
 )

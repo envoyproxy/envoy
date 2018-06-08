@@ -78,6 +78,20 @@ TEST(HttpUtility, appendXff) {
   }
 }
 
+TEST(HttpUtility, appendVia) {
+  {
+    TestHeaderMapImpl headers;
+    Utility::appendVia(headers, "foo");
+    EXPECT_EQ("foo", headers.get_("via"));
+  }
+
+  {
+    TestHeaderMapImpl headers{{"via", "foo"}};
+    Utility::appendVia(headers, "bar");
+    EXPECT_EQ("foo, bar", headers.get_("via"));
+  }
+}
+
 TEST(HttpUtility, createSslRedirectPath) {
   {
     TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/hello"}};
@@ -241,6 +255,26 @@ TEST(HttpUtility, TestHasSetCookieBadValues) {
   EXPECT_TRUE(Utility::hasSetCookie(headers, "key2"));
 }
 
+TEST(HttpUtility, TestMakeSetCookieValue) {
+  EXPECT_EQ("name=\"value\"; Max-Age=10",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), false));
+  EXPECT_EQ("name=\"value\"",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), false));
+  EXPECT_EQ("name=\"value\"; Max-Age=10; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds(10), true));
+  EXPECT_EQ("name=\"value\"; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "", std::chrono::seconds::zero(), true));
+
+  EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), false));
+  EXPECT_EQ("name=\"value\"; Path=/",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), false));
+  EXPECT_EQ("name=\"value\"; Max-Age=10; Path=/; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds(10), true));
+  EXPECT_EQ("name=\"value\"; Path=/; HttpOnly",
+            Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true));
+}
+
 TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;
@@ -274,31 +308,6 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
-}
-
-TEST(HttpUtility, TestAppendHeader) {
-  // Test appending to a string with a value.
-  {
-    HeaderString value1;
-    value1.setCopy("some;", 5);
-    Utility::appendToHeader(value1, "test");
-    EXPECT_EQ(value1, "some;,test");
-  }
-
-  // Test appending to an empty string.
-  {
-    HeaderString value2;
-    Utility::appendToHeader(value2, "my tag data");
-    EXPECT_EQ(value2, "my tag data");
-  }
-
-  // Test empty data case.
-  {
-    HeaderString value3;
-    value3.setCopy("empty", 5);
-    Utility::appendToHeader(value3, "");
-    EXPECT_EQ(value3, "empty");
-  }
 }
 
 } // namespace Http

@@ -29,6 +29,8 @@ are noted.
 
 The following command operators are supported:
 
+.. _config_access_log_format_start_time:
+
 %START_TIME%
   HTTP
     Request start time including milliseconds.
@@ -36,11 +38,33 @@ The following command operators are supported:
   TCP
     Downstream connection start time including milliseconds.
 
-  START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_, for example:
+  START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  In addition to that, START_TIME also accepts following specifiers:
 
-.. code-block:: none
+  +------------------------+-------------------------------------------------------------+
+  | Specifier              | Explanation                                                 |
+  +========================+=============================================================+
+  | ``%s``                 | The number of seconds since the Epoch                       |
+  +------------------------+-------------------------------------------------------------+
+  | ``%f``, ``%[1-9]f``    | Fractional seconds digits, default is 9 digits (nanosecond) |
+  |                        +-------------------------------------------------------------+
+  |                        | - ``%3f`` millisecond (3 digits)                            |
+  |                        | - ``%6f`` microsecond (6 digits)                            |
+  |                        | - ``%9f`` nanosecond (9 digits)                             |
+  +------------------------+-------------------------------------------------------------+
 
-  %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+  Examples of formatting START_TIME is as follows:
+
+  .. code-block:: none
+
+    %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%
+
+    # To include millisecond fraction of the second (.000 ... .999). E.g. 1527590590.528.
+    %START_TIME(%s.%3f)%
+
+    %START_TIME(%s.%6f)%
+
+    %START_TIME(%s.%9f)%
 
 %BYTES_RECEIVED%
   HTTP

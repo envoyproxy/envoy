@@ -81,8 +81,10 @@ public:
    * example prefix rewriting for redirects etc. This should only be called ONCE
    * immediately prior to redirecting.
    * @param headers supplies the request headers, which may be modified during this call.
+   * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers) const PURE;
+  virtual void rewritePathHeader(Http::HeaderMap& headers,
+                                 bool insert_envoy_original_path) const PURE;
 };
 
 /**
@@ -142,6 +144,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -303,24 +306,26 @@ public:
   /**
    * A callback used for requesting that a cookie be set with the given lifetime.
    * @param key the name of the cookie to be set
+   * @param path the path of the cookie, or the empty string if no path should be set.
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+  typedef std::function<std::string(const std::string& key, const std::string& path,
+                                    std::chrono::seconds ttl)>
       AddCookieCallback;
 
   /**
-   * @param downstream_address contains the address of the connected client host, or an
-   * empty string if the request is initiated from within this host
+   * @param downstream_address is the address of the connected client host, or nullptr if the
+   * request is initiated from within this host
    * @param headers stores the HTTP headers for the stream
    * @param add_cookie is called to add a set-cookie header on the reply sent to the downstream
    * host
    * @return absl::optional<uint64_t> an optional hash value to route on. A hash value might not be
    * returned if for example the specified HTTP header does not exist.
    */
-  virtual absl::optional<uint64_t> generateHash(const std::string& downstream_address,
-                                                const Http::HeaderMap& headers,
-                                                AddCookieCallback add_cookie) const PURE;
+  virtual absl::optional<uint64_t>
+  generateHash(const Network::Address::Instance* downstream_address, const Http::HeaderMap& headers,
+               AddCookieCallback add_cookie) const PURE;
 };
 
 class MetadataMatchCriterion {
@@ -424,9 +429,11 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param request_info holds additional information about the request.
+   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info) const PURE;
+                                      const RequestInfo::RequestInfo& request_info,
+                                      bool insert_envoy_original_path) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.

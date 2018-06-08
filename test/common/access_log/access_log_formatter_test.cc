@@ -395,7 +395,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
 
   {
     const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
-                               "%START_TIME%";
+                               "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
 
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
@@ -407,7 +407,41 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     gmtime_r(&test_epoch, &time_val);
     time_t expected_time_t = mktime(&time_val);
 
-    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z", expected_time_t),
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                          expected_time_t),
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
+    // This tests multiple START_TIMEs.
+    const std::string format =
+        "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("1522796769.123|1522796769.1234|1522796769.12345|1522796769.123456",
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
+    const std::string format =
+        "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|%s-%3f-asdf-%9f|.%7f:segm5:%Y)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|1522796769-"
+              "123-asdf-123456000|.1234560:segm5:2018",
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
+    // This tests START_TIME specifier that has shorter segments when formatted, i.e.
+    // strftime("%%%%"") equals "%%", %1f will have 1 as its size.
+    const std::string format = "%START_TIME(%%%%|%%%%%f|%s%%%%%3f|%1f%%%%%s)%";
+    const SystemTime start_time(std::chrono::microseconds(1522796769123456));
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(start_time));
+    FormatterImpl formatter(format);
+    EXPECT_EQ("%%|%%123456000|1522796769%%123|1%%1522796769",
               formatter.format(request_header, response_header, response_trailer, request_info));
   }
 }

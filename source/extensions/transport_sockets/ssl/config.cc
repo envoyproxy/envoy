@@ -32,15 +32,13 @@ static Registry::RegisterFactory<UpstreamSslSocketFactory,
     upstream_registered_;
 
 Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSocketFactory(
-    const std::string& listener_name, const std::vector<std::string>& server_names,
-    bool skip_context_update, const Protobuf::Message& message,
-    Server::Configuration::TransportSocketFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
+    const std::vector<std::string>& server_names) {
   return std::make_unique<Ssl::ServerSslSocketFactory>(
       Ssl::ServerContextConfigImpl(
           MessageUtil::downcastAndValidate<const envoy::api::v2::auth::DownstreamTlsContext&>(
               message)),
-      listener_name, server_names, skip_context_update, context.sslContextManager(),
-      context.statsScope());
+      context.sslContextManager(), context.statsScope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {

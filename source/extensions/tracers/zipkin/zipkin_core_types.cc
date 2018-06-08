@@ -143,6 +143,9 @@ const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
 
 Span::Span(const Span& span) {
   trace_id_ = span.traceId();
+  if (span.isSetTraceIdHigh()) {
+    trace_id_high_ = span.traceIdHigh();
+  }
   name_ = span.name();
   id_ = span.id();
   if (span.isSetParentId()) {
@@ -157,9 +160,6 @@ Span::Span(const Span& span) {
   }
   if (span.isSetDuration()) {
     duration_ = span.duration();
-  }
-  if (span.isSetTraceIdHigh()) {
-    trace_id_high_ = span.traceIdHigh();
   }
   monotonic_start_time_ = span.startTime();
   tracer_ = span.tracer();
@@ -176,7 +176,7 @@ const std::string Span::toJson() {
   rapidjson::Writer<rapidjson::StringBuffer> writer(s);
   writer.StartObject();
   writer.Key(ZipkinJsonFieldNames::get().SPAN_TRACE_ID.c_str());
-  writer.String(Hex::uint64ToHex(trace_id_).c_str());
+  writer.String(traceIdAsHexString().c_str());
   writer.Key(ZipkinJsonFieldNames::get().SPAN_NAME.c_str());
   writer.String(name_.c_str());
   writer.Key(ZipkinJsonFieldNames::get().SPAN_ID.c_str());

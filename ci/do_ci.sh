@@ -106,8 +106,17 @@ elif [[ "$1" == "bazel.dev" ]]; then
 elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   # This is around until Circle supports IPv6. We try to run a limited set of IPv6 tests as fast
   # as possible for basic sanity testing.
-  apt-get update && apt-get install -y dnsutils && \
-    dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
+
+  # Hack to avoid returning IPv6 DNS
+  sed -i 's_#precedence ::ffff:0:0/96  100_precedence ::ffff:0:0/96  100_' /etc/gai.conf
+  # Debug IPv6 network issues
+  apt-get update && apt-get install -y dnsutils net-tools curl && \
+    ifconfig && \
+    route -A inet -A inet6 && \
+    curl -v https://go.googlesource.com && \
+    curl -6 -v https://go.googlesource.com && \
+    dig go.googlesource.com A go.googlesource.com AAAA
+
   setup_clang_toolchain
   echo "Testing..."
   cd "${ENVOY_CI_DIR}"
@@ -171,8 +180,10 @@ elif [[ "$1" == "fix_format" ]]; then
   ./tools/check_format.py fix
   exit 0
 elif [[ "$1" == "check_format" ]]; then
-  echo "check_format..."
   cd "${ENVOY_SRCDIR}"
+  echo "check_format_test..."
+  ./tools/check_format_test_helper.py --log=WARN
+  echo "check_format..."
   ./tools/check_format.py check
   exit 0
 elif [[ "$1" == "docs" ]]; then

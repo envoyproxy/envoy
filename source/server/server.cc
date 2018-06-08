@@ -22,6 +22,7 @@
 #include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/memory/stats.h"
@@ -128,6 +129,7 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
+    server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
@@ -362,10 +364,15 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([this, &init_manager, workers_start_cb]() {
+  cm.setInitializedCb([this, &init_manager, &cm, workers_start_cb]() {
     if (shutdown_) {
       return;
     }
+
+    // Pause RDS to ensure that we don't send any requests until we've
+    // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
+    // so we pause RDS until we've completed all the callbacks.
+    cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize([this, workers_start_cb]() {
@@ -375,6 +382,10 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
 
       workers_start_cb();
     });
+
+    // Now that we're execute all the init callbacks we can resume RDS
+    // as we've subscribed to all the statically defined RDS resources.
+    cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
 }
 

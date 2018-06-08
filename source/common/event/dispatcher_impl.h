@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <mutex>
 #include <vector>
 
 #include "envoy/event/deferred_deletable.h"
@@ -75,8 +74,8 @@ private:
   std::vector<DeferredDeletablePtr> to_delete_1_;
   std::vector<DeferredDeletablePtr> to_delete_2_;
   std::vector<DeferredDeletablePtr>* current_to_delete_;
-  std::mutex post_lock_;
-  std::list<std::function<void()>> post_callbacks_;
+  Thread::MutexBasicLockable post_lock_;
+  std::list<std::function<void()>> post_callbacks_ GUARDED_BY(post_lock_);
   bool deferred_deleting_{};
 };
 

@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-// [#proto-status: draft]
-
 package envoy.service.auth.v2alpha;
 option go_package = "v2alpha";
 option java_generic_services = true;
@@ -10,6 +8,11 @@ import "envoy/service/auth/v2alpha/attribute_context.proto";
 
 import "google/rpc/status.proto";
 import "validate/validate.proto";
+
+// [#protodoc-title: Authorization Service ]
+
+// The authorization service request messages used by external authorization :ref:`network filter
+// <config_network_filters_ext_authz>` and :ref:`HTTP filter <config_http_filters_ext_authz>`.
 
 // A generic interface for performing authorization check on incoming
 // requests to a networked service.

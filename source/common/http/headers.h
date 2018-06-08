@@ -85,6 +85,7 @@ public:
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
   const LowerCaseString Vary{"vary"};
+  const LowerCaseString Via{"via"};
   const LowerCaseString XB3TraceId{"x-b3-traceid"};
   const LowerCaseString XB3SpanId{"x-b3-spanid"};
   const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
@@ -144,6 +145,7 @@ public:
     const std::string Cancelled{"cancelled"};
     const std::string DeadlineExceeded{"deadline-exceeded"};
     const std::string ResourceExhausted{"resource-exhausted"};
+    const std::string Unavailable{"unavailable"};
   } EnvoyRetryOnGrpcValues;
 
   struct {

@@ -21,6 +21,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * `SAN` is replaced by `URI` in the `x-forwarded-client-cert` header.
 * The `endpoint` field in the http health check filter is deprecated in favor of the `headers`
   field where one can specify HeaderMatch objects to match on.
+* The `sni_domains` field in the filter chain match was deprecated/renamed to `server_names`.
 
 ## Version 1.6.0 (March 20, 2018)
 
