@@ -192,6 +192,13 @@ void HeaderString::setReference(const std::string& ref_value) {
   string_length_ = ref_value.size();
 }
 
+// Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
+// A fully specialized template must be defined once in the program, hence this may not be in
+// a header file.
+template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString& key) {
+  return key.get().c_str()[0] == ':';
+}
+
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value)

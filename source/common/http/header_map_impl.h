@@ -127,31 +127,14 @@ protected:
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
-    std::list<HeaderEntryImpl>::iterator insert(HeaderString&& key, HeaderString&& value) {
-      bool is_pseudo_header = key.c_str()[0] == ':';
-      std::list<HeaderEntryImpl>::iterator i =
-          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(), std::move(key),
-                           std::move(value));
-      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
-        pseudo_headers_end_ = i;
-      }
-      return i;
-    }
+    template <class Key> bool isPseudoHeader(const Key& key) { return key.c_str()[0] == ':'; }
 
-    std::list<HeaderEntryImpl>::iterator insert(const LowerCaseString& key, HeaderString&& value) {
-      bool is_pseudo_header = key.get().c_str()[0] == ':';
-      std::list<HeaderEntryImpl>::iterator i = headers_.emplace(
-          is_pseudo_header ? pseudo_headers_end_ : headers_.end(), key, std::move(value));
-      if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
-        pseudo_headers_end_ = i;
-      }
-      return i;
-    }
-
-    std::list<HeaderEntryImpl>::iterator insert(const LowerCaseString& key) {
-      bool is_pseudo_header = key.get().c_str()[0] == ':';
+    template <class Key, class... Value>
+    std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
+      const bool is_pseudo_header = isPseudoHeader(key);
       std::list<HeaderEntryImpl>::iterator i =
-          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(), key);
+          headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
+                           std::forward<Key>(key), std::forward<Value>(value)...);
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;
       }
@@ -167,7 +150,7 @@ protected:
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
       headers_.remove_if([&](const HeaderEntryImpl& entry) {
-        bool to_remove = p(entry);
+        const bool to_remove = p(entry);
         if (to_remove) {
           if (pseudo_headers_end_ == entry.entry_) {
             pseudo_headers_end_++;
