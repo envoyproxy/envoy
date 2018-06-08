@@ -36,6 +36,7 @@ public:
   const std::string PEER_IPV6 = "peer.ipv6";
   const std::string PEER_PORT = "peer.port";
   const std::string PEER_SERVICE = "peer.service";
+  const std::string SAMPLING_PRIORITY = "sampling.priority";
   const std::string SPAN_KIND = "span.kind";
 
   // Non-standard tag names.
@@ -125,6 +126,7 @@ public:
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }
+  void setSampled(const bool) override {}
 };
 
 class HttpNullTracer : public HttpTracer {

@@ -38,6 +38,9 @@ Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& head
     health_check_request_ = true;
     callbacks_->requestInfo().healthCheck(true);
 
+    // Hint to tracer to ignore the span and any subsequent child spans
+    callbacks_->activeSpan().setSampled(false);
+
     // If we are not in pass through mode, we always handle. Otherwise, we handle if the server is
     // in the failed state or if we are using caching and we should use the cached response.
     if (!pass_through_mode_ || context_.healthCheckFailed() ||

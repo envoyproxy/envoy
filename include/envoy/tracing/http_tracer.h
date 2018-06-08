@@ -99,6 +99,12 @@ public:
    */
   virtual SpanPtr spawnChild(const Config& config, const std::string& name,
                              SystemTime start_time) PURE;
+
+  /**
+   * Set the span's sampled flag.
+   * @param sampled whether the span and any subsequent child spans should be sampled
+   */
+  virtual void setSampled(const bool sampled) PURE;
 };
 
 /**
