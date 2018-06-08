@@ -1291,18 +1291,21 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 // priority from the ConnPoolsContainer would delete the ConnPoolsContainer mid-iteration over the
 // pool.
 TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "strict_dns",
-      "dns_resolvers": [ "1.2.3.4:80" ],
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: localhost
+          port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1313,7 +1316,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
@@ -1347,18 +1350,21 @@ public:
 // Regression test for https://github.com/envoyproxy/envoy/issues/3518. Make sure we handle a
 // drain callback during CP destroy.
 TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
-  const std::string json = R"EOF(
-  {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "strict_dns",
-      "dns_resolvers": [ "1.2.3.4:80" ],
-      "lb_type": "round_robin",
-      "hosts": [{"url": "tcp://localhost:11001"}]
-    }]
-  }
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: localhost
+          port_value: 11001
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
@@ -1369,7 +1375,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))
       .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
-  create(parseBootstrapFromJson(json));
+  create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2"}));
