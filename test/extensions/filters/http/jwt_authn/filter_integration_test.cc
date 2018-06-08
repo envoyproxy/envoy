@@ -37,6 +37,7 @@ INSTANTIATE_TEST_CASE_P(Protocols, LocalJwksIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// With local Jwks, this test verifies a request is passed with a good Jwt token.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   config_helper_.addFilter(getFilterConfig(true));
   initialize();
@@ -66,6 +67,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
+// With local Jwks, this test verifies a request is rejected with an expired Jwt token.
 TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   config_helper_.addFilter(getFilterConfig(true));
   initialize();
@@ -137,6 +139,8 @@ INSTANTIATE_TEST_CASE_P(Protocols, RemoteJwksIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// With remote Jwks, this test verifies a request is passed with a good Jwt token
+// and a good public key fetched from a remote server.
 TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   initializeFilter();
 
@@ -170,6 +174,8 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   cleanup();
 }
 
+// With remote Jwks, this test verifies a request is rejected even with a good Jwt token
+// when the remote jwks server replied with 500.
 TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
   initializeFilter();
 

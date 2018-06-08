@@ -181,12 +181,9 @@ public:
   static void appendToHeader(HeaderString& header, const std::string& data);
 
   /**
-   * Extract host and path from a URI. host may contain port in the format of host:port.
+   * Extract host and path from a URI. The host may contain port.
    * This function doesn't validate if the URI is valid. It only parses the URI with following
-   * format:
-   *    scheme://host/path
-   * if not "://", the whole string will be "host/path" portion.
-   * if not "/" in the "host/path" portion,  the whole string will be host with path as "/".
+   * format: scheme://host/path.
    * @param the input URI string
    * @param the output host string.
    * @param the output path string.

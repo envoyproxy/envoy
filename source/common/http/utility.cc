@@ -353,11 +353,11 @@ void Utility::extractHostPathFromUri(const std::string& uri, std::string& host, 
    *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
    *
    *  Example:
-   *  uri  = "https://example.com/certs"
+   *  uri  = "https://example.com:8443/certs"
    *  pos:          ^
    *  host_pos:       ^
-   *  path_pos:                  ^
-   *  host = "example.com"
+   *  path_pos:                       ^
+   *  host = "example.com:8443"
    *  path = "/certs"
    */
   const auto pos = uri.find("://");
