@@ -58,6 +58,8 @@ proto_library(
         "//envoy/data/accesslog/v2:accesslog",
         "//envoy/data/tap/v2alpha:capture",
         "//envoy/service/accesslog/v2:als",
+        "//envoy/service/auth/v2alpha:attribute_context",
+        "//envoy/service/auth/v2alpha:external_auth",
         "//envoy/service/discovery/v2:ads",
         "//envoy/service/load_stats/v2:lrs",
         "//envoy/service/metrics/v2:metrics_service",

@@ -130,6 +130,7 @@
       "ssl_context": {
         "cert_chain_file": "certs/clientcert.pem",
         "private_key_file": "certs/clientkey.pem",
+        "ca_cert_file": "certs/cacert.pem",
         "verify_subject_alt_name": ["front-proxy.yourcompany.net"]
       },
       "hosts": [{"url": "tcp://front-proxy.yourcompany.net:9400"}]

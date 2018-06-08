@@ -11,14 +11,10 @@ import shutil
 import logging
 import subprocess
 
-def getenvFallback(envvar, fallback):
-  val = os.getenv(envvar)
-  if not val:
-    val = fallback
-  return val
+os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
 
 tools = os.path.dirname(os.path.realpath(__file__))
-tmp = os.path.join(getenvFallback('TEST_TMPDIR', "/tmp"), "check_format_test")
+tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')
 check_format = os.path.join(tools, 'check_format.py')
 errors = 0
@@ -67,9 +63,13 @@ def fixFileHelper(filename):
 def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
+    print "FAILED:"
+    emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
+    print "FAILED:"
+    emitStdoutAsError(stdout)
     return 1
   return 0
 
@@ -83,8 +83,7 @@ def fixFileExpectingNoChange(file):
   return 0
 
 def emitStdoutAsError(stdout):
-  for line in stdout:
-    logging.error("    %s" % line)
+  logging.error("\n".join(stdout))
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
@@ -113,7 +112,7 @@ def checkFileExpectingOK(filename):
   return 0
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description='tester for check_foramt.py.')
+  parser = argparse.ArgumentParser(description='tester for check_format.py.')
   parser.add_argument('--log', choices=['INFO', 'WARN', 'ERROR'], default='INFO')
   args = parser.parse_args()
   logging.basicConfig(format='%(message)s', level=args.log)
@@ -126,13 +125,38 @@ if __name__ == "__main__":
   os.makedirs(tmp)
   os.chdir(tmp)
   errors += fixFileExpectingSuccess("over_enthusiastic_spaces.cc")
+  errors += fixFileExpectingSuccess("angle_bracket_include.cc")
+  errors += fixFileExpectingFailure("proto_deps.cc",
+                                    "has unexpected direct dependency on google.protobuf")
+  errors += fixFileExpectingSuccess("proto_style.cc")
+  errors += fixFileExpectingSuccess("long_line.cc")
+  errors += fixFileExpectingSuccess("header_order.cc")
+  errors += fixFileExpectingSuccess("license.BUILD")
   errors += fixFileExpectingFailure("no_namespace_envoy.cc",
                                     "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+
   errors += fixFileExpectingNoChange("ok_file.cc")
 
   errors += checkFileExpectingError("over_enthusiastic_spaces.cc",
                                     "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+  errors += checkFileExpectingError("angle_bracket_include.cc",
+                                    "envoy includes should not have angle brackets")
+  errors += checkFileExpectingError("no_namespace_envoy.cc",
+                                    "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += checkFileExpectingError("proto_deps.cc",
+                                    "as unexpected direct dependency on google.protobuf")
+  errors += checkFileExpectingError("proto_style.cc", "incorrect protobuf type reference")
+  errors += checkFileExpectingError("long_line.cc", "clang-format check failed")
+  errors += checkFileExpectingError("header_order.cc", "header_order.py check failed")
+  errors += checkFileExpectingError("license.BUILD", "envoy_build_fixer check failed")
   errors += checkFileExpectingOK("ok_file.cc")
+
+  # TODO(jmarantz): I think this is a bug in check_format.py: this dependency can't be
+  # fixed automatically, but the invalid BUILD file is not detected when a 'fix' is requested,
+  # and so it passes silently. But if you then call 'check' it will fail.
+  errors += fixFileExpectingSuccess("proto.BUILD")  # should be fixFileExpectingFailure.
+  errors += checkFileExpectingError("proto.BUILD",
+                                    "unexpected direct external dependency on protobuf")
 
   if errors != 0:
     logging.error("%d FAILURES" % errors)
