@@ -95,7 +95,7 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, const std::string path,
+  CookieHashMethod(const std::string& key, const std::string& path,
                    const absl::optional<std::chrono::seconds>& ttl)
       : key_(key), path_(path), ttl_(ttl) {}
 
