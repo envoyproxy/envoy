@@ -65,7 +65,8 @@ Connections to upstream hosts are pooled and unused hosts are flushed out when t
 :ref:`cleanup_interval_ms <config_cluster_manager_cluster_cleanup_interval_ms>`, which defaults to
 5000ms. If the original destination address is is not available, no upstream connection is opened.
 Original destination service discovery must be used with the original destination :ref:`load
-balancer <arch_overview_load_balancing_types_original_destination>`.
+balancer <arch_overview_load_balancing_types_original_destination>`. Please note that
+fully resolved IP address should be passed in this header.
 
 .. _arch_overview_service_discovery_types_sds:
 

@@ -27,6 +27,7 @@ OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, Cluste
   priority_set_.addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         // Update the hosts map
+        //TODO(ramaraochavali): use cluster stats and move the log lines to debug.
         for (const HostSharedPtr& host : hosts_removed) {
           ENVOY_LOG(debug, "Removing host {}.", host->address()->asString());
           host_map_.remove(host);
@@ -97,7 +98,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       }
     }
   }
-
+  //TODO(ramaraochavali): add a stat and move this log line to debug.
   ENVOY_LOG(warn, "original_dst_load_balancer: No downstream connection or no original_dst.");
   return nullptr;
 }
@@ -115,6 +116,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
     } catch (const Envoy::EnvoyException& e) {
       ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
+      parent_.lock()->info_->stats().original_dst_host_invalid_.inc();
     }
   }
   return request_host;
