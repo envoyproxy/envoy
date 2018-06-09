@@ -176,7 +176,9 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
-    EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "cluster.name.original_dst_host_invalid")->value());
+    EXPECT_EQ(
+        1,
+        TestUtility::findCounter(stats_store_, "cluster.name.original_dst_host_invalid")->value());
   }
 
   // Request host override malformed ip => no host.
@@ -187,7 +189,9 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
-    EXPECT_EQ(2, TestUtility::findCounter(stats_store_, "cluster.name.original_dst_host_invalid")->value());
+    EXPECT_EQ(
+        2,
+        TestUtility::findCounter(stats_store_, "cluster.name.original_dst_host_invalid")->value());
   }
 
   // Downstream connection is not using original dst => no host.
