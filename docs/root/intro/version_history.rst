@@ -101,7 +101,7 @@ Version history
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
-* upstream: added support for host override for a request in Original Destination Cluster.
+* upstream: added support for host override for a request in :ref:`Original Destination Cluster <arch_overview_load_balancing_types_original_destination>`.
 
 1.6.0 (March 20, 2018)
 ======================
