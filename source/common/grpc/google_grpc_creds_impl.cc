@@ -79,11 +79,8 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultChannelCredential
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
   std::shared_ptr<grpc::ChannelCredentials> channel_creds =
       sslChannelCredentials(grpc_service_config.google_grpc());
-  // Call credentials aren't supported on insecure channels (it would be bad
-  // placing a token in clear text, plus the gRPC core doesn't support it
-  // https://github.com/grpc/grpc/issues/8142).
   if (channel_creds == nullptr) {
-    return grpc::InsecureChannelCredentials();
+    channel_creds = grpc::InsecureChannelCredentials();
   }
   auto call_creds_vec = callCredentials(grpc_service_config.google_grpc());
   if (call_creds_vec.empty()) {
