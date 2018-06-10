@@ -18,9 +18,6 @@ Stats::SinkPtr HystrixSinkFactory::createStatsSink(const Protobuf::Message& conf
                                                    Server::Instance& server) {
   const auto& hystrix_sink =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::HystrixSink&>(config);
-  if (hystrix_sink.num_of_buckets() == 0) { // if not set
-    return std::make_unique<Hystrix::HystrixSink>(server);
-  }
   return std::make_unique<Hystrix::HystrixSink>(server, hystrix_sink.num_of_buckets());
 }
 

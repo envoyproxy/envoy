@@ -250,18 +250,8 @@ const std::string HystrixSink::printRollingWindows() {
 
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_of_buckets)
     : // stats_(new HystrixStatCache(num_of_buckets)),
-      server_(server), current_index_(num_of_buckets), window_size_(num_of_buckets + 1) {
-  init();
-}
-
-HystrixSink::HystrixSink(Server::Instance& server)
-    : // stats_(new HystrixStatCache()),
-      server_(server), current_index_(DEFAULT_NUM_OF_BUCKETS),
-      window_size_(DEFAULT_NUM_OF_BUCKETS + 1) {
-  init();
-}
-
-void HystrixSink::init() {
+      server_(server), current_index_(num_of_buckets > 0 ? num_of_buckets : DEFAULT_NUM_OF_BUCKETS),
+      window_size_(current_index_ + 1) {
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
@@ -281,7 +271,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   response_headers.insertConnection().value().setReference(
       Http::Headers::get().ConnectionValues.Close);
   response_headers.insertAccessControlAllowHeaders().value().setReference(
-      Http::Headers::get().AccessControlAllowHeadersValue.AccessControlAllowHeadersHystrix);
+      Http::Headers::get().AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.insertAccessControlAllowOrigin().value().setReference(
       Http::Headers::get().AccessControlAllowOriginValue.All);
   response_headers.insertNoChunks().value().setReference("0");

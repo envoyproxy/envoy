@@ -44,7 +44,6 @@ void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   bool saw_content_length = false;
-  bool no_chunks = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         const char* key_to_use = header.key().c_str();
@@ -70,19 +69,15 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     saw_content_length = true;
   }
 
-  // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
-  // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
-  // header to avoid adding chunks
-  if (headers.NoChunks()) {
-    no_chunks = true;
-  }
-
   ASSERT(!headers.TransferEncoding());
 
   // Assume we are chunk encoding unless we are passed a content length or this is a header only
   // response. Upper layers generally should strip transfer-encoding since it only applies to
   // HTTP/1.1. The codec will infer it based on the type of response.
-  if (saw_content_length || no_chunks) {
+  // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
+  // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
+  // header to avoid adding chunks
+  if (saw_content_length || headers.NoChunks()) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {

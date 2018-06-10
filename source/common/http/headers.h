@@ -213,8 +213,7 @@ public:
   } VaryValues;
 
   struct {
-    const std::string AccessControlAllowHeadersHystrix{
-        "Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
+    const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
   } AccessControlAllowHeadersValue;
 
   struct {

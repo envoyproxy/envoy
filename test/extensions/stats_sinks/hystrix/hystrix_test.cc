@@ -29,23 +29,22 @@ class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_.reset(new HystrixSink(server_, 10)); }
 
-  absl::string_view getStreamField(absl::string_view dataMessage, absl::string_view key) {
-    absl::string_view::size_type key_pos = dataMessage.find(key);
+  absl::string_view getStreamField(absl::string_view data_message, absl::string_view key) {
+    absl::string_view::size_type key_pos = data_message.find(key);
     EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view trimDataBeforeKey = dataMessage.substr(key_pos);
-    key_pos = trimDataBeforeKey.find(" ");
+    absl::string_view trim_data_before_Key = data_message.substr(key_pos);
+    key_pos = trim_data_before_Key.find(" ");
     EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view trimDataAfterValue = trimDataBeforeKey.substr(key_pos + 1);
-    key_pos = trimDataAfterValue.find(",");
+    absl::string_view trim_data_after_value = trim_data_before_Key.substr(key_pos + 1);
+    key_pos = trim_data_after_value.find(",");
     EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view actual = trimDataAfterValue.substr(0, key_pos);
+    absl::string_view actual = trim_data_after_value.substr(0, key_pos);
     return actual;
   }
 
   Buffer::OwnedImpl createClusterAndCallbacks() {
 
-    // set cluster
-    // cluster1_.info_->name_ = cluster1_name_;
+    // Set cluster.
     cluster_map_.emplace("test_cluster1", cluster1_);
     ON_CALL(server_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
@@ -54,13 +53,13 @@ public:
     ON_CALL(*cluster1_info_, name()).WillByDefault(testing::ReturnRefOfCopy(cluster1_name_));
     ON_CALL(*cluster1_info_, statsScope()).WillByDefault(ReturnRef(cluster1_stats_scope_));
 
-    // set gauge value.
+    // Set gauge value.
     membership_total_gauge_.name_ = "membership_total";
     ON_CALL(cluster1_stats_scope_, gauge("membership_total"))
         .WillByDefault(ReturnRef(membership_total_gauge_));
     ON_CALL(membership_total_gauge_, value()).WillByDefault(Return(5));
 
-    // attach counters
+    // Attach counters.
     success_counter_.name_ = "upstream_rq_2xx";
     ON_CALL(cluster1_stats_scope_, counter("upstream_rq_2xx"))
         .WillByDefault(ReturnRef(success_counter_));
@@ -80,9 +79,9 @@ public:
     ON_CALL(error_4xx_counter_, value()).WillByDefault(Return(0));
     ON_CALL(retry_5xx_counter_, value()).WillByDefault(Return(0));
 
-    // set callbacks to send data to buffer
     Buffer::OwnedImpl buffer;
     auto encode_callback = [&buffer](Buffer::Instance& data, bool) {
+      // Set callbacks to send data to buffer.
       buffer.add(
           data); // This will append to the end of the buffer, so multiple calls will all be dumped
       // one after another into this buffer. See Buffer::Instance for other buffer
@@ -120,7 +119,7 @@ public:
 TEST_F(HystrixSinkTest, EmptyFlush) {
   InSequence s;
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
-  // register callback to sink
+  // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
   sink_->flush(source_);
@@ -137,7 +136,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
 TEST_F(HystrixSinkTest, BasicFlow) {
   InSequence s;
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
-  // register callback to sink
+  // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
   for (int i = 0; i < 12; i++) {
@@ -149,26 +148,23 @@ TEST_F(HystrixSinkTest, BasicFlow) {
     sink_->flush(source_);
   }
 
-  //  //std::string rolling_map = sink_->getStats().printRollingWindow();
   std::string rolling_map = sink_->printRollingWindows();
-  std::size_t pos = rolling_map.find("test_cluster1.total");
-  EXPECT_NE(std::string::npos, pos);
+  EXPECT_NE(std::string::npos, rolling_map.find("test_cluster1.total"));
 
   std::string data_message = TestUtility::bufferToString(buffer);
 
-  // check stream format and data
-  EXPECT_EQ(getStreamField(data_message, "errorCount"), "140"); // note that on regular operation,
-  // 5xx and timeout are raised
-  // together, so timeouts are
-  // reduced
-  // from 5xx count
+  // Check stream format and data.
+  EXPECT_EQ(getStreamField(data_message, "errorCount"), "140"); // Note that on regular operation,
+                                                                // 5xx and timeout are raised
+                                                                // together, so timeouts are reduced
+                                                                // from 5xx count
   EXPECT_EQ(getStreamField(data_message, "requestCount"), "320");
   EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "80");
   EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "70");
   EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "30");
   EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "78");
 
-  // check the values are reset
+  // Check the values are reset.
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
   sink_->flush(source_);
@@ -189,20 +185,20 @@ TEST_F(HystrixSinkTest, Disconnect) {
   sink_->flush(source_);
   EXPECT_EQ(buffer.length(), 0);
 
-  // register callback to sink
+  // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
   std::string data_message = TestUtility::bufferToString(buffer);
   EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
 
-  // disconnect
+  // Disconnect.
   buffer.drain(buffer.length());
   sink_->unregisterConnection(&callbacks_);
   sink_->flush(source_);
   EXPECT_EQ(buffer.length(), 0);
 
-  // reconnect
+  // Reconnect.
   buffer.drain(buffer.length());
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
@@ -214,10 +210,10 @@ TEST_F(HystrixSinkTest, Disconnect) {
 TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   InSequence s;
 
-  // register callback to sink
+  // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
-  // new cluster
+  // New cluster.
   NiceMock<Upstream::MockCluster> cluster2;
   Upstream::MockClusterInfo* cluster2_info = new NiceMock<Upstream::MockClusterInfo>();
   Upstream::ClusterInfoConstSharedPtr cluster2_info_ptr{cluster2_info};
@@ -225,17 +221,16 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   NiceMock<Stats::MockStore> cluster2_stats_scope;
   const std::string cluster2_name{"test_cluster2"};
 
-  // behavior
   ON_CALL(cluster2, info()).WillByDefault(Return(cluster2_info_ptr));
 
   ON_CALL(*cluster2_info, name()).WillByDefault(testing::ReturnRefOfCopy(cluster2_name));
   ON_CALL(*cluster2_info, statsScope()).WillByDefault(ReturnRef(cluster2_stats_scope));
 
-  // set gauge value.
+  // Set gauge value.
   ON_CALL(cluster2_stats_scope, gauge("membership_total"))
       .WillByDefault(ReturnRef(membership_total_gauge_));
 
-  // attach counters
+  // Attach counters.
   NiceMock<Stats::MockCounter> success_counter2;
   NiceMock<Stats::MockCounter> error_5xx_counter2;
   NiceMock<Stats::MockCounter> retry_5xx_counter2;
@@ -261,21 +256,21 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   cluster2_info->stats().upstream_rq_per_try_timeout_.reset();
   cluster2_info->stats().upstream_rq_pending_overflow_.reset();
 
-  // add cluster
+  // Add cluster.
   cluster_map_.emplace(cluster2_name, cluster2);
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
-  // generate data to both clusters
+  // Generate data to both clusters.
   for (int i = 0; i < 12; i++) {
     buffer.drain(buffer.length());
-    // cluster 1
+    // Cluster 1
     ON_CALL(error_5xx_counter_, value()).WillByDefault(Return((i + 1) * 17));
     ON_CALL(success_counter_, value()).WillByDefault(Return((i + 1) * 7));
     cluster1_info_->stats().upstream_rq_timeout_.add(1);
     cluster1_info_->stats().upstream_rq_per_try_timeout_.add(2);
     cluster1_info_->stats().upstream_rq_pending_overflow_.add(8);
 
-    // cluster 2
+    // Cluster 2
     ON_CALL(error_5xx_counter2, value()).WillByDefault(Return((i + 1) * 1));
     ON_CALL(retry_5xx_counter2, value()).WillByDefault(Return((i + 1) * 2));
     ON_CALL(error_4xx_counter2, value()).WillByDefault(Return((i + 1) * 3));
@@ -292,27 +287,24 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
   std::size_t pos1 = data_message.find(cluster1_name_);
   std::size_t pos2 = data_message.find(cluster2_name);
-  EXPECT_NE(std::string::npos, pos1);
-  EXPECT_NE(std::string::npos, pos2);
+  ASSERT_NE(std::string::npos, pos1);
+  ASSERT_NE(std::string::npos, pos2);
 
   std::string data_message_1 =
       (pos1 < pos2) ? data_message.substr(pos1, pos2) : data_message.substr(pos1);
   std::string data_message_2 =
       (pos2 < pos1) ? data_message.substr(pos2, pos1) : data_message.substr(pos2);
 
-  // check stream format and data
-  EXPECT_EQ(getStreamField(data_message_1, "errorCount"), "160"); // note that on regular operation,
-  // 5xx and timeout are raised
-  // together, so timeouts are
-  // reduced
-  // from 5xx count
+  // Check stream format and data.
+  EXPECT_EQ(getStreamField(data_message_1, "errorCount"), "160"); // Note that on regular operation,
+  // 5xx and timeout are raised together, so timeouts are reduced from 5xx count.
   EXPECT_EQ(getStreamField(data_message_1, "requestCount"), "340");
   EXPECT_EQ(getStreamField(data_message_1, "rollingCountSemaphoreRejected"), "80");
   EXPECT_EQ(getStreamField(data_message_1, "rollingCountSuccess"), "70");
   EXPECT_EQ(getStreamField(data_message_1, "rollingCountTimeout"), "30");
   EXPECT_EQ(getStreamField(data_message_1, "errorPercentage"), "79");
 
-  // check stream format and data
+  // Check stream format and data.
   EXPECT_EQ(getStreamField(data_message_2, "errorCount"), "70"); // note that on regular operation,
                                                                  // 5xx and timeout are raised
                                                                  // together, so timeouts are
@@ -325,7 +317,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
   buffer.drain(buffer.length());
 
-  // removing cluster
+  // Removing cluster.
   cluster_map_.erase(cluster2_name);
   ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
   sink_->flush(source_);
@@ -334,7 +326,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   EXPECT_NE(std::string::npos, data_message.find(cluster1_name_));
   EXPECT_EQ(std::string::npos, data_message.find(cluster2_name));
 
-  // add cluster again
+  // Add cluster again.
   buffer.drain(buffer.length());
   cluster_map_.emplace(cluster2_name, cluster2);
   ON_CALL(error_5xx_counter2, value()).WillByDefault(Return(0));
@@ -351,12 +343,12 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   data_message = TestUtility::bufferToString(buffer);
   pos1 = data_message.find(cluster1_name_);
   pos2 = data_message.find(cluster2_name);
-  EXPECT_NE(std::string::npos, pos1);
-  EXPECT_NE(std::string::npos, pos2);
+  ASSERT_NE(std::string::npos, pos1);
+  ASSERT_NE(std::string::npos, pos2);
 
   data_message_2 = (pos2 < pos1) ? data_message.substr(pos2, pos1) : data_message.substr(pos2);
 
-  // check that old values of test_cluster2 were deleted
+  // Check that old values of test_cluster2 were deleted.
   EXPECT_EQ(getStreamField(data_message_2, "errorPercentage"), "0");
   EXPECT_EQ(getStreamField(data_message_2, "errorCount"), "0");
   EXPECT_EQ(getStreamField(data_message_2, "requestCount"), "0");

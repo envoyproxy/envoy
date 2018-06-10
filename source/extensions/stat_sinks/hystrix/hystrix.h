@@ -17,11 +17,11 @@ typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
 struct ClusterStatsCache {
-  // This constructor initializes all the stat names by concatenating
-  // the cluster name and the rest of the stat name that's required for
-  // the lookup.
   ClusterStatsCache(const std::string& cluster_name);
 
+  void printToStream(std::stringstream& out_str);
+  void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
+                          std::stringstream& out_str);
   std::string cluster_name_;
 
   // Rolling windows
@@ -30,10 +30,6 @@ struct ClusterStatsCache {
   RollingWindow total_;
   RollingWindow timeouts_;
   RollingWindow rejected_;
-
-  void printToStream(std::stringstream& out_str);
-  void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
-                          std::stringstream& out_str);
 };
 
 typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
@@ -41,19 +37,17 @@ typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Instance& server, uint64_t num_of_buckets);
-  HystrixSink(Server::Instance& server);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
-  void init();
   void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 
   /**
-   * register a new connection
+   * Register a new connection.
    */
   void registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_register);
   /**
-   * remove registered connection
+   * Remove registered connection.
    */
   void unregisterConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_remove);
 
@@ -127,15 +121,14 @@ private:
                             uint64_t reporting_hosts, std::chrono::milliseconds rolling_window_ms,
                             std::stringstream& ss);
 
-  // HystrixStatCachePtr stats_;
-  std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_{};
+  std::vector<Http::StreamDecoderFilterCallbacks*> callbacks_list_;
   Server::Instance& server_;
   uint64_t current_index_;
   const uint64_t window_size_;
   static const uint64_t DEFAULT_NUM_OF_BUCKETS = 10;
 
   // Map from cluster names to a struct of all of that cluster's stat windows.
-  std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_{};
+  std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;
