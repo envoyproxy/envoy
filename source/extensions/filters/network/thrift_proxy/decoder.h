@@ -56,7 +56,7 @@ private:
 };
 
 /**
- * DecoderStateMachine is the Thrift message state machine as describe in
+ * DecoderStateMachine is the Thrift message state machine as described in
  * source/extensions/filters/network/thrift_proxy/docs.
  */
 class DecoderStateMachine {
@@ -71,7 +71,7 @@ public:
    * Once the Done state is reached, further invocations of run return immediately with Done.
    *
    * @return ProtocolState returns with ProtocolState::WaitForData or ProtocolState::Done
-   * @throw Envoy Exception if throw by the underlying Protocol
+   * @throw Envoy Exception if thrown by the underlying Protocol
    */
   ProtocolState run();
 

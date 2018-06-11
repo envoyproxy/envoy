@@ -8,11 +8,11 @@ transitions. Each state corresponds to the invocation of a function on
 the `ThriftProxy::Protocol` interface. Not pictured in the state
 diagram is the transient `WaitForData` state which implies that
 insufficient data was available to process a state and that the state
-machine should be restarted when more data is available.
+machine should be resumed when more data is available.
 
 The `Value` states in the diagram are represented by multiple states
 in the actual state machine (`FieldValue`, `ListValue`, `MapKey`,
-`MapValue`, and `SetValue`). The various value states encoded the
+`MapValue`, and `SetValue`). The various value states encode the
 transition from, for example, a list value (`ListValue`) to the
 `ListEnd` state.
 
