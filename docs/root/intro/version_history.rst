@@ -93,6 +93,10 @@ Version history
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
 * router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
   to ignore the source port.
+* router: added an :ref:`prefix_match <envoy_api_field_route.HeaderMatcher.prefix_match>` match type
+  to explicitly match based on the prefix of a header value.
+* router: added an :ref:`suffix_match <envoy_api_field_route.HeaderMatcher.suffix_match>` match type
+  to explicitly match based on the suffix of a header value.
 * router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
   to explicitly match based on a header's presence.
 * router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
