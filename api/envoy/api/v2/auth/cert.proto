@@ -268,6 +268,13 @@ message UpstreamTlsContext {
 
   // SNI string to use when creating TLS backend connections.
   string sni = 2 [(validate.rules).string.max_bytes = 255];
+
+  // If true, server-initiated TLS renegotiation will be allowed.
+  //
+  // .. attention::
+  //
+  //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
+  bool allow_renegotiation = 3;
 }
 
 message DownstreamTlsContext {

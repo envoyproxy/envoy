@@ -139,7 +139,8 @@ public:
   bssl::UniquePtr<SSL> newSsl() const override;
 
 private:
-  std::string server_name_indication_;
+  const std::string server_name_indication_;
+  const bool allow_renegotiation_;
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {

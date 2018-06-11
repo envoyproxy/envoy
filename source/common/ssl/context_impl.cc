@@ -458,14 +458,13 @@ std::string ContextImpl::getSerialNumber(const X509* cert) {
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      const ClientContextConfig& config)
-    : ContextImpl(parent, scope, config) {
+    : ContextImpl(parent, scope, config), server_name_indication_(config.serverNameIndication()),
+      allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0);
   }
-
-  server_name_indication_ = config.serverNameIndication();
 }
 
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
@@ -474,6 +473,10 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
     RELEASE_ASSERT(rc);
+  }
+
+  if (allow_renegotiation_) {
+    SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
 
   return ssl_con;

@@ -751,6 +751,13 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
@@ -780,6 +787,13 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
   // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
@@ -910,6 +924,13 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
@@ -942,6 +963,13 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate) {
@@ -967,6 +995,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertificate) {
@@ -989,6 +1021,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
 
   envoy::api::v2::auth::UpstreamTlsContext client;
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
 }
 
@@ -1022,6 +1058,11 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
 
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
              GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCertificate) {
@@ -1050,6 +1091,11 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
              GetParam());
 }
@@ -1082,6 +1128,10 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
 }
 
@@ -1119,6 +1169,13 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
@@ -1153,6 +1210,13 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCertificate) {
@@ -1178,6 +1242,10 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
   envoy::api::v2::auth::UpstreamTlsContext client;
 
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClientCertificate) {
@@ -1200,6 +1268,10 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
 
   envoy::api::v2::auth::UpstreamTlsContext client;
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
 }
 
@@ -1233,6 +1305,11 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
 
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
              GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongClientCertificate) {
@@ -1261,6 +1338,11 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
              GetParam());
 }
@@ -1293,6 +1375,10 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
   client_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
 
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
   testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
 }
 
@@ -2068,6 +2154,13 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
 
+  // Connection using defaults (client & server) succeeds, negotiating TLSv1.2,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
+
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
   client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
@@ -2148,6 +2241,13 @@ TEST_P(SslSocketTest, ALPN) {
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
 
+  // Connection using defaults (client & server) succeeds, no ALPN is negotiated,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
+
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
   server_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
@@ -2166,7 +2266,18 @@ TEST_P(SslSocketTest, ALPN) {
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
 
-  // Client connects with "test" ALPN to a server with "test2" ALPN, "test" ALPN is negotiated.
+  // Client connects with "test" ALPN to a server with "test" ALPN, "test" ALPN is negotiated,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  client_ctx->add_alpn_protocols("test");
+  server_ctx->add_alpn_protocols("test");
+  testUtilV2(listener, client, "", true, "", "", "", "test", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
+  client_ctx->clear_alpn_protocols();
+  server_ctx->clear_alpn_protocols();
+
+  // Client connects with "test" ALPN to a server with "test2" ALPN, no ALPN is negotiated.
   // ssl.handshake logged by both: client & server.
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test2");
@@ -2194,6 +2305,12 @@ TEST_P(SslSocketTest, CipherSuites) {
   // Connection using defaults (client & server) succeeds.
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client & server) succeeds, even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported cipher suites, connection succeeds.
   // ssl.handshake logged by both: client & server.
@@ -2231,6 +2348,12 @@ TEST_P(SslSocketTest, EcdhCurves) {
   // Connection using defaults (client & server) succeeds.
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client & server) succeeds, even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported ECDH curves, connection succeeds.
   // ssl.handshake logged by both: client & server.
