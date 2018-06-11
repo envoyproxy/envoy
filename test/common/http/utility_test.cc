@@ -67,7 +67,7 @@ TEST(HttpUtility, appendXff) {
     TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Network::Address::Ipv4Instance address("127.0.0.1");
     Utility::appendXff(headers, address);
-    EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
+    EXPECT_EQ("10.0.0.1,127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
