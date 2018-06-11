@@ -403,9 +403,9 @@ TEST(MixedAddresses, Equality) {
     {kIpv4, "1.2.3.4", 1},
     {kIpv4, "1.2.3.4", 2},
     {kIpv4, "1.2.3.5", 1},
-    {kIpv6, "[01:023::00ef]", 1},
-    {kIpv6, "[01:023::00ef]", 2},
-    {kIpv6, "[01:023::00ed]", 1},
+    {kIpv6, "01:023::00ef", 1},
+    {kIpv6, "01:023::00ef", 2},
+    {kIpv6, "01:023::00ed", 1},
     {kPipe, "/path/to/pipe/1", 0},
     {kPipe, "/path/to/pipe/2", 0}
   };
@@ -424,31 +424,33 @@ TEST(MixedAddresses, Equality) {
       default:
         FAIL();
     }
-    for (size_t j = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
+    ASSERT_TRUE(lhs);
+    for (size_t j = 0; j < sizeof(test_cases) / sizeof(struct TestCase); j++) {
       InstanceConstSharedPtr rhs;
       switch (test_cases[j].type) {
         case kIpv4:
-          lhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
+          rhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
           break;
         case kIpv6:
-          lhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
+          rhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
           break;
         case kPipe:
-          lhs = std::make_shared<PipeInstance>(test_cases[j].address);
+          rhs = std::make_shared<PipeInstance>(test_cases[j].address);
           break;
         default:
           FAIL();
       }
+      ASSERT_TRUE(rhs);
       if (i == j) {
-        EXPECT_EQ(*lhs, *rhs);
+        EXPECT_EQ(*lhs, *rhs) << "i " << i << " j " << j;
       } else {
-        EXPECT_NE(*lhs, *rhs);
+        EXPECT_NE(*lhs, *rhs) << "i " << i << " j " << j;
       }
     }
   }
 
-  EXPECT_EQ(Ipv4Instance("1.2.3.4:1"), Ipv4Instance("1.2.3.4:1"));
-  EXPECT_EQ(Ipv6Instance("[01:023::00ef]:1"), Ipv6Instance("[01:023::00ef]:1"));
+  EXPECT_EQ(Ipv4Instance("1.2.3.4", 1), Ipv4Instance("1.2.3.4", 1));
+  EXPECT_EQ(Ipv6Instance("01:023::00ef", 1), Ipv6Instance("01:023::00ef", 1));
   EXPECT_EQ(PipeInstance("/path/to/pipe/1"), PipeInstance("/path/to/pipe/1"));
 }
 
