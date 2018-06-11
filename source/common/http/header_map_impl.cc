@@ -192,6 +192,13 @@ void HeaderString::setReference(const std::string& ref_value) {
   string_length_ = ref_value.size();
 }
 
+// Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
+// A fully specialized template must be defined once in the program, hence this may not be in
+// a header file.
+template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString& key) {
+  return key.get().c_str()[0] == ':';
+}
+
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key) : key_(key) {}
 
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value)
@@ -319,8 +326,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     ASSERT(*ref_lookup_response.entry_ == nullptr); // This function doesn't handle append.
     maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
   } else {
-    std::list<HeaderEntryImpl>::iterator i =
-        headers_.emplace(headers_.end(), std::move(key), std::move(value));
+    std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
   }
 }
@@ -516,7 +522,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
     return **entry;
   }
 
-  std::list<HeaderEntryImpl>::iterator i = headers_.emplace(headers_.end(), key);
+  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key);
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
@@ -530,7 +536,7 @@ HeaderMapImpl::HeaderEntryImpl& HeaderMapImpl::maybeCreateInline(HeaderEntryImpl
     return **entry;
   }
 
-  std::list<HeaderEntryImpl>::iterator i = headers_.emplace(headers_.end(), key, std::move(value));
+  std::list<HeaderEntryImpl>::iterator i = headers_.insert(key, std::move(value));
   i->entry_ = i;
   *entry = &(*i);
   return **entry;
