@@ -441,7 +441,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
-  lazilyCreateFilterChain();
+  createFilterChain();
 
   maybeEndDecode(end_stream);
 
@@ -678,7 +678,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(filter_chain_created_);
   maybeEndDecode(end_stream);
   request_info_.bytes_received_ += data.length();
 
@@ -1112,14 +1111,11 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::lazilyCreateFilterChain() {
-  if (!filter_chain_created_) {
-    connection_manager_.config_.filterFactory().createFilterChain(*this);
-    // Make sure new streams are apprised that the underlying connection is blocked.
-    if (connection_manager_.read_callbacks_->connection().aboveHighWatermark()) {
-      callHighWatermarkCallbacks();
-    }
-    filter_chain_created_ = true;
+void ConnectionManagerImpl::ActiveStream::createFilterChain() {
+  connection_manager_.config_.filterFactory().createFilterChain(*this);
+  // Make sure new streams are apprised that the underlying connection is blocked.
+  if (connection_manager_.read_callbacks_->connection().aboveHighWatermark()) {
+    callHighWatermarkCallbacks();
   }
 }
 
