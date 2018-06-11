@@ -67,7 +67,7 @@ TEST(HttpUtility, appendXff) {
     TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"}};
     Network::Address::Ipv4Instance address("127.0.0.1");
     Utility::appendXff(headers, address);
-    EXPECT_EQ("10.0.0.1, 127.0.0.1", headers.get_("x-forwarded-for"));
+    EXPECT_EQ("10.0.0.1,127.0.0.1", headers.get_("x-forwarded-for"));
   }
 
   {
@@ -308,31 +308,6 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
-}
-
-TEST(HttpUtility, TestAppendHeader) {
-  // Test appending to a string with a value.
-  {
-    HeaderString value1;
-    value1.setCopy("some;", 5);
-    Utility::appendToHeader(value1, "test");
-    EXPECT_EQ(value1, "some;,test");
-  }
-
-  // Test appending to an empty string.
-  {
-    HeaderString value2;
-    Utility::appendToHeader(value2, "my tag data");
-    EXPECT_EQ(value2, "my tag data");
-  }
-
-  // Test empty data case.
-  {
-    HeaderString value3;
-    value3.setCopy("empty", 5);
-    Utility::appendToHeader(value3, "");
-    EXPECT_EQ(value3, "empty");
-  }
 }
 
 } // namespace Http

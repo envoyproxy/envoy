@@ -31,12 +31,8 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   }
 
   HeaderString& header = headers.insertForwardedFor().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  header.append(address_as_string.c_str(), address_as_string.size());
+  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
@@ -331,16 +327,6 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
-}
-
-void Utility::appendToHeader(HeaderString& header, const std::string& data) {
-  if (data.empty()) {
-    return;
-  }
-  if (!header.empty()) {
-    header.append(",", 1);
-  }
-  header.append(data.c_str(), data.size());
 }
 
 } // namespace Http

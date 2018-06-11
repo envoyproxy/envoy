@@ -763,6 +763,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
   }
 
+  // TODO(mattklein123): This stat is used by both the RR and LR load balancer to decide at
+  // runtime whether to use either the weighted or unweighted mode. If we extend weights to
+  // static clusters or DNS SRV clusters we need to make sure this gets set. Better, we should
+  // avoid pivoting on this entirely and probably just force a host set refresh if any weights
+  // change.
   info_->stats().max_host_weight_.set(max_host_weight);
 
   if (!hosts_added.empty() || !current_hosts.empty()) {

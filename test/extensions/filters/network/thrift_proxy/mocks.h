@@ -22,6 +22,32 @@ public:
   MOCK_METHOD0(transportFrameComplete, void());
 };
 
+class MockTransport : public Transport {
+public:
+  MockTransport();
+  ~MockTransport();
+
+  // ThriftProxy::Transport
+  MOCK_CONST_METHOD0(name, const std::string&());
+  MOCK_METHOD1(decodeFrameStart, bool(Buffer::Instance&));
+  MOCK_METHOD1(decodeFrameEnd, bool(Buffer::Instance&));
+
+  std::string name_{"mock"};
+};
+
+class MockProtocolCallbacks : public ProtocolCallbacks {
+public:
+  MockProtocolCallbacks();
+  ~MockProtocolCallbacks();
+
+  // ThriftProxy::ProtocolCallbacks
+  MOCK_METHOD3(messageStart, void(const absl::string_view, MessageType, int32_t));
+  MOCK_METHOD1(structBegin, void(const absl::string_view));
+  MOCK_METHOD3(structField, void(const absl::string_view, FieldType, int16_t));
+  MOCK_METHOD0(structEnd, void());
+  MOCK_METHOD0(messageComplete, void());
+};
+
 class MockProtocol : public Protocol {
 public:
   MockProtocol();

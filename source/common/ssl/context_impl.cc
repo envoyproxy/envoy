@@ -85,6 +85,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
+    verify_trusted_ca_ = true;
   }
 
   if (!config.certificateRevocationList().empty()) {
@@ -256,10 +257,12 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
 
-  int ret = X509_verify_cert(store_ctx);
-  if (ret <= 0) {
-    impl->stats_.fail_verify_error_.inc();
-    return ret;
+  if (impl->verify_trusted_ca_) {
+    int ret = X509_verify_cert(store_ctx);
+    if (ret <= 0) {
+      impl->stats_.fail_verify_error_.inc();
+      return ret;
+    }
   }
 
   SSL* ssl = reinterpret_cast<SSL*>(
@@ -455,14 +458,13 @@ std::string ContextImpl::getSerialNumber(const X509* cert) {
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      const ClientContextConfig& config)
-    : ContextImpl(parent, scope, config) {
+    : ContextImpl(parent, scope, config), server_name_indication_(config.serverNameIndication()),
+      allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0);
   }
-
-  server_name_indication_ = config.serverNameIndication();
 }
 
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
@@ -471,6 +473,10 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
     RELEASE_ASSERT(rc);
+  }
+
+  if (allow_renegotiation_) {
+    SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
 
   return ssl_con;
@@ -615,22 +621,20 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
       RELEASE_ASSERT(rc == 1);
     }
+  }
 
-    // verify_certificate_hash_ can only be set with a ca_cert
-    for (const auto& hash : verify_certificate_hash_list_) {
-      rc = EVP_DigestUpdate(&md, hash.data(),
-                            hash.size() *
-                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-      RELEASE_ASSERT(rc == 1);
-    }
+  for (const auto& hash : verify_certificate_hash_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+    RELEASE_ASSERT(rc == 1);
+  }
 
-    // verify_certificate_spki_ can only be set with a ca_cert
-    for (const auto& hash : verify_certificate_spki_list_) {
-      rc = EVP_DigestUpdate(&md, hash.data(),
-                            hash.size() *
-                                sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-      RELEASE_ASSERT(rc == 1);
-    }
+  for (const auto& hash : verify_certificate_spki_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+    RELEASE_ASSERT(rc == 1);
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different

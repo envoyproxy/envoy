@@ -67,9 +67,16 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
-  if (ca_cert_.empty() && !certificate_revocation_list_.empty()) {
-    throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA certificates",
-                                     certificateRevocationListPath()));
+  if (ca_cert_.empty()) {
+    if (!certificate_revocation_list_.empty()) {
+      throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
+                                       certificateRevocationListPath()));
+    }
+    if (!verify_subject_alt_name_list_.empty()) {
+      throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
+                                       "trusted CA is insecure and not allowed",
+                                       certificateRevocationListPath()));
+    }
   }
 }
 
@@ -95,7 +102,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config)
-    : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
+    : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()),
+      allow_renegotiation_(config.allow_renegotiation()) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {

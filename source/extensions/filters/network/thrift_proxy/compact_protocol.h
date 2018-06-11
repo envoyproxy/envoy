@@ -19,8 +19,10 @@ namespace ThriftProxy {
  * CompactProtocolImpl implements the Thrift Compact protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md
  */
-class CompactProtocolImpl : public virtual Protocol {
+class CompactProtocolImpl : public ProtocolImplBase {
 public:
+  CompactProtocolImpl(ProtocolCallbacks& callbacks) : ProtocolImplBase(callbacks) {}
+
   // Protocol
   const std::string& name() const override { return ProtocolNames::get().COMPACT; }
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
