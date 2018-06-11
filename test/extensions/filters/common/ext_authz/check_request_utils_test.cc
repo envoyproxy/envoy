@@ -38,10 +38,9 @@ public:
   NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
 };
 
+// Verify that createTcpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
-
   envoy::service::auth::v2alpha::CheckRequest request;
-
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -50,11 +49,10 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
   CheckRequestUtils::createTcpCheck(&net_callbacks_, request);
 }
 
+// Verify that createHttpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
-
   Http::HeaderMapImpl headers;
   envoy::service::auth::v2alpha::CheckRequest request;
-
   EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -62,15 +60,16 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+
   CheckRequestUtils::createHttpCheck(&callbacks_, headers, request);
 }
 
+// Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
+// proto object.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
-
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
   envoy::service::auth::v2alpha::CheckRequest request;
-
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
@@ -78,9 +77,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
-
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
   EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
+
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, request);
 
   EXPECT_EQ("source", request.attributes().source().principal());

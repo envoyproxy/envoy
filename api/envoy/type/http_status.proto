@@ -72,11 +72,11 @@ enum StatusCode {
   
 }
 
-
 // HTTP status code.
 message HttpStatus {
-
   // Supplies HTTP response code.
-  StatusCode code = 1 [(validate.rules).enum = {not_in: [0]}];
-
+  StatusCode code = 1 [
+    (validate.rules).enum = {not_in: [0]},
+    (validate.rules).enum.defined_only = true
+  ];
 }

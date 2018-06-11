@@ -28,12 +28,17 @@ envoy_cc_test(
     name = "ext_authz_grpc_impl_test",
     srcs = ["ext_authz_grpc_impl_test.cc"],
     deps = [
-        "//source/common/http:headers_lib",
-        "//source/common/protobuf",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
-        "//test/mocks/grpc:grpc_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
+    ],
+)
+
+envoy_cc_test(
+    name = "ext_authz_http_impl_test",
+    srcs = ["ext_authz_http_impl_test.cc"],
+    deps = [
+        "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
+        "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
     ],
 )
 
@@ -43,5 +48,20 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "ext_authz_test_common",
+    srcs = ["test_common.cc"],
+    hdrs = ["test_common.h"],
+    deps = [
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
+        "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

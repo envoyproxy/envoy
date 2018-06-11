@@ -5,6 +5,8 @@
 
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
+#include "test/extensions/filters/common/ext_authz/mocks.h"
+#include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -26,58 +28,6 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-class MockRequestCallbacks : public RequestCallbacks {
-public:
-  void onComplete(ResponsePtr&& response) override { onComplete_(response); }
-
-  MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
-};
-
-MATCHER_P(AuthzDeniedResponse, response, "") {
-  if (arg->status_code != response.status_code) {
-    return false;
-  }
-  if (arg->body.compare(response.body)) {
-    return false;
-  }
-  // Compare headers_to_add.
-  if (!arg->headers_to_add.empty() && response.headers_to_add.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_add.begin(), arg->headers_to_add.end(),
-                  response.headers_to_add.begin())) {
-    return false;
-  }
-
-  return true;
-}
-
-MATCHER_P(AuthzOkResponse, response, "") {
-  if (arg->status != response.status) {
-    return false;
-  }
-  // Compare headers_to_apppend.
-  if (!arg->headers_to_append.empty() && response.headers_to_append.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_append.begin(), arg->headers_to_append.end(),
-                  response.headers_to_append.begin())) {
-    return false;
-  }
-  // Compare headers_to_add.
-  if (!arg->headers_to_add.empty() && response.headers_to_add.empty()) {
-    return false;
-  }
-  if (!std::equal(arg->headers_to_add.begin(), arg->headers_to_add.end(),
-                  response.headers_to_add.begin())) {
-    return false;
-  }
-
-  return true;
-}
-
-typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
-
 class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
@@ -88,76 +38,6 @@ public:
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan span_;
-
-  std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>
-  initCheckResponse(Grpc::Status::GrpcStatus response_status = Grpc::Status::GrpcStatus::Ok,
-                    envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
-                    const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{}) {
-    auto response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
-    auto status = response->mutable_status();
-    status->set_code(response_status);
-
-    if (response_status != Grpc::Status::GrpcStatus::Ok) {
-      auto denied_response = response->mutable_denied_response();
-      if (!body.empty()) {
-        denied_response->set_body(body);
-      }
-
-      auto status_code = denied_response->mutable_status();
-      status_code->set_code(http_status_code);
-
-      auto denied_response_headers = denied_response->mutable_headers();
-      if (!headers.empty()) {
-        for (const auto& header : headers) {
-          auto* item = denied_response_headers->Add();
-          item->CopyFrom(header);
-        }
-      }
-    } else {
-      if (!headers.empty()) {
-        auto ok_response_headers = response->mutable_ok_response()->mutable_headers();
-        for (const auto& header : headers) {
-          auto* item = ok_response_headers->Add();
-          item->CopyFrom(header);
-        }
-      }
-    }
-    return response;
-  }
-
-  Response initAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
-                             const std::string& body = std::string{},
-                             const HeaderValueOptionVector& headers = HeaderValueOptionVector{}) {
-    auto authz_response = Response{};
-    authz_response.status = status;
-    authz_response.status_code = status_code;
-    if (!body.empty()) {
-      authz_response.body = body;
-    }
-    if (!headers.empty()) {
-      for (auto& header : headers) {
-        if (header.append().value()) {
-          authz_response.headers_to_append.emplace_back(
-              Http::LowerCaseString(header.header().key()), header.header().value());
-        } else {
-          authz_response.headers_to_add.emplace_back(Http::LowerCaseString(header.header().key()),
-                                                     header.header().value());
-        }
-      }
-    }
-    return authz_response;
-  }
-
-  envoy::api::v2::core::HeaderValueOption makeHeaderValueOption(std::string&& key,
-                                                                std::string&& value, bool append) {
-    envoy::api::v2::core::HeaderValueOption header_value_option;
-    auto* mutable_header = header_value_option.mutable_header();
-    mutable_header->set_key(key);
-    mutable_header->set_value(value);
-    header_value_option.mutable_append()->set_value(append);
-    return header_value_option;
-  }
 
   void expectCallSend(envoy::service::auth::v2alpha::CheckRequest& request) {
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
@@ -175,8 +55,8 @@ public:
 };
 
 TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
-  auto check_response = initCheckResponse(Grpc::Status::GrpcStatus::Ok);
-  auto authz_response = initAuthzResponse(CheckStatus::OK);
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::Ok);
+  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   expectCallSend(request);
@@ -192,9 +72,9 @@ TEST_F(ExtAuthzGrpcClientTest, BasicOK) {
 }
 
 TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
-  auto check_response = initCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
-                                          envoy::type::StatusCode::Forbidden);
-  auto authz_response = initAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden);
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
+                                                      envoy::type::StatusCode::Forbidden);
+  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   expectCallSend(request);
@@ -212,12 +92,12 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
 
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   auto expected_body = std::string{"test"};
-  auto expected_headers = HeaderValueOptionVector{makeHeaderValueOption("foo", "bar", false)};
-  auto check_response =
-      initCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
-                        envoy::type::StatusCode::Unauthorized, expected_body, expected_headers);
-  auto authz_response = initAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
-                                          expected_body, expected_headers);
+  auto expected_headers = TestCommon::makeHeaderValueOption("foo", "bar", false);
+  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
+                                                      envoy::type::StatusCode::Unauthorized,
+                                                      expected_body, expected_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Unauthorized,
+                                                      expected_body, expected_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   expectCallSend(request);
