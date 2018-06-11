@@ -11,7 +11,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -82,8 +81,9 @@ public:
 
 class HystrixSinkTest : public testing::Test {
 public:
-  HystrixSinkTest() { sink_.reset(new HystrixSink(server_, 10)); }
+  HystrixSinkTest() { sink_.reset(new HystrixSink(server_, window_size_)); }
 
+  // Return the value corresponding to key in an event stream.
   absl::string_view getStreamField(absl::string_view data_message, absl::string_view key) {
     absl::string_view::size_type key_pos = data_message.find(key);
     EXPECT_NE(absl::string_view::npos, key_pos);
@@ -97,8 +97,10 @@ public:
     return actual;
   }
 
+  // Return a string without quotes.
   absl::string_view getStringStreamField(absl::string_view data_message, absl::string_view key) {
-    return absl::StrReplaceAll(getStreamField(data_message, key), {{"\"", ""}});
+    absl::string_view value = getStreamField(data_message, key);
+    return value.substr(1, value.length() - 2);
   }
 
   Buffer::OwnedImpl createClusterAndCallbacks() {
@@ -118,13 +120,29 @@ public:
     return buffer;
   }
 
-  void validateAllZero(std::string data_message) {
-    EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "0");
-    EXPECT_EQ(getStreamField(data_message, "errorCount"), "0");
-    EXPECT_EQ(getStreamField(data_message, "requestCount"), "0");
-    EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "0");
-    EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
-    EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "0");
+  void validate_results(std::string data_message, uint64_t success_step, uint64_t error_step,
+                        uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
+                        uint64_t window_size) {
+    EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"),
+              std::to_string(window_size * rejected_step));
+    EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"),
+              std::to_string(window_size * success_step));
+    EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"),
+              std::to_string(window_size * (timeout_step + timeout_retry_step)));
+    EXPECT_EQ(getStreamField(data_message, "errorCount"),
+              std::to_string(window_size *
+                             (error_step - timeout_step))); // Note that on regular operation,
+    // 5xx and timeout are raised together, so timeouts are reduced from 5xx count
+    uint64_t total = error_step + success_step + rejected_step + timeout_retry_step;
+    EXPECT_EQ(getStreamField(data_message, "requestCount"), std::to_string(window_size * total));
+    if (total != 0) {
+      EXPECT_EQ(
+          getStreamField(data_message, "errorPercentage"),
+          std::to_string(static_cast<uint64_t>(
+              100 * (static_cast<double>(total - success_step) / static_cast<double>(total)))));
+    } else {
+      EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "0");
+    }
   }
 
   std::unordered_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
@@ -140,6 +158,7 @@ public:
     return cluster_message_map;
   }
 
+  uint64_t window_size_ = 10; // Arbitrary reasonable number.
   const std::string cluster1_name_{"test_cluster1"};
   ClusterTestInfo cluster1_{cluster1_name_};
 
@@ -159,7 +178,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
   std::string data_message = TestUtility::bufferToString(buffer);
-  validateAllZero(data_message);
+  validate_results(data_message, 0, 0, 0, 0, 0, window_size_);
 }
 
 TEST_F(HystrixSinkTest, BasicFlow) {
@@ -168,37 +187,33 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
-  for (int i = 0; i < 12; i++) {
+  // Arbitrary numbers for testing. Make sure error > timeout.
+  uint64_t success_step = 7;
+  uint64_t error_step = 17;
+  uint64_t timeout_step = 3;
+  uint64_t rejected_step = 8;
+
+  for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
-    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * 17));
-    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * 7));
-    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(3);
-    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(8);
+    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_step));
+    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
+    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
+    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
     sink_->flush(source_);
   }
 
   std::string rolling_map = sink_->printRollingWindows();
   EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"));
 
-  std::string data_message = TestUtility::bufferToString(buffer);
-
   // Check stream format and data.
-  EXPECT_EQ(getStreamField(data_message, "errorCount"), "140"); // Note that on regular operation,
-                                                                // 5xx and timeout are raised
-                                                                // together, so timeouts are reduced
-                                                                // from 5xx count
-  EXPECT_EQ(getStreamField(data_message, "requestCount"), "320");
-  EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"), "80");
-  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "70");
-  EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"), "30");
-  EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "78");
+  validate_results(TestUtility::bufferToString(buffer), success_step, error_step, timeout_step, 0,
+                   rejected_step, window_size_);
 
   // Check the values are reset.
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
   sink_->flush(source_);
-  data_message = TestUtility::bufferToString(buffer);
-  validateAllZero(data_message);
+  validate_results(TestUtility::bufferToString(buffer), 0, 0, 0, 0, 0, window_size_);
 }
 
 //
@@ -212,8 +227,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
-  std::string data_message = TestUtility::bufferToString(buffer);
-  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
 
   // Disconnect.
@@ -226,30 +240,43 @@ TEST_F(HystrixSinkTest, Disconnect) {
   buffer.drain(buffer.length());
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
-  data_message = TestUtility::bufferToString(buffer);
-  EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"), "0");
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
 }
 
 TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   InSequence s;
 
+  // Arbitrary numbers for testing. Make sure error > timeout.
+  uint64_t success_step = 7;
+  uint64_t error_step = 17;
+  uint64_t timeout_step = 1;
+  uint64_t timeout_retry_step = 2;
+  uint64_t rejected_step = 8;
+
+  uint64_t success_step2 = 3;
+  uint64_t error_4xx_step2 = 1;
+  uint64_t error_4xx_retry_step2 = 2;
+  uint64_t error_5xx_step2 = 3;
+  uint64_t error_5xx_retry_step2 = 4;
+  uint64_t timeout_step2 = 3;
+  uint64_t timeout_retry_step2 = 1;
+  uint64_t rejected_step2 = 5;
+
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
-  // New cluster.
+  // Add new cluster.
   const std::string cluster2_name{"test_cluster2"};
   ClusterTestInfo cluster2(cluster2_name);
-
-  // Add cluster.
-  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
   cluster_map_.emplace(cluster2_name, cluster2.cluster_);
   // Redefining since cluster_map_ is returned by value.
   ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
 
   // Generate data to both clusters.
   sink_->flush(source_);
-  for (int i = 0; i < 12; i++) {
+  for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
     // Cluster 1
     ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * 17));
@@ -276,38 +303,22 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
   ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
 
-  std::string data_message_1 = cluster_message_map[cluster1_name_];
-  std::string data_message_2 = cluster_message_map[cluster2_name];
-
   // Check stream format and data.
-  EXPECT_EQ(getStreamField(data_message_1, "errorCount"), "160"); // Note that on regular operation,
-  // 5xx and timeout are raised together, so timeouts are reduced from 5xx count.
-  EXPECT_EQ(getStreamField(data_message_1, "requestCount"), "340");
-  EXPECT_EQ(getStreamField(data_message_1, "rollingCountSemaphoreRejected"), "80");
-  EXPECT_EQ(getStreamField(data_message_1, "rollingCountSuccess"), "70");
-  EXPECT_EQ(getStreamField(data_message_1, "rollingCountTimeout"), "30");
-  EXPECT_EQ(getStreamField(data_message_1, "errorPercentage"), "79");
-
-  // Check stream format and data.
-  EXPECT_EQ(getStreamField(data_message_2, "errorCount"), "70"); // note that on regular operation,
-                                                                 // 5xx and timeout are raised
-                                                                 // together, so timeouts are
-                                                                 // reduced from 5xx count
-  EXPECT_EQ(getStreamField(data_message_2, "requestCount"), "190");
-  EXPECT_EQ(getStreamField(data_message_2, "rollingCountSemaphoreRejected"), "50");
-  EXPECT_EQ(getStreamField(data_message_2, "rollingCountSuccess"), "30");
-  EXPECT_EQ(getStreamField(data_message_2, "rollingCountTimeout"), "40");
-  EXPECT_EQ(getStreamField(data_message_2, "errorPercentage"), "84");
+  validate_results(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step,
+                   timeout_retry_step, rejected_step, window_size_);
+  validate_results(cluster_message_map[cluster2_name], success_step2,
+                   error_4xx_step2 + error_4xx_retry_step2 + error_5xx_step2 +
+                       error_5xx_retry_step2,
+                   timeout_step2, timeout_retry_step2, rejected_step2, window_size_);
 
   buffer.drain(buffer.length());
 
-  // Removing cluster.
+  // Remove cluster.
   cluster_map_.erase(cluster2_name);
   // Redefining since cluster_map_ is returned by value.
   ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
   sink_->flush(source_);
 
-  cluster_message_map.clear();
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
   ASSERT_EQ(cluster_message_map.find(cluster2_name), cluster_message_map.end());
@@ -324,13 +335,12 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   cluster2.cluster_info_->stats().upstream_rq_pending_overflow_.reset();
   sink_->flush(source_);
 
-  cluster_message_map.clear();
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
   ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
 
   // Check that old values of test_cluster2 were deleted.
-  validateAllZero(cluster_message_map[cluster2_name]);
+  validate_results(cluster_message_map[cluster2_name], 0, 0, 0, 0, 0, window_size_);
 }
 } // namespace Hystrix
 } // namespace StatSinks

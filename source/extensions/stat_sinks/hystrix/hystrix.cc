@@ -16,7 +16,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
-const uint64_t HystrixSink::DEFAULT_NUM_OF_BUCKETS;
+const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
 
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
@@ -64,11 +64,11 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
   }
 }
 
-void HystrixSink::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
+void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                                          ClusterStatsCache& cluster_stats_cache) {
-  const std::string cluster_name = cluster_info->name();
-  Upstream::ClusterStats& cluster_stats = cluster_info->stats();
-  Stats::Scope& cluster_stats_scope = cluster_info->statsScope();
+  const std::string cluster_name = cluster_info.name();
+  Upstream::ClusterStats& cluster_stats = cluster_info.stats();
+  Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
 
   // Combining timeouts+retries - retries are counted  as separate requests
   // (alternative: each request including the retries counted as 1).
@@ -106,18 +106,19 @@ void HystrixSink::updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr clu
 void HystrixSink::resetRollingWindow() { cluster_stats_cache_map_.clear(); }
 
 void HystrixSink::addStringToStream(absl::string_view key, absl::string_view value,
-                                    std::stringstream& info) {
+                                    std::stringstream& info, bool is_first) {
   std::string quoted_value = absl::StrCat("\"", value, "\"");
-  addInfoToStream(key, quoted_value, info);
+  addInfoToStream(key, quoted_value, info, is_first);
 }
 
-void HystrixSink::addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info) {
-  addInfoToStream(key, std::to_string(value), info);
+void HystrixSink::addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
+                                 bool is_first) {
+  addInfoToStream(key, std::to_string(value), info, is_first);
 }
 
 void HystrixSink::addInfoToStream(absl::string_view key, absl::string_view value,
-                                  std::stringstream& info) {
-  if (!info.str().empty()) {
+                                  std::stringstream& info, bool is_first) {
+  if (!is_first) {
     info << ", ";
   }
   std::string added_info = absl::StrCat("\"", key, "\": ", value);
@@ -130,14 +131,14 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     std::chrono::milliseconds rolling_window_ms,
                                     std::stringstream& ss) {
 
-  std::stringstream cluster_info;
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-  addStringToStream("type", "HystrixCommand", cluster_info);
-  addStringToStream("name", cluster_name, cluster_info);
-  addStringToStream("group", "NA", cluster_info);
-  addIntToStream("currentTime", static_cast<uint64_t>(currentTime), cluster_info);
-  addInfoToStream("isCircuitBreakerOpen", "false", cluster_info);
+  ss << "data: {";
+  addStringToStream("type", "HystrixCommand", ss, true);
+  addStringToStream("name", cluster_name, ss);
+  addStringToStream("group", "NA", ss);
+  addIntToStream("currentTime", static_cast<uint64_t>(currentTime), ss);
+  addInfoToStream("isCircuitBreakerOpen", "false", ss);
 
   uint64_t errors = getRollingValue(cluster_stats_cache.errors_);
   uint64_t timeouts = getRollingValue(cluster_stats_cache.timeouts_);
@@ -146,83 +147,80 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
 
   uint64_t error_rate = total == 0 ? 0 : (100 * (errors + timeouts + rejected)) / total;
 
-  addIntToStream("errorPercentage", error_rate, cluster_info);
-  addIntToStream("errorCount", errors, cluster_info);
-  addIntToStream("requestCount", total, cluster_info);
-  addIntToStream("rollingCountCollapsedRequests", 0, cluster_info);
-  addIntToStream("rollingCountExceptionsThrown", 0, cluster_info);
-  addIntToStream("rollingCountFailure", errors, cluster_info);
-  addIntToStream("rollingCountFallbackFailure", 0, cluster_info);
-  addIntToStream("rollingCountFallbackRejection", 0, cluster_info);
-  addIntToStream("rollingCountFallbackSuccess", 0, cluster_info);
-  addIntToStream("rollingCountResponsesFromCache", 0, cluster_info);
+  addIntToStream("errorPercentage", error_rate, ss);
+  addIntToStream("errorCount", errors, ss);
+  addIntToStream("requestCount", total, ss);
+  addIntToStream("rollingCountCollapsedRequests", 0, ss);
+  addIntToStream("rollingCountExceptionsThrown", 0, ss);
+  addIntToStream("rollingCountFailure", errors, ss);
+  addIntToStream("rollingCountFallbackFailure", 0, ss);
+  addIntToStream("rollingCountFallbackRejection", 0, ss);
+  addIntToStream("rollingCountFallbackSuccess", 0, ss);
+  addIntToStream("rollingCountResponsesFromCache", 0, ss);
 
   // Envoy's "circuit breaker" has similar meaning to hystrix's isolation
-  // so we count upstream_rq_pending_overflow and present it as rejected
-  addIntToStream("rollingCountSemaphoreRejected", rejected, cluster_info);
+  // so we count upstream_rq_pending_overflow and present it as ss
+  addIntToStream("rollingCountSemaphoreRejected", rejected, ss);
 
   // Hystrix's short circuit is not similar to Envoy's since it is triggered by 503 responses
   // there is no parallel counter in Envoy since as a result of errors (outlier detection)
   // requests are not rejected, but rather the node is removed from load balancer healthy pool.
-  addIntToStream("rollingCountShortCircuited", 0, cluster_info);
-  addIntToStream("rollingCountSuccess", getRollingValue(cluster_stats_cache.success_),
-                 cluster_info);
-  addIntToStream("rollingCountThreadPoolRejected", 0, cluster_info);
-  addIntToStream("rollingCountTimeout", timeouts, cluster_info);
-  addIntToStream("rollingCountBadRequests", 0, cluster_info);
-  addIntToStream("currentConcurrentExecutionCount", 0, cluster_info);
-  addIntToStream("latencyExecute_mean", 0, cluster_info);
+  addIntToStream("rollingCountShortCircuited", 0, ss);
+  addIntToStream("rollingCountSuccess", getRollingValue(cluster_stats_cache.success_), ss);
+  addIntToStream("rollingCountThreadPoolRejected", 0, ss);
+  addIntToStream("rollingCountTimeout", timeouts, ss);
+  addIntToStream("rollingCountBadRequests", 0, ss);
+  addIntToStream("currentConcurrentExecutionCount", 0, ss);
+  addIntToStream("latencyExecute_mean", 0, ss);
 
   // TODO trabetti : add histogram information once available by PR #2932
   addInfoToStream(
       "latencyExecute",
-      "{\"0\":0,\"25\":0,\"50\":0,\"75\":0,\"90\":0,\"95\":0,\"99\":0,\"99.5\":0,\"100\":0}",
-      cluster_info);
-  addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, cluster_info);
-  addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, cluster_info);
-  addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, cluster_info);
-  addInfoToStream("propertyValue_circuitBreakerForceOpen", "false", cluster_info);
-  addInfoToStream("propertyValue_circuitBreakerForceClosed", "true", cluster_info);
-  addStringToStream("propertyValue_executionIsolationStrategy", "SEMAPHORE", cluster_info);
-  addIntToStream("propertyValue_executionIsolationThreadTimeoutInMilliseconds", 0, cluster_info);
-  addInfoToStream("propertyValue_executionIsolationThreadInterruptOnTimeout", "false",
-                  cluster_info);
+      "{\"0\":0,\"25\":0,\"50\":0,\"75\":0,\"90\":0,\"95\":0,\"99\":0,\"99.5\":0,\"100\":0}", ss);
+  addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
+  addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
+  addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
+  addInfoToStream("propertyValue_circuitBreakerForceOpen", "false", ss);
+  addInfoToStream("propertyValue_circuitBreakerForceClosed", "true", ss);
+  addStringToStream("propertyValue_executionIsolationStrategy", "SEMAPHORE", ss);
+  addIntToStream("propertyValue_executionIsolationThreadTimeoutInMilliseconds", 0, ss);
+  addInfoToStream("propertyValue_executionIsolationThreadInterruptOnTimeout", "false", ss);
   addIntToStream("propertyValue_executionIsolationSemaphoreMaxConcurrentRequests",
-                 max_concurrent_requests, cluster_info);
-  addIntToStream("propertyValue_fallbackIsolationSemaphoreMaxConcurrentRequests", 0, cluster_info);
-  addInfoToStream("propertyValue_requestCacheEnabled", "false", cluster_info);
-  addInfoToStream("propertyValue_requestLogEnabled", "true", cluster_info);
-  addIntToStream("reportingHosts", reporting_hosts, cluster_info);
+                 max_concurrent_requests, ss);
+  addIntToStream("propertyValue_fallbackIsolationSemaphoreMaxConcurrentRequests", 0, ss);
+  addInfoToStream("propertyValue_requestCacheEnabled", "false", ss);
+  addInfoToStream("propertyValue_requestLogEnabled", "true", ss);
+  addIntToStream("reportingHosts", reporting_hosts, ss);
   addIntToStream("propertyValue_metricsRollingStatisticalWindowInMilliseconds",
-                 rolling_window_ms.count(), cluster_info);
+                 rolling_window_ms.count(), ss);
 
-  ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
+  ss << "}" << std::endl << std::endl;
 }
 
 void HystrixSink::addHystrixThreadPool(absl::string_view cluster_name, uint64_t queue_size,
                                        uint64_t reporting_hosts,
                                        std::chrono::milliseconds rolling_window_ms,
                                        std::stringstream& ss) {
-  std::stringstream cluster_info;
 
-  addIntToStream("currentPoolSize", 0, cluster_info);
-  addIntToStream("rollingMaxActiveThreads", 0, cluster_info);
-  addIntToStream("currentActiveCount", 0, cluster_info);
-  addIntToStream("currentCompletedTaskCount", 0, cluster_info);
-  addIntToStream("propertyValue_queueSizeRejectionThreshold", queue_size, cluster_info);
-  addStringToStream("type", "HystrixThreadPool", cluster_info);
-  addIntToStream("reportingHosts", reporting_hosts, cluster_info);
+  ss << "data: {";
+  addIntToStream("currentPoolSize", 0, ss, true);
+  addIntToStream("rollingMaxActiveThreads", 0, ss);
+  addIntToStream("currentActiveCount", 0, ss);
+  addIntToStream("currentCompletedTaskCount", 0, ss);
+  addIntToStream("propertyValue_queueSizeRejectionThreshold", queue_size, ss);
+  addStringToStream("type", "HystrixThreadPool", ss);
+  addIntToStream("reportingHosts", reporting_hosts, ss);
   addIntToStream("propertyValue_metricsRollingStatisticalWindowInMilliseconds",
-                 rolling_window_ms.count(), cluster_info);
-  addStringToStream("name", cluster_name, cluster_info);
-  addIntToStream("currentLargestPoolSize", 0, cluster_info);
-  addIntToStream("currentCorePoolSize", 0, cluster_info);
-  addIntToStream("currentQueueSize", 0, cluster_info);
-  addIntToStream("currentTaskCount", 0, cluster_info);
-  addIntToStream("rollingCountThreadsExecuted", 0, cluster_info);
-  addIntToStream("currentMaximumPoolSize", 0, cluster_info);
+                 rolling_window_ms.count(), ss);
+  addStringToStream("name", cluster_name, ss);
+  addIntToStream("currentLargestPoolSize", 0, ss);
+  addIntToStream("currentCorePoolSize", 0, ss);
+  addIntToStream("currentQueueSize", 0, ss);
+  addIntToStream("currentTaskCount", 0, ss);
+  addIntToStream("rollingCountThreadsExecuted", 0, ss);
+  addIntToStream("currentMaximumPoolSize", 0, ss);
 
-  ss << "data: {" << cluster_info.str() << "}" << std::endl << std::endl;
+  ss << "}" << std::endl << std::endl;
 }
 
 void HystrixSink::addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache,
@@ -248,9 +246,8 @@ const std::string HystrixSink::printRollingWindows() {
   return out_str.str();
 }
 
-HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_of_buckets)
-    : // stats_(new HystrixStatCache(num_of_buckets)),
-      server_(server), current_index_(num_of_buckets > 0 ? num_of_buckets : DEFAULT_NUM_OF_BUCKETS),
+HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
+    : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
       window_size_(current_index_ + 1) {
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
@@ -317,7 +314,7 @@ void HystrixSink::flush(Stats::Source&) {
     }
 
     // update rolling window with cluster stats
-    updateRollingWindowMap(cluster_info, *cluster_stats_cache_ptr);
+    updateRollingWindowMap(*cluster_info, *cluster_stats_cache_ptr);
 
     // append it to stream to be sent
     addClusterStatsToStream(

@@ -36,7 +36,7 @@ typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
 
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
-  HystrixSink(Server::Instance& server, uint64_t num_of_buckets);
+  HystrixSink(Server::Instance& server, uint64_t num_buckets);
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::Source& source) override;
@@ -72,7 +72,7 @@ public:
   /**
    * Calculate values needed to create the stream and write into the map.
    */
-  void updateRollingWindowMap(Upstream::ClusterInfoConstSharedPtr cluster_info,
+  void updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                               ClusterStatsCache& cluster_stats_cache);
   /**
    * Clear map.
@@ -94,18 +94,21 @@ private:
    * Format the given key and absl::string_view value to "key"="value", and adding to the
    * stringstream.
    */
-  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
+  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
+                         bool is_first = false);
 
   /**
    * Format the given key and uint64_t value to "key"=<string of uint64_t>, and adding to the
    * stringstream.
    */
-  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info);
+  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
+                      bool is_first = false);
 
   /**
    * Format the given key and value to "key"=value, and adding to the stringstream.
    */
-  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info);
+  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
+                       bool is_first = false);
 
   /**
    * Generate HystrixCommand event stream.
@@ -125,7 +128,7 @@ private:
   Server::Instance& server_;
   uint64_t current_index_;
   const uint64_t window_size_;
-  static const uint64_t DEFAULT_NUM_OF_BUCKETS = 10;
+  static const uint64_t DEFAULT_NUM_BUCKETS = 10;
 
   // Map from cluster names to a struct of all of that cluster's stat windows.
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
