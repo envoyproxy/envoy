@@ -20,7 +20,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      defaultSslChannelCredentials(grpc_service_config, false);
+      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config);
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {

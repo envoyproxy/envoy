@@ -33,6 +33,8 @@ Version history
   connections from hosts after they are removed from service discovery, regardless of health status.
 * cluster: fixed bug preventing the deletion of all endpoints in a priority
 * debug: added symbolized stack traces (where supported)
+* grpc: support added for the full set of :ref:`Google gRPC call credentials
+  <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
