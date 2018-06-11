@@ -398,47 +398,41 @@ TEST(MixedAddresses, Equality) {
   struct TestCase {
     enum InstanceType type;
     std::string address;
-    uint32_t port;                // Ignored for kPipe
-  } test_cases[] = {
-    {kIpv4, "1.2.3.4", 1},
-    {kIpv4, "1.2.3.4", 2},
-    {kIpv4, "1.2.3.5", 1},
-    {kIpv6, "01:023::00ef", 1},
-    {kIpv6, "01:023::00ef", 2},
-    {kIpv6, "01:023::00ed", 1},
-    {kPipe, "/path/to/pipe/1", 0},
-    {kPipe, "/path/to/pipe/2", 0}
-  };
+    uint32_t port; // Ignored for kPipe
+  } test_cases[] = {{kIpv4, "1.2.3.4", 1},         {kIpv4, "1.2.3.4", 2},
+                    {kIpv4, "1.2.3.5", 1},         {kIpv6, "01:023::00ef", 1},
+                    {kIpv6, "01:023::00ef", 2},    {kIpv6, "01:023::00ed", 1},
+                    {kPipe, "/path/to/pipe/1", 0}, {kPipe, "/path/to/pipe/2", 0}};
   for (size_t i = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
     InstanceConstSharedPtr lhs;
     switch (test_cases[i].type) {
-      case kIpv4:
-        lhs = std::make_shared<Ipv4Instance>(test_cases[i].address, test_cases[i].port);
-        break;
-      case kIpv6:
-        lhs = std::make_shared<Ipv6Instance>(test_cases[i].address, test_cases[i].port);
-        break;
-      case kPipe:
-        lhs = std::make_shared<PipeInstance>(test_cases[i].address);
-        break;
-      default:
-        FAIL();
+    case kIpv4:
+      lhs = std::make_shared<Ipv4Instance>(test_cases[i].address, test_cases[i].port);
+      break;
+    case kIpv6:
+      lhs = std::make_shared<Ipv6Instance>(test_cases[i].address, test_cases[i].port);
+      break;
+    case kPipe:
+      lhs = std::make_shared<PipeInstance>(test_cases[i].address);
+      break;
+    default:
+      FAIL();
     }
     ASSERT_TRUE(lhs);
     for (size_t j = 0; j < sizeof(test_cases) / sizeof(struct TestCase); j++) {
       InstanceConstSharedPtr rhs;
       switch (test_cases[j].type) {
-        case kIpv4:
-          rhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
-          break;
-        case kIpv6:
-          rhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
-          break;
-        case kPipe:
-          rhs = std::make_shared<PipeInstance>(test_cases[j].address);
-          break;
-        default:
-          FAIL();
+      case kIpv4:
+        rhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
+        break;
+      case kIpv6:
+        rhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
+        break;
+      case kPipe:
+        rhs = std::make_shared<PipeInstance>(test_cases[j].address);
+        break;
+      default:
+        FAIL();
       }
       ASSERT_TRUE(rhs);
       if (i == j) {
