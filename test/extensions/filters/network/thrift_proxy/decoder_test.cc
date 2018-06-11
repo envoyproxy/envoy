@@ -9,6 +9,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
 using testing::Combine;
 using testing::DoAll;
 using testing::Expectation;
@@ -17,6 +18,7 @@ using testing::InSequence;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::StrictMock;
 using testing::TestWithParam;
@@ -622,6 +624,10 @@ TEST(DecoderTest, OnDataResumes) {
 TEST(DecoderTest, OnDataResumesTransportFrameEnd) {
   StrictMock<MockTransport>* transport = new StrictMock<MockTransport>();
   StrictMock<MockProtocol>* proto = new StrictMock<MockProtocol>();
+
+  EXPECT_CALL(*transport, name()).Times(AnyNumber());
+  EXPECT_CALL(*proto, name()).Times(AnyNumber());
+
   InSequence dummy;
 
   Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto});

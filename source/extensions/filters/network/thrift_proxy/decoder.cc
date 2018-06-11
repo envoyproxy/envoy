@@ -347,10 +347,10 @@ void Decoder::onData(Buffer::Instance& data) {
     if (!frame_started_) {
       // Look for start of next frame.
       if (!transport_->decodeFrameStart(buffer_)) {
-        ENVOY_LOG(debug, "thrift: need more data for {} frame start", transport_->name());
+        ENVOY_LOG(debug, "thrift: need more data for {} transport start", transport_->name());
         return;
       }
-      ENVOY_LOG(debug, "thrift: {} frame started", transport_->name());
+      ENVOY_LOG(debug, "thrift: {} transport started", transport_->name());
 
       frame_started_ = true;
       state_machine_ = std::make_unique<DecoderStateMachine>(buffer_, *protocol_);
@@ -371,8 +371,10 @@ void Decoder::onData(Buffer::Instance& data) {
 
     // Message complete, get decode end of frame.
     if (!transport_->decodeFrameEnd(buffer_)) {
+      ENVOY_LOG(debug, "thrift: need more data for {} transport end", transport_->name());
       return;
     }
+    ENVOY_LOG(debug, "thrift: {} transport ended", transport_->name());
 
     // Reset for next frame.
     state_machine_ = nullptr;
