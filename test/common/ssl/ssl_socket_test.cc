@@ -831,40 +831,6 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
              "ssl.fail_verify_error", 1, GetParam());
 }
 
-// Allow the client to accept expired server certs but enable strict checking on the server.
-TEST_P(SslSocketTest, FailedClientCertAllowClientExpiredVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
-  server_cert->mutable_certificate_chain()->set_filename(
-      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
-  server_cert->mutable_private_key()->set_filename(
-      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
-  server_validation_ctx->mutable_trusted_ca()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
-
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
-      client.mutable_common_tls_context()->add_tls_certificates();
-  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem"));
-  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"));
-
-  // Allow the client to accept expired server certs.
-  // This doesn't help because the server's cert has not expired (but the client's has).
-  client.mutable_common_tls_context()->mutable_validation_context()->set_allow_expired_certificate(
-      true);
-
-  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
-             "ssl.fail_verify_error", 1, GetParam());
-}
-
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
   std::string client_ctx_json = R"EOF(
   {

@@ -77,6 +77,9 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
                                        "trusted CA is insecure and not allowed"));
     }
+    if (allow_expired_certificate_) {
+      throw EnvoyException(fmt::format("Cannot ignore certificate expiration without trusted CA"));
+    }
   }
 }
 
