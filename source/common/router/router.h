@@ -84,8 +84,7 @@ public:
    * @return TimeoutData for both the global and per try timeouts.
    */
   static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
-                                  bool insert_envoy_expected_request_timeout_ms,
-                                  bool grpc_request = false);
+                                  bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
 };
 
 /**
