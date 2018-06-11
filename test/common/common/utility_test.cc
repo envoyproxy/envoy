@@ -19,6 +19,62 @@ using testing::ContainerEq;
 
 namespace Envoy {
 
+TEST(StringUtil, strtoul) {
+  uint64_t out;
+  const char* rest;
+
+  static const char* test_str = "12345b";
+  rest = StringUtil::strtoul(test_str, out);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('b', *rest);
+  EXPECT_EQ(&test_str[5], rest);
+  EXPECT_EQ(12345U, out);
+
+  EXPECT_EQ(nullptr, StringUtil::strtoul("", out));
+  EXPECT_EQ(nullptr, StringUtil::strtoul("b123", out));
+
+  rest = StringUtil::strtoul("123", out);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('\0', *rest);
+  EXPECT_EQ(123U, out);
+
+  EXPECT_NE(nullptr, StringUtil::strtoul("  456", out));
+  EXPECT_EQ(456U, out);
+
+  EXPECT_NE(nullptr, StringUtil::strtoul("00789", out));
+  EXPECT_EQ(789U, out);
+
+  // Hex
+  rest = StringUtil::strtoul("0x1234567890abcdefg", out, 16);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('g', *rest);
+  EXPECT_EQ(0x1234567890abcdefU, out);
+
+  // Explicit decimal
+  rest = StringUtil::strtoul("01234567890A", out, 10);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('A', *rest);
+  EXPECT_EQ(1234567890U, out);
+
+  // Octal
+  rest = StringUtil::strtoul("012345678", out, 8);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('8', *rest);
+  EXPECT_EQ(01234567U, out);
+
+  // Binary
+  rest = StringUtil::strtoul("01010101012", out, 2);
+  EXPECT_NE(nullptr, rest);
+  EXPECT_EQ('2', *rest);
+  EXPECT_EQ(0b101010101U, out);
+
+  // Verify subsequent call to strtoul succeeds after the first one
+  // failed due to errno ERANGE
+  EXPECT_EQ(nullptr, StringUtil::strtoul("18446744073709551616", out));
+  EXPECT_NE(nullptr, StringUtil::strtoul("18446744073709551615", out));
+  EXPECT_EQ(18446744073709551615U, out);
+}
+
 TEST(StringUtil, atoul) {
   uint64_t out;
   EXPECT_FALSE(StringUtil::atoul("123b", out));
