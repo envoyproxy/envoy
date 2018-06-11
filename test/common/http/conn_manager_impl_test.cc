@@ -1712,13 +1712,14 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamDisconnect) {
     data.drain(2);
   }));
 
-  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+  setupFilterChain(1, 0);
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
   // Now raise a remote disconnection, we should see the filter get reset called.
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
   conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1731,9 +1732,10 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
     throw CodecProtocolException("protocol error");
   }));
 
-  EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
+  setupFilterChain(1, 0);
 
   // A protocol exception should result in reset of the streams followed by a local close.
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   // Kick off the incoming data.
