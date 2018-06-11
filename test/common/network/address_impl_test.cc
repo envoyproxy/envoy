@@ -394,25 +394,25 @@ TEST(AddressFromSockAddr, Pipe) {
 
 // Test comparisons between all the different (known) test classes.
 TEST(MixedAddresses, Equality) {
-  enum InstanceType { kIpv4, kIpv6, kPipe };
+  enum InstanceType { Ipv4, Ipv6, Pipe };
   struct TestCase {
     enum InstanceType type;
     std::string address;
-    uint32_t port; // Ignored for kPipe
-  } test_cases[] = {{kIpv4, "1.2.3.4", 1},         {kIpv4, "1.2.3.4", 2},
-                    {kIpv4, "1.2.3.5", 1},         {kIpv6, "01:023::00ef", 1},
-                    {kIpv6, "01:023::00ef", 2},    {kIpv6, "01:023::00ed", 1},
-                    {kPipe, "/path/to/pipe/1", 0}, {kPipe, "/path/to/pipe/2", 0}};
+    uint32_t port; // Ignored for Pipe
+  } test_cases[] = {{Ipv4, "1.2.3.4", 1},         {Ipv4, "1.2.3.4", 2},
+                    {Ipv4, "1.2.3.5", 1},         {Ipv6, "01:023::00ef", 1},
+                    {Ipv6, "01:023::00ef", 2},    {Ipv6, "01:023::00ed", 1},
+                    {Pipe, "/path/to/pipe/1", 0}, {Pipe, "/path/to/pipe/2", 0}};
   for (size_t i = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
     InstanceConstSharedPtr lhs;
     switch (test_cases[i].type) {
-    case kIpv4:
+    case Ipv4:
       lhs = std::make_shared<Ipv4Instance>(test_cases[i].address, test_cases[i].port);
       break;
-    case kIpv6:
+    case Ipv6:
       lhs = std::make_shared<Ipv6Instance>(test_cases[i].address, test_cases[i].port);
       break;
-    case kPipe:
+    case Pipe:
       lhs = std::make_shared<PipeInstance>(test_cases[i].address);
       break;
     default:
@@ -422,13 +422,13 @@ TEST(MixedAddresses, Equality) {
     for (size_t j = 0; j < sizeof(test_cases) / sizeof(struct TestCase); j++) {
       InstanceConstSharedPtr rhs;
       switch (test_cases[j].type) {
-      case kIpv4:
+      case Ipv4:
         rhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
         break;
-      case kIpv6:
+      case Ipv6:
         rhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
         break;
-      case kPipe:
+      case Pipe:
         rhs = std::make_shared<PipeInstance>(test_cases[j].address);
         break;
       default:
