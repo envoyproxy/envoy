@@ -136,9 +136,9 @@ TEST_P(DecoderStateMachineNonValueTest, NoData) {
   ProtocolState state = GetParam();
   Buffer::OwnedImpl buffer;
   NiceMock<MockProtocol> proto;
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
   dsm.setCurrentState(state);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), state);
 }
 
@@ -154,10 +154,10 @@ TEST_P(DecoderStateMachineValueTest, NoFieldValueData) {
                       SetArgReferee<3>(1), Return(true)));
   expectValue(proto, field_type, false);
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::FieldBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::FieldValue);
 }
 
@@ -176,10 +176,10 @@ TEST_P(DecoderStateMachineValueTest, FieldValue) {
   EXPECT_CALL(proto, readFieldEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(proto, readFieldBegin(Ref(buffer), _, _, _)).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::FieldBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::FieldBegin);
 }
 
@@ -192,10 +192,10 @@ TEST(DecoderStateMachineTest, NoListValueData) {
       .WillOnce(DoAll(SetArgReferee<1>(FieldType::I32), SetArgReferee<2>(1), Return(true)));
   EXPECT_CALL(proto, readInt32(Ref(buffer), _)).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::ListBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::ListValue);
 }
 
@@ -208,10 +208,10 @@ TEST(DecoderStateMachineTest, EmptyList) {
       .WillOnce(DoAll(SetArgReferee<1>(FieldType::I32), SetArgReferee<2>(0), Return(true)));
   EXPECT_CALL(proto, readListEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::ListBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::ListEnd);
 }
 
@@ -228,10 +228,10 @@ TEST_P(DecoderStateMachineValueTest, ListValue) {
 
   EXPECT_CALL(proto, readListEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::ListBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::ListEnd);
 }
 
@@ -250,10 +250,10 @@ TEST_P(DecoderStateMachineValueTest, MultipleListValues) {
 
   EXPECT_CALL(proto, readListEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::ListBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::ListEnd);
 }
 
@@ -267,10 +267,10 @@ TEST(DecoderStateMachineTest, NoMapKeyData) {
                       SetArgReferee<3>(1), Return(true)));
   EXPECT_CALL(proto, readInt32(Ref(buffer), _)).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapKey);
 }
 
@@ -285,10 +285,10 @@ TEST(DecoderStateMachineTest, NoMapValueData) {
   EXPECT_CALL(proto, readInt32(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(proto, readString(Ref(buffer), _)).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapValue);
 }
 
@@ -302,10 +302,10 @@ TEST(DecoderStateMachineTest, EmptyMap) {
                       SetArgReferee<3>(0), Return(true)));
   EXPECT_CALL(proto, readMapEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
@@ -324,10 +324,10 @@ TEST_P(DecoderStateMachineValueTest, MapKeyValue) {
 
   EXPECT_CALL(proto, readMapEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
@@ -346,10 +346,10 @@ TEST_P(DecoderStateMachineValueTest, MapValueValue) {
 
   EXPECT_CALL(proto, readMapEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
@@ -370,10 +370,10 @@ TEST_P(DecoderStateMachineValueTest, MultipleMapKeyValues) {
 
   EXPECT_CALL(proto, readMapEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::MapBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::MapEnd);
 }
 
@@ -386,10 +386,10 @@ TEST(DecoderStateMachineTest, NoSetValueData) {
       .WillOnce(DoAll(SetArgReferee<1>(FieldType::I32), SetArgReferee<2>(1), Return(true)));
   EXPECT_CALL(proto, readInt32(Ref(buffer), _)).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::SetBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetValue);
 }
 
@@ -402,10 +402,10 @@ TEST(DecoderStateMachineTest, EmptySet) {
       .WillOnce(DoAll(SetArgReferee<1>(FieldType::I32), SetArgReferee<2>(0), Return(true)));
   EXPECT_CALL(proto, readSetEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::SetBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetEnd);
 }
 
@@ -422,10 +422,10 @@ TEST_P(DecoderStateMachineValueTest, SetValue) {
 
   EXPECT_CALL(proto, readSetEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::SetBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetEnd);
 }
 
@@ -444,10 +444,10 @@ TEST_P(DecoderStateMachineValueTest, MultipleSetValues) {
 
   EXPECT_CALL(proto, readSetEnd(Ref(buffer))).WillOnce(Return(false));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::SetBegin);
-  EXPECT_EQ(dsm.run(), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::SetEnd);
 }
 
@@ -465,9 +465,9 @@ TEST(DecoderStateMachineTest, EmptyStruct) {
   EXPECT_CALL(proto, readStructEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
-  EXPECT_EQ(dsm.run(), ProtocolState::Done);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
   EXPECT_EQ(dsm.currentState(), ProtocolState::Done);
 }
 
@@ -492,9 +492,9 @@ TEST_P(DecoderStateMachineValueTest, SingleFieldStruct) {
   EXPECT_CALL(proto, readStructEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
-  EXPECT_EQ(dsm.run(), ProtocolState::Done);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
   EXPECT_EQ(dsm.currentState(), ProtocolState::Done);
 }
 
@@ -527,9 +527,9 @@ TEST(DecoderStateMachineTest, MultiFieldStruct) {
   EXPECT_CALL(proto, readStructEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
-  EXPECT_EQ(dsm.run(), ProtocolState::Done);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
   EXPECT_EQ(dsm.currentState(), ProtocolState::Done);
 }
 
@@ -567,9 +567,9 @@ TEST_P(DecoderStateMachineNestingTest, NestedTypes) {
   expectContainerEnd(proto, FieldType::Struct);
   EXPECT_CALL(proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
 
-  DecoderStateMachine dsm(buffer, proto);
+  DecoderStateMachine dsm(proto);
 
-  EXPECT_EQ(dsm.run(), ProtocolState::Done);
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
   EXPECT_EQ(dsm.currentState(), ProtocolState::Done);
 }
 
@@ -577,22 +577,21 @@ TEST(DecoderTest, OnData) {
   NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
   InSequence dummy;
+  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto});
+  Buffer::OwnedImpl buffer;
 
-  EXPECT_CALL(*transport, decodeFrameStart(_)).WillOnce(Return(true));
-  EXPECT_CALL(*proto, readMessageBegin(_, _, _, _))
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*proto, readMessageBegin(Ref(buffer), _, _, _))
       .WillOnce(DoAll(SetArgReferee<1>("name"), SetArgReferee<2>(MessageType::Call),
                       SetArgReferee<3>(100), Return(true)));
-  EXPECT_CALL(*proto, readStructBegin(_, _)).WillOnce(Return(true));
-  EXPECT_CALL(*proto, readFieldBegin(_, _, _, _))
+  EXPECT_CALL(*proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
+  EXPECT_CALL(*proto, readFieldBegin(Ref(buffer), _, _, _))
       .WillOnce(DoAll(SetArgReferee<2>(FieldType::Stop), Return(true)));
-  EXPECT_CALL(*proto, readStructEnd(_)).WillOnce(Return(true));
-  EXPECT_CALL(*proto, readMessageEnd(_)).WillOnce(Return(true));
-  EXPECT_CALL(*transport, decodeFrameEnd(_)).WillOnce(Return(true));
-  EXPECT_CALL(*transport, decodeFrameStart(_)).WillOnce(Return(false));
+  EXPECT_CALL(*proto, readStructEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*transport, decodeFrameEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer))).WillOnce(Return(false));
 
-  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto});
-
-  Buffer::OwnedImpl buffer;
   decoder.onData(buffer);
 }
 

@@ -61,8 +61,7 @@ private:
  */
 class DecoderStateMachine {
 public:
-  DecoderStateMachine(Buffer::Instance& buffer, Protocol& proto)
-      : buffer_(buffer), proto_(proto), state_(ProtocolState::MessageBegin) {}
+  DecoderStateMachine(Protocol& proto) : proto_(proto), state_(ProtocolState::MessageBegin) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -70,10 +69,11 @@ public:
    * a message. Returns ProtocolState::Done when the end of a message is successfully processed.
    * Once the Done state is reached, further invocations of run return immediately with Done.
    *
+   * @param buffer a buffer containing the remaining data to be processed
    * @return ProtocolState returns with ProtocolState::WaitForData or ProtocolState::Done
    * @throw Envoy Exception if thrown by the underlying Protocol
    */
-  ProtocolState run();
+  ProtocolState run(Buffer::Instance& buffer);
 
   /**
    * @return the current ProtocolState
@@ -116,39 +116,39 @@ private:
 
   // These functions map directly to the matching ProtocolState values. Each returns the next state
   // or ProtocolState::WaitForData if more data is required.
-  ProtocolState messageBegin();
-  ProtocolState messageEnd();
-  ProtocolState structBegin();
-  ProtocolState structEnd();
-  ProtocolState fieldBegin();
-  ProtocolState fieldValue();
-  ProtocolState fieldEnd();
-  ProtocolState listBegin();
-  ProtocolState listValue();
-  ProtocolState listEnd();
-  ProtocolState mapBegin();
-  ProtocolState mapKey();
-  ProtocolState mapValue();
-  ProtocolState mapEnd();
-  ProtocolState setBegin();
-  ProtocolState setValue();
-  ProtocolState setEnd();
+  ProtocolState messageBegin(Buffer::Instance& buffer);
+  ProtocolState messageEnd(Buffer::Instance& buffer);
+  ProtocolState structBegin(Buffer::Instance& buffer);
+  ProtocolState structEnd(Buffer::Instance& buffer);
+  ProtocolState fieldBegin(Buffer::Instance& buffer);
+  ProtocolState fieldValue(Buffer::Instance& buffer);
+  ProtocolState fieldEnd(Buffer::Instance& buffer);
+  ProtocolState listBegin(Buffer::Instance& buffer);
+  ProtocolState listValue(Buffer::Instance& buffer);
+  ProtocolState listEnd(Buffer::Instance& buffer);
+  ProtocolState mapBegin(Buffer::Instance& buffer);
+  ProtocolState mapKey(Buffer::Instance& buffer);
+  ProtocolState mapValue(Buffer::Instance& buffer);
+  ProtocolState mapEnd(Buffer::Instance& buffer);
+  ProtocolState setBegin(Buffer::Instance& buffer);
+  ProtocolState setValue(Buffer::Instance& buffer);
+  ProtocolState setEnd(Buffer::Instance& buffer);
 
   // handleValue represents the generic Value state from the state machine documentation. It
   // returns either ProtocolState::WaitForData if more data is required or the next state. For
   // structs, lists, maps, or sets the return_state is pushed onto the stack and the next state is
   // based on elem_type. For primitive value types, return_state is returned as the next state
   // (unless WaitForData is returned).
-  ProtocolState handleValue(FieldType elem_type, ProtocolState return_state);
+  ProtocolState handleValue(Buffer::Instance& buffer, FieldType elem_type,
+                            ProtocolState return_state);
 
   // handleState delegates to the appropriate method based on state_.
-  ProtocolState handleState();
+  ProtocolState handleState(Buffer::Instance& buffer);
 
   // Helper method to retrieve the current frame's return state and remove the frame from the
   // stack.
   ProtocolState popReturnState();
 
-  Buffer::Instance& buffer_;
   Protocol& proto_;
   ProtocolState state_;
   std::vector<Frame> stack_;
@@ -157,17 +157,17 @@ private:
 typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
 
 /**
- * Decoder encapsulates a configure TransportPtr and ProtocolPtr. It copies Thrift data into a
- * private buffer and executes the DecoderStateMachine on it.
+ * Decoder encapsulates a configured TransportPtr and ProtocolPtr.
  */
 class Decoder : public Logger::Loggable<Logger::Id::thrift> {
 public:
   Decoder(TransportPtr&& transport, ProtocolPtr&& protocol);
 
   /**
-   * Copies data into a private buffer and executes a DecoderStateMachine on the data.
-   * A new DecoderStateMachine is instantiated for each message.
+   * Drains data from the given buffer while executing a DecoderStateMachine over the data. A new
+   * DecoderStateMachine is instantiated for each message.
    *
+   * @param data a Buffer containing Thrift protocol data
    * @throw EnvoyException on Thrift protocol errors
    */
   void onData(Buffer::Instance& data);
@@ -176,7 +176,6 @@ public:
   const Protocol& protocol() { return *protocol_; }
 
 private:
-  Buffer::OwnedImpl buffer_;
   TransportPtr transport_;
   ProtocolPtr protocol_;
   DecoderStateMachinePtr state_machine_;

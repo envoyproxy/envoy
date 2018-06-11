@@ -13,11 +13,11 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 // MessageBegin -> StructBegin
-ProtocolState DecoderStateMachine::messageBegin() {
+ProtocolState DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
   std::string message_name;
   MessageType msg_type;
   int32_t seq_id;
-  if (!proto_.readMessageBegin(buffer_, message_name, msg_type, seq_id)) {
+  if (!proto_.readMessageBegin(buffer, message_name, msg_type, seq_id)) {
     return ProtocolState::WaitForData;
   }
 
@@ -28,8 +28,8 @@ ProtocolState DecoderStateMachine::messageBegin() {
 }
 
 // MessageEnd -> Done
-ProtocolState DecoderStateMachine::messageEnd() {
-  if (!proto_.readMessageEnd(buffer_)) {
+ProtocolState DecoderStateMachine::messageEnd(Buffer::Instance& buffer) {
+  if (!proto_.readMessageEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
@@ -37,9 +37,9 @@ ProtocolState DecoderStateMachine::messageEnd() {
 }
 
 // StructBegin -> FieldBegin
-ProtocolState DecoderStateMachine::structBegin() {
+ProtocolState DecoderStateMachine::structBegin(Buffer::Instance& buffer) {
   std::string name;
-  if (!proto_.readStructBegin(buffer_, name)) {
+  if (!proto_.readStructBegin(buffer, name)) {
     return ProtocolState::WaitForData;
   }
 
@@ -47,8 +47,8 @@ ProtocolState DecoderStateMachine::structBegin() {
 }
 
 // StructEnd -> stack's return state
-ProtocolState DecoderStateMachine::structEnd() {
-  if (!proto_.readStructEnd(buffer_)) {
+ProtocolState DecoderStateMachine::structEnd(Buffer::Instance& buffer) {
+  if (!proto_.readStructEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
@@ -57,11 +57,11 @@ ProtocolState DecoderStateMachine::structEnd() {
 
 // FieldBegin -> FieldValue, or
 // FieldBegin -> StructEnd (stop field)
-ProtocolState DecoderStateMachine::fieldBegin() {
+ProtocolState DecoderStateMachine::fieldBegin(Buffer::Instance& buffer) {
   std::string name;
   FieldType field_type;
   int16_t field_id;
-  if (!proto_.readFieldBegin(buffer_, name, field_type, field_id)) {
+  if (!proto_.readFieldBegin(buffer, name, field_type, field_id)) {
     return ProtocolState::WaitForData;
   }
 
@@ -75,15 +75,15 @@ ProtocolState DecoderStateMachine::fieldBegin() {
 }
 
 // FieldValue -> FieldEnd (via stack return state)
-ProtocolState DecoderStateMachine::fieldValue() {
+ProtocolState DecoderStateMachine::fieldValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
   FieldType field_type = stack_.back().elem_type_;
-  return handleValue(field_type, popReturnState());
+  return handleValue(buffer, field_type, popReturnState());
 }
 
 // FieldEnd -> FieldBegin
-ProtocolState DecoderStateMachine::fieldEnd() {
-  if (!proto_.readFieldEnd(buffer_)) {
+ProtocolState DecoderStateMachine::fieldEnd(Buffer::Instance& buffer) {
+  if (!proto_.readFieldEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
@@ -91,10 +91,10 @@ ProtocolState DecoderStateMachine::fieldEnd() {
 }
 
 // ListBegin -> ListValue
-ProtocolState DecoderStateMachine::listBegin() {
+ProtocolState DecoderStateMachine::listBegin(Buffer::Instance& buffer) {
   FieldType elem_type;
   uint32_t size;
-  if (!proto_.readListBegin(buffer_, elem_type, size)) {
+  if (!proto_.readListBegin(buffer, elem_type, size)) {
     return ProtocolState::WaitForData;
   }
 
@@ -105,7 +105,7 @@ ProtocolState DecoderStateMachine::listBegin() {
 
 // ListValue -> ListValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on value type), or
 // ListValue -> ListEnd
-ProtocolState DecoderStateMachine::listValue() {
+ProtocolState DecoderStateMachine::listValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
@@ -113,12 +113,12 @@ ProtocolState DecoderStateMachine::listValue() {
   }
   frame.remaining_--;
 
-  return handleValue(frame.elem_type_, ProtocolState::ListValue);
+  return handleValue(buffer, frame.elem_type_, ProtocolState::ListValue);
 }
 
 // ListEnd -> stack's return state
-ProtocolState DecoderStateMachine::listEnd() {
-  if (!proto_.readListEnd(buffer_)) {
+ProtocolState DecoderStateMachine::listEnd(Buffer::Instance& buffer) {
+  if (!proto_.readListEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
@@ -126,10 +126,10 @@ ProtocolState DecoderStateMachine::listEnd() {
 }
 
 // MapBegin -> MapKey
-ProtocolState DecoderStateMachine::mapBegin() {
+ProtocolState DecoderStateMachine::mapBegin(Buffer::Instance& buffer) {
   FieldType key_type, value_type;
   uint32_t size;
-  if (!proto_.readMapBegin(buffer_, key_type, value_type, size)) {
+  if (!proto_.readMapBegin(buffer, key_type, value_type, size)) {
     return ProtocolState::WaitForData;
   }
 
@@ -140,30 +140,30 @@ ProtocolState DecoderStateMachine::mapBegin() {
 
 // MapKey -> MapValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on key type), or
 // MapKey -> MapEnd
-ProtocolState DecoderStateMachine::mapKey() {
+ProtocolState DecoderStateMachine::mapKey(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
     return popReturnState();
   }
 
-  return handleValue(frame.elem_type_, ProtocolState::MapValue);
+  return handleValue(buffer, frame.elem_type_, ProtocolState::MapValue);
 }
 
 // MapValue -> MapKey, ListBegin, MapBegin, SetBegin, StructBegin (depending on value type), or
 // MapValue -> MapKey
-ProtocolState DecoderStateMachine::mapValue() {
+ProtocolState DecoderStateMachine::mapValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   ASSERT(frame.remaining_ != 0);
   frame.remaining_--;
 
-  return handleValue(frame.value_type_, ProtocolState::MapKey);
+  return handleValue(buffer, frame.value_type_, ProtocolState::MapKey);
 }
 
 // MapEnd -> stack's return state
-ProtocolState DecoderStateMachine::mapEnd() {
-  if (!proto_.readMapEnd(buffer_)) {
+ProtocolState DecoderStateMachine::mapEnd(Buffer::Instance& buffer) {
+  if (!proto_.readMapEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
@@ -171,10 +171,10 @@ ProtocolState DecoderStateMachine::mapEnd() {
 }
 
 // SetBegin -> SetValue
-ProtocolState DecoderStateMachine::setBegin() {
+ProtocolState DecoderStateMachine::setBegin(Buffer::Instance& buffer) {
   FieldType elem_type;
   uint32_t size;
-  if (!proto_.readSetBegin(buffer_, elem_type, size)) {
+  if (!proto_.readSetBegin(buffer, elem_type, size)) {
     return ProtocolState::WaitForData;
   }
 
@@ -185,7 +185,7 @@ ProtocolState DecoderStateMachine::setBegin() {
 
 // SetValue -> SetValue, ListBegin, MapBegin, SetBegin, StructBegin (depending on value type), or
 // SetValue -> SetEnd
-ProtocolState DecoderStateMachine::setValue() {
+ProtocolState DecoderStateMachine::setValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
   Frame& frame = stack_.back();
   if (frame.remaining_ == 0) {
@@ -193,64 +193,65 @@ ProtocolState DecoderStateMachine::setValue() {
   }
   frame.remaining_--;
 
-  return handleValue(frame.elem_type_, ProtocolState::SetValue);
+  return handleValue(buffer, frame.elem_type_, ProtocolState::SetValue);
 }
 
 // SetEnd -> stack's return state
-ProtocolState DecoderStateMachine::setEnd() {
-  if (!proto_.readSetEnd(buffer_)) {
+ProtocolState DecoderStateMachine::setEnd(Buffer::Instance& buffer) {
+  if (!proto_.readSetEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
 
   return popReturnState();
 }
 
-ProtocolState DecoderStateMachine::handleValue(FieldType elem_type, ProtocolState return_state) {
+ProtocolState DecoderStateMachine::handleValue(Buffer::Instance& buffer, FieldType elem_type,
+                                               ProtocolState return_state) {
   switch (elem_type) {
   case FieldType::Bool:
     bool value;
-    if (!proto_.readBool(buffer_, value)) {
+    if (!proto_.readBool(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   case FieldType::Byte: {
     uint8_t value;
-    if (!proto_.readByte(buffer_, value)) {
+    if (!proto_.readByte(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   }
   case FieldType::I16: {
     int16_t value;
-    if (!proto_.readInt16(buffer_, value)) {
+    if (!proto_.readInt16(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   }
   case FieldType::I32: {
     int32_t value;
-    if (!proto_.readInt32(buffer_, value)) {
+    if (!proto_.readInt32(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   }
   case FieldType::I64: {
     int64_t value;
-    if (!proto_.readInt64(buffer_, value)) {
+    if (!proto_.readInt64(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   }
   case FieldType::Double: {
     double value;
-    if (!proto_.readDouble(buffer_, value)) {
+    if (!proto_.readDouble(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
   }
   case FieldType::String: {
     std::string value;
-    if (!proto_.readString(buffer_, value)) {
+    if (!proto_.readString(buffer, value)) {
       return ProtocolState::WaitForData;
     }
     break;
@@ -274,42 +275,42 @@ ProtocolState DecoderStateMachine::handleValue(FieldType elem_type, ProtocolStat
   return return_state;
 }
 
-ProtocolState DecoderStateMachine::handleState() {
+ProtocolState DecoderStateMachine::handleState(Buffer::Instance& buffer) {
   switch (state_) {
   case ProtocolState::MessageBegin:
-    return messageBegin();
+    return messageBegin(buffer);
   case ProtocolState::StructBegin:
-    return structBegin();
+    return structBegin(buffer);
   case ProtocolState::StructEnd:
-    return structEnd();
+    return structEnd(buffer);
   case ProtocolState::FieldBegin:
-    return fieldBegin();
+    return fieldBegin(buffer);
   case ProtocolState::FieldValue:
-    return fieldValue();
+    return fieldValue(buffer);
   case ProtocolState::FieldEnd:
-    return fieldEnd();
+    return fieldEnd(buffer);
   case ProtocolState::ListBegin:
-    return listBegin();
+    return listBegin(buffer);
   case ProtocolState::ListValue:
-    return listValue();
+    return listValue(buffer);
   case ProtocolState::ListEnd:
-    return listEnd();
+    return listEnd(buffer);
   case ProtocolState::MapBegin:
-    return mapBegin();
+    return mapBegin(buffer);
   case ProtocolState::MapKey:
-    return mapKey();
+    return mapKey(buffer);
   case ProtocolState::MapValue:
-    return mapValue();
+    return mapValue(buffer);
   case ProtocolState::MapEnd:
-    return mapEnd();
+    return mapEnd(buffer);
   case ProtocolState::SetBegin:
-    return setBegin();
+    return setBegin(buffer);
   case ProtocolState::SetValue:
-    return setValue();
+    return setValue(buffer);
   case ProtocolState::SetEnd:
-    return setEnd();
+    return setEnd(buffer);
   case ProtocolState::MessageEnd:
-    return messageEnd();
+    return messageEnd(buffer);
   default:
     NOT_REACHED;
   }
@@ -322,9 +323,9 @@ ProtocolState DecoderStateMachine::popReturnState() {
   return return_state;
 }
 
-ProtocolState DecoderStateMachine::run() {
+ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
   while (state_ != ProtocolState::Done) {
-    ProtocolState s = handleState();
+    ProtocolState s = handleState(buffer);
     if (s == ProtocolState::WaitForData) {
       return s;
     }
@@ -340,28 +341,27 @@ Decoder::Decoder(TransportPtr&& transport, ProtocolPtr&& protocol)
       frame_started_(false) {}
 
 void Decoder::onData(Buffer::Instance& data) {
-  ENVOY_LOG(debug, "thrift: read {} bytes", data.length());
-  buffer_.add(data);
+  ENVOY_LOG(debug, "thrift: {} bytes available", data.length());
 
   while (true) {
     if (!frame_started_) {
       // Look for start of next frame.
-      if (!transport_->decodeFrameStart(buffer_)) {
+      if (!transport_->decodeFrameStart(data)) {
         ENVOY_LOG(debug, "thrift: need more data for {} transport start", transport_->name());
         return;
       }
       ENVOY_LOG(debug, "thrift: {} transport started", transport_->name());
 
       frame_started_ = true;
-      state_machine_ = std::make_unique<DecoderStateMachine>(buffer_, *protocol_);
+      state_machine_ = std::make_unique<DecoderStateMachine>(*protocol_);
     }
 
     ASSERT(state_machine_ != nullptr);
 
-    ENVOY_LOG(debug, "thrift: protocol {}, state {}, {} bytes buffered", protocol_->name(),
-              ProtocolStateNameValues::name(state_machine_->currentState()), buffer_.length());
+    ENVOY_LOG(debug, "thrift: protocol {}, state {}, {} bytes available", protocol_->name(),
+              ProtocolStateNameValues::name(state_machine_->currentState()), data.length());
 
-    ProtocolState rv = state_machine_->run();
+    ProtocolState rv = state_machine_->run(data);
     if (rv == ProtocolState::WaitForData) {
       ENVOY_LOG(debug, "thrift: wait for data");
       return;
@@ -370,7 +370,7 @@ void Decoder::onData(Buffer::Instance& data) {
     ASSERT(rv == ProtocolState::Done);
 
     // Message complete, get decode end of frame.
-    if (!transport_->decodeFrameEnd(buffer_)) {
+    if (!transport_->decodeFrameEnd(data)) {
       ENVOY_LOG(debug, "thrift: need more data for {} transport end", transport_->name());
       return;
     }
