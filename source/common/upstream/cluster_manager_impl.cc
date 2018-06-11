@@ -694,6 +694,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
   // TODO(mattklein123): The above is sub-optimal and is related to the TODO in
   //                     redis/conn_pool_impl.cc. Will fix at the same time.
   ENVOY_LOG(debug, "shutting down thread local cluster manager");
+  destroying_ = true;
   host_http_conn_pool_map_.clear();
   ASSERT(host_tcp_conn_map_.empty());
   for (auto& cluster : thread_local_clusters_) {
@@ -719,6 +720,14 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
   for (const auto& pair : container.pools_) {
     pair.second->addDrainedCallback([this, old_host]() -> void {
+      if (destroying_) {
+        // It is possible for a connection pool to fire drain callbacks during destruction. Instead
+        // of checking if old_host actually exists in the map, it's clearer and cleaner to keep
+        // track of destruction as a separate state and check for it here. This also allows us to
+        // do this check here versus inside every different connection pool implementation.
+        return;
+      }
+
       ConnPoolsContainer& container = host_http_conn_pool_map_[old_host];
       ASSERT(container.drains_remaining_ > 0);
       container.drains_remaining_--;

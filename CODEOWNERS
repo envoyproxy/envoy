@@ -1,0 +1,6 @@
+# TODO(zuercher): determine how we want to deal deal with auto-assignment
+# By default, @envoyproxy/maintainers own everything.
+#*       @envoyproxy/maintainers
+
+# thrift_proxy extension
+/*/extensions/filters/network/thrift_proxy @zuercher @brian-pane

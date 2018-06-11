@@ -93,6 +93,11 @@ public:
   virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;
 
   /**
+   * @return A list of a hex-encoded SHA-256 SPKI hashes to be verified.
+   */
+  virtual const std::vector<std::string>& verifyCertificateSpkiList() const PURE;
+
+  /**
    * @return whether to ignore expired certificates (both too new and too old).
    */
   virtual bool allowExpiredCertificate() const PURE;
@@ -115,6 +120,11 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& serverNameIndication() const PURE;
+
+  /**
+   * @return true if server-initiated TLS renegotiation will be allowed.
+   */
+  virtual bool allowRenegotiation() const PURE;
 };
 
 class ServerContextConfig : public virtual ContextConfig {

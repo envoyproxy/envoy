@@ -95,8 +95,9 @@ private:
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  CookieHashMethod(const std::string& key, const absl::optional<std::chrono::seconds>& ttl)
-      : key_(key), ttl_(ttl) {}
+  CookieHashMethod(const std::string& key, const std::string& path,
+                   const absl::optional<std::chrono::seconds>& ttl)
+      : key_(key), path_(path), ttl_(ttl) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -105,7 +106,7 @@ public:
     std::string value = Http::Utility::parseCookieValue(headers, key_);
 
     if (value.empty() && ttl_.has_value()) {
-      value = add_cookie(key_, ttl_.value());
+      value = add_cookie(key_, path_, ttl_.value());
       hash = HashUtil::xxHash64(value);
 
     } else if (!value.empty()) {
@@ -116,6 +117,7 @@ public:
 
 private:
   const std::string key_;
+  const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
 };
 
@@ -155,7 +157,8 @@ HashPolicyImpl::HashPolicyImpl(
       if (hash_policy.cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
       }
-      hash_impls_.emplace_back(new CookieHashMethod(hash_policy.cookie().name(), ttl));
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().path(), ttl));
       break;
     }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
@@ -358,17 +361,22 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
                                                           read_callbacks, websocket_config_);
 }
 
-void RouteEntryImplBase::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
+                                                const RequestInfo::RequestInfo& request_info,
+                                                bool insert_envoy_original_path) const {
   // Append user-specified request headers in the following order: route-level headers,
   // virtual host level headers and finally global connection manager level headers.
   request_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
-  if (host_rewrite_.empty()) {
-    return;
+  if (!host_rewrite_.empty()) {
+    headers.Host()->value(host_rewrite_);
   }
-  headers.Host()->value(host_rewrite_);
+
+  // Handle path rewrite
+  if (!getPathRewrite().empty()) {
+    rewritePathHeader(headers, insert_envoy_original_path);
+  }
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(
@@ -392,14 +400,17 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
-                                            const std::string& matched_path) const {
-  const auto& rewrite = (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+                                            const std::string& matched_path,
+                                            bool insert_envoy_original_path) const {
+  const auto& rewrite = getPathRewrite();
   if (rewrite.empty()) {
     return;
   }
 
   std::string path = headers.Path()->value().c_str();
-  headers.insertEnvoyOriginalPath().value(*headers.Path());
+  if (insert_envoy_original_path) {
+    headers.insertEnvoyOriginalPath().value(*headers.Path());
+  }
   ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
   headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
@@ -594,15 +605,9 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
                                            Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context), prefix_(route.match().prefix()) {}
 
-void PrefixRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
-
-  finalizePathHeader(headers, prefix_);
-}
-
-void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
-  finalizePathHeader(headers, prefix_);
+void PrefixRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+                                             bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::HeaderMap& headers,
@@ -619,15 +624,9 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        Server::Configuration::FactoryContext& factory_context)
     : RouteEntryImplBase(vhost, route, factory_context), path_(route.match().path()) {}
 
-void PathRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
-
-  finalizePathHeader(headers, path_);
-}
-
-void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
-  finalizePathHeader(headers, path_);
+void PathRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+                                           bool insert_envoy_original_path) const {
+  finalizePathHeader(headers, path_, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
@@ -665,19 +664,16 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
       regex_(RegexUtil::parseRegex(route.match().regex().c_str())),
       regex_str_(route.match().regex()) {}
 
-void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers) const {
+void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
+                                            bool insert_envoy_original_path) const {
   const Http::HeaderString& path = headers.Path()->value();
   const char* query_string_start = Http::Utility::findQueryStringStart(path);
+  // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
+  // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
   ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
   std::string matched_path(path.c_str(), query_string_start);
 
-  finalizePathHeader(headers, matched_path);
-}
-
-void RegexRouteEntryImpl::finalizeRequestHeaders(
-    Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
-  RouteEntryImplBase::finalizeRequestHeaders(headers, request_info);
-  rewritePathHeader(headers);
+  finalizePathHeader(headers, matched_path, insert_envoy_original_path);
 }
 
 RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,

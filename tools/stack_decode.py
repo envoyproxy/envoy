@@ -29,8 +29,8 @@ def decode_stacktrace_log(input_source):
   # bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
   backtrace_marker = "\[backtrace\] [^\s]+"
   trace_begin_re = re.compile(
-      "^(.+)%s Backtrace obj<(.+)> thr<(\d+)" % backtrace_marker)
-  stackaddr_re = re.compile("%s thr<(\d+)> #\d+ (0x[0-9a-fA-F]+)$" % backtrace_marker)
+      "^(.+)%s Backtrace thr<(\d+)> obj<(.+)>" % backtrace_marker)
+  stackaddr_re = re.compile("%s thr<(\d+)> #\d+ (0x[0-9a-fA-F]+) " % backtrace_marker)
   new_object_re = re.compile("%s thr<(\d+)> obj<(.+)>$" % backtrace_marker)
   trace_end_re = re.compile("%s end backtrace thread (\d+)" % backtrace_marker)
 
@@ -42,7 +42,7 @@ def decode_stacktrace_log(input_source):
         return  # EOF
       begin_trace_match = trace_begin_re.search(line)
       if begin_trace_match:
-        log_prefix, objfile, thread_id = begin_trace_match.groups()
+        log_prefix, thread_id, objfile = begin_trace_match.groups()
         traces[thread_id] = Backtrace(log_prefix=log_prefix, obj_list=[])
         traces[thread_id].obj_list.append(
             AddressList(obj_file=objfile, addresses=[]))

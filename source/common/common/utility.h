@@ -25,7 +25,7 @@ namespace Envoy {
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : format_string_(format_string) {}
+  DateFormatter(const std::string& format_string) : format_string_(parse(format_string)) {}
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -48,7 +48,34 @@ public:
   const std::string& formatString() const { return format_string_; }
 
 private:
-  std::string format_string_;
+  std::string parse(const std::string& format_string);
+
+  typedef std::vector<int32_t> SubsecondOffsets;
+  std::string fromTimeAndPrepareSubsecondOffsets(time_t time,
+                                                 SubsecondOffsets& subsecond_offsets) const;
+
+  // A container to hold a subsecond specifier (%f, %Nf) found in a format string.
+  struct SubsecondSpecifier {
+    SubsecondSpecifier(const size_t position, const size_t width, const std::string& segment)
+        : position_(position), width_(width), segment_(segment) {}
+
+    // The position/index of a subsecond specifier in a format string.
+    const size_t position_;
+
+    // The width of a subsecond specifier, e.g. given %3f, the width is 3. If %f is set as the
+    // specifier, the width value should be 9 (the number of nanosecond digits).
+    const size_t width_;
+
+    // The string before the current specifier's position and after the previous found specifier. A
+    // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
+    // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
+    const std::string segment_;
+  };
+
+  // This holds all subsecond specifiers found in a given format string.
+  std::vector<SubsecondSpecifier> subseconds_;
+
+  const std::string format_string_;
 };
 
 /**

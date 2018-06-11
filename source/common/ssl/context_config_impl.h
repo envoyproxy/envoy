@@ -46,6 +46,9 @@ public:
   const std::vector<std::string>& verifyCertificateHashList() const override {
     return verify_certificate_hash_list_;
   };
+  const std::vector<std::string>& verifyCertificateSpkiList() const override {
+    return verify_certificate_spki_list_;
+  };
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; };
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
@@ -75,6 +78,7 @@ private:
   const std::string private_key_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::vector<std::string> verify_certificate_hash_list_;
+  const std::vector<std::string> verify_certificate_spki_list_;
   const bool allow_expired_certificate_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
@@ -87,9 +91,11 @@ public:
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
+  bool allowRenegotiation() const override { return allow_renegotiation_; }
 
 private:
   const std::string server_name_indication_;
+  const bool allow_renegotiation_;
 };
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {

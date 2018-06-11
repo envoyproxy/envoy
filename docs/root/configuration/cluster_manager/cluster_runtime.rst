@@ -98,10 +98,6 @@ upstream.use_http2
   Whether the cluster utilizes the *http2* :ref:`feature <config_cluster_manager_cluster_features>`
   if configured. Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
 
-upstream.weight_enabled
-  Binary switch to turn on or off weighted load balancing. If set to non 0, weighted load balancing
-  is enabled. Defaults to enabled.
-
 .. _config_cluster_manager_cluster_runtime_zone_routing:
 
 Zone aware load balancing
