@@ -224,7 +224,8 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
-   * @param upstream_local_address sets upstream local address.
+   * @param upstream_local_address sets the local address of the upstream connection. Note that it
+   * can be different than the local address of the downstream connection.
    */
   virtual void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
@@ -245,7 +246,8 @@ public:
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
-   * @param downstream_local_address sets the downstream local address.
+   * @param downstream_local_address sets the local address of the downstream connection. Note that
+   * it can be different than the local address of the upstream connection.
    */
   virtual void setDownstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_local_address) PURE;
@@ -256,7 +258,7 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
 
   /**
-   * @param downstream_remote_address sets the downstream remote address.
+   * @param downstream_remote_address sets the remote address of downstream connection.
    */
   virtual void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) PURE;
