@@ -185,17 +185,19 @@ struct RequestInfoImpl : public RequestInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
-  uint64_t bytes_received_{};
   absl::optional<uint32_t> response_code_;
-  uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Network::Address::InstanceConstSharedPtr upstream_local_address_;
   bool hc_request_{};
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+
+private:
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
 } // namespace RequestInfo

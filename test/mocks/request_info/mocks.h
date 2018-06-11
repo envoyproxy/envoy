@@ -71,14 +71,16 @@ public:
   absl::optional<std::chrono::nanoseconds> first_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> end_time_;
+  absl::optional<Http::Protocol> protocol_;
+  absl::optional<uint32_t> response_code_;
+  envoy::api::v2::core::Metadata metadata_;
+
+private:
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  absl::optional<Http::Protocol> protocol_;
-  absl::optional<uint32_t> response_code_;
-  uint64_t bytes_received_{};
-  uint64_t bytes_sent_{};
-  envoy::api::v2::core::Metadata metadata_;
 };
 
 } // namespace RequestInfo
