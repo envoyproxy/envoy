@@ -75,8 +75,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
     }
     if (!verify_subject_alt_name_list_.empty()) {
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
-                                       "trusted CA is insecure and not allowed",
-                                       certificateRevocationListPath()));
+                                       "trusted CA is insecure and not allowed"));
     }
   }
 }
