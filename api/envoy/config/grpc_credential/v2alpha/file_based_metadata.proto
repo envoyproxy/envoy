@@ -3,7 +3,7 @@ syntax = "proto3";
 // [#protodoc-title: Grpc Credentials File Based Metadata]
 // Configuration for File Based Metadata Grpc Credentials Plugin
 
-package envoy.config.grpc_credentials.v2alpha;
+package envoy.config.grpc_credential.v2alpha;
 option go_package = "v2alpha";
 
 import "envoy/api/v2/core/base.proto";
