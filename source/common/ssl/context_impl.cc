@@ -86,6 +86,14 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     }
     verify_mode = SSL_VERIFY_PEER;
     verify_trusted_ca_ = true;
+
+    // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
+    // directly. However, our new callback is still calling X509_verify_cert() under
+    // the hood. Therefore, to ignore cert expiration, we need to set the callback
+    // for X509_verify_cert to ignore that error.
+    if (config.allowExpiredCertificate()) {
+      X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
+    }
   }
 
   if (!config.certificateRevocationList().empty()) {
@@ -146,16 +154,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
 
   if (verify_mode != SSL_VERIFY_NONE) {
     SSL_CTX_set_verify(ctx_.get(), verify_mode, nullptr);
-
-    // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
-    // directly. However, our new callback is still calling X509_verify_cert() under
-    // the hood. Therefore, to ignore cert expiration, we need to set the callback
-    // for X509_verify_cert to ignore that error.
-    if (verify_trusted_ca_ && config.allowExpiredCertificate()) {
-      X509_STORE* store = SSL_CTX_get_cert_store(ctx_.get());
-      X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
-    }
-
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 

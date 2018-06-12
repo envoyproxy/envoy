@@ -78,7 +78,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
                                        "trusted CA is insecure and not allowed"));
     }
     if (allow_expired_certificate_) {
-      throw EnvoyException(fmt::format("Cannot ignore certificate expiration without trusted CA"));
+      throw EnvoyException(
+          fmt::format("Certificate validity period is always ignored without trusted CA"));
     }
   }
 }

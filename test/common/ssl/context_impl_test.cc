@@ -439,7 +439,7 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
                             EnvoyException,
-                            "Cannot ignore certificate expiration without trusted CA");
+                            "Certificate validity period is always ignored without trusted CA");
 
   envoy::api::v2::auth::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -456,7 +456,7 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
                             EnvoyException,
-                            "Cannot ignore certificate expiration without trusted CA");
+                            "Certificate validity period is always ignored without trusted CA");
 
   // But once you add a trusted CA, you should be able to create the context.
   server_validation_ctx->mutable_trusted_ca()->set_filename(
