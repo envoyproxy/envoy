@@ -239,6 +239,7 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
+        ":message_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
@@ -251,6 +252,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )

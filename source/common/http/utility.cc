@@ -16,6 +16,7 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -338,16 +339,6 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED;
 }
 
-void Utility::appendToHeader(HeaderString& header, const std::string& data) {
-  if (data.empty()) {
-    return;
-  }
-  if (!header.empty()) {
-    header.append(",", 1);
-  }
-  header.append(data.c_str(), data.size());
-}
-
 void Utility::extractHostPathFromUri(const std::string& uri, std::string& host, std::string& path) {
   /**
    *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
@@ -373,6 +364,17 @@ void Utility::extractHostPathFromUri(const std::string& uri, std::string& host, 
     host = uri.substr(host_pos, path_pos - host_pos);
     path = uri.substr(path_pos);
   }
+}
+
+MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri) {
+  std::string host, path;
+  extractHostPathFromUri(http_uri.uri(), host, path);
+
+  MessagePtr message(new RequestMessageImpl());
+  message->headers().insertPath().value(path);
+  message->headers().insertHost().value(host);
+
+  return message;
 }
 
 } // namespace Http

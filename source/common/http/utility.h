@@ -4,10 +4,12 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/message.h"
 
 #include "common/json/json_loader.h"
 
@@ -173,14 +175,6 @@ public:
   static const std::string& getProtocolString(const Protocol p);
 
   /**
-   * Appends data to header. If header already has a value, the string ',' is added between the
-   * existing value and data.
-   * @param header the header to append to.
-   * @param data to append to the header.
-   */
-  static void appendToHeader(HeaderString& header, const std::string& data);
-
-  /**
    * Extract host and path from a URI. The host may contain port.
    * This function doesn't validate if the URI is valid. It only parses the URI with following
    * format: scheme://host/path.
@@ -189,6 +183,11 @@ public:
    * @param the output path string.
    */
   static void extractHostPathFromUri(const std::string& uri, std::string& host, std::string& path);
+
+  /**
+   * Prepare headers for a HttpUri.
+   */
+  static MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 };
 
 } // namespace Http

@@ -148,24 +148,23 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 }
 
 void AuthenticatorImpl::fetchRemoteJwks() {
-  uri_ = jwks_data_->getJwtRule().remote_jwks().http_uri().uri();
-  std::string host, path;
-  Http::Utility::extractHostPathFromUri(uri_, host, path);
+  const auto& http_uri = jwks_data_->getJwtRule().remote_jwks().http_uri();
 
-  Http::MessagePtr message(new Http::RequestMessageImpl());
+  Http::MessagePtr message = Http::Utility::prepareHeaders(http_uri);
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  message->headers().insertPath().value(path);
-  message->headers().insertHost().value(host);
 
-  const auto& cluster = jwks_data_->getJwtRule().remote_jwks().http_uri().cluster();
-  if (config_->cm().get(cluster) == nullptr) {
+  if (config_->cm().get(http_uri.cluster()) == nullptr) {
     doneWithStatus(Status::JwksFetchFail);
     return;
   }
 
+  uri_ = http_uri.uri();
   ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_);
-  request_ = config_->cm().httpAsyncClientForCluster(cluster).send(
-      std::move(message), *this, absl::optional<std::chrono::milliseconds>());
+  request_ = config_->cm()
+                 .httpAsyncClientForCluster(http_uri.cluster())
+                 .send(std::move(message), *this,
+                       std::chrono::milliseconds(
+                           DurationUtil::durationToMilliseconds(http_uri.timeout())));
 }
 
 void AuthenticatorImpl::onSuccess(Http::MessagePtr&& response) {

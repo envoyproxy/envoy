@@ -343,31 +343,6 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
-TEST(HttpUtility, TestAppendHeader) {
-  // Test appending to a string with a value.
-  {
-    HeaderString value1;
-    value1.setCopy("some;", 5);
-    Utility::appendToHeader(value1, "test");
-    EXPECT_EQ(value1, "some;,test");
-  }
-
-  // Test appending to an empty string.
-  {
-    HeaderString value2;
-    Utility::appendToHeader(value2, "my tag data");
-    EXPECT_EQ(value2, "my tag data");
-  }
-
-  // Test empty data case.
-  {
-    HeaderString value3;
-    value3.setCopy("empty", 5);
-    Utility::appendToHeader(value3, "");
-    EXPECT_EQ(value3, "empty");
-  }
-}
-
 TEST(HttpUtility, TestExtractHostPathFromUri) {
   std::string host, path;
 
@@ -403,6 +378,16 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   Utility::extractHostPathFromUri("/:/adsf", host, path);
   EXPECT_EQ(host, "");
   EXPECT_EQ(path, "/:/adsf");
+}
+
+TEST(HttpUtility, TestPrepareHeaders) {
+  envoy::api::v2::core::HttpUri http_uri;
+  http_uri.set_uri("scheme://dns.name/x/y/z");
+
+  Http::MessagePtr message = Utility::prepareHeaders(http_uri);
+
+  EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
+  EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
 }
 
 } // namespace Http

@@ -254,9 +254,9 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ((Http::TestHeaderMapImpl{
-                          {":method", "GET"},
                           {":path", "/pubkey_path"},
                           {":authority", "pubkey_server"},
+                          {":method", "GET"},
                       }),
                       message->headers());
             callbacks = &cb;
@@ -291,9 +291,9 @@ TEST_F(AuthenticatorTest, TestInvalidPubkey) {
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ((Http::TestHeaderMapImpl{
-                          {":method", "GET"},
                           {":path", "/pubkey_path"},
                           {":authority", "pubkey_server"},
+                          {":method", "GET"},
                       }),
                       message->headers());
             callbacks = &cb;
@@ -331,9 +331,9 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
           [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
             EXPECT_EQ((Http::TestHeaderMapImpl{
-                          {":method", "GET"},
                           {":path", "/pubkey_path"},
                           {":authority", "pubkey_server"},
+                          {":method", "GET"},
                       }),
                       message->headers());
             callbacks = &cb;
