@@ -80,11 +80,26 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
 }
 
-TEST_F(OpenTracingDriverTest, TagSamplingFalse) {
+TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
   setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
 
   Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
                                                    start_time_, {Tracing::Reason::Sampling, false});
+  first_span->finishSpan();
+
+  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+      {opentracing::ext::sampling_priority, 0}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
+}
+
+TEST_F(OpenTracingDriverTest, TagSamplingFalseByFlag) {
+  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  first_span->setSampled(false);
   first_span->finishSpan();
 
   const std::unordered_map<std::string, opentracing::Value> expected_tags = {
