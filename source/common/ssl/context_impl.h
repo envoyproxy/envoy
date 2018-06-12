@@ -84,7 +84,12 @@ protected:
    */
   static int sslContextIndex();
 
+  // A X509_STORE_CTX_verify_cb callback for ignoring cert expiration in X509_verify_cert().
+  static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
+
+  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+
   int verifyCertificate(X509* cert);
 
   /**

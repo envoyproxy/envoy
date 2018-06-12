@@ -428,5 +428,42 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
                             "Server TlsCertificates must have a certificate specified");
 }
 
+// Cannot ignore certificate expiration without a trusted CA.
+TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      tls_context.mutable_common_tls_context()->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
+                            EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+
+  server_validation_ctx->set_allow_expired_certificate(false);
+
+  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context));
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
+                            EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+
+  // But once you add a trusted CA, you should be able to create the context.
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+
+  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context));
+}
+
 } // namespace Ssl
 } // namespace Envoy

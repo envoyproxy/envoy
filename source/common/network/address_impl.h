@@ -48,7 +48,6 @@ InstanceConstSharedPtr peerAddressFromFd(int fd);
 class InstanceBase : public Instance {
 public:
   // Network::Address::Instance
-  bool operator==(const Instance& rhs) const override { return asString() == rhs.asString(); }
   const std::string& asString() const override { return friendly_name_; }
   // Default logical name is the human-readable name.
   const std::string& logicalName() const override { return asString(); }
@@ -91,6 +90,7 @@ public:
   explicit Ipv4Instance(uint32_t port);
 
   // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
   int bind(int fd) const override;
   int connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
@@ -150,6 +150,7 @@ public:
   explicit Ipv6Instance(uint32_t port);
 
   // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
   int bind(int fd) const override;
   int connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
@@ -206,6 +207,7 @@ public:
   explicit PipeInstance(const std::string& pipe_path);
 
   // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override;
   int bind(int fd) const override;
   int connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }

@@ -41,6 +41,7 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
+  const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};

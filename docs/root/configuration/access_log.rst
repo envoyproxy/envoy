@@ -90,7 +90,7 @@ The following command operators are supported:
 
 %BYTES_SENT%
   HTTP
-    Body bytes sent.
+    Body bytes sent. For WebSocket connection it will also include response header bytes.
 
   TCP
     Downstream bytes sent on connection.

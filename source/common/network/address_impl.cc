@@ -206,6 +206,12 @@ Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
   ip_.friendly_address_ = "0.0.0.0";
 }
 
+bool Ipv4Instance::operator==(const Instance& rhs) const {
+  const Ipv4Instance* rhs_casted = dynamic_cast<const Ipv4Instance*>(&rhs);
+  return (rhs_casted && (ip_.ipv4_.address() == rhs_casted->ip_.ipv4_.address()) &&
+          (ip_.port() == rhs_casted->ip_.port()));
+}
+
 int Ipv4Instance::bind(int fd) const {
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
                 sizeof(ip_.ipv4_.address_));
@@ -263,6 +269,12 @@ Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port) : Instance
 
 Ipv6Instance::Ipv6Instance(uint32_t port) : Ipv6Instance("", port) {}
 
+bool Ipv6Instance::operator==(const Instance& rhs) const {
+  const Ipv6Instance* rhs_casted = dynamic_cast<const Ipv6Instance*>(&rhs);
+  return (rhs_casted && (ip_.ipv6_.address() == rhs_casted->ip_.ipv6_.address()) &&
+          (ip_.port() == rhs_casted->ip_.port()));
+}
+
 int Ipv6Instance::bind(int fd) const {
   return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
                 sizeof(ip_.ipv6_.address_));
@@ -318,6 +330,8 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
     address_.sun_path[0] = '\0';
   }
 }
+
+bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 int PipeInstance::bind(int fd) const {
   if (abstract_namespace_) {

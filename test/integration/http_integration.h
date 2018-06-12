@@ -145,6 +145,7 @@ protected:
   void testAbsolutePathWithPort();
   void testAbsolutePathWithoutPort();
   void testConnect();
+  void testInlineHeaders();
   void testAllowAbsoluteSameRelative();
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled

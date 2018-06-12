@@ -254,6 +254,32 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   return new_session;
 }
 
+// Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
+// Configure the client with expired_san_uri_{cert,key}.pem
+void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listener,
+                                                envoy::api::v2::auth::UpstreamTlsContext& client) {
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"));
+}
+
 } // namespace
 
 class SslSocketTest : public SslCertsTest,
@@ -676,6 +702,96 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
 
   testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.fail_verify_san", false,
            GetParam());
+}
+
+// By default, expired certificates are not permitted.
+TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
+}
+
+// Expired certificates will not be accepted when explicitly disallowed via
+// allow_expired_certificate.
+TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  listener.mutable_filter_chains(0)
+      ->mutable_tls_context()
+      ->mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->set_allow_expired_certificate(false);
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
+}
+
+// Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
+TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  listener.mutable_filter_chains(0)
+      ->mutable_tls_context()
+      ->mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->set_allow_expired_certificate(true);
+
+  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "ssl.handshake",
+             2, GetParam());
+}
+
+// Allow expired certificates, but add a certificate hash requirement so it still fails.
+TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      listener.mutable_filter_chains(0)
+          ->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_cert_hash", 1, GetParam());
+}
+
+// Allow expired certificatess, but use the wrong CA so it should fail still.
+TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      listener.mutable_filter_chains(0)
+          ->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  // This fake CA was not used to sign the client's certificate.
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {

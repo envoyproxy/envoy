@@ -12,6 +12,7 @@ Version history
 * access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
+* access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
@@ -67,7 +68,6 @@ Version history
   to elide *x-forwarded-for* header modifications.
 * http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
   encountering inline headers with multiple instances.
-* http: no longer adding whitespace when appending X-Forwarded-For headers.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
@@ -136,6 +136,8 @@ Version history
   :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`
   and :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   without :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for allowing expired certificates with
+  :ref:`allow_expired_certificate <envoy_api_field_auth.CertificateValidationContext.allow_expired_certificate>`.
 * tls: added support for :ref:`renegotiation <envoy_api_field_auth.UpstreamTlsContext.allow_renegotiation>`
   when acting as a client.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
@@ -144,6 +146,7 @@ Version history
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
+* upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
 
 1.6.0 (March 20, 2018)
 ======================

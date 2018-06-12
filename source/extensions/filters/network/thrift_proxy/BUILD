@@ -20,6 +20,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "decoder_lib",
+    srcs = ["decoder.cc"],
+    hdrs = ["decoder.h"],
+    deps = [
+        ":protocol_lib",
+        ":transport_lib",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "protocol_lib",
     srcs = [
         "binary_protocol.cc",
