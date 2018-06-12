@@ -941,7 +941,7 @@ message HeaderMatcher {
     bool present_match = 7;
   }
 
-  // If specified, the match result will be inverted before before checking. Defaults to false.
+  // If specified, the match result will be inverted before checking. Defaults to false.
   //
   // Examples:
   //
