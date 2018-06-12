@@ -214,7 +214,7 @@ message CertificateValidationContext {
   // multiple CRLs, all of them will be used.
   core.DataSource crl = 7;
 
-  // If specified, Envoy will not reject expired certs.
+  // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
 }
 

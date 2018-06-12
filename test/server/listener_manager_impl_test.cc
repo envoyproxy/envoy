@@ -2183,6 +2183,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
                             "is insecure and not allowed");
 }
 
+// Disabling certificate expiration checks only makes sense with a trusted CA.
 TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -2203,6 +2204,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
                             "Certificate validity period is always ignored without trusted CA");
 }
 
+// Verify that with a CA, expired certificates are allowed.
 TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:

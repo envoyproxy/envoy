@@ -270,7 +270,6 @@ int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx
     }
   }
 
-  // Otherwise, return the original value
   return ok;
 }
 
