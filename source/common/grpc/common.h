@@ -68,6 +68,14 @@ public:
   static std::chrono::milliseconds getGrpcTimeout(Http::HeaderMap& request_headers);
 
   /**
+   * Encode 'timeout' into 'grpc-timeout' format.
+   * @param timeout the duration in std::chrono::milliseconds.
+   * @param value the HeaderString onto which format the timeout in 'grpc-timeout' format, upto
+   *        8 decimal digits and a letter indicating the unit.
+   */
+  static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);
+
+  /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.

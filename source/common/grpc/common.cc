@@ -187,7 +187,7 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   return timeout;
 }
 
-static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
+void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
   uint64_t time = timeout.count();
   static const char units[] = "mSMH";
   const char* unit = units; // start with milliseconds
