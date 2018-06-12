@@ -103,6 +103,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   absl::optional<uint64_t> hash_key_;
 };

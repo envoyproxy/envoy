@@ -111,7 +111,7 @@ towards the host in the set that comes after a failed host.
 .. _arch_overview_load_balancing_types_original_destination:
 
 Original destination
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 This is a special purpose load balancer that can only be used with :ref:`an original destination
 cluster <arch_overview_service_discovery_types_original_destination>`. Upstream host is selected
@@ -121,6 +121,15 @@ Envoy. New destinations are added to the cluster by the load balancer on-demand,
 :ref:`periodically <config_cluster_manager_cluster_cleanup_interval_ms>` cleans out unused hosts
 from the cluster. No other :ref:`load balancing type <config_cluster_manager_cluster_lb_type>` can
 be used with original destination clusters.
+
+.. _arch_overview_load_balancing_types_original_destination_request_header:
+
+Original destination host request header
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Envoy can also pick up the original destination from a HTTP header called ``x-envoy-original-destination-host``. 
+Please note that fully resolved IP address should be passed in this header. For example if a request has to be
+routed to a host with IP address 10.195.16.237 at port 8888, the request header value should be set as
+``10.195.16.237:8888``.
 
 .. _arch_overview_load_balancing_panic_threshold:
 
