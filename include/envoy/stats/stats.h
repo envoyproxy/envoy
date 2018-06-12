@@ -408,28 +408,25 @@ typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 struct RawStatData;
 
 /**
- * Abstract interface for allocating statistics.
+ * Abstract interface for allocating statistics. Alternate
+ * implementations can be created utilizing a single fixed-size block
+ * suitable for shared-memory, or in the heap, allowing for pointers
+ * and sharing of substrings, with an opportunity for reduced memory
+ * consumption.
  */
 class StatDataAllocator {
 public:
   virtual ~StatDataAllocator() {}
 
   /**
-   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
-   *         more memory available for stats. The allocator should return a reference counted
-   *         data location by name if one already exists with the same name. This is used for
-   *         intra-process scope swapping as well as inter-process hot restart.
+   * @return Counter* a counter.
    */
-  // virtual RawStatData* alloc(const std::string& name) PURE;
-
-  /**
-   * Free a raw stat data block. The allocator should handle reference counting and only truly
-   * free the block if it is no longer needed.
-   */
-  // virtual void free(RawStatData& data) PURE;
-
   virtual Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) PURE;
+
+  /**
+   * @return Counter* a gauge.
+   */
   virtual Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,
                            std::vector<Tag>&& tags) PURE;
 };

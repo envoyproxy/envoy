@@ -305,8 +305,13 @@ private:
   const std::vector<Tag> tags_;
 };
 
+/**
+ * Implements a StatDataAllocator that uses RawStatData -- capable of deploying
+ * in a shared memory block without internal pointers.
+ */
 class RawStatDataAllocator : public StatDataAllocator {
 public:
+  // StatDataAllocator
   Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
                        std::vector<Tag>&& tags) override;
   Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,

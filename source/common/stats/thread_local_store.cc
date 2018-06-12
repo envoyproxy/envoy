@@ -155,21 +155,6 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
-/*
-ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::string& name) {
-  RawStatData* data = alloc_.alloc(name);
-  if (!data) {
-    // If we run out of stat space from the allocator (which can happen if for example allocations
-    // are coming from a fixed shared memory region, we need to deal with this case the best we
-    // can. We must pass back the right allocator so that free() happens on the heap.
-    num_last_resort_stats_.inc();
-    return {*heap_allocator_.alloc(name), heap_allocator_};
-  } else {
-    return {*data, alloc_};
-  }
-}
-*/
-
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
@@ -197,7 +182,6 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   Thread::LockGuard lock(parent_.lock_);
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
-    // SafeAllocData alloc = parent_.safeAlloc(final_name);
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
@@ -245,7 +229,6 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   Thread::LockGuard lock(parent_.lock_);
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
-    // SafeAllocData alloc = parent_.safeAlloc(final_name);
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(

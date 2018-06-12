@@ -400,6 +400,14 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 }
 
 /*
+DO NOT SUBMIT
+
+This test will not work, which I think is OK. This PR redefines the behavior
+of hot-restart alloc failing so that it will directly try the heap allocator.
+However this is not fully copacetic yet:
+  - I'm not sure stats free themselves correctly
+  - The 'stats.overflow' stat is not bumped on stat failure.
+
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);

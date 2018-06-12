@@ -149,8 +149,9 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   auto value_created = stats_set_->insert(key);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
+    // TODO(jmarantz): bump "stat.overflow" when this occurs, and make sure
+    // when this object gets freed that things work.
     return heap_allocator_.alloc(name);
-    // return nullptr;
   }
   // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
   // automatically, but on recycled entries (value-created.second==false) we need to bump the

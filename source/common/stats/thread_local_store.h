@@ -244,17 +244,9 @@ private:
     std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  /*
-  struct SafeAllocData {
-    RawStatData& data_;
-    RawStatDataAllocator& free_;
-  };
-  */
-
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
-  // SafeAllocData safeAlloc(const std::string& name);
   void mergeInternal(PostMergeCb mergeCb);
 
   StatDataAllocator& alloc_;
