@@ -155,7 +155,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
       "EDS cluster");
 }
-
+  
 TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   InSequence s;
 
@@ -182,7 +182,8 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
                             "Error adding/updating listener invalid-listener: something is wrong");
   EXPECT_CALL(request_, cancel());
 }
-
+  
+  
 TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(
