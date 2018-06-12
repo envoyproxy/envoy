@@ -134,10 +134,10 @@ typedef std::unique_ptr<FakeStream> FakeStreamPtr;
 // threads. With FakeUpstream fabricated objects, we have a Connection that is associated with a
 // dispatcher on a thread managed by FakeUpstream. We want to be able to safely invoke methods on
 // this object from other threads (e.g. the main test thread) and be able to track connection state
-// (e.g. are we disconnected and the Connection is now possibly deleted). We managed this via a
+// (e.g. are we disconnected and the Connection is now possibly deleted). We manage this via a
 // SharedConnectionWrapper that lives from when the Connection is added to the accepted connection
 // queue and then through the lifetime of the Fake{Raw,Http}Connection that manages the Connection
-// through activeu use.
+// through active use.
 class SharedConnectionWrapper : public Network::ConnectionCallbacks {
 public:
   using DisconnectCallback = std::function<void()>;
