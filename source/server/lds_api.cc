@@ -50,6 +50,10 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   // We need to keep track of which listeners we might need to remove.
   std::unordered_map<std::string, std::reference_wrapper<Network::ListenerConfig>>
       listeners_to_remove;
+  // We need to keep track of which listeners we might need to retry if they
+  // fail to be added before the remove operations are performed.
+  std::vector<envoy::api::v2::Listener> listeners_to_retry;
+
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
@@ -64,14 +68,30 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     } catch (const EnvoyException& e) {
-      throw EnvoyException(
-          fmt::format("Error adding/updating listener {}: {}", listener_name, e.what()));
+      // retry after the remove opertions are performed to allow new listeners
+      // with addresses used by other listeners that have to be removed.
+      listeners_to_retry.push_back(listener);
+      ENVOY_LOG(debug, "lds: add/update listener '{}' failed. Will retry.", listener_name);
     }
   }
 
   for (const auto& listener : listeners_to_remove) {
     if (listener_manager_.removeListener(listener.first)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", listener.first);
+    }
+  }
+
+  for (const auto& listener : listeners_to_retry) {
+    const std::string listener_name = listener.name();
+    try {
+      if (listener_manager_.addOrUpdateListener(listener, version_info, true)) {
+        ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);
+      } else {
+        ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
+      }
+    } catch (const EnvoyException& e) {
+      throw EnvoyException(
+          fmt::format("Error adding/updating listener {}: {}", listener_name, e.what()));
     }
   }
 
