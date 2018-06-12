@@ -107,6 +107,8 @@ static_resources:
           private_key:
             filename: certs/clientkey.pem
         validation_context:
+          trusted_ca:
+            filename: certs/cacert.pem
           verify_subject_alt_name:
             - front-proxy.yourcompany.net
   - name: lightstep_saas
