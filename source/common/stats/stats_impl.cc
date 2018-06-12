@@ -365,15 +365,22 @@ void SourceImpl::clearCache() {
   histograms_.reset();
 }
 
-Counter* RawStatDataAllocator::makeCounter(const std::string& name,
-                                           std::string&& tag_extracted_name,
-                                           std::vector<Tag>&& tags) {
-  return new CounterImpl(*alloc(name), *this, std::move(tag_extracted_name), std::move(tags));
+Counter* RawStatDataAllocator::makeCounter(const std::string& name, std::string& tag_extracted_name,
+                                           std::vector<Tag>& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return new CounterImpl(*data, *this, std::move(tag_extracted_name), std::move(tags));
 }
 
-Gauge* RawStatDataAllocator::makeGauge(const std::string& name, std::string&& tag_extracted_name,
-                                       std::vector<Tag>&& tags) {
-  return new GaugeImpl(*alloc(name), *this, std::move(tag_extracted_name), std::move(tags));
+Gauge* RawStatDataAllocator::makeGauge(const std::string& name, std::string& tag_extracted_name,
+                                       std::vector<Tag>& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return new GaugeImpl(*data, *this, std::move(tag_extracted_name), std::move(tags));
 }
 
 } // namespace Stats

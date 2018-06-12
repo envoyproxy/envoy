@@ -399,15 +399,6 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_CALL(*this, free(_)).Times(3);
 }
 
-/*
-DO NOT SUBMIT
-
-This test will not work, which I think is OK. This PR redefines the behavior
-of hot-restart alloc failing so that it will directly try the heap allocator.
-However this is not fully copacetic yet:
-  - I'm not sure stats free themselves correctly
-  - The 'stats.overflow' stat is not bumped on stat failure.
-
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -425,7 +416,6 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   // Includes overflow but not the failsafe stat which we allocated from the heap.
   EXPECT_CALL(*this, free(_));
 }
-*/
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;

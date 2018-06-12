@@ -421,14 +421,14 @@ public:
   /**
    * @return Counter* a counter.
    */
-  virtual Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
-                               std::vector<Tag>&& tags) PURE;
+  virtual Counter* makeCounter(const std::string& name, std::string& tag_extracted_name,
+                               std::vector<Tag>& tags) PURE;
 
   /**
    * @return Counter* a gauge.
    */
-  virtual Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,
-                           std::vector<Tag>&& tags) PURE;
+  virtual Gauge* makeGauge(const std::string& name, std::string& tag_extracted_name,
+                           std::vector<Tag>& tags) PURE;
 };
 
 } // namespace Stats

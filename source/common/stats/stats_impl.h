@@ -312,10 +312,10 @@ private:
 class RawStatDataAllocator : public StatDataAllocator {
 public:
   // StatDataAllocator
-  Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
-                       std::vector<Tag>&& tags) override;
-  Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,
-                   std::vector<Tag>&& tags) override;
+  Counter* makeCounter(const std::string& name, std::string& tag_extracted_name,
+                       std::vector<Tag>& tags) override;
+  Gauge* makeGauge(const std::string& name, std::string& tag_extracted_name,
+                   std::vector<Tag>& tags) override;
 
   /**
    * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
@@ -531,10 +531,14 @@ class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
       : counters_([this](const std::string& name) -> Counter* {
-          return alloc_.makeCounter(name, std::string(name), std::vector<Tag>());
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeCounter(name, tag_extracted_name, tags);
         }),
         gauges_([this](const std::string& name) -> Gauge* {
-          return alloc_.makeGauge(name, std::string(name), std::vector<Tag>());
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeGauge(name, tag_extracted_name, tags);
         }),
         histograms_([this](const std::string& name) -> HistogramImpl* {
           return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());

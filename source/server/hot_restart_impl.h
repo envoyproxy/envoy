@@ -142,9 +142,6 @@ public:
   Stats::RawStatData* alloc(const std::string& name) override;
   void free(Stats::RawStatData& data) override;
 
-  uint32_t numStats() const;
-  Stats::HeapRawStatDataAllocator& heapAllocator() { return heap_allocator_; }
-
 private:
   enum class RpcMessageType {
     DrainListenersRequest = 1,
@@ -215,7 +212,7 @@ private:
   std::unique_ptr<RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
-  mutable ProcessSharedMutex stat_lock_;
+  ProcessSharedMutex stat_lock_;
   ProcessSharedMutex init_lock_;
   int my_domain_socket_{-1};
   sockaddr_un parent_address_;
@@ -224,7 +221,6 @@ private:
   std::array<uint8_t, 4096> rpc_buffer_;
   Server::Instance* server_{};
   bool parent_terminated_{};
-  Stats::HeapRawStatDataAllocator heap_allocator_;
 };
 
 } // namespace Server

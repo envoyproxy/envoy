@@ -184,8 +184,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        parent_.alloc_.makeCounter(final_name, std::move(tag_extracted_name), std::move(tags)));
+    Counter* c = parent_.alloc_.makeCounter(final_name, tag_extracted_name, tags);
+    if (c == nullptr) {
+      parent_.num_last_resort_stats_.inc();
+      c = parent_.heap_allocator_.makeCounter(final_name, tag_extracted_name, tags);
+      ASSERT(c != nullptr);
+    }
+    central_ref.reset(c);
   }
 
   // If we have a TLS location to store or allocation into, do it.
@@ -231,8 +236,12 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        parent_.alloc_.makeGauge(final_name, std::move(tag_extracted_name), std::move(tags)));
+    Gauge* g = parent_.alloc_.makeGauge(final_name, tag_extracted_name, tags);
+    if (g == nullptr) {
+      g = parent_.heap_allocator_.makeGauge(final_name, tag_extracted_name, tags);
+      ASSERT(g != nullptr);
+    }
+    central_ref.reset(g);
   }
 
   if (tls_ref) {

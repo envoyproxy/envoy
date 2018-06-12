@@ -139,10 +139,7 @@ TEST_F(HotRestartImplTest, allocFail) {
   Stats::RawStatData* s3 = hot_restart_->alloc("3");
   EXPECT_NE(s1, nullptr);
   EXPECT_NE(s2, nullptr);
-  EXPECT_NE(s3, nullptr);
-  EXPECT_EQ(2, hot_restart_->numStats());
-  EXPECT_EQ(1, hot_restart_->heapAllocator().numStats());
-  hot_restart_->heapAllocator().free(*s3); // Else asserts if destructed with stats allocated.
+  EXPECT_EQ(s3, nullptr);
 }
 
 // Because the shared memory is managed manually, make sure it meets
