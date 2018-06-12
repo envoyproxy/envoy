@@ -175,8 +175,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-      .Times(2)
-      .WillRepeatedly(Throw(EnvoyException("something is wrong")));
+      .WillOnce(Throw(EnvoyException("something is wrong")));
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener invalid-listener: something is wrong");
@@ -269,9 +268,9 @@ TEST_F(LdsApiTest, Basic) {
   message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   makeListenersAndExpectCall({"listener1", "listener2"});
+  EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   expectAdd("listener1", "hash_fabfe23d041792d3", false);
   expectAdd("listener3", "hash_fabfe23d041792d3", true);
-  EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
@@ -448,10 +447,8 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   message->body().reset(new Buffer::OwnedImpl(response2_json));
 
   makeListenersAndExpectCall({"listener1", "listener2"});
-  expectAdd("listener1", "hash_16e261d4c65402a2", false);
-  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-      .WillOnce(Throw(EnvoyException("something is wrong")));
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
+  expectAdd("listener1", "hash_16e261d4c65402a2", false);
   expectAdd("listener3", "hash_16e261d4c65402a2", true);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
