@@ -305,6 +305,28 @@ private:
   const std::vector<Tag> tags_;
 };
 
+class RawStatDataAllocator : public StatDataAllocator {
+public:
+  Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                       std::vector<Tag>&& tags) override;
+  Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                   std::vector<Tag>&& tags) override;
+
+  /**
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
+   */
+  virtual RawStatData* alloc(const std::string& name) PURE;
+
+  /**
+   * Free a raw stat data block. The allocator should handle reference counting and only truly
+   * free the block if it is no longer needed.
+   */
+  virtual void free(RawStatData& data) PURE;
+};
+
 /**
  * Counter implementation that wraps a RawStatData.
  */
@@ -437,8 +459,9 @@ class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
   ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
-  RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
+  RawStatData* alloc(const std::string& name) override;
+  uint32_t numStats() const { return num_stats_; }
 
 private:
   struct RawStatDataHash_ {
@@ -458,6 +481,7 @@ private:
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
   Thread::MutexBasicLockable mutex_;
+  std::atomic<uint32_t> num_stats_;
 };
 
 /**
@@ -465,7 +489,7 @@ private:
  */
 template <class Base, class Impl> class IsolatedStatsCache {
 public:
-  typedef std::function<Impl*(const std::string& name)> Allocator;
+  typedef std::function<Base*(const std::string& name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
@@ -475,8 +499,8 @@ public:
       return *stat->second;
     }
 
-    Impl* new_stat = alloc_(name);
-    stats_.emplace(name, std::shared_ptr<Impl>{new_stat});
+    Base* new_stat = alloc_(name);
+    stats_.emplace(name, std::shared_ptr<Base>{new_stat});
     return *new_stat;
   }
 
@@ -491,7 +515,7 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::shared_ptr<Impl>> stats_;
+  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
 
@@ -501,12 +525,11 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> CounterImpl* {
-          return new CounterImpl(*alloc_.alloc(name), alloc_, std::string(name),
-                                 std::vector<Tag>());
+      : counters_([this](const std::string& name) -> Counter* {
+          return alloc_.makeCounter(name, std::string(name), std::vector<Tag>());
         }),
-        gauges_([this](const std::string& name) -> GaugeImpl* {
-          return new GaugeImpl(*alloc_.alloc(name), alloc_, std::string(name), std::vector<Tag>());
+        gauges_([this](const std::string& name) -> Gauge* {
+          return alloc_.makeGauge(name, std::string(name), std::vector<Tag>());
         }),
         histograms_([this](const std::string& name) -> HistogramImpl* {
           return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());

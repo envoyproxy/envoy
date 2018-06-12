@@ -399,6 +399,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_CALL(*this, free(_)).Times(3);
 }
 
+/*
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
@@ -416,6 +417,7 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   // Includes overflow but not the failsafe stat which we allocated from the heap.
   EXPECT_CALL(*this, free(_));
 }
+*/
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;

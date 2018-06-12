@@ -163,7 +163,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(RawStatDataAllocator& alloc);
+  ThreadLocalStoreImpl(StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
@@ -244,18 +244,20 @@ private:
     std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
+  /*
   struct SafeAllocData {
     RawStatData& data_;
     RawStatDataAllocator& free_;
   };
+  */
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
-  SafeAllocData safeAlloc(const std::string& name);
+  // SafeAllocData safeAlloc(const std::string& name);
   void mergeInternal(PostMergeCb mergeCb);
 
-  RawStatDataAllocator& alloc_;
+  StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
@@ -266,7 +268,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapRawStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

@@ -149,7 +149,8 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   auto value_created = stats_set_->insert(key);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
-    return nullptr;
+    return heap_allocator_.alloc(name);
+    // return nullptr;
   }
   // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
   // automatically, but on recycled entries (value-created.second==false) we need to bump the
@@ -491,6 +492,11 @@ std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t m
 std::string HotRestartImpl::versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           RawStatDataSet& stats_set) {
   return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+}
+
+uint32_t HotRestartImpl::numStats() const {
+  Thread::LockGuard lock(stat_lock_);
+  return stats_set_->size();
 }
 
 } // namespace Server

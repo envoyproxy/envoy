@@ -408,11 +408,11 @@ typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 struct RawStatData;
 
 /**
- * Abstract interface for allocating a RawStatData.
+ * Abstract interface for allocating statistics.
  */
-class RawStatDataAllocator {
+class StatDataAllocator {
 public:
-  virtual ~RawStatDataAllocator() {}
+  virtual ~StatDataAllocator() {}
 
   /**
    * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
@@ -420,13 +420,18 @@ public:
    *         data location by name if one already exists with the same name. This is used for
    *         intra-process scope swapping as well as inter-process hot restart.
    */
-  virtual RawStatData* alloc(const std::string& name) PURE;
+  // virtual RawStatData* alloc(const std::string& name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
    * free the block if it is no longer needed.
    */
-  virtual void free(RawStatData& data) PURE;
+  // virtual void free(RawStatData& data) PURE;
+
+  virtual Counter* makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                               std::vector<Tag>&& tags) PURE;
+  virtual Gauge* makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags) PURE;
 };
 
 } // namespace Stats

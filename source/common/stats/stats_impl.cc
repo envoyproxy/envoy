@@ -171,6 +171,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
     ++existing_data->ref_count_;
     return existing_data;
   } else {
+    ++num_stats_;
     return data;
   }
 }
@@ -286,6 +287,7 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   }
 
   ASSERT(key_removed == 1);
+  --num_stats_;
   ::free(&data);
 }
 
@@ -361,6 +363,17 @@ void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
   histograms_.reset();
+}
+
+Counter* RawStatDataAllocator::makeCounter(const std::string& name,
+                                           std::string&& tag_extracted_name,
+                                           std::vector<Tag>&& tags) {
+  return new CounterImpl(*alloc(name), *this, std::move(tag_extracted_name), std::move(tags));
+}
+
+Gauge* RawStatDataAllocator::makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                                       std::vector<Tag>&& tags) {
+  return new GaugeImpl(*alloc(name), *this, std::move(tag_extracted_name), std::move(tags));
 }
 
 } // namespace Stats

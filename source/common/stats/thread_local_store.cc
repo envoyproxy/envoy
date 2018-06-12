@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
@@ -155,6 +155,7 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
+/*
 ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::string& name) {
   RawStatData* data = alloc_.alloc(name);
   if (!data) {
@@ -167,6 +168,7 @@ ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::s
     return {*data, alloc_};
   }
 }
+*/
 
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
@@ -195,11 +197,11 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   Thread::LockGuard lock(parent_.lock_);
   CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
   if (!central_ref) {
-    SafeAllocData alloc = parent_.safeAlloc(final_name);
+    // SafeAllocData alloc = parent_.safeAlloc(final_name);
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
-        new CounterImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
+        parent_.alloc_.makeCounter(final_name, std::move(tag_extracted_name), std::move(tags)));
   }
 
   // If we have a TLS location to store or allocation into, do it.
@@ -243,11 +245,11 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   Thread::LockGuard lock(parent_.lock_);
   GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
   if (!central_ref) {
-    SafeAllocData alloc = parent_.safeAlloc(final_name);
+    // SafeAllocData alloc = parent_.safeAlloc(final_name);
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
     central_ref.reset(
-        new GaugeImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
+        parent_.alloc_.makeGauge(final_name, std::move(tag_extracted_name), std::move(tags)));
   }
 
   if (tls_ref) {
