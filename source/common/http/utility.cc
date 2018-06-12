@@ -303,7 +303,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
     xff_string = xff_string.substr(last_comma + seperator.size());
   }
 
-  // ignore the whitespace, since they are allowed in HTTP lists (see rfc7239)
+  // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
