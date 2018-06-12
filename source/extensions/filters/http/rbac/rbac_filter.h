@@ -20,7 +20,7 @@ namespace RBACFilter {
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
-  COUNTER(shadow_allowed)                                                                      \
+  COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
 // clang-format on
 
@@ -31,7 +31,7 @@ struct RoleBasedAccessControlFilterStats {
   ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-enum class EnforcementMode { ENFORCED, SHADOW };
+enum class EnforcementMode { Enforced, Shadow };
 
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
@@ -40,7 +40,7 @@ public:
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
   engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::ENFORCED ? engine_ : shadow_engine_;
+    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
 private:
@@ -65,7 +65,7 @@ public:
 private:
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
   engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::ENFORCED ? engine_ : shadow_engine_;
+    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
   RoleBasedAccessControlFilterStats stats_;

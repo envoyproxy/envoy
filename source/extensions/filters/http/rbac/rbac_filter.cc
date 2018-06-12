@@ -66,7 +66,7 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& shadow_engine =
-      config_->engine(callbacks_->route(), EnforcementMode::SHADOW);
+      config_->engine(callbacks_->route(), EnforcementMode::Shadow);
   if (shadow_engine.has_value()) {
     if (shadow_engine->allowed(*callbacks_->connection(), headers)) {
       config_->stats().shadow_allowed_.inc();
@@ -76,7 +76,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   }
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& engine =
-      config_->engine(callbacks_->route(), EnforcementMode::ENFORCED);
+      config_->engine(callbacks_->route(), EnforcementMode::Enforced);
   if (engine.has_value()) {
     if (engine->allowed(*callbacks_->connection(), headers)) {
       config_->stats().allowed_.inc();

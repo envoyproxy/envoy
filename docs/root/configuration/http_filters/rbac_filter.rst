@@ -8,8 +8,8 @@ The RBAC filter is used to authorize actions (permissions) by identified downstr
 unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
 block-list (DENY) set of policies based off properties of the connection (IPs, ports, SSL subject)
 as well as the incoming request's HTTP headers. This filter also supports policy in both enforcement
-and shadow mode, shadow mode won't effect real users, it is used to test a new set of policies work
-before rolling out to prod.
+and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
+work before rolling out to production.
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rbac.v2.RBAC>`
 
