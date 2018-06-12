@@ -12,7 +12,7 @@ pulls:
   # Comment to post when marking as stale. Set to `false` to disable
   markComment: >
     This pull request has been automatically marked as stale because it has not had
-    activity in 7 days. It will be closed if no further activity occurs. Please
+    activity in the last 7 days. It will be closed in 7 days if not further activity occurs. Please
     feel free to give a status update now, ping for review, or re-open when it's ready.
     Thank you for your contributions!
   # Comment to post when closing a stale Issue or Pull Request.
