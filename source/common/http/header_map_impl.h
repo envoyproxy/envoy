@@ -43,7 +43,7 @@ public:
    * @param header the header to append to.
    * @param data to append to the header.
    */
-  static void appendToHeader(HeaderString& header, const std::string& data);
+  static void appendToHeader(HeaderString& header, absl::string_view data);
 
   HeaderMapImpl();
   HeaderMapImpl(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
