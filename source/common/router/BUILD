@@ -226,6 +226,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
     ],
 )

@@ -16,6 +16,8 @@ envoy_cc_test(
         "//source/common/decompressor:decompressor_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -407,16 +407,13 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
   }
 }
 
-RoundRobinLoadBalancer::RoundRobinLoadBalancer(
+EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const envoy::api::v2::Cluster::CommonLbConfig& common_config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()) {
-  for (uint32_t priority = 0; priority < priority_set.hostSetsPerPriority().size(); ++priority) {
-    refresh(priority);
-  }
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -426,55 +423,43 @@ RoundRobinLoadBalancer::RoundRobinLoadBalancer(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
 
-void RoundRobinLoadBalancer::refresh(uint32_t priority) {
+void EdfLoadBalancerBase::initialize() {
+  for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+    refresh(priority);
+  }
+}
+
+void EdfLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
-    bool weighted = false;
-
-    for (const auto& host : hosts) {
-      if (host->weight() != hosts[0]->weight()) {
-        weighted = true;
-        break;
-      }
-    }
-
-    // Compute schedule offset for unweighted before deleting the existing
-    // scheduler.
-    uint64_t unweighted_offset = 0;
-    if (hosts.size() > 0) {
-      // If we already have been balancing for this locality, continue where we
-      // left off; a rebuild with the same hosts will have the expected RR
-      // across the rebuild. Otherwise, start with the LB seed.
-      if (scheduler_.find(source) != scheduler_.end()) {
-        unweighted_offset = scheduler_[source].rr_index_;
-      } else {
-        unweighted_offset = seed_ % hosts.size();
-      }
-    }
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
-    scheduler.weighted_ = weighted;
-    if (weighted) {
-      // Populate scheduler with host list.
-      for (const auto& host : hosts) {
-        // We use a fixed weight here. While the weight may change without
-        // notification, this will only be stale until this host is next picked,
-        // at which point it is reinserted into the EdfScheduler with its new
-        // weight in chooseHost().
-        scheduler.edf_.add(host->weight(), host);
-      }
-      // Cycle through hosts to achieve the intended offset behavior.
-      // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the
-      // schedule across refreshes for the weighted case.
+    refreshHostSource(source);
+
+    // Populate scheduler with host list.
+    // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
+    // weighted 1. This is because currently we don't refresh host sets if only weights change.
+    // We should probably change this to refresh at all times. See the comment in
+    // BaseDynamicClusterImpl::updateDynamicHostList about this.
+    for (const auto& host : hosts) {
+      // We use a fixed weight here. While the weight may change without
+      // notification, this will only be stale until this host is next picked,
+      // at which point it is reinserted into the EdfScheduler with its new
+      // weight in chooseHost().
+      scheduler.edf_.add(hostWeight(*host), host);
+    }
+
+    // Cycle through hosts to achieve the intended offset behavior.
+    // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
+    // refreshes for the weighted case.
+    if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
         auto host = scheduler.edf_.pick();
-        scheduler.edf_.add(host->weight(), host);
+        scheduler.edf_.add(hostWeight(*host), host);
       }
-    } else {
-      scheduler.rr_index_ = unweighted_offset;
     }
   };
-  // Populate EdfSchedulers for each valid HostsSource value for the host set
-  // at this priority.
+
+  // Populate EdfSchedulers for each valid HostsSource value for the host set at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::HealthyHosts),
@@ -487,84 +472,45 @@ void RoundRobinLoadBalancer::refresh(uint32_t priority) {
   }
 }
 
-HostConstSharedPtr RoundRobinLoadBalancer::chooseHost(LoadBalancerContext*) {
+HostConstSharedPtr EdfLoadBalancerBase::chooseHost(LoadBalancerContext*) {
   const HostsSource hosts_source = hostSourceToUse();
   auto scheduler_it = scheduler_.find(hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
   ASSERT(scheduler_it != scheduler_.end());
   auto& scheduler = scheduler_it->second;
-  if (scheduler.weighted_) {
+
+  // As has been commented in both EdfLoadBalancerBase::refresh and
+  // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
+  // whether to use EDF or do unweighted (fast) selection.
+  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
+  // host set if any weights change. Additionally, it has the property that if all weights are
+  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
+  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
+  if (stats_.max_host_weight_.value() != 1) {
     auto host = scheduler.edf_.pick();
-    // We should always succeed if weighted, since when we compute the scheduler
-    // in refresh() above, any empty host vector will be treated as unweighted.
-    // We do not expire any hosts from the host list without rebuilding the scheduler.
-    ASSERT(host != nullptr);
-    scheduler.edf_.add(host->weight(), host);
+    if (host != nullptr) {
+      scheduler.edf_.add(hostWeight(*host), host);
+    }
     return host;
   } else {
     const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
     if (hosts_to_use.size() == 0) {
       return nullptr;
     }
-    return hosts_to_use[scheduler.rr_index_++ % hosts_to_use.size()];
+    return unweightedHostPick(hosts_to_use, hosts_source);
   }
 }
 
-LeastRequestLoadBalancer::LeastRequestLoadBalancer(
-    const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
-    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
-    : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                common_config) {
-  priority_set.addMemberUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector& hosts_removed) -> void {
-        if (last_host_) {
-          for (const HostSharedPtr& host : hosts_removed) {
-            if (host == last_host_) {
-              hits_left_ = 0;
-              last_host_.reset();
-
-              break;
-            }
-          }
-        }
-      });
-}
-
-HostConstSharedPtr LeastRequestLoadBalancer::chooseHost(LoadBalancerContext*) {
-  bool is_weight_imbalanced = stats_.max_host_weight_.value() != 1;
-  bool is_weight_enabled = runtime_.snapshot().getInteger("upstream.weight_enabled", 1UL) != 0;
-
-  if (is_weight_imbalanced && hits_left_ > 0 && is_weight_enabled) {
-    --hits_left_;
-
-    return last_host_;
+HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
+                                                                const HostsSource&) {
+  // This is just basic unweighted P2C.
+  const HostSharedPtr host1 = hosts_to_use[random_.random() % hosts_to_use.size()];
+  const HostSharedPtr host2 = hosts_to_use[random_.random() % hosts_to_use.size()];
+  if (host1->stats().rq_active_.value() < host2->stats().rq_active_.value()) {
+    return host1;
   } else {
-    // To avoid hit stale last_host_ when all hosts become weight balanced.
-    hits_left_ = 0;
-    last_host_.reset();
-  }
-
-  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse());
-  if (hosts_to_use.empty()) {
-    return nullptr;
-  }
-
-  // Make weighed random if we have hosts with non 1 weights.
-  if (is_weight_imbalanced & is_weight_enabled) {
-    last_host_ = hosts_to_use[random_.random() % hosts_to_use.size()];
-    hits_left_ = last_host_->weight() - 1;
-
-    return last_host_;
-  } else {
-    HostSharedPtr host1 = hosts_to_use[random_.random() % hosts_to_use.size()];
-    HostSharedPtr host2 = hosts_to_use[random_.random() % hosts_to_use.size()];
-    if (host1->stats().rq_active_.value() < host2->stats().rq_active_.value()) {
-      return host1;
-    } else {
-      return host2;
-    }
+    return host2;
   }
 }
 

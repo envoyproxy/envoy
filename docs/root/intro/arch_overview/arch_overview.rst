@@ -36,3 +36,4 @@ Architecture overview
   init
   draining
   scripting
+  ext_authz_filter

@@ -204,10 +204,10 @@ private:
 };
 
 /**
- * Implementation of LoadBalancer that performs RR selection across the hosts in the cluster.
- * This scheduler respects host weighting and utilizes an EdfScheduler to achieve O(log n)
- * pick and insertion time complexity, O(n) memory use. The key insight is that if we schedule with
- * 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
+ * Base implementation of LoadBalancer that performs weighted RR selection across the hosts in the
+ * cluster. This scheduler respects host weighting and utilizes an EdfScheduler to achieve O(log
+ * n) pick and insertion time complexity, O(n) memory use. The key insight is that if we schedule
+ * with 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
  * where m is the weight range. We also explicitly check for the unweighted special case and use a
  * simple index to acheive O(1) scheduling in that case.
@@ -216,64 +216,126 @@ private:
  * explicit schedule, since m will be a small constant factor in O(m * n). This
  * could also be done on a thread aware LB, avoiding creating multiple EDF
  * instances.
+ *
+ * This base class also supports unweighted selection which derived classes can use to customize
+ * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class RoundRobinLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
+class EdfLoadBalancerBase : public LoadBalancer, public ZoneAwareLoadBalancerBase {
 public:
-  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                         ClusterStats& stats, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random,
-                         const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                      ClusterStats& stats, Runtime::Loader& runtime,
+                      Runtime::RandomGenerator& random,
+                      const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Upstream::LoadBalancer
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
-private:
-  void refresh(uint32_t priority);
-
+protected:
   struct Scheduler {
-    // EdfScheduler for weighted RR.
+    // EdfScheduler for weighted LB.
     EdfScheduler<const Host> edf_;
-    // Simple clock hand for when we do unweighted.
-    size_t rr_index_{};
-    bool weighted_{};
   };
 
-  // Scheduler for each valid HostsSource.
-  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
-  // Seed to allow us to desynchronize WRR balancers across a fleet. If we don't
+  void initialize();
+
+  // Seed to allow us to desynchronize load balancers across a fleet. If we don't
   // do this, multiple Envoys that receive an update at the same time (or even
-  // multiple RoundRobinLoadBalancers on the same host) will send requests to
+  // multiple load balancers on the same host) will send requests to
   // backends in roughly lock step, causing significant imbalance and potential
   // overload.
   const uint64_t seed_;
+
+private:
+  void refresh(uint32_t priority);
+  virtual void refreshHostSource(const HostsSource& source) PURE;
+  virtual double hostWeight(const Host& host) PURE;
+  virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
+                                                const HostsSource& source) PURE;
+
+  // Scheduler for each valid HostsSource.
+  std::unordered_map<HostsSource, Scheduler, HostsSourceHash> scheduler_;
+};
+
+/**
+ * A round roubin load balancer. When in weighted mode, EDF scheduling is used. When in not
+ * weighted mode, simple RR index selection is used.
+ */
+class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
+public:
+  RoundRobinLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
+                         ClusterStats& stats, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random,
+                         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                            common_config) {
+    initialize();
+  }
+
+private:
+  void refreshHostSource(const HostsSource& source) override {
+    // insert() is used here on purpose so that we don't overwrite the index if the host source
+    // already exists. Note that host sources will never be removed, but given how uncommon this
+    // is it probably doesn't matter.
+    rr_indexes_.insert({source, seed_});
+  }
+  double hostWeight(const Host& host) override { return host.weight(); }
+  HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
+                                        const HostsSource& source) override {
+    // To avoid storing the RR index in the base class, we end up using a second map here with
+    // host source as the key. This means that each LB decision will require two map lookups in
+    // the unweighted case. We might consider trying to optimize this in the future.
+    ASSERT(rr_indexes_.find(source) != rr_indexes_.end());
+    return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
+  }
+
+  std::unordered_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
 };
 
 /**
  * Weighted Least Request load balancer.
  *
  * In a normal setup when all hosts have the same weight of 1 it randomly picks up two healthy hosts
- * and compares number of active requests.
- * Technique is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf
+ * and compares number of active requests. Technique is based on
+ * http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C (power of
+ * two choices).
  *
- * When any of the hosts have non 1 weight, apply random weighted balancing.
- * Randomly pickup the host and send 'weight' number of requests to it.
- * This technique is acceptable for load testing but
- * will not work well in situations where requests take a long time.
- * In that case a different algorithm using a full scan will be required.
+ * When any hosts have a weight that is not 1, an RR EDF schedule is used. Host weight is scaled
+ * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as
+ * they would in normal P2C, though they will get picked less and less often. In the future, we
+ * can consider two alternate algorithms:
+ * 1) Expand out all hosts by weight (using more memory) and do standard P2C.
+ * 2) Use a weighted Maglev table, and perform P2C on two random hosts selected from the table.
+ *    The benefit of the Maglev table is at the expense of resolution, memory usage is capped.
+ *    Additionally, the Maglev table can be shared amongst all threads.
  */
-class LeastRequestLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
+class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
   LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                            ClusterStats& stats, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random,
-                           const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+                           const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+      : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
+                            common_config) {
+    initialize();
+  }
 
 private:
-  HostSharedPtr last_host_;
-  uint32_t hits_left_{};
+  void refreshHostSource(const HostsSource&) override {}
+  double hostWeight(const Host& host) override {
+    // Here we scale host weight by the number of active requests at the time we do the pick. We
+    // always add 1 to avoid division by 0. Note that if all weights are 1, the EDF schedule is
+    // unlikely to yield the same result as P2C given the lack of randomness as well as the fact
+    // that hosts are always picked, regardless of their current request load at the time of pick.
+    // It might be posible to do better by picking two hosts off of the schedule, and selecting
+    // the one with fewer active requests at the time of selection.
+    // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
+    // be the only/best way of doing this. Essentially, it makes weight and active requests equally
+    // important. Are they equally important in practice? There is no right answer here and we might
+    // want to iterate on this as we gain more experience.
+    return static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+  }
+  HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
+                                        const HostsSource& source) override;
 };
 
 /**

@@ -72,12 +72,14 @@ TEST(GrpcCodecTest, decodeIncompleteFrame) {
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(0), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(request.ByteSize()), decoder.length());
+  EXPECT_EQ(true, decoder.hasBufferedData());
 
   buffer.add(request_buffer.c_str() + 5);
   EXPECT_TRUE(decoder.decode(buffer, frames));
   EXPECT_EQ(static_cast<size_t>(0), buffer.length());
   EXPECT_EQ(static_cast<size_t>(1), frames.size());
   EXPECT_EQ(static_cast<uint32_t>(0), decoder.length());
+  EXPECT_EQ(false, decoder.hasBufferedData());
   helloworld::HelloRequest decoded_request;
   EXPECT_TRUE(decoded_request.ParseFromArray(frames[0].data_->linearize(frames[0].data_->length()),
                                              frames[0].data_->length()));

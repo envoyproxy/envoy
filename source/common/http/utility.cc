@@ -19,6 +19,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -30,12 +31,8 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
   }
 
   HeaderString& header = headers.insertForwardedFor().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  header.append(address_as_string.c_str(), address_as_string.size());
+  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
@@ -134,11 +131,23 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::chrono::seconds max_age) {
-  if (max_age == std::chrono::seconds::zero()) {
-    return fmt::format("{}=\"{}\"", key, value);
+                                        const std::string& path, const std::chrono::seconds max_age,
+                                        bool httponly) {
+  std::string cookie_value;
+  // Best effort attempt to avoid numerous string copies.
+  cookie_value.reserve(value.size() + path.size() + 30);
+
+  cookie_value = absl::StrCat(key, "=\"", value, "\"");
+  if (max_age != std::chrono::seconds::zero()) {
+    absl::StrAppend(&cookie_value, "; Max-Age=", max_age.count());
   }
-  return fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age.count());
+  if (!path.empty()) {
+    absl::StrAppend(&cookie_value, "; Path=", path);
+  }
+  if (httponly) {
+    absl::StrAppend(&cookie_value, "; HttpOnly");
+  }
+  return cookie_value;
 }
 
 bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
@@ -318,16 +327,6 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
-}
-
-void Utility::appendToHeader(HeaderString& header, const std::string& data) {
-  if (data.empty()) {
-    return;
-  }
-  if (!header.empty()) {
-    header.append(",", 1);
-  }
-  header.append(data.c_str(), data.size());
 }
 
 } // namespace Http

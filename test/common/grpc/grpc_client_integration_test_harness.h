@@ -7,6 +7,7 @@
 #include "common/ssl/context_config_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -423,16 +424,7 @@ public:
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
-    auto* google_grpc = config.mutable_google_grpc();
-    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
-    ssl_creds->mutable_root_certs()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    if (use_client_cert_) {
-      ssl_creds->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-      ssl_creds->mutable_cert_chain()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
-    }
+    TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;
   }
 

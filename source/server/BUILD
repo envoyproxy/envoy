@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
-    external_deps = ["backward"],
+    external_deps = [
+        "backward",
+        "abseil_symbolize",
+    ],
     tags = ["backtrace"],
     deps = ["//source/common/common:minimal_logger_lib"],
 )

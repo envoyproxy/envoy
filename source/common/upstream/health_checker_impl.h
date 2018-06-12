@@ -106,10 +106,15 @@ private:
     return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
   }
 
+  Http::CodecClient::Type codecClientType(bool use_http2);
+
   const std::string path_;
   const std::string host_value_;
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
+
+protected:
+  const Http::CodecClient::Type codec_client_type_;
 };
 
 /**

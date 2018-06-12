@@ -329,7 +329,21 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
-                          "^Failed to load CRL from .* without trusted CA certificates$");
+                          "^Failed to load CRL from .* without trusted CA$");
+}
+
+TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "verify_subject_alt_name": [ "spiffe://lyft.com/testclient" ]
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
+                            "SAN-based verification of peer certificates without trusted CA "
+                            "is insecure and not allowed");
 }
 
 // Validate that empty SNI (according to C string rules) fails config validation.
@@ -357,6 +371,21 @@ TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException, "Invalid hex-encoded SHA-256 .*");
+}
+
+// Validate that values other than a base64-encoded SHA-256 fail config validation.
+TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      // Not a base64-encoded string.
+      ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ClientContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
 // Multiple TLS certificates are not yet supported.
