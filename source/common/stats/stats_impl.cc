@@ -171,7 +171,6 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
     ++existing_data->ref_count_;
     return existing_data;
   } else {
-    ++num_stats_;
     return data;
   }
 }
@@ -287,7 +286,6 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   }
 
   ASSERT(key_removed == 1);
-  --num_stats_;
   ::free(&data);
 }
 

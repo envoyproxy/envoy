@@ -464,9 +464,8 @@ class HeapRawStatDataAllocator : public RawStatDataAllocator {
 public:
   // RawStatDataAllocator
   ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
-  void free(RawStatData& data) override;
   RawStatData* alloc(const std::string& name) override;
-  uint32_t numStats() const { return num_stats_; }
+  void free(RawStatData& data) override;
 
 private:
   struct RawStatDataHash_ {
@@ -486,13 +485,12 @@ private:
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
   Thread::MutexBasicLockable mutex_;
-  std::atomic<uint32_t> num_stats_;
 };
 
 /**
  * A stats cache template that is used by the isolated store.
  */
-template <class Base, class Impl> class IsolatedStatsCache {
+template <class Base> class IsolatedStatsCache {
 public:
   typedef std::function<Base*(const std::string& name)> Allocator;
 
@@ -584,9 +582,9 @@ private:
   };
 
   HeapRawStatDataAllocator alloc_;
-  IsolatedStatsCache<Counter, CounterImpl> counters_;
-  IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
+  IsolatedStatsCache<Counter> counters_;
+  IsolatedStatsCache<Gauge> gauges_;
+  IsolatedStatsCache<Histogram> histograms_;
 };
 
 } // namespace Stats
