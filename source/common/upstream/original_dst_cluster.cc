@@ -116,7 +116,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
     } catch (const Envoy::EnvoyException& e) {
       ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
-      parent_.lock()->info_->stats().original_dst_host_invalid_.inc();
+      info_->stats().original_dst_host_invalid_.inc();
     }
   }
   return request_host;
