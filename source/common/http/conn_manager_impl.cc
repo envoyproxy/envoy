@@ -189,6 +189,10 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
+  // Make sure new streams are apprised that the underlying connection is blocked.
+  if (read_callbacks_->connection().aboveHighWatermark()) {
+    new_stream->callHighWatermarkCallbacks();
+  }
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
@@ -1113,10 +1117,6 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
 
 void ConnectionManagerImpl::ActiveStream::createFilterChain() {
   connection_manager_.config_.filterFactory().createFilterChain(*this);
-  // Make sure new streams are apprised that the underlying connection is blocked.
-  if (connection_manager_.read_callbacks_->connection().aboveHighWatermark()) {
-    callHighWatermarkCallbacks();
-  }
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
