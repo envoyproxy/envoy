@@ -12,6 +12,7 @@ Version history
 * access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
+* access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
@@ -33,6 +34,8 @@ Version history
   connections from hosts after they are removed from service discovery, regardless of health status.
 * cluster: fixed bug preventing the deletion of all endpoints in a priority
 * debug: added symbolized stack traces (where supported)
+* grpc: support added for the full set of :ref:`Google gRPC call credentials
+  <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -93,6 +96,10 @@ Version history
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
 * router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
   to ignore the source port.
+* router: added an :ref:`prefix_match <envoy_api_field_route.HeaderMatcher.prefix_match>` match type
+  to explicitly match based on the prefix of a header value.
+* router: added an :ref:`suffix_match <envoy_api_field_route.HeaderMatcher.suffix_match>` match type
+  to explicitly match based on the suffix of a header value.
 * router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
   to explicitly match based on a header's presence.
 * router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
@@ -125,12 +132,21 @@ Version history
 * tls: added support for multiple
   :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
   values.
+* tls: added support for using
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`
+  and :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
+  without :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for allowing expired certificates with
+  :ref:`allow_expired_certificate <envoy_api_field_auth.CertificateValidationContext.allow_expired_certificate>`.
+* tls: added support for :ref:`renegotiation <envoy_api_field_auth.UpstreamTlsContext.allow_renegotiation>`
+  when acting as a client.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
+* upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
 
 1.6.0 (March 20, 2018)
 ======================

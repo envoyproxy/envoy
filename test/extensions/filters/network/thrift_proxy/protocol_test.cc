@@ -26,7 +26,8 @@ namespace ThriftProxy {
 
 TEST(AutoProtocolTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  AutoProtocolImpl proto;
+  NiceMock<MockProtocolCallbacks> cb;
+  AutoProtocolImpl proto(cb);
   std::string name = "-";
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
@@ -40,7 +41,8 @@ TEST(AutoProtocolTest, NotEnoughData) {
 
 TEST(AutoProtocolTest, UnknownProtocol) {
   Buffer::OwnedImpl buffer;
-  AutoProtocolImpl proto;
+  NiceMock<MockProtocolCallbacks> cb;
+  AutoProtocolImpl proto(cb);
   std::string name = "-";
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
@@ -57,7 +59,8 @@ TEST(AutoProtocolTest, UnknownProtocol) {
 TEST(AutoProtocolTest, ReadMessageBegin) {
   // Binary Protocol
   {
-    AutoProtocolImpl proto;
+    NiceMock<MockProtocolCallbacks> cb;
+    AutoProtocolImpl proto(cb);
     std::string name = "-";
     MessageType msg_type = MessageType::Oneway;
     int32_t seq_id = -1;
@@ -80,7 +83,8 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
 
   // Compact protocol
   {
-    AutoProtocolImpl proto;
+    NiceMock<MockProtocolCallbacks> cb;
+    AutoProtocolImpl proto(cb);
     std::string name = "-";
     MessageType msg_type = MessageType::Oneway;
     int32_t seq_id = 1;
@@ -102,7 +106,8 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
 
 TEST(AutoProtocolTest, Delegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
-  AutoProtocolImpl auto_proto;
+  NiceMock<MockProtocolCallbacks> dummy_cb;
+  AutoProtocolImpl auto_proto(dummy_cb);
   auto_proto.setProtocol(ProtocolPtr{proto});
 
   // readMessageBegin
@@ -226,7 +231,8 @@ TEST(AutoProtocolTest, Delegation) {
 }
 
 TEST(AutoProtocolTest, Name) {
-  AutoProtocolImpl proto;
+  NiceMock<MockProtocolCallbacks> cb;
+  AutoProtocolImpl proto(cb);
   EXPECT_EQ(proto.name(), "auto");
 }
 

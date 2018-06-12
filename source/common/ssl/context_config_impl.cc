@@ -63,6 +63,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
                                     config.validation_context().verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.validation_context().verify_certificate_spki().begin(),
                                     config.validation_context().verify_certificate_spki().end()),
+      allow_expired_certificate_(config.validation_context().allow_expired_certificate()),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
@@ -74,8 +75,11 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
     }
     if (!verify_subject_alt_name_list_.empty()) {
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
-                                       "trusted CA is insecure and not allowed",
-                                       certificateRevocationListPath()));
+                                       "trusted CA is insecure and not allowed"));
+    }
+    if (allow_expired_certificate_) {
+      throw EnvoyException(
+          fmt::format("Certificate validity period is always ignored without trusted CA"));
     }
   }
 }
@@ -102,7 +106,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 
 ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::api::v2::auth::UpstreamTlsContext& config)
-    : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()) {
+    : ContextConfigImpl(config.common_tls_context()), server_name_indication_(config.sni()),
+      allow_renegotiation_(config.allow_renegotiation()) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.
   if (server_name_indication_.find('\0') != std::string::npos) {

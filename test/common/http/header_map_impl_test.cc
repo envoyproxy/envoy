@@ -7,6 +7,8 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::InSequence;
+
 namespace Envoy {
 namespace Http {
 
@@ -415,6 +417,7 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
   {
     MockCb cb;
 
+    InSequence seq;
     EXPECT_CALL(cb, Call("hello", "world"));
     EXPECT_CALL(cb, Call("olleh", "planet"));
     EXPECT_CALL(cb, Call("hello", "globe"));
@@ -428,13 +431,14 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
         &cb);
   }
 
-  headers.setReference(key1, ref_value5);
+  headers.setReference(key1, ref_value5); // set moves key to end
 
   {
     MockCb cb;
 
-    EXPECT_CALL(cb, Call("hello", "blue marble"));
+    InSequence seq;
     EXPECT_CALL(cb, Call("olleh", "planet"));
+    EXPECT_CALL(cb, Call("hello", "blue marble"));
 
     headers.iterate(
         [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
@@ -581,6 +585,7 @@ TEST(HeaderMapImplTest, Iterate) {
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
 
+  InSequence seq;
   EXPECT_CALL(cb, Call("hello", "world"));
   EXPECT_CALL(cb, Call("world", "hello"));
   EXPECT_CALL(cb, Call("foo", "bar"));
@@ -602,6 +607,7 @@ TEST(HeaderMapImplTest, IterateReverse) {
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
 
+  InSequence seq;
   EXPECT_CALL(cb, Call("world", "hello"));
   EXPECT_CALL(cb, Call("foo", "bar"));
   // no "hello"
@@ -684,6 +690,191 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     value3.setCopy("empty", 5);
     HeaderMapImpl::appendToHeader(value3, "");
     EXPECT_EQ(value3, "empty");
+  }
+}
+
+TEST(HeaderMapImplTest, PseudoHeaderOrder) {
+  typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
+  MockCb cb;
+
+  {
+    LowerCaseString foo("hello");
+    Http::TestHeaderMapImpl headers{};
+    EXPECT_EQ(0UL, headers.size());
+
+    headers.addReferenceKey(foo, "world");
+    EXPECT_EQ(1UL, headers.size());
+
+    headers.setReferenceKey(Headers::get().ContentType, "text/html");
+    EXPECT_EQ(2UL, headers.size());
+
+    // Pseudo header gets inserted before non-pseudo headers
+    headers.setReferenceKey(Headers::get().Method, "PUT");
+    EXPECT_EQ(3UL, headers.size());
+
+    InSequence seq;
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call("hello", "world"));
+    EXPECT_CALL(cb, Call("content-type", "text/html"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Removal of the header before which pseudo-headers are inserted
+    headers.remove(foo);
+    EXPECT_EQ(2UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call("content-type", "text/html"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Next pseudo-header goes after other pseudo-headers, but before normal headers
+    headers.setReferenceKey(Headers::get().Path, "/test");
+    EXPECT_EQ(3UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call(":path", "/test"));
+    EXPECT_CALL(cb, Call("content-type", "text/html"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Removing the last normal header
+    headers.remove(Headers::get().ContentType);
+    EXPECT_EQ(2UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call(":path", "/test"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Adding a new pseudo-header after removing the last normal header
+    headers.setReferenceKey(Headers::get().Host, "host");
+    EXPECT_EQ(3UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call(":path", "/test"));
+    EXPECT_CALL(cb, Call(":authority", "host"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Adding the first normal header
+    headers.setReferenceKey(Headers::get().ContentType, "text/html");
+    EXPECT_EQ(4UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":method", "PUT"));
+    EXPECT_CALL(cb, Call(":path", "/test"));
+    EXPECT_CALL(cb, Call(":authority", "host"));
+    EXPECT_CALL(cb, Call("content-type", "text/html"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Removing all pseudo-headers
+    headers.remove(Headers::get().Path);
+    headers.remove(Headers::get().Method);
+    headers.remove(Headers::get().Host);
+    EXPECT_EQ(1UL, headers.size());
+
+    EXPECT_CALL(cb, Call("content-type", "text/html"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+
+    // Removing all headers
+    headers.remove(Headers::get().ContentType);
+    EXPECT_EQ(0UL, headers.size());
+
+    // Adding a lone pseudo-header
+    headers.setReferenceKey(Headers::get().Status, "200");
+    EXPECT_EQ(1UL, headers.size());
+
+    EXPECT_CALL(cb, Call(":status", "200"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+
+  // Starting with a normal header
+  {
+    Http::TestHeaderMapImpl headers{{"content-type", "text/plain"},
+                                    {":method", "GET"},
+                                    {":path", "/"},
+                                    {"hello", "world"},
+                                    {":authority", "host"}};
+
+    InSequence seq;
+    EXPECT_CALL(cb, Call(":method", "GET"));
+    EXPECT_CALL(cb, Call(":path", "/"));
+    EXPECT_CALL(cb, Call(":authority", "host"));
+    EXPECT_CALL(cb, Call("content-type", "text/plain"));
+    EXPECT_CALL(cb, Call("hello", "world"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
+  }
+
+  // Starting with a pseudo-header
+  {
+    Http::TestHeaderMapImpl headers{{":path", "/"},
+                                    {"content-type", "text/plain"},
+                                    {":method", "GET"},
+                                    {"hello", "world"},
+                                    {":authority", "host"}};
+
+    InSequence seq;
+    EXPECT_CALL(cb, Call(":path", "/"));
+    EXPECT_CALL(cb, Call(":method", "GET"));
+    EXPECT_CALL(cb, Call(":authority", "host"));
+    EXPECT_CALL(cb, Call("content-type", "text/plain"));
+    EXPECT_CALL(cb, Call("hello", "world"));
+
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
+          static_cast<MockCb*>(cb_v)->Call(header.key().c_str(), header.value().c_str());
+          return HeaderMap::Iterate::Continue;
+        },
+        &cb);
   }
 }
 

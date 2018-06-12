@@ -353,7 +353,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+    Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
   return std::make_unique<Http::WebSocket::WsHandlerImpl>(request_headers, request_info, *this,

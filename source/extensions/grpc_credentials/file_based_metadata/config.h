@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/grpc_credentials/v2alpha/file_based_metadata.pb.h"
+#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 
 #include "common/protobuf/protobuf.h"
@@ -27,7 +27,7 @@ public:
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override;
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() {
-    return std::make_unique<envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig>();
+    return std::make_unique<envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig>();
   }
 
   std::string name() const override { return GrpcCredentialsNames::get().FILE_BASED_METADATA; }
@@ -36,14 +36,14 @@ public:
 class FileBasedMetadataAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
   FileBasedMetadataAuthenticator(
-      const envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig config)
+      const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig config)
       : config_(config) {}
 
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,
                            std::multimap<grpc::string, grpc::string>* metadata) override;
 
 private:
-  const envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig config_;
+  const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig config_;
 };
 
 } // namespace FileBasedMetadata

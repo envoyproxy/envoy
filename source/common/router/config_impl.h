@@ -312,10 +312,11 @@ public:
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool useWebSocket() const override { return websocket_config_ != nullptr; }
-  Http::WebSocketProxyPtr createWebSocketProxy(
-      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-      Network::ReadFilterCallbacks* read_callbacks) const override;
+  Http::WebSocketProxyPtr
+  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                       Http::WebSocketProxyCallbacks& callbacks,
+                       Upstream::ClusterManager& cluster_manager,
+                       Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -404,10 +405,11 @@ private:
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool useWebSocket() const override { return parent_->useWebSocket(); }
-    Http::WebSocketProxyPtr createWebSocketProxy(
-        Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-        Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-        Network::ReadFilterCallbacks* read_callbacks) const override {
+    Http::WebSocketProxyPtr
+    createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                         Http::WebSocketProxyCallbacks& callbacks,
+                         Upstream::ClusterManager& cluster_manager,
+                         Network::ReadFilterCallbacks* read_callbacks) const override {
       return parent_->createWebSocketProxy(request_headers, request_info, callbacks,
                                            cluster_manager, read_callbacks);
     }

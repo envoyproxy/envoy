@@ -16,8 +16,10 @@ namespace ThriftProxy {
  * BinaryProtocolImpl implements the Thrift Binary protocol with strict message encoding.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-binary-protocol.md
  */
-class BinaryProtocolImpl : public virtual Protocol {
+class BinaryProtocolImpl : public ProtocolImplBase {
 public:
+  BinaryProtocolImpl(ProtocolCallbacks& callbacks) : ProtocolImplBase(callbacks) {}
+
   // Protocol
   const std::string& name() const override { return ProtocolNames::get().BINARY; }
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
@@ -56,6 +58,8 @@ private:
  */
 class LaxBinaryProtocolImpl : public BinaryProtocolImpl {
 public:
+  LaxBinaryProtocolImpl(ProtocolCallbacks& callbacks) : BinaryProtocolImpl(callbacks) {}
+
   const std::string& name() const override { return ProtocolNames::get().LAX_BINARY; }
 
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,

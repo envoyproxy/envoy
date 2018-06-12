@@ -84,7 +84,12 @@ protected:
    */
   static int sslContextIndex();
 
+  // A X509_STORE_CTX_verify_cb callback for ignoring cert expiration in X509_verify_cert().
+  static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
+
+  // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
+
   int verifyCertificate(X509* cert);
 
   /**
@@ -118,6 +123,7 @@ protected:
 
   ContextManagerImpl& parent_;
   bssl::UniquePtr<SSL_CTX> ctx_;
+  bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
@@ -138,7 +144,8 @@ public:
   bssl::UniquePtr<SSL> newSsl() const override;
 
 private:
-  std::string server_name_indication_;
+  const std::string server_name_indication_;
+  const bool allow_renegotiation_;
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {

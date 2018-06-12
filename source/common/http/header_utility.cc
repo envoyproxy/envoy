@@ -4,6 +4,8 @@
 #include "common/config/rds_json.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -13,7 +15,8 @@ namespace Http {
 //   Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
 //   exact string matching.
 //   This is now deprecated.
-// 2.header_match_specifier which can be any one of exact_match, regex_match or range_match.
+// 2.header_match_specifier which can be any one of exact_match, regex_match, range_match,
+//   present_match, prefix_match or suffix_match.
 //   Each of these also can be inverted with the invert_match option.
 //   Absence of these options implies empty header value match based on header presence.
 //   a.exact_match: value will be used for exact string matching.
@@ -21,6 +24,8 @@ namespace Http {
 //   c.range_match: Match will succeed if header value lies within the range specified
 //     here, using half open interval semantics [start,end).
 //   d.present_match: Match will succeed if the header is present.
+//   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
+//   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
 HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
     : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
@@ -39,6 +44,14 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
     break;
   case envoy::api::v2::route::HeaderMatcher::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
+    break;
+  case envoy::api::v2::route::HeaderMatcher::kPrefixMatch:
+    header_match_type_ = HeaderMatchType::Prefix;
+    value_ = config.prefix_match();
+    break;
+  case envoy::api::v2::route::HeaderMatcher::kSuffixMatch:
+    header_match_type_ = HeaderMatchType::Suffix;
+    value_ = config.suffix_match();
     break;
   case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
@@ -65,7 +78,6 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
 
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
                                  const std::vector<HeaderData>& config_headers) {
-
   // TODO (rodaine): Should this really allow empty headers to always match?
   if (!config_headers.empty()) {
     for (const HeaderData& cfg_header_data : config_headers) {
@@ -102,6 +114,12 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
   case HeaderMatchType::Present:
     match = true;
+    break;
+  case HeaderMatchType::Prefix:
+    match = absl::StartsWith(header->value().getStringView(), header_data.value_);
+    break;
+  case HeaderMatchType::Suffix:
+    match = absl::EndsWith(header->value().getStringView(), header_data.value_);
     break;
   default:
     NOT_REACHED;

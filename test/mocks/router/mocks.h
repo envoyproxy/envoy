@@ -234,7 +234,7 @@ public:
   MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD5(createWebSocketProxy,
                      Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
-                                             const RequestInfo::RequestInfo& request_info,
+                                             RequestInfo::RequestInfo& request_info,
                                              Http::WebSocketProxyCallbacks& callbacks,
                                              Upstream::ClusterManager& cluster_manager,
                                              Network::ReadFilterCallbacks* read_callbacks));

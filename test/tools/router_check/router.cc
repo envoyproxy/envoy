@@ -206,7 +206,7 @@ bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const st
                                                const std::string& expected) {
   std::string actual = "";
   Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
-  request_info.downstream_remote_address_ = Network::Utility::getCanonicalIpv4LoopbackAddress();
+  request_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
                                                              true);

@@ -91,6 +91,8 @@ public:
       std::unordered_multimap<std::string, HostSharedPtr> map_;
     };
 
+    Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
+
     PrioritySet& priority_set_;                // Thread local priority set.
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.
     ClusterInfoConstSharedPtr info_;
