@@ -155,7 +155,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
       "EDS cluster");
 }
-
+  
 TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   InSequence s;
 
@@ -175,13 +175,15 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-      .WillOnce(Throw(EnvoyException("something is wrong")));
+    .Times(2)
+    .WillRepeatedly(Throw(EnvoyException("something is wrong")));
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener invalid-listener: something is wrong");
   EXPECT_CALL(request_, cancel());
 }
-
+  
+  
 TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(
@@ -386,6 +388,81 @@ TEST_F(LdsApiTest, Failure) {
   EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_failure").value());
   EXPECT_EQ(0UL, store_.gauge("listener_manager.lds.version").value());
 }
+
+TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
+  InSequence s;
+
+  setup();
+
+  const std::string response1_json = R"EOF(
+  {
+    "listeners": [
+    {
+      "name": "listener1",
+      "address": "tcp://0.0.0.0:1",
+      "filters": []
+    },
+    {
+      "name": "listener2",
+      "address": "tcp://0.0.0.0:2",
+      "filters": []
+    }
+    ]
+  }
+  )EOF";
+
+  Http::MessagePtr message(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body().reset(new Buffer::OwnedImpl(response1_json));
+
+  makeListenersAndExpectCall({});
+  expectAdd("listener1", "hash_d5b83398260abbbc", true);
+  expectAdd("listener2", "hash_d5b83398260abbbc", true);
+  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response1_json).first, lds_->versionInfo());
+  EXPECT_EQ(15400115654359694268U, store_.gauge("listener_manager.lds.version").value());
+  expectRequest();
+  interval_timer_->callback_();
+
+  const std::string response2_json = R"EOF(
+  {
+    "listeners": [
+    {
+      "name": "listener1",
+      "address": "tcp://0.0.0.0:1",
+      "filters": []
+    },
+    {
+      "name": "listener3",
+      "address": "tcp://0.0.0.0:2",
+      "filters": []
+    }
+    ]
+  }
+  )EOF";
+
+  message.reset(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+  message->body().reset(new Buffer::OwnedImpl(response2_json));
+
+  makeListenersAndExpectCall({"listener1", "listener2"});
+  expectAdd("listener1", "hash_16e261d4c65402a2", false);
+  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
+    .WillOnce(Throw(EnvoyException("something is wrong")));
+  EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
+  expectAdd("listener3", "hash_16e261d4c65402a2", true);
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+  callbacks_->onSuccess(std::move(message));
+
+  EXPECT_EQ(Config::Utility::computeHashedVersion(response2_json).first, lds_->versionInfo());
+  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_attempt").value());
+  EXPECT_EQ(2UL, store_.counter("listener_manager.lds.update_success").value());
+  EXPECT_EQ(1648987980059378338U, store_.gauge("listener_manager.lds.version").value());
+}
+
 
 } // namespace Server
 } // namespace Envoy
