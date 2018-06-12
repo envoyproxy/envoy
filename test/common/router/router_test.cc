@@ -1926,7 +1926,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
@@ -1934,7 +1935,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(false));
+    EXPECT_CALL(route, maxGrpcTimeout()).WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
@@ -1943,7 +1944,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"}};
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
@@ -1952,7 +1954,27 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+    Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                    {"grpc-timeout", "1000m"}};
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+    Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "0m"}};
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
@@ -1964,7 +1986,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "bad"}};
@@ -1976,7 +1999,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -1990,7 +2014,8 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -2004,21 +2029,23 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
-    EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(7), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
-    EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("7", headers.get_("x-envoy-expected-rq-timeout-ms"));
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, useGrpcTimeout()).WillOnce(Return(true));
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},

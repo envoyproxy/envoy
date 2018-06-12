@@ -191,7 +191,9 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
-    bool useGrpcTimeout() const override { return false; }
+    absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return absl::nullopt;
+    }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }

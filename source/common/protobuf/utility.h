@@ -28,6 +28,14 @@
   ((message).has_##field_name() ? DurationUtil::durationToMilliseconds((message).field_name())     \
                                 : (default_value))
 
+// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_MS(message, field_name)                                              \
+  ((message).has_##field_name()                                                                    \
+       ? absl::optional<std::chrono::milliseconds>(                                                \
+             DurationUtil::durationToMilliseconds((message).field_name()))                         \
+       : absl::nullopt)
+
 // Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
 // MissingFieldException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \

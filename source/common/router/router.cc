@@ -65,13 +65,19 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // infinity when gRPC headers have no timeout, or the default from the route config for
   // non-gRPC requests.
   TimeoutData timeout;
-  if (grpc_request && route.useGrpcTimeout()) {
-    timeout.global_timeout_ = Grpc::Common::getGrpcTimeout(request_headers);
-    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+  if (grpc_request && route.maxGrpcTimeout()) {
+    const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
+    std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
+    if (max_grpc_timeout != std::chrono::milliseconds(0) &&
+        (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
+      grpc_timeout = max_grpc_timeout;
+    }
+    timeout.global_timeout_ = grpc_timeout;
   } else {
     timeout.global_timeout_ = route.timeout();
-    timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
   }
+  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
 
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;

@@ -185,7 +185,7 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0);
-        route->mutable_route()->set_use_grpc_timeout(true);
+        route->mutable_route()->mutable_max_grpc_timeout()->set_seconds(60 * 60);
       });
   initialize();
 

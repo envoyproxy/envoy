@@ -470,7 +470,7 @@ public:
   /**
    * @return bool if the timeout should be derived from the headers of a gRPC request.
    */
-  virtual bool useGrpcTimeout() const PURE;
+  virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 
   /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.

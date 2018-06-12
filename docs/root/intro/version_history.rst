@@ -94,11 +94,13 @@ Version history
   generate session cookies.
 * router: added START_TIME as one of supported variables in :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
-* router: added a :ref:`use_grpc_timeout <envoy_api_field_route.RouteAction.use_grpc_timeout>`
-  config option to use gRPC header field `grpc-timeout`, or its default value (infinity), for gRPC
-  requests instead of the normal request `timeout` or its default. This can be used to prevent
-  unexpected upstream request timeouts due to potentially long time gaps between gRPC request and
-  response in gRPC streaming mode.
+* router: added a :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  config option to specify the maximum allowable value for timeouts decoded from gRPC header field
+  `grpc-timeout`. If configured as 0, the maximum allowed timeout for gRPC requests is infinity.
+  If not configured at all, the `grpc-timeout` header is not used and gRPC requests time out like
+  any other requests using the `timeout` or its default. This can be used to prevent unexpected
+  upstream request timeouts due to potentially long time gaps between gRPC request and response
+  in gRPC streaming mode.
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.

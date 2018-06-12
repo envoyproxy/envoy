@@ -610,9 +610,11 @@ message RouteAction {
 
   reserved 21;
 
-  // When the request is a gRPC request, use the 'grpc-timeout' header, or it's default value
-  // (infinity) instead of 'timeout'.
-  bool use_grpc_timeout = 23;
+  // If present, and the request is a gRPC request, use the 'grpc-timeout' header, or its
+  // default value (infinity) instead of 'timeout', but limit the applied timeout to the
+  // maximum value specified here. 0 indicates no limit, also allowing infinite timeouts
+  // (0 values of 'grpc-timeout' header).
+  google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 }
 
 message RedirectAction {
