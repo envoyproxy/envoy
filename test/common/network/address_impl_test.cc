@@ -393,60 +393,72 @@ TEST(AddressFromSockAddr, Pipe) {
 }
 
 // Test comparisons between all the different (known) test classes.
-TEST(MixedAddresses, Equality) {
-  enum InstanceType { Ipv4, Ipv6, Pipe };
-  struct TestCase {
-    enum InstanceType type;
-    std::string address;
-    uint32_t port; // Ignored for Pipe
-  } test_cases[] = {{Ipv4, "1.2.3.4", 1},         {Ipv4, "1.2.3.4", 2},
-                    {Ipv4, "1.2.3.5", 1},         {Ipv6, "01:023::00ef", 1},
-                    {Ipv6, "01:023::00ef", 2},    {Ipv6, "01:023::00ed", 1},
-                    {Pipe, "/path/to/pipe/1", 0}, {Pipe, "/path/to/pipe/2", 0}};
-  for (size_t i = 0; i < sizeof(test_cases) / sizeof(struct TestCase); i++) {
-    InstanceConstSharedPtr lhs;
-    switch (test_cases[i].type) {
-    case Ipv4:
-      lhs = std::make_shared<Ipv4Instance>(test_cases[i].address, test_cases[i].port);
-      break;
-    case Ipv6:
-      lhs = std::make_shared<Ipv6Instance>(test_cases[i].address, test_cases[i].port);
-      break;
-    case Pipe:
-      lhs = std::make_shared<PipeInstance>(test_cases[i].address);
-      break;
-    default:
-      FAIL();
-    }
-    ASSERT_TRUE(lhs);
-    for (size_t j = 0; j < sizeof(test_cases) / sizeof(struct TestCase); j++) {
-      InstanceConstSharedPtr rhs;
-      switch (test_cases[j].type) {
-      case Ipv4:
-        rhs = std::make_shared<Ipv4Instance>(test_cases[j].address, test_cases[j].port);
-        break;
-      case Ipv6:
-        rhs = std::make_shared<Ipv6Instance>(test_cases[j].address, test_cases[j].port);
-        break;
-      case Pipe:
-        rhs = std::make_shared<PipeInstance>(test_cases[j].address);
-        break;
-      default:
-        FAIL();
-      }
-      ASSERT_TRUE(rhs);
-      if (i == j) {
-        EXPECT_EQ(*lhs, *rhs) << "i " << i << " j " << j;
-      } else {
-        EXPECT_NE(*lhs, *rhs) << "i " << i << " j " << j;
-      }
-    }
+struct TestCase {
+  enum  InstanceType { Ipv4, Ipv6, Pipe };
+
+  TestCase() : type_(Ipv4), port_(0) {}
+  TestCase(enum InstanceType type, std::string address, uint32_t port)
+      : type_(type), address_(address), port_(port) {}
+  TestCase(const TestCase& rhs) : type_(rhs.type_), address_(rhs.address_), port_(rhs.port_) {}
+
+  bool operator==(const TestCase& rhs) {
+    return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);
   }
 
-  EXPECT_EQ(Ipv4Instance("1.2.3.4", 1), Ipv4Instance("1.2.3.4", 1));
-  EXPECT_EQ(Ipv6Instance("01:023::00ef", 1), Ipv6Instance("01:023::00ef", 1));
-  EXPECT_EQ(PipeInstance("/path/to/pipe/1"), PipeInstance("/path/to/pipe/1"));
+  enum  InstanceType type_;
+  std::string address_;
+  uint32_t port_; // Ignored for Pipe
+};
+
+class MixedAddressTest : public testing::TestWithParam<
+  ::testing::tuple<TestCase, TestCase>> {
+ public:
+ protected:
+  InstanceConstSharedPtr testCaseToInstance(const struct TestCase& test_case) {
+    // Catch default construction.
+    if (test_case.address_ == "") { return nullptr; }
+    switch (test_case.type_) {
+      case TestCase::Ipv4:
+        return std::make_shared<Ipv4Instance>(test_case.address_, test_case.port_);
+        break;
+      case TestCase::Ipv6:
+        return std::make_shared<Ipv6Instance>(test_case.address_, test_case.port_);
+        break;
+      case TestCase::Pipe:
+        return std::make_shared<PipeInstance>(test_case.address_);
+        break;
+    }
+    return nullptr;
+  }
+};
+
+TEST_P(MixedAddressTest, Equality) {
+  TestCase lhs_case = ::testing::get<0>(GetParam());
+  TestCase rhs_case = ::testing::get<1>(GetParam());
+  InstanceConstSharedPtr lhs = testCaseToInstance(lhs_case);
+  InstanceConstSharedPtr rhs = testCaseToInstance(rhs_case);
+  if (lhs_case == rhs_case) {
+    EXPECT_EQ(*lhs, *rhs) << lhs->asString() << " != " << rhs->asString();
+  } else {
+    EXPECT_NE(*lhs, *rhs) << lhs->asString() << " == " << rhs->asString();
+  }
 }
+
+struct TestCase test_cases[] = {
+  {TestCase::Ipv4, "1.2.3.4", 1},
+  {TestCase::Ipv4, "1.2.3.4", 2},
+  {TestCase::Ipv4, "1.2.3.5", 1},
+  {TestCase::Ipv6, "01:023::00ef", 1},
+  {TestCase::Ipv6, "01:023::00ef", 2},
+  {TestCase::Ipv6, "01:023::00ed", 1},
+  {TestCase::Pipe, "/path/to/pipe/1", 0},
+  {TestCase::Pipe, "/path/to/pipe/2", 0}
+};
+
+INSTANTIATE_TEST_CASE_P(AddressCrossProduct, MixedAddressTest,
+                        ::testing::Combine(
+                             ::testing::ValuesIn(test_cases),
+                             ::testing::ValuesIn(test_cases)));
 
 } // namespace Address
 } // namespace Network
