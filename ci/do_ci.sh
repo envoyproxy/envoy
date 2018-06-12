@@ -4,13 +4,7 @@
 
 set -e
 
-build_setup_args=""
-if [[ "$1" == "fix_format" || "$1" == "check_format" ]]; then
-  build_setup_args="-nofetch"
-fi
-
-. "$(dirname "$0")"/build_setup.sh $build_setup_args
-
+. "$(dirname "$0")"/build_setup.sh
 echo "building using ${NUM_CPUS} CPUs"
 
 function bazel_release_binary_build() {
