@@ -299,6 +299,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",

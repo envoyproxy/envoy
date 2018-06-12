@@ -149,8 +149,8 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     request_info.start_time_ = SystemTime(1h);
     request_info.start_time_monotonic_ = MonotonicTime(1h);
     request_info.last_downstream_tx_byte_sent_ = 2ms;
-    request_info.downstream_local_address_ =
-        std::make_shared<Network::Address::PipeInstance>("/foo");
+    request_info.setDownstreamLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("/foo"));
 
     expectLog(R"EOF(
 http_logs:
@@ -213,11 +213,11 @@ http_logs:
     request_info.first_downstream_tx_byte_sent_ = 12ms;
     request_info.last_downstream_tx_byte_sent_ = 14ms;
 
-    request_info.upstream_local_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2");
+    request_info.setUpstreamLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2"));
     request_info.protocol_ = Http::Protocol::Http10;
-    request_info.bytes_received_ = 10;
-    request_info.bytes_sent_ = 20;
+    request_info.addBytesReceived(10);
+    request_info.addBytesSent(20);
     request_info.response_code_ = 200;
     ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));

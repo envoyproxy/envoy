@@ -12,6 +12,7 @@ Version history
 * access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
+* access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.

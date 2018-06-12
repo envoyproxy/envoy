@@ -200,7 +200,7 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool useWebSocket() const override { return false; }
-    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, const RequestInfo::RequestInfo&,
+    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, RequestInfo::RequestInfo&,
                                                  Http::WebSocketProxyCallbacks&,
                                                  Upstream::ClusterManager&,
                                                  Network::ReadFilterCallbacks*) const override {

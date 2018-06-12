@@ -129,10 +129,10 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
-  request_info_.onRequestComplete();
+  getRequestInfo().onRequestComplete();
 
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, request_info_);
+    access_log->log(nullptr, nullptr, nullptr, getRequestInfo());
   }
 
   if (upstream_connection_) {
@@ -169,8 +169,8 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
-  request_info_.downstream_local_address_ = read_callbacks_->connection().localAddress();
-  request_info_.downstream_remote_address_ = read_callbacks_->connection().remoteAddress();
+  getRequestInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
+  getRequestInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -305,14 +305,14 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                    cluster_name);
   } else {
     config_->stats().downstream_cx_no_route_.inc();
-    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
+    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
+    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
     return Network::FilterStatus::StopIteration;
@@ -332,7 +332,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   read_callbacks_->upstreamHost(conn_info.host_description_);
   if (!upstream_connection_) {
     // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
-    request_info_.setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
+    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
@@ -350,8 +350,8 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
        &read_callbacks_->upstreamHost()->cluster().stats().bind_errors_});
   upstream_connection_->connect();
   upstream_connection_->noDelay(true);
-  request_info_.onUpstreamHostSelected(conn_info.host_description_);
-  request_info_.upstream_local_address_ = upstream_connection_->localAddress();
+  getRequestInfo().onUpstreamHostSelected(conn_info.host_description_);
+  getRequestInfo().setUpstreamLocalAddress(upstream_connection_->localAddress());
 
   ASSERT(connect_timeout_timer_ == nullptr);
   connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
@@ -374,7 +374,7 @@ void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
   read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
-  request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
+  getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
 
   // This will cause a LocalClose event to be raised, which will trigger a reconnect if
   // needed/configured.
@@ -384,7 +384,7 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  request_info_.bytes_received_ += data.length();
+  getRequestInfo().addBytesReceived(data.length());
   upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
@@ -413,7 +413,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  request_info_.bytes_sent_ += data.length();
+  getRequestInfo().addBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
@@ -445,7 +445,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
-        request_info_.setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
+        getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::CONNECT_FAILED);
         read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();

@@ -36,17 +36,22 @@ public:
   MOCK_METHOD0(onRequestComplete, void());
   MOCK_CONST_METHOD0(requestComplete, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD0(resetUpstreamTimings, void());
+  MOCK_METHOD1(addBytesReceived, void(uint64_t));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());
+  MOCK_METHOD1(addBytesSent, void(uint64_t));
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD1(getResponseFlag, bool(ResponseFlag));
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
+  MOCK_METHOD1(setUpstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(healthCheck, bool());
   MOCK_METHOD1(healthCheck, void(bool is_hc));
+  MOCK_METHOD1(setDownstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setDownstreamRemoteAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
   MOCK_CONST_METHOD0(dynamicMetadata, const envoy::api::v2::core::Metadata&());
@@ -66,14 +71,16 @@ public:
   absl::optional<std::chrono::nanoseconds> first_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> last_downstream_tx_byte_sent_;
   absl::optional<std::chrono::nanoseconds> end_time_;
+  absl::optional<Http::Protocol> protocol_;
+  absl::optional<uint32_t> response_code_;
+  envoy::api::v2::core::Metadata metadata_;
+
+private:
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  absl::optional<Http::Protocol> protocol_;
-  absl::optional<uint32_t> response_code_;
-  uint64_t bytes_received_{};
-  uint64_t bytes_sent_{};
-  envoy::api::v2::core::Metadata metadata_;
 };
 
 } // namespace RequestInfo

@@ -497,10 +497,11 @@ public:
    * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
    *         in this route.
    */
-  virtual Http::WebSocketProxyPtr createWebSocketProxy(
-      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-      Network::ReadFilterCallbacks* read_callbacks) const PURE;
+  virtual Http::WebSocketProxyPtr
+  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                       Http::WebSocketProxyCallbacks& callbacks,
+                       Upstream::ClusterManager& cluster_manager,
+                       Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
