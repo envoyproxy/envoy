@@ -174,6 +174,8 @@ TEST_P(IntegrationTest, Http09Enabled) { testHttp09Enabled(); }
 
 TEST_P(IntegrationTest, Http10Enabled) { testHttp10Enabled(); }
 
+TEST_P(IntegrationTest, TestInlineHeaders) { testInlineHeaders(); }
+
 TEST_P(IntegrationTest, Http10WithHostandKeepAlive) { testHttp10WithHostAndKeepAlive(); }
 
 TEST_P(IntegrationTest, NoHost) { testNoHost(); }
