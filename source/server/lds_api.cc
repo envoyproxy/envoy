@@ -51,14 +51,15 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   std::unordered_map<std::string, std::reference_wrapper<Network::ListenerConfig>>
       listeners_to_remove;
 
+  // We build the list of listeners to be removed and remove them before
+  // adding new listeners. This allows adding a new listener with the same
+  // address as a listener that is to be removed. Do not change the order.
   for (const auto& listener : listener_manager_.listeners()) {
     listeners_to_remove.emplace(listener.get().name(), listener);
   }
-
   for (const auto& listener : resources) {
     listeners_to_remove.erase(listener.name());
   }
-
   for (const auto& listener : listeners_to_remove) {
     if (listener_manager_.removeListener(listener.first)) {
       ENVOY_LOG(info, "lds: remove listener '{}'", listener.first);
