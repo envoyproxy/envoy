@@ -225,6 +225,20 @@ private:
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
+    template <class StatType>
+    using MakeStatFn = StatType* (StatDataAllocator::*)(const std::string& name,
+                                                        std::string& tag_extracted_name,
+                                                        std::vector<Tag>& tags);
+
+    // Makes a stat either by looking it up in the central cache,
+    // generating it from the the parent allocator, or as a last
+    // result, creating it with the heap allocator.
+    template <class StatType>
+    StatType&
+    safeMakeStat(const std::string& name,
+                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+                 MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
