@@ -30,6 +30,9 @@ envoy_cc_library(
     deps = [
         ":lua_lib",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/request_info:request_info_interface",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/request_info:request_info_lib",
     ],
 )
