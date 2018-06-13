@@ -318,20 +318,23 @@ void FakeUpstream::threadRoutine() {
 }
 
 FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher) {
-  Thread::LockGuard lock(lock_);
-  while (new_connections_.empty()) {
-    new_connection_event_.waitFor(lock_, std::chrono::milliseconds(5));
-    if (new_connections_.empty()) {
-      // Run the client dispatcher since we may need to process window updates, etc.
-      client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+  FakeHttpConnectionPtr connection;
+  {
+    Thread::LockGuard lock(lock_);
+    while (new_connections_.empty()) {
+      new_connection_event_.waitFor(lock_, std::chrono::milliseconds(5));
+      if (new_connections_.empty()) {
+        // Run the client dispatcher since we may need to process window updates, etc.
+        client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+      }
     }
-  }
 
-  ASSERT(!new_connections_.empty());
-  FakeHttpConnectionPtr connection(
-      new FakeHttpConnection(std::move(new_connections_.front()), stats_store_, http_type_));
+    ASSERT(!new_connections_.empty());
+    connection = std::make_unique<FakeHttpConnection>(std::move(new_connections_.front()),
+                                                      stats_store_, http_type_);
+    new_connections_.pop_front();
+  }
   connection->initialize();
-  new_connections_.pop_front();
   connection->readDisable(false);
   return connection;
 }
@@ -342,7 +345,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   for (;;) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
       FakeUpstream& upstream = **it;
-      Thread::LockGuard lock(upstream.lock_);
+      Thread::ReleasableLockGuard lock(upstream.lock_);
       if (upstream.new_connections_.empty()) {
         upstream.new_connection_event_.waitFor(upstream.lock_, std::chrono::milliseconds(5));
       }
@@ -354,8 +357,9 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         FakeHttpConnectionPtr connection(
             new FakeHttpConnection(std::move(upstream.new_connections_.front()),
                                    upstream.stats_store_, upstream.http_type_));
-        connection->initialize();
         upstream.new_connections_.pop_front();
+        lock.release();
+        connection->initialize();
         connection->readDisable(false);
         return connection;
       }
@@ -364,18 +368,21 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
 }
 
 FakeRawConnectionPtr FakeUpstream::waitForRawConnection(std::chrono::milliseconds wait_for_ms) {
-  Thread::LockGuard lock(lock_);
-  if (new_connections_.empty()) {
-    ENVOY_LOG(debug, "waiting for raw connection");
-    new_connection_event_.waitFor(lock_, wait_for_ms); // Safe since CondVar::wait won't throw.
-  }
+  FakeRawConnectionPtr connection;
+  {
+    Thread::LockGuard lock(lock_);
+    if (new_connections_.empty()) {
+      ENVOY_LOG(debug, "waiting for raw connection");
+      new_connection_event_.waitFor(lock_, wait_for_ms); // Safe since CondVar::wait won't throw.
+    }
 
-  if (new_connections_.empty()) {
-    return nullptr;
+    if (new_connections_.empty()) {
+      return nullptr;
+    }
+    connection = std::make_unique<FakeRawConnection>(std::move(new_connections_.front()));
+    new_connections_.pop_front();
   }
-  FakeRawConnectionPtr connection(new FakeRawConnection(std::move(new_connections_.front())));
   connection->initialize();
-  new_connections_.pop_front();
   connection->readDisable(false);
   connection->enableHalfClose(enable_half_close_);
   return connection;
