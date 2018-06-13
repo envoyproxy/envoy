@@ -20,7 +20,7 @@ class ThriftProxyFilterConfigFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy> {
 public:
-  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().THRIFT) {}
+  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().THRIFT_PROXY) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
