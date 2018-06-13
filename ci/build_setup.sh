@@ -79,15 +79,17 @@ if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
   rsync -a /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
 fi
 
-# Setup Envoy consuming project.
-if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
-then
-  git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+if [ "$1" != "-nofetch" ]; then
+  # Setup Envoy consuming project.
+  if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
+  then
+    git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  fi
+  
+  # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 4b6c55b726eda8a1f99e6f4ca1a87f6ce670604f)
+  cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
-
-# This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-(cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 4b6c55b726eda8a1f99e6f4ca1a87f6ce670604f)
-cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy

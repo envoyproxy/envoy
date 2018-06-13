@@ -72,6 +72,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "decoder_test",
+    srcs = ["decoder_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        "//source/extensions/filters/network/thrift_proxy:decoder_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "protocol_test",
     srcs = ["protocol_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",

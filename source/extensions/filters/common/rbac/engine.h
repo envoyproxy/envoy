@@ -13,7 +13,7 @@ namespace RBAC {
 /**
  * Shared logic for evaluating RBAC policies.
  */
-class RoleBasedAccessControlEngine : public Router::RouteSpecificFilterConfig {
+class RoleBasedAccessControlEngine {
 public:
   virtual ~RoleBasedAccessControlEngine() {}
 

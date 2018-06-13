@@ -30,9 +30,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
+  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
+  if (!header.empty()) {
+    header.append(", ", 2);
+  }
+
   const std::string& address_as_string = remote_address.ip()->addressAsString();
-  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
+  header.append(address_as_string.c_str(), address_as_string.size());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {

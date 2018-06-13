@@ -203,7 +203,7 @@ public:
     ON_CALL(route_entry, useWebSocket()).WillByDefault(Return(true));
     ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
         .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
-                                                   const RequestInfo::RequestInfo& request_info,
+                                                   RequestInfo::RequestInfo& request_info,
                                                    Http::WebSocketProxyCallbacks& callbacks,
                                                    Upstream::ClusterManager& cluster_manager,
                                                    Network::ReadFilterCallbacks* read_callbacks) {

@@ -264,14 +264,14 @@ HeaderMapImpl::StaticLookupTable::find(const char* key) const {
   return current->cb_;
 }
 
-void HeaderMapImpl::appendToHeader(HeaderString& header, const std::string& data) {
+void HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data) {
   if (data.empty()) {
     return;
   }
   if (!header.empty()) {
     header.append(",", 1);
   }
-  header.append(data.c_str(), data.size());
+  header.append(data.data(), data.size());
 }
 
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
@@ -337,6 +337,8 @@ void HeaderMapImpl::addViaMove(HeaderString&& key, HeaderString&& value) {
   auto* entry = getExistingInline(key.c_str());
   if (entry != nullptr) {
     appendToHeader(entry->value(), value.c_str());
+    key.clear();
+    value.clear();
   } else {
     insertByKey(std::move(key), std::move(value));
   }

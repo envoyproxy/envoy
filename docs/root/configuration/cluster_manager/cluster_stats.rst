@@ -201,6 +201,7 @@ the following statistics:
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
   lb_zone_number_differs, Counter, Number of zones in local and upstream cluster different
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
+  original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 
 Load balancer subset statistics
 -------------------------------

@@ -213,6 +213,9 @@ message CertificateValidationContext {
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.
   core.DataSource crl = 7;
+
+  // If specified, Envoy will not reject expired certificates.
+  bool allow_expired_certificate = 8;
 }
 
 // TLS context shared by both client and server TLS contexts.

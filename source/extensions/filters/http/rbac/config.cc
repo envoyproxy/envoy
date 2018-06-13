@@ -25,8 +25,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::config::filter::http::rbac::v2::RBACPerRoute& proto_config,
     Server::Configuration::FactoryContext&) {
-  return std::make_shared<const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>(
-      proto_config);
+  return std::make_shared<const RoleBasedAccessControlRouteSpecificFilterConfig>(proto_config);
 }
 
 /**

@@ -1216,6 +1216,32 @@ void HttpIntegrationTest::testConnect() {
   testEquivalent("CONNECT www.somewhere.com:80 HTTP/1.1\r\nHost: host\r\n\r\n");
 }
 
+void HttpIntegrationTest::testInlineHeaders() {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\n"
+                                "Host: foo.com\r\n"
+                                "Foo: bar\r\n"
+                                "Cache-control: public\r\n"
+                                "Cache-control: 123\r\n"
+                                "Eep: baz\r\n\r\n",
+                                &response, true);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+
+  std::unique_ptr<Http::TestHeaderMapImpl> upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_TRUE(upstream_headers.get() != nullptr);
+  EXPECT_EQ(upstream_headers->Host()->value(), "foo.com");
+  EXPECT_EQ(upstream_headers->CacheControl()->value(), "public,123");
+  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("foo")) != nullptr);
+  EXPECT_STREQ("bar", upstream_headers->get(Envoy::Http::LowerCaseString("foo"))->value().c_str());
+  ASSERT_TRUE(upstream_headers->get(Envoy::Http::LowerCaseString("eep")) != nullptr);
+  EXPECT_STREQ("baz", upstream_headers->get(Envoy::Http::LowerCaseString("eep"))->value().c_str());
+}
+
 void HttpIntegrationTest::testEquivalent(const std::string& request) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     // Clone the whole listener.
