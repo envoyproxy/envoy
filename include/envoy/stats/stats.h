@@ -419,13 +419,19 @@ public:
   virtual ~StatDataAllocator() {}
 
   /**
-   * @return Counter* a counter.
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the extracted tag values.
+   * @return Counter* a counter, or nullptr if allocation failed.
    */
   virtual Counter* makeCounter(const std::string& name, std::string& tag_extracted_name,
                                std::vector<Tag>& tags) PURE;
 
   /**
-   * @return Counter* a gauge.
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the extracted tag values.
+   * @return Counter* a gauge, or nullptr if allocation failed.
    */
   virtual Gauge* makeGauge(const std::string& name, std::string& tag_extracted_name,
                            std::vector<Tag>& tags) PURE;

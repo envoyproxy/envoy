@@ -318,6 +318,7 @@ public:
                    std::vector<Tag>& tags) override;
 
   /**
+   * @param name the full name of the stat.
    * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
    *         more memory available for stats. The allocator should return a reference counted
    *         data location by name if one already exists with the same name. This is used for
@@ -328,6 +329,7 @@ public:
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
    * free the block if it is no longer needed.
+   * @param data the data returned by alloc().
    */
   virtual void free(RawStatData& data) PURE;
 };
