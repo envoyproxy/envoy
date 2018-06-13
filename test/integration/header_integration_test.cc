@@ -35,6 +35,8 @@ const std::string http_connection_mgr_config = R"EOF(
 http_filters:
   - name: envoy.router
 codec_type: HTTP1
+use_remote_address: false
+xff_num_trusted_hops: 1
 stat_prefix: header_test
 route_config:
   virtual_hosts:
@@ -108,6 +110,16 @@ route_config:
                   key: "x-route-response"
                   value: "route"
             response_headers_to_remove: ["x-route-response-remove"]
+    - name: xff-headers
+      domains: ["xff-headers.com"]
+      routes:
+        - match: { prefix: "/test" }
+          route:
+            cluster: cluster_0
+            request_headers_to_add:
+              - header:
+                  key: "x-real-ip"
+                  value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
 )EOF";
 
 } // namespace
@@ -857,6 +869,37 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {"x-vhost-dynamic", "vhost:metadata-value"},
           {"x-routeconfig-response", "routeconfig"},
           {"x-routeconfig-dynamic", "metadata-value"},
+          {":status", "200"},
+      });
+}
+
+// Validates that XFF gets properly parsed.
+TEST_P(HeaderIntegrationTest, TestXFFParsing) {
+  initializeFilter(HeaderMode::Replace, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", "xff-headers.com"},
+          {"x-forwarded-for", "1.2.3.4, 5.6.7.8 ,9.10.11.12"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "xff-headers.com"},
+          {"x-forwarded-for", "1.2.3.4, 5.6.7.8 ,9.10.11.12"},
+          {"x-real-ip", "5.6.7.8"},
+          {":path", "/test"},
+          {":method", "GET"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
           {":status", "200"},
       });
 }
