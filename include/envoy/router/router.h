@@ -468,7 +468,9 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
-   * @return bool if the timeout should be derived from the headers of a gRPC request.
+   * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
+   * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
+   * header, while 0 represents infinity.
    */
   virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 

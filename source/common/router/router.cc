@@ -61,9 +61,10 @@ FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
                             bool insert_envoy_expected_request_timeout_ms, bool grpc_request) {
   // See if there is a user supplied timeout in a request header. If there is we take that.
-  // Otherwise we check if the request is gRPC and use the timeout in the gRPC headers or
-  // infinity when gRPC headers have no timeout, or the default from the route config for
-  // non-gRPC requests.
+  // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
+  // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
+  // the configured maximum gRPC timeout (which may also be infinity, represented by a 0 value),
+  // or the default from the route config otherwise.
   TimeoutData timeout;
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
