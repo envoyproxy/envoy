@@ -21,12 +21,7 @@ public:
   // Network::Socket
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
   int fd() const override { return fd_; }
-  void close() override {
-    if (fd_ != -1) {
-      ::close(fd_);
-      fd_ = -1;
-    }
-  }
+  void close() override;
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();

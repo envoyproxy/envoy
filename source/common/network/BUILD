@@ -115,6 +115,7 @@ envoy_cc_library(
         ":address_lib",
         ":utility_lib",
         "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/ssl:context_lib",
     ],

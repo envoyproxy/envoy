@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
@@ -14,6 +15,13 @@
 
 namespace Envoy {
 namespace Network {
+
+void SocketImpl::close() {
+  if (fd_ != -1) {
+    Api::OsSysCallsSingleton::get().close(fd_);
+    fd_ = -1;
+  }
+}
 
 void ListenSocketImpl::doBind() {
   int rc = local_address_->bind(fd_);
