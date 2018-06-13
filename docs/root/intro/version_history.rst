@@ -108,6 +108,9 @@ Version history
   generate session cookies.
 * router: added START_TIME as one of supported variables in :ref:`header
   formatters <config_http_conn_man_headers_custom_request_headers>`.
+* router: added a :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  config option to specify the maximum allowable value for timeouts decoded from gRPC header field
+  `grpc-timeout`.
 * router: added a :ref:`configuration option
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.

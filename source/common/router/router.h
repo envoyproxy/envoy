@@ -80,10 +80,11 @@ public:
    * @param request_headers supplies the request headers.
    * @param insert_envoy_expected_request_timeout_ms insert
    *        x-envoy-expected-request-timeout-ms?
+   * @param grpc_request tells if the request is a gRPC request.
    * @return TimeoutData for both the global and per try timeouts.
    */
   static TimeoutData finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
-                                  bool insert_envoy_expected_request_timeout_ms);
+                                  bool insert_envoy_expected_request_timeout_ms, bool grpc_request);
 };
 
 /**

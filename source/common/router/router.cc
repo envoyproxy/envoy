@@ -59,12 +59,27 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 
 FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
-                            bool insert_envoy_expected_request_timeout_ms) {
-  // See if there is a user supplied timeout in a request header. If there is we take that,
-  // otherwise we use the default.
+                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request) {
+  // See if there is a user supplied timeout in a request header. If there is we take that.
+  // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
+  // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
+  // the configured maximum gRPC timeout (which may also be infinity, represented by a 0 value),
+  // or the default from the route config otherwise.
   TimeoutData timeout;
-  timeout.global_timeout_ = route.timeout();
+  if (grpc_request && route.maxGrpcTimeout()) {
+    const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
+    std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
+    if (max_grpc_timeout != std::chrono::milliseconds(0) &&
+        (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
+      grpc_timeout = max_grpc_timeout;
+    }
+    timeout.global_timeout_ = grpc_timeout;
+  } else {
+    timeout.global_timeout_ = route.timeout();
+  }
   timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
+
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
@@ -264,7 +279,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_);
+  timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
+                                         grpc_request_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
