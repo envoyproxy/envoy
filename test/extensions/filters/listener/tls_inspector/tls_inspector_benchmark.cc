@@ -77,7 +77,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  Network::ConnectionSocketImpl socket(42, nullptr, nullptr);
+  Network::ConnectionSocketImpl socket(-1, nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 
