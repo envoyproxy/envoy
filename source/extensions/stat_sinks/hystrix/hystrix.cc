@@ -22,13 +22,13 @@ ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
 
 void ClusterStatsCache::printToStream(std::stringstream& out_str) {
-  const std::string cluster_name_with_prefix = absl::StrCat(cluster_name_, ".");
+  const std::string cluster_name_prefix = absl::StrCat(cluster_name_, ".");
 
-  printRollingWindow(absl::StrCat(cluster_name_with_prefix, "errors"), success_, out_str);
-  printRollingWindow(absl::StrCat(cluster_name_with_prefix, "success"), errors_, out_str);
-  printRollingWindow(absl::StrCat(cluster_name_with_prefix, "total"), timeouts_, out_str);
-  printRollingWindow(absl::StrCat(cluster_name_with_prefix, "timeouts"), rejected_, out_str);
-  printRollingWindow(absl::StrCat(cluster_name_with_prefix, "rejected"), total_, out_str);
+  printRollingWindow(absl::StrCat(cluster_name_prefix, "success"), success_, out_str);
+  printRollingWindow(absl::StrCat(cluster_name_prefix, "errors"), errors_, out_str);
+  printRollingWindow(absl::StrCat(cluster_name_prefix, "timeouts"), timeouts_, out_str);
+  printRollingWindow(absl::StrCat(cluster_name_prefix, "rejected"), rejected_, out_str);
+  printRollingWindow(absl::StrCat(cluster_name_prefix, "total"), total_, out_str);
 }
 
 void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow rolling_window,
@@ -360,6 +360,12 @@ void HystrixSink::unregisterConnection(Http::StreamDecoderFilterCallbacks* callb
       callbacks_list_.erase(it);
       break;
     }
+  }
+  // If there are no callbacks, clear the map to avoid stale values or having to keep updating the
+  // map. When a new callback is assigned, the rollingWindow is initialized with current statistics
+  // and within RollingWindow time, the results showed in the dashboard will be reliable
+  if (callbacks_list_.empty()) {
+    cluster_stats_cache_map_.clear();
   }
 }
 

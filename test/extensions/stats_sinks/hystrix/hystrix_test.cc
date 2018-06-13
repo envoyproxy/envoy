@@ -111,10 +111,9 @@ public:
 
     Buffer::OwnedImpl buffer;
     auto encode_callback = [&buffer](Buffer::Instance& data, bool) {
-      // Set callbacks to send data to buffer.
-      buffer.add(
-          data); // This will append to the end of the buffer, so multiple calls will all be dumped
-                 // one after another into this buffer.
+      // Set callbacks to send data to buffer. This will append to the end of the buffer, so
+      // multiple calls will all be dumped one after another into this buffer.
+      buffer.add(data);
     };
     ON_CALL(callbacks_, encodeData(_, _)).WillByDefault(Invoke(encode_callback));
     return buffer;
@@ -188,10 +187,10 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   sink_->registerConnection(&callbacks_);
 
   // Arbitrary numbers for testing. Make sure error > timeout.
-  uint64_t success_step = 7;
-  uint64_t error_step = 17;
-  uint64_t timeout_step = 3;
-  uint64_t rejected_step = 8;
+  uint64_t success_step = 44;
+  uint64_t error_step = 33;
+  uint64_t timeout_step = 22;
+  uint64_t rejected_step = 11;
 
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
@@ -226,8 +225,18 @@ TEST_F(HystrixSinkTest, Disconnect) {
 
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
-  sink_->flush(source_);
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"), "0");
+
+  // Arbitrary numbers for testing. Make sure error > timeout.
+  uint64_t success_step = 1;
+
+  for (uint64_t i = 0; i < (window_size_ + 1); i++) {
+    buffer.drain(buffer.length());
+    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
+    sink_->flush(source_);
+  }
+
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"),
+            std::to_string(success_step * window_size_));
   EXPECT_NE(buffer.length(), 0);
 
   // Disconnect.
@@ -239,6 +248,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   // Reconnect.
   buffer.drain(buffer.length());
   sink_->registerConnection(&callbacks_);
+  ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(success_step));
   sink_->flush(source_);
   EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
@@ -248,20 +258,20 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   InSequence s;
 
   // Arbitrary numbers for testing. Make sure error > timeout.
-  uint64_t success_step = 7;
-  uint64_t error_step = 17;
-  uint64_t timeout_step = 1;
+  uint64_t success_step = 5;
+  uint64_t error_step = 4;
+  uint64_t timeout_step = 3;
   uint64_t timeout_retry_step = 2;
-  uint64_t rejected_step = 8;
+  uint64_t rejected_step = 1;
 
-  uint64_t success_step2 = 3;
-  uint64_t error_4xx_step2 = 1;
-  uint64_t error_4xx_retry_step2 = 2;
-  uint64_t error_5xx_step2 = 3;
-  uint64_t error_5xx_retry_step2 = 4;
-  uint64_t timeout_step2 = 3;
-  uint64_t timeout_retry_step2 = 1;
-  uint64_t rejected_step2 = 5;
+  uint64_t success_step2 = 13;
+  uint64_t error_4xx_step2 = 12;
+  uint64_t error_4xx_retry_step2 = 11;
+  uint64_t error_5xx_step2 = 10;
+  uint64_t error_5xx_retry_step2 = 9;
+  uint64_t timeout_step2 = 8;
+  uint64_t timeout_retry_step2 = 7;
+  uint64_t rejected_step2 = 6;
 
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
@@ -279,21 +289,23 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
     // Cluster 1
-    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * 17));
-    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * 7));
-    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(1);
-    cluster1_.cluster_info_->stats().upstream_rq_per_try_timeout_.add(2);
-    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(8);
+    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_step));
+    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
+    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
+    cluster1_.cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
+    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
 
     // Cluster 2
-    ON_CALL(cluster2.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * 1));
-    ON_CALL(cluster2.retry_5xx_counter_, value()).WillByDefault(Return((i + 1) * 2));
-    ON_CALL(cluster2.error_4xx_counter_, value()).WillByDefault(Return((i + 1) * 3));
-    ON_CALL(cluster2.retry_4xx_counter_, value()).WillByDefault(Return((i + 1) * 4));
-    ON_CALL(cluster2.success_counter_, value()).WillByDefault(Return((i + 1) * 3));
-    cluster2.cluster_info_->stats().upstream_rq_timeout_.add(3);
-    cluster2.cluster_info_->stats().upstream_rq_per_try_timeout_.add(1);
-    cluster2.cluster_info_->stats().upstream_rq_pending_overflow_.add(5);
+    ON_CALL(cluster2.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_5xx_step2));
+    ON_CALL(cluster2.retry_5xx_counter_, value())
+        .WillByDefault(Return((i + 1) * error_5xx_retry_step2));
+    ON_CALL(cluster2.error_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_step2));
+    ON_CALL(cluster2.retry_4xx_counter_, value())
+        .WillByDefault(Return((i + 1) * error_4xx_retry_step2));
+    ON_CALL(cluster2.success_counter_, value()).WillByDefault(Return((i + 1) * success_step2));
+    cluster2.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step2);
+    cluster2.cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step2);
+    cluster2.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step2);
 
     sink_->flush(source_);
   }
