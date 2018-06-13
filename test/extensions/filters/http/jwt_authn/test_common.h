@@ -33,7 +33,7 @@ const std::string PublicKey =
     "}]}";
 
 // A good config.
-const char ExampleConfig[] = R"(
+const std::string ExampleConfig = R"(
 rules:
   - issuer: https://example.com
     audiences:
@@ -93,6 +93,19 @@ const std::string ExpectedPayloadValue =
     "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
     "aWNlIn0";
+
+// A wrong Jwt with non exist kid
+const std::string JwtTextWithNonExistKid =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImF1ZCI6ImV4YW1wbGVfc2VydmljZSIsImV4cCI6MjAwMTAwMTAwMX0."
+    "n45uWZfIBZwCIPiL0K8Ca3tmm-ZlsDrC79_"
+    "vXCspPwk5oxdSn983tuC9GfVWKXWUMHe11DsB02b19Ow-"
+    "fmoEzooTFn65Ml7G34nW07amyM6lETiMhNzyiunctplOr6xKKJHmzTUhfTirvDeG-q9n24-"
+    "8lH7GP8GgHvDlgSM9OY7TGp81bRcnZBmxim_UzHoYO3_"
+    "c8OP4ZX3xG5PfihVk5G0g6wcHrO70w0_64JgkKRCrLHMJSrhIgp9NHel_"
+    "CNOnL0AjQKe9IGblJrMuouqYYS0zEWwmOVUWUSxQkoLpldQUVefcfjQeGjz8IlvktRa77FYe"
+    "xfP590ACPyXrivtsxg";
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

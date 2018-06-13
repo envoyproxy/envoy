@@ -125,6 +125,9 @@ TEST_F(FilterTest, OutBoundFailure) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+
+  // Should be OK to call the onComplete() again.
+  auth_cb->onComplete(Status::JwtBadFormat);
 }
 
 // This test verifies authenticator::onDestory() is called when Filter::onDestory() is called.

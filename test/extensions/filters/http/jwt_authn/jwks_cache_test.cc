@@ -53,6 +53,21 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   EXPECT_TRUE(jwks->isExpired());
 }
 
+// Test setRemoteJwks and use default cache duration.
+TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
+  auto rule0 = config_.mutable_rules(0);
+  // Clear cache_duration to use default one.
+  rule0->mutable_remote_jwks()->clear_cache_duration();
+  cache_ = JwksCache::create(config_);
+
+  auto jwks = cache_->findByIssuer("https://example.com");
+  EXPECT_TRUE(jwks->getJwksObj() == nullptr);
+
+  EXPECT_EQ(jwks->setRemoteJwks(PublicKey), Status::Ok);
+  EXPECT_FALSE(jwks->getJwksObj() == nullptr);
+  EXPECT_FALSE(jwks->isExpired());
+}
+
 // Test a good local jwks
 TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto rule0 = config_.mutable_rules(0);

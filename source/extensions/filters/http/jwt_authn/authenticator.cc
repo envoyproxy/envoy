@@ -2,6 +2,7 @@
 
 #include "envoy/http/async_client.h"
 
+#include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
@@ -124,10 +125,8 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 
   // Check the issuer is configured or not.
   jwks_data_ = config_->getCache().getJwksCache().findByIssuer(jwt_.iss_);
-  if (jwks_data_ == nullptr) {
-    doneWithStatus(Status::JwtUnknownIssuer);
-    return;
-  }
+  // isIssuerSpecified() check already make sure the issuer is in the cache.
+  ASSERT(jwks_data_ != nullptr);
 
   // Check if audience is allowed
   if (!jwks_data_->areAudiencesAllowed(jwt_.audiences_)) {
