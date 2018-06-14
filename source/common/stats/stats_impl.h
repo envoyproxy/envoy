@@ -45,12 +45,12 @@ namespace Stats {
 // option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
 // max-obj-name-len
 struct StatsOptionsImpl : public StatsOptions {
-  uint64_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
-  uint64_t maxObjNameLength() const override { return max_obj_name_length_; }
-  uint64_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
+  size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
+  size_t maxObjNameLength() const override { return max_obj_name_length_; }
+  size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
 
-  uint64_t max_obj_name_length_ = 60;
-  uint64_t max_stat_suffix_length_ = 67;
+  size_t max_obj_name_length_ = 60;
+  size_t max_stat_suffix_length_ = 67;
 };
 
 class TagExtractorImpl : public TagExtractor {

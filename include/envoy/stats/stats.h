@@ -33,9 +33,9 @@ namespace Stats {
 class StatsOptions {
 public:
   virtual ~StatsOptions() {}
-  virtual uint64_t maxNameLength() const PURE;
-  virtual uint64_t maxObjNameLength() const PURE;
-  virtual uint64_t maxStatSuffixLength() const PURE;
+  virtual size_t maxNameLength() const PURE;
+  virtual size_t maxObjNameLength() const PURE;
+  virtual size_t maxStatSuffixLength() const PURE;
 };
 
 /**
