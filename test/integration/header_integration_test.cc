@@ -139,6 +139,11 @@ public:
   };
 
   void TearDown() override {
+    if (eds_connection_ != nullptr) {
+      eds_connection_->close();
+      eds_connection_->waitForDisconnect();
+      eds_connection_.reset();
+    }
     test_server_.reset();
     fake_upstream_connection_.reset();
     fake_upstreams_.clear();

@@ -33,16 +33,14 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousHttpConnection(SharedConnectionWrapperPtr shared_connection, Stats::Store& store,
+  AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream)
-      : FakeHttpConnection(*shared_connection, store, type), upstream_(upstream),
-        shared_connection_(std::move(shared_connection)) {}
+      : FakeHttpConnection(shared_connection, store, type), upstream_(upstream) {}
 
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
 
 private:
   AutonomousUpstream& upstream_;
-  SharedConnectionWrapperPtr shared_connection_;
   std::vector<FakeStreamPtr> streams_;
 };
 
@@ -67,6 +65,7 @@ private:
   Thread::MutexBasicLockable headers_lock_;
   std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
+  std::vector<SharedConnectionWrapperPtr> shared_connections_;
 };
 
 } // namespace Envoy

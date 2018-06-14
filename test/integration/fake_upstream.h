@@ -154,6 +154,12 @@ public:
     return disconnect_callback_manager_.add(callback);
   }
 
+  // Avoid directly removing by caller, since CallbackManager is not thread safe.
+  void removeDisconnectCallback(Common::CallbackHandle* handle) {
+    Thread::LockGuard lock(lock_);
+    handle->remove();
+  }
+
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
     // Throughout this entire function, we know that the connection_ cannot disappear, since this
@@ -261,9 +267,8 @@ class FakeConnectionBase {
 public:
   virtual ~FakeConnectionBase() {
     ASSERT(initialized_);
-    if (disconnect_callback_handle_ != nullptr) {
-      disconnect_callback_handle_->remove();
-    }
+    ASSERT(disconnect_callback_handle_ != nullptr);
+    shared_connection_.removeDisconnectCallback(disconnect_callback_handle_);
   }
   void close();
   void readDisable(bool disable);
@@ -275,12 +280,8 @@ public:
 
   virtual void initialize() {
     initialized_ = true;
-    disconnect_callback_handle_ = shared_connection_.addDisconnectCallback([this] {
-      connection_event_.notifyOne();
-      ASSERT(disconnect_callback_handle_ != nullptr);
-      disconnect_callback_handle_->remove();
-      disconnect_callback_handle_ = nullptr;
-    });
+    disconnect_callback_handle_ =
+        shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
   }
   void enableHalfClose(bool enabled);
   SharedConnectionWrapper& shared_connection() { return shared_connection_; }
@@ -292,7 +293,7 @@ protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection)
       : shared_connection_(shared_connection) {}
 
-  Common::CallbackHandle* disconnect_callback_handle_{};
+  Common::CallbackHandle* disconnect_callback_handle_;
   SharedConnectionWrapper& shared_connection_;
   bool initialized_{};
   Thread::CondVar connection_event_;
