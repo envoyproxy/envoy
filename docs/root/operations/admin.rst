@@ -310,3 +310,38 @@ The fields are:
   Use the /runtime_modify endpoint with care. Changes are effectively immediately. It is
   **critical** that the admin interface is :ref:`properly secured
   <operations_admin_interface_security>`.
+  
+  .. _operations_admin_interface_hystrix_event_stream:
+
+.. http:get:: /hystrix_event_stream
+
+  Starts streaming statistics from envoy in 
+  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
+  formatted stream for use by 
+  `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_. 
+  Hystrix dashobard is used for monitoring resiliency related metrics.
+
+  To start getting the stream from Envoy in Hystrix dashboard, this endpoint should be specified as 
+  its stream source.
+
+  This handler is enabled only when a Hystrix sink is enabled in the config file as documented
+  :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
+  
+  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics showed in the dashboard 
+  had to be adapted:
+  
+  * **Thread pool rejections** - Are generally similar to what's called short circuited in Envoy, 
+    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for 
+    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream. 
+  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the 
+    current number of connections/requests in queue, there is no sleeping window for circuit breaker, 
+    circuit open/closed is momentary. Hence, we set the circuit breaker status to "forced closed".
+  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because 
+    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because 
+    of high percentage of service unavailable responses during some time frame. 
+    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
+    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
+    set to '0'.
+  * Latency information is currently unavailable.
+  
+  

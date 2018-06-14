@@ -64,23 +64,20 @@ public:
   }
 
   // Set counter return values to simulate traffic
-  void setCounterReturnValues(const uint64_t i,
-                              const uint64_t success_step, const uint64_t error_4xx_step,
-                              const uint64_t error_4xx_retry_step, const uint64_t error_5xx_step,
-                              const uint64_t error_5xx_retry_step, const uint64_t timeout_step,
-                              const uint64_t timeout_retry_step, const uint64_t rejected_step) {
+  void setCounterReturnValues(const uint64_t i, const uint64_t success_step,
+                              const uint64_t error_4xx_step, const uint64_t error_4xx_retry_step,
+                              const uint64_t error_5xx_step, const uint64_t error_5xx_retry_step,
+                              const uint64_t timeout_step, const uint64_t timeout_retry_step,
+                              const uint64_t rejected_step) {
     ON_CALL(error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_5xx_step));
-    ON_CALL(retry_5xx_counter_, value())
-        .WillByDefault(Return((i + 1) * error_5xx_retry_step));
+    ON_CALL(retry_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_5xx_retry_step));
     ON_CALL(error_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_step));
-    ON_CALL(retry_4xx_counter_, value())
-        .WillByDefault(Return((i + 1) * error_4xx_retry_step));
+    ON_CALL(retry_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_retry_step));
     ON_CALL(success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
     cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
     cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
     cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
   }
-
 
   NiceMock<Upstream::MockCluster> cluster_;
   Upstream::MockClusterInfo* cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
@@ -138,13 +135,13 @@ public:
     return buffer;
   }
 
-  void addClusterToMap(const std::string& cluster_name, NiceMock<Upstream::MockCluster>& cluster){
+  void addClusterToMap(const std::string& cluster_name, NiceMock<Upstream::MockCluster>& cluster) {
     cluster_map_.emplace(cluster_name, cluster);
     // Redefining since cluster_map_ is returned by value.
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
   }
 
-  void removeClusterFromMap(const std::string& cluster_name){
+  void removeClusterFromMap(const std::string& cluster_name) {
     cluster_map_.erase(cluster_name);
     // Redefining since cluster_map_ is returned by value.
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
@@ -220,9 +217,10 @@ TEST_F(HystrixSinkTest, BasicFlow) {
 
   // Only success traffic, check randomly increasing traffic
   // Later in the test we'll "shortcut" by constant traffic
-  uint64_t traffic_counter = 0;;
+  uint64_t traffic_counter = 0;
+  ;
   sink_->flush(source_); // init window with 0
-  for (uint64_t i = 0; i < (window_size_-1); i++) {
+  for (uint64_t i = 0; i < (window_size_ - 1); i++) {
     buffer.drain(buffer.length());
     traffic_counter += rand_.random() % 1000;
     ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(traffic_counter));
@@ -250,8 +248,8 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
     cluster1_.setCounterReturnValues(i, success_step, error_4xx_step, error_4xx_retry_step,
-                           error_5xx_step, error_5xx_retry_step, timeout_step, timeout_retry_step,
-                           rejected_step);
+                                     error_5xx_step, error_5xx_retry_step, timeout_step,
+                                     timeout_retry_step, rejected_step);
     sink_->flush(source_);
   }
 
@@ -344,8 +342,10 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
 
   // Check stream format and data.
-  validateResults(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step, 0, 0, window_size_);
-  validateResults(cluster_message_map[cluster2_name], success_step2, error_step2, timeout_step2, 0, 0, window_size_);
+  validateResults(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step, 0, 0,
+                  window_size_);
+  validateResults(cluster_message_map[cluster2_name], success_step2, error_step2, timeout_step2, 0,
+                  0, window_size_);
 
   buffer.drain(buffer.length());
 
