@@ -428,8 +428,8 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                                 Secret::SecretManager& secret_manager)
+                                 Ssl::ContextManager& ssl_context_manager,
+                                 Secret::SecretManager& secret_manager, bool added_via_api)
     : runtime_(runtime),
       info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
                                 secret_manager, added_via_api)) {
@@ -640,8 +640,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
-                      cm.clusterManagerFactory().secretManager()),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
+                      cm.clusterManagerFactory().secretManager(), added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -799,7 +799,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api, cm.clusterManagerFactory().secretManager()),
+                             cm.clusterManagerFactory().secretManager(), added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
