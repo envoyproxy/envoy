@@ -185,7 +185,7 @@ public:
 
   // Execute some function on the connection's dispatcher. This involves a cross-thread post and
   // wait-for-completion. If the connection is disconnected, either prior to post or when the
-  // dispatcher schedules the callback, we silently ignore, unless panic_on_unexpected_disconnect_
+  // dispatcher schedules the callback, we silently ignore if allow_unexpected_disconnects_
   // is set.
   void executeOnDispatcher(std::function<void(Network::Connection&)> f) {
     Thread::LockGuard lock(lock_);
