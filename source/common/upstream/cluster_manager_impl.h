@@ -36,29 +36,30 @@ public:
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info)
+                            const LocalInfo::LocalInfo& local_info,
+                            Secret::SecretManager& secret_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), runtime_(runtime), stats_(stats),
         tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info) {}
+        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
+        secret_manager_(secret_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
-                          Secret::SecretManager& secret_manager) override;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) override;
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                    bool added_via_api,
-                                    Secret::SecretManager& secret_manager) override;
+                                    bool added_via_api) override;
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -71,6 +72,7 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
+  Secret::SecretManager& secret_manager_;
 };
 
 /**
@@ -153,8 +155,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     Secret::SecretManager& secret_manager);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -195,6 +196,8 @@ public:
 
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+
+  ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
 private:
   /**
@@ -365,7 +368,6 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  Secret::SecretManager& secret_manager_;
 };
 
 } // namespace Upstream

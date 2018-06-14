@@ -120,7 +120,6 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   ReadyWatcher initialized;
-  Secret::MockSecretManager secret_manager;
 
   const std::string json = R"EOF(
   {
@@ -142,7 +141,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       }));
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   cluster.initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -157,7 +156,6 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
   ReadyWatcher initialized;
-  Secret::MockSecretManager secret_manager;
 
   const std::string yaml = R"EOF(
     name: name
@@ -169,7 +167,7 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -190,7 +188,6 @@ TEST(StrictDnsClusterImplTest, Basic) {
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
 
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver, dispatcher);
@@ -228,7 +225,7 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   NiceMock<MockClusterManager> cm;
   StrictDnsClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime.snapshot_,
@@ -332,7 +329,6 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
-  Secret::MockSecretManager secret_manager;
 
   const std::string yaml = R"EOF(
     name: name
@@ -345,7 +341,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -427,7 +423,6 @@ TEST(StaticClusterImplTest, EmptyHostname) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
   const std::string json = R"EOF(
   {
     "name": "staticcluster",
@@ -440,7 +435,7 @@ TEST(StaticClusterImplTest, EmptyHostname) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
-                            false, secret_manager);
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -452,7 +447,6 @@ TEST(StaticClusterImplTest, AltStatName) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
 
   const std::string yaml = R"EOF(
     name: staticcluster
@@ -465,7 +459,7 @@ TEST(StaticClusterImplTest, AltStatName) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager, cm,
-                            false, secret_manager);
+                            false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
   cluster.info()->stats().upstream_rq_total_.inc();
@@ -476,7 +470,6 @@ TEST(StaticClusterImplTest, RingHash) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
   const std::string json = R"EOF(
   {
     "name": "staticcluster",
@@ -489,7 +482,7 @@ TEST(StaticClusterImplTest, RingHash) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
-                            true, secret_manager);
+                            true);
   cluster.initialize([] {});
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -501,7 +494,6 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
 
   const std::string json = R"EOF(
   {
@@ -516,7 +508,7 @@ TEST(StaticClusterImplTest, OutlierDetector) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
-                            false, secret_manager);
+                            false);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
@@ -550,7 +542,6 @@ TEST(StaticClusterImplTest, HealthyStat) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
   const std::string json = R"EOF(
   {
     "name": "addressportconfig",
@@ -564,7 +555,7 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
-                            false, secret_manager);
+                            false);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
   cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
@@ -633,7 +624,6 @@ TEST(StaticClusterImplTest, UrlConfig) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-  Secret::MockSecretManager secret_manager;
   const std::string json = R"EOF(
   {
     "name": "addressportconfig",
@@ -647,7 +637,7 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
   NiceMock<MockClusterManager> cm;
   StaticClusterImpl cluster(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm,
-                            false, secret_manager);
+                            false);
   cluster.initialize([] {});
 
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -676,7 +666,6 @@ TEST(StaticClusterImplTest, UrlConfig) {
 TEST(StaticClusterImplTest, UnsupportedLBType) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  Secret::MockSecretManager secret_manager;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<MockClusterManager> cm;
   const std::string json = R"EOF(
@@ -690,15 +679,14 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   }
   )EOF";
 
-  EXPECT_THROW(StaticClusterImpl(parseClusterFromJson(json), runtime, stats, ssl_context_manager,
-                                 cm, false, secret_manager),
-               EnvoyException);
+  EXPECT_THROW(
+      StaticClusterImpl(parseClusterFromJson(json), runtime, stats, ssl_context_manager, cm, false),
+      EnvoyException);
 }
 
 TEST(StaticClusterImplTest, MalformedHostIP) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  Secret::MockSecretManager secret_manager;
   NiceMock<Runtime::MockLoader> runtime;
   const std::string yaml = R"EOF(
     name: name
@@ -710,7 +698,7 @@ TEST(StaticClusterImplTest, MalformedHostIP) {
 
   NiceMock<MockClusterManager> cm;
   EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl(parseClusterFromV2Yaml(yaml), runtime, stats,
-                                              ssl_context_manager, cm, false, secret_manager),
+                                              ssl_context_manager, cm, false),
                             EnvoyException,
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
@@ -751,7 +739,6 @@ TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
 TEST(StaticClusterImplTest, SourceAddressPriority) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  Secret::MockSecretManager secret_manager;
   NiceMock<Runtime::MockLoader> runtime;
   envoy::api::v2::Cluster config;
   config.set_name("staticcluster");
@@ -761,8 +748,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     // If the cluster manager gets a source address from the bootstrap proto, use it.
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false,
-                              secret_manager);
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ("1.2.3.5:0", cluster.info()->sourceAddress()->asString());
   }
 
@@ -771,8 +757,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
   {
     // Verify source address from cluster config is used when present.
     NiceMock<MockClusterManager> cm;
-    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false,
-                              secret_manager);
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
 
@@ -780,8 +765,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false,
-                              secret_manager);
+    StaticClusterImpl cluster(config, runtime, stats, ssl_context_manager, cm, false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
 }
@@ -791,7 +775,6 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
 TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  Secret::MockSecretManager secret_manager;
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -807,7 +790,7 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
   )EOF";
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   EXPECT_TRUE(cluster.info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
@@ -865,7 +848,6 @@ TEST(PrioritySet, Extend) {
 TEST(ClusterMetadataTest, Metadata) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
-  Secret::MockSecretManager secret_manager;
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
@@ -885,7 +867,7 @@ TEST(ClusterMetadataTest, Metadata) {
   )EOF";
 
   StrictDnsClusterImpl cluster(parseClusterFromV2Yaml(yaml), runtime, stats, ssl_context_manager,
-                               dns_resolver, cm, dispatcher, false, secret_manager);
+                               dns_resolver, cm, dispatcher, false);
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
                 .string_value());

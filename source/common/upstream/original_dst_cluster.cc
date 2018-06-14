@@ -125,10 +125,9 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
                                        Runtime::Loader& runtime, Stats::Store& stats,
                                        Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
-                                       Event::Dispatcher& dispatcher, bool added_via_api,
-                                       Secret::SecretManager& secret_manager)
+                                       Event::Dispatcher& dispatcher, bool added_via_api)
     : ClusterImplBase(config, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
-                      secret_manager),
+                      cm.clusterManagerFactory().secretManager()),
       dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
                                    PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
       cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {

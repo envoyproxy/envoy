@@ -266,7 +266,7 @@ void InstanceImpl::initialize(Options& options,
 
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo()));
+      localInfo(), secretManager()));
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.

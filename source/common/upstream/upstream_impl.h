@@ -420,7 +420,7 @@ public:
                                  Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                 bool added_via_api, Secret::SecretManager& secret_manager);
+                                 bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -502,7 +502,7 @@ class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    ClusterManager& cm, bool added_via_api, Secret::SecretManager& secret_manager);
+                    ClusterManager& cm, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -534,8 +534,7 @@ public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                        Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                        Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, bool added_via_api,
-                       Secret::SecretManager& secret_manager);
+                       Event::Dispatcher& dispatcher, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

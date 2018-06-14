@@ -59,10 +59,8 @@ public:
 
   void setup(const std::string& json) {
     NiceMock<MockClusterManager> cm;
-    Secret::MockSecretManager secret_manager;
     cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                          ssl_context_manager_, cm, dispatcher_, false,
-                                          secret_manager));
+                                          ssl_context_manager_, cm, dispatcher_, false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

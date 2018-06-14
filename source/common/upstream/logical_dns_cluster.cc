@@ -20,10 +20,9 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                                      Ssl::ContextManager& ssl_context_manager,
                                      Network::DnsResolverSharedPtr dns_resolver,
                                      ThreadLocal::SlotAllocator& tls, ClusterManager& cm,
-                                     Event::Dispatcher& dispatcher, bool added_via_api,
-                                     Secret::SecretManager& secret_manager)
+                                     Event::Dispatcher& dispatcher, bool added_via_api)
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
-                      secret_manager),
+                      cm.clusterManagerFactory().secretManager()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),

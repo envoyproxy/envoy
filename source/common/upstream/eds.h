@@ -22,7 +22,7 @@ public:
                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                  const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                 bool added_via_api, Secret::SecretManager& secret_manager);
+                 bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }

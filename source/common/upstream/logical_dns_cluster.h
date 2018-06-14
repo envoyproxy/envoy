@@ -5,7 +5,6 @@
 #include <functional>
 #include <string>
 
-#include "envoy/secret/secret_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
@@ -32,8 +31,7 @@ public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
-                    ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api,
-                    Secret::SecretManager& secret_manager);
+                    ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
   ~LogicalDnsCluster();
 
