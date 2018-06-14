@@ -257,8 +257,8 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                                 Secret::SecretManager& secret_manager)
+                                 Ssl::ContextManager& ssl_context_manager,
+                                 Secret::SecretManager& secret_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -432,7 +432,7 @@ ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  Secret::SecretManager& secret_manager)
     : runtime_(runtime),
       info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
-                                added_via_api, secret_manager)) {
+                                secret_manager, added_via_api)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);

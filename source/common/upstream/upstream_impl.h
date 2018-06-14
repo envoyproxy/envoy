@@ -312,8 +312,8 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                  Secret::SecretManager& secret_manager);
+                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                  Secret::SecretManager& secret_manager, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
