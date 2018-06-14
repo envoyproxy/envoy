@@ -9,6 +9,6 @@ decisions or consumed from logs.
 
 Configuration
 -------------
-* :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.HeaderToMetadata>`
+* :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.Config>`
 
 TODO(rgs)
