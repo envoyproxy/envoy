@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.header_to_metadata.v2;
+
+enum ValueType {
+  STRING = 0;
+  NUMBER = 1;
+}
+
+message KeyValuePair {
+  // The namespace. If this is empty, the filter's namespace will be used.
+  string metadata_namespace = 1;
+
+  // The key — must be present.
+  string key = 2;
+
+  // The value — may be absent.
+  string value = 3;
+
+  // The type.
+  ValueType type = 4;
+}
+
+message Rule {
+  // The header from which to extract a value.
+  string header = 1;
+
+  // The metadata key with which the extracted value will be paired.
+  KeyValuePair on_header_present = 2;
+
+  // If the header is not present — and this is set — insert this key/value pair instead.
+  KeyValuePair on_header_missing = 3;
+
+  // Whether or not to remove the header after it's been copied to metadata. By allowing the
+  // configuration to express header removal, we easily prevent internal metadata from leaking.
+  bool remove = 4;
+}
+
+message Config {
+  repeated Rule request_rules = 1;
+  repeated Rule response_rules = 2;
+}

@@ -28,6 +28,8 @@ public:
   const std::string GRPC_WEB = "envoy.grpc_web";
   // Gzip filter
   const std::string ENVOY_GZIP = "envoy.gzip";
+  // Header to metadata filter
+  const std::string HEADER_TO_METADATA = "envoy.header_to_metadata";
   // IP tagging filter
   const std::string IP_TAGGING = "envoy.ip_tagging";
   // Rate limit filter
@@ -53,7 +55,7 @@ public:
   // NOTE: Do not add any new filters to this list. All future filters are v2 only.
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
+                       GRPC_WEB, HEADER_TO_METADATA, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
                        EXT_AUTHORIZATION}) {}
 };
 
