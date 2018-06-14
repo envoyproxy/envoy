@@ -24,7 +24,8 @@ struct MetadataKeyValue {
 };
 
 struct Rule {
-  std::string header;
+  Rule(const std::string& hdr) : header(hdr) {}
+  Http::LowerCaseString header;
   MetadataKeyValue onHeaderPresent;
   MetadataKeyValue onHeaderMissing;
   bool remove;

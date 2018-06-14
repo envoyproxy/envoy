@@ -52,9 +52,8 @@ MetadataKeyValue Config::toKeyValue(
 }
 
 Rule Config::toRule(const envoy::config::filter::http::header_to_metadata::v2::Rule& entry) {
-  Rule rule;
+  Rule rule(entry.header());
 
-  rule.header = entry.header();
   rule.onHeaderPresent = toKeyValue(entry.on_header_present());
   rule.onHeaderMissing = toKeyValue(entry.on_header_missing());
   rule.remove = entry.remove();
@@ -143,8 +142,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   auto& keyval = namespaceIter->second;
-  Http::LowerCaseString metadata_key(key);
-  (*keyval.mutable_fields())[metadata_key.get()] = val;
+  (*keyval.mutable_fields())[key] = val;
 
   return true;
 }
@@ -159,9 +157,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   StructMap structsByNamespace;
 
   for (const auto& rule : rules) {
-    Http::LowerCaseString header(rule.header);
+    const Http::HeaderEntry* header_entry = headers.get(rule.header);
 
-    const Http::HeaderEntry* header_entry = headers.get(header);
     if (header_entry != nullptr) {
       const auto& value = rule.onHeaderPresent.value.empty()
                               ? std::string(header_entry->value().getStringView())
@@ -172,7 +169,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                   rule.onHeaderPresent.type);
 
       if (rule.remove) {
-        headers.remove(header);
+        headers.remove(rule.header);
       }
     } else {
       // Should we add metadata if the header is missing?
