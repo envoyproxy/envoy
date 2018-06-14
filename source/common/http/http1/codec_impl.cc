@@ -695,8 +695,8 @@ void ClientConnectionImpl::onAboveHighWatermark() {
 
 void ClientConnectionImpl::onBelowLowWatermark() {
   // This can get called without an active stream/request when upstream decides to do bad things
-  // such send multiple responses to the same request, causing us to close the connection, but in
-  // doing so go below low watermark.
+  // such as sending multiple responses to the same request, causing us to close the connection, but
+  // in doing so go below low watermark.
   if (!pending_responses_.empty()) {
     request_encoder_->runLowWatermarkCallbacks();
   }
