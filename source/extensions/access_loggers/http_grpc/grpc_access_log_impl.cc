@@ -82,7 +82,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(
 }
 
 void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
-    envoy::config::filter::accesslog::v2::AccessLogCommon& common_access_log,
+    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const RequestInfo::RequestInfo& request_info) {
 
   static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
@@ -138,7 +138,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
 
   if (request_info.getResponseFlag(RequestInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::config::filter::accesslog::v2::ResponseFlags_Unauthorized_Reason::
+        envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
             ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   }
 }
@@ -246,16 +246,13 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   if (request_info.protocol()) {
     switch (request_info.protocol().value()) {
     case Http::Protocol::Http10:
-      log_entry->set_protocol_version(
-          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP10);
+      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP10);
       break;
     case Http::Protocol::Http11:
-      log_entry->set_protocol_version(
-          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP11);
+      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP11);
       break;
     case Http::Protocol::Http2:
-      log_entry->set_protocol_version(
-          envoy::config::filter::accesslog::v2::HTTPAccessLogEntry::HTTP2);
+      log_entry->set_protocol_version(envoy::data::accesslog::v2::HTTPAccessLogEntry::HTTP2);
       break;
     }
   }

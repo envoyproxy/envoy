@@ -50,6 +50,9 @@ public:
   // the frame.
   uint32_t length() const { return frame_.length_; }
 
+  // Indicates whether it has buffered any partial data.
+  bool hasBufferedData() const { return state_ != State::FH_FLAG; }
+
 private:
   // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
   // header:

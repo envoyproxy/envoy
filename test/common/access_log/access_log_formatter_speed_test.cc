@@ -41,8 +41,8 @@ int main(int argc, char** argv) {
 
   formatter = std::make_unique<Envoy::AccessLog::FormatterImpl>(LogFormat);
   request_info = std::make_unique<Envoy::TestRequestInfo>();
-  request_info->downstream_remote_address_ =
-      std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1");
+  request_info->setDownstreamRemoteAddress(
+      std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;

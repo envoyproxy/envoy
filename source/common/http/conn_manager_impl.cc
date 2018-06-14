@@ -17,6 +17,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -361,14 +362,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  request_info_.downstream_local_address_ =
-      connection_manager_.read_callbacks_->connection().localAddress();
+  request_info_.setDownstreamLocalAddress(
+      connection_manager_.read_callbacks_->connection().localAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
   // prevents surprises for logging code in edge cases.
-  request_info_.downstream_remote_address_ =
-      connection_manager_.read_callbacks_->connection().remoteAddress();
+  request_info_.setDownstreamRemoteAddress(
+      connection_manager_.read_callbacks_->connection().remoteAddress());
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -536,11 +537,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Modify the downstream remote address depending on configuration and headers.
-  request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
+  request_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-      connection_manager_.runtime_, connection_manager_.local_info_);
-  ASSERT(request_info_.downstream_remote_address_ != nullptr);
+      connection_manager_.runtime_, connection_manager_.local_info_));
+  ASSERT(request_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
@@ -681,7 +682,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
-  request_info_.bytes_received_ += data.length();
+  request_info_.addBytesReceived(data.length());
 
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
@@ -864,7 +865,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -903,7 +904,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+                                                  connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
@@ -1024,7 +1026,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  request_info_.bytes_sent_ += data.length();
+  request_info_.addBytesSent(data.length());
   response_encoder_->encodeData(data, end_stream);
   maybeEndEncode(end_stream);
 }

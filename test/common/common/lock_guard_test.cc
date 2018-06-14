@@ -1,3 +1,4 @@
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
 #include "gtest/gtest.h"

@@ -9,6 +9,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 
@@ -29,18 +30,17 @@ int ContextImpl::sslContextIndex() {
 
 ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                          const ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)),
-      min_protocol_version_(config.minProtocolVersion()),
-      max_protocol_version_(config.maxProtocolVersion()), ecdh_curves_(config.ecdhCurves()) {
+    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
+      stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_);
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_min_proto_version(ctx_.get(), min_protocol_version_);
+  rc = SSL_CTX_set_min_proto_version(ctx_.get(), config.minProtocolVersion());
   RELEASE_ASSERT(rc == 1);
 
-  rc = SSL_CTX_set_max_proto_version(ctx_.get(), max_protocol_version_);
+  rc = SSL_CTX_set_max_proto_version(ctx_.get(), config.maxProtocolVersion());
   RELEASE_ASSERT(rc == 1);
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
@@ -48,8 +48,8 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
         fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
   }
 
-  if (!SSL_CTX_set1_curves_list(ctx_.get(), ecdh_curves_.c_str())) {
-    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", ecdh_curves_));
+  if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {
+    throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
   }
 
   int verify_mode = SSL_VERIFY_NONE;
@@ -85,6 +85,15 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load trusted CA certificates from {}", config.caCertPath()));
     }
     verify_mode = SSL_VERIFY_PEER;
+    verify_trusted_ca_ = true;
+
+    // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
+    // directly. However, our new callback is still calling X509_verify_cert() under
+    // the hood. Therefore, to ignore cert expiration, we need to set the callback
+    // for X509_verify_cert to ignore that error.
+    if (config.allowExpiredCertificate()) {
+      X509_STORE_set_verify_cb(store, ContextImpl::ignoreCertificateExpirationCallback);
+    }
   }
 
   if (!config.certificateRevocationList().empty()) {
@@ -116,11 +125,30 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
-  if (!config.verifyCertificateHash().empty()) {
-    std::string hash = config.verifyCertificateHash();
-    // remove ':' delimiters from hex string
-    hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
-    verify_certificate_hash_ = Hex::decode(hash);
+  if (!config.verifyCertificateHashList().empty()) {
+    for (auto hash : config.verifyCertificateHashList()) {
+      // Remove colons from the 95 chars long colon-separated "fingerprint"
+      // in order to get the hex-encoded string.
+      if (hash.size() == 95) {
+        hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
+      }
+      const auto& decoded = Hex::decode(hash);
+      if (decoded.size() != SHA256_DIGEST_LENGTH) {
+        throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
+      }
+      verify_certificate_hash_list_.push_back(decoded);
+    }
+    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  }
+
+  if (!config.verifyCertificateSpkiList().empty()) {
+    for (auto hash : config.verifyCertificateSpkiList()) {
+      const auto decoded = Base64::decode(hash);
+      if (decoded.size() != SHA256_DIGEST_LENGTH) {
+        throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
+      }
+      verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
+    }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
@@ -234,13 +262,26 @@ bssl::UniquePtr<SSL> ContextImpl::newSsl() const {
   return bssl::UniquePtr<SSL>(SSL_new(ctx_.get()));
 }
 
+int ContextImpl::ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* ctx) {
+  if (!ok) {
+    int err = X509_STORE_CTX_get_error(ctx);
+    if (err == X509_V_ERR_CERT_HAS_EXPIRED || err == X509_V_ERR_CERT_NOT_YET_VALID) {
+      return 1;
+    }
+  }
+
+  return ok;
+}
+
 int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
 
-  int ret = X509_verify_cert(store_ctx);
-  if (ret <= 0) {
-    impl->stats_.fail_verify_error_.inc();
-    return ret;
+  if (impl->verify_trusted_ca_) {
+    int ret = X509_verify_cert(store_ctx);
+    if (ret <= 0) {
+      impl->stats_.fail_verify_error_.inc();
+      return ret;
+    }
   }
 
   SSL* ssl = reinterpret_cast<SSL*>(
@@ -256,9 +297,18 @@ int ContextImpl::verifyCertificate(X509* cert) {
     return 0;
   }
 
-  if (!verify_certificate_hash_.empty() && !verifyCertificateHash(cert, verify_certificate_hash_)) {
-    stats_.fail_verify_cert_hash_.inc();
-    return 0;
+  if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
+    const bool valid_certificate_hash =
+        !verify_certificate_hash_list_.empty() &&
+        verifyCertificateHashList(cert, verify_certificate_hash_list_);
+    const bool valid_certificate_spki =
+        !verify_certificate_spki_list_.empty() &&
+        verifyCertificateSpkiList(cert, verify_certificate_spki_list_);
+
+    if (!valid_certificate_hash && !valid_certificate_spki) {
+      stats_.fail_verify_cert_hash_.inc();
+      return 0;
+    }
   }
 
   return 1;
@@ -325,13 +375,43 @@ bool ContextImpl::dNSNameMatch(const std::string& dNSName, const char* pattern) 
   return false;
 }
 
-bool ContextImpl::verifyCertificateHash(X509* cert, const std::vector<uint8_t>& expected_hash) {
+bool ContextImpl::verifyCertificateHashList(
+    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
   RELEASE_ASSERT(n == computed_hash.size());
 
-  return computed_hash == expected_hash;
+  for (const auto& expected_hash : expected_hashes) {
+    if (computed_hash == expected_hash) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ContextImpl::verifyCertificateSpkiList(
+    X509* cert, const std::vector<std::vector<uint8_t>>& expected_hashes) {
+  X509_PUBKEY* pubkey = X509_get_X509_PUBKEY(cert);
+  if (pubkey == nullptr) {
+    return false;
+  }
+  uint8_t* spki = nullptr;
+  const int len = i2d_X509_PUBKEY(pubkey, &spki);
+  if (len < 0) {
+    return false;
+  }
+  bssl::UniquePtr<uint8_t> free_spki(spki);
+
+  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+  SHA256(spki, len, computed_hash.data());
+
+  for (const auto& expected_hash : expected_hashes) {
+    if (computed_hash == expected_hash) {
+      return true;
+    }
+  }
+  return false;
 }
 
 SslStats ContextImpl::generateStats(Stats::Scope& store) {
@@ -397,14 +477,13 @@ std::string ContextImpl::getSerialNumber(const X509* cert) {
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                                      const ClientContextConfig& config)
-    : ContextImpl(parent, scope, config) {
+    : ContextImpl(parent, scope, config), server_name_indication_(config.serverNameIndication()),
+      allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0);
   }
-
-  server_name_indication_ = config.serverNameIndication();
 }
 
 bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
@@ -415,26 +494,22 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
     RELEASE_ASSERT(rc);
   }
 
+  if (allow_renegotiation_) {
+    SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
+  }
+
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::string& listener_name,
+ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
+                                     const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
-                                     Stats::Scope& scope, const ServerContextConfig& config,
-                                     bool skip_context_update, Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), listener_name_(listener_name),
-      server_names_(server_names), skip_context_update_(skip_context_update), runtime_(runtime),
+                                     Runtime::Loader& runtime)
+    : ContextImpl(parent, scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.certChain().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
-  SSL_CTX_set_select_certificate_cb(
-      ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-        ContextImpl* context_impl = static_cast<ContextImpl*>(
-            SSL_CTX_get_ex_data(SSL_get_SSL_CTX(client_hello->ssl), sslContextIndex()));
-        return dynamic_cast<ServerContextImpl*>(context_impl)->processClientHello(client_hello);
-      });
-
   if (!config.caCert().empty()) {
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
@@ -565,17 +640,25 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
       RELEASE_ASSERT(rc == 1);
     }
+  }
 
-    // verify_certificate_hash_ can only be set with a ca_cert
-    rc = EVP_DigestUpdate(&md, verify_certificate_hash_.data(),
-                          verify_certificate_hash_.size() *
-                              sizeof(decltype(verify_certificate_hash_)::value_type));
+  for (const auto& hash : verify_certificate_hash_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
+    RELEASE_ASSERT(rc == 1);
+  }
+
+  for (const auto& hash : verify_certificate_spki_list_) {
+    rc = EVP_DigestUpdate(&md, hash.data(),
+                          hash.size() *
+                              sizeof(std::remove_reference<decltype(hash)>::type::value_type));
     RELEASE_ASSERT(rc == 1);
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
-  for (const auto& name : server_names_) {
+  for (const auto& name : server_names) {
     rc = EVP_DigestUpdate(&md, name.data(), name.size());
     RELEASE_ASSERT(rc == 1);
   }
@@ -584,73 +667,6 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, const std::stri
   RELEASE_ASSERT(rc == 1);
   rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
   RELEASE_ASSERT(rc == 1);
-}
-
-ssl_select_cert_result_t
-ServerContextImpl::processClientHello(const SSL_CLIENT_HELLO* client_hello) {
-  if (skip_context_update_) {
-    return ssl_select_cert_success;
-  }
-
-  std::string server_name;
-  const uint8_t* data;
-  size_t len;
-
-  if (SSL_early_callback_ctx_extension_get(client_hello, TLSEXT_TYPE_server_name, &data, &len)) {
-    // Based on BoringSSL's ext_sni_parse_clienthello().
-    // Match on empty SNI instead of rejecting connection in case we cannot process the extension.
-    // TODO(PiotrSikora): figure out if we can upstream this to BoringSSL.
-    CBS extension;
-    CBS_init(&extension, data, len);
-    CBS server_name_list, host_name;
-    uint8_t name_type;
-    if (CBS_get_u16_length_prefixed(&extension, &server_name_list) &&
-        CBS_get_u8(&server_name_list, &name_type) &&
-        CBS_get_u16_length_prefixed(&server_name_list, &host_name) &&
-        CBS_len(&server_name_list) == 0 && CBS_len(&extension) == 0 &&
-        name_type == TLSEXT_NAMETYPE_host_name && CBS_len(&host_name) != 0 &&
-        CBS_len(&host_name) <= TLSEXT_MAXLEN_host_name && !CBS_contains_zero_byte(&host_name)) {
-      server_name.assign(reinterpret_cast<const char*>(CBS_data(&host_name)), CBS_len(&host_name));
-    }
-  }
-
-  ServerContext* new_ctx = parent_.findSslServerContext(listener_name_, server_name);
-
-  // Reject connection if we didn't find a match.
-  if (new_ctx == nullptr) {
-    stats_.fail_no_sni_match_.inc();
-    return ssl_select_cert_error;
-  }
-
-  // Update context if it changed.
-  if (new_ctx != this) {
-    ServerContextImpl* new_impl = dynamic_cast<ServerContextImpl*>(new_ctx);
-    new_impl->updateConnectionContext(client_hello->ssl);
-  }
-
-  return ssl_select_cert_success;
-}
-
-void ServerContextImpl::updateConnectionContext(SSL* ssl) {
-  ASSERT(ctx_);
-
-  SSL_set_SSL_CTX(ssl, ctx_.get());
-  ASSERT(SSL_CTX_get_ex_data(ctx_.get(), sslContextIndex()) == this);
-
-  // Update SSL-level settings and parameters that are inherited from SSL_CTX during SSL_new().
-  // TODO(PiotrSikora): add SSL_early_set_SSL_CTX() to BoringSSL.
-
-  // TODO(PiotrSikora): add getters to BoringSSL.
-  int rc = SSL_set_min_proto_version(ssl, min_protocol_version_);
-  ASSERT(rc == 1);
-  rc = SSL_set_max_proto_version(ssl, max_protocol_version_);
-  ASSERT(rc == 1);
-
-  SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ctx_.get()), SSL_CTX_get_verify_callback(ctx_.get()));
-
-  // TODO(PiotrSikora): add getters to BoringSSL.
-  rc = SSL_set1_curves_list(ssl, ecdh_curves_.c_str());
-  ASSERT(rc == 1);
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,

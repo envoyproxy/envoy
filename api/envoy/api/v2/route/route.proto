@@ -305,7 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -353,7 +353,9 @@ message RouteAction {
 
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
-  // at a different path from those exposed at the reverse proxy layer.
+  // at a different path from those exposed at the reverse proxy layer. The router filter will
+  // place the original path before rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // .. attention::
   //
@@ -519,8 +521,13 @@ message RouteAction {
       string name = 1 [(validate.rules).string.min_bytes = 1];
 
       // If specified, a cookie with the TTL will be generated if the cookie is
-      // not present.
+      // not present. If the TTL is present and zero, the generated cookie will
+      // be a session cookie.
       google.protobuf.Duration ttl = 2 [(gogoproto.stdduration) = true];
+
+      // The name of the path for the cookie. If no path is specified here, no path
+      // will be set for the cookie.
+      string path = 3;
     }
 
     message ConnectionProperties {
@@ -569,23 +576,25 @@ message RouteAction {
   google.protobuf.BoolValue use_websocket = 16;
 
   message WebSocketProxyConfig {
-    // See :ref:`stat_prefix <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`.
-    // If the parameter is not specified, the default value of "websocket" is used.
+    // See :ref:`stat_prefix
+    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.stat_prefix>`. If the parameter
+    // is not specified, the default value of "websocket" is used.
     //
     // WebSocket connections support the :ref:`downstream statistics
-    // <config_network_filters_tcp_proxy_stats>` for TCP proxy, except for the following, which are reported
-    // in the :ref:`HTTP Connection Manager statistics <config_http_conn_man_stats>`:
+    // <config_network_filters_tcp_proxy_stats>` for TCP proxy, except for the following, which are
+    // reported in the :ref:`HTTP Connection Manager statistics <config_http_conn_man_stats>`:
     // - downstream_cx_tx_bytes_total
     // - downstream_cx_tx_bytes_buffered
     // - downstream_cx_rx_bytes_total
     // - downstream_cx_rx_bytes_buffered
     string stat_prefix = 1;
 
-    // See :ref:`idle_timeout <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`.
-    // This timeout is only in effect after the WebSocket upgrade request is received by Envoy. It does
-    // not cover the initial part of the HTTP request.
+    // See :ref:`idle_timeout
+    // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.idle_timeout>`. This timeout is
+    // only in effect after the WebSocket upgrade request is received by Envoy. It does not cover
+    // the initial part of the HTTP request.
     google.protobuf.Duration idle_timeout = 2
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+        [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
     // See :ref:`max_connect_attempts
     // <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>`.
@@ -600,6 +609,18 @@ message RouteAction {
   CorsPolicy cors = 17;
 
   reserved 21;
+
+  // If present, and the request is a gRPC request, use the
+  // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
+  // or its default value (infinity) instead of
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>`, but limit the applied timeout
+  // to the maximum value specified here. If configured as 0, the maximum allowed timeout for
+  // gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
+  // and gRPC requests time out like any other requests using
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` or its default.
+  // This can be used to prevent unexpected upstream request timeouts due to potentially long
+  // time gaps between gRPC request and response in gRPC streaming mode.
+  google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 }
 
 message RedirectAction {
@@ -873,7 +894,10 @@ message HeaderMatcher {
 
   // Specifies the value of the header. If the value is absent a request that
   // has the name header will match, regardless of the header’s value.
-  string value = 2;
+  //
+  // .. attention::
+  //   Deprecated. Use :ref:`exact_match <envoy_api_field_route.HeaderMatcher.exact_match>` instead.
+  string value = 2 [deprecated = true];
 
   // Specifies whether the header value is a regular
   // expression or not. Defaults to false. The entire request header value must match the regex. The
@@ -886,7 +910,10 @@ message HeaderMatcher {
   // * The regex *\d{3}* matches the value *123*
   // * The regex *\d{3}* does not match the value *1234*
   // * The regex *\d{3}* does not match the value *123.456*
-  google.protobuf.BoolValue regex = 3;
+  //
+  // .. attention::
+  //   Deprecated. Use :ref:`regex_match <envoy_api_field_route.HeaderMatcher.regex_match>` instead.
+  google.protobuf.BoolValue regex = 3 [deprecated = true];
 
   // Specifies how the header match will be performed to route the request.
   // If header_match_specifier is absent, a request that has the
@@ -920,7 +947,35 @@ message HeaderMatcher {
     // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
     //   "-1somestring"
     envoy.type.Int64Range range_match = 6;
+
+    // If specified, header match will be be performed based on whether the header is in the
+    // request.
+    bool present_match = 7;
+
+    // If specified, header match will be performed based on the prefix of the header value.
+    // Note: empty prefix is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
+    string prefix_match = 9 [(validate.rules).string.min_bytes = 1];
+
+    // If specified, header match will be performed based on the suffix of the header value.
+    // Note: empty suffix is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
+    string suffix_match = 10 [(validate.rules).string.min_bytes = 1];
   }
+
+  // If specified, the match result will be inverted before checking. Defaults to false.
+  //
+  // Examples:
+  //
+  // * The regex *\d{3}* does not match the value *1234*, so it will match when inverted.
+  // * The range [-10,0) will match the value -1, so it will not match when inverted.
+  bool invert_match = 8;
 }
 
 // Query parameter matching treats the query string of a request's :path header

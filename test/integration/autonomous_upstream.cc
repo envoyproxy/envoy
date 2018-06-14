@@ -67,7 +67,8 @@ AutonomousUpstream::~AutonomousUpstream() {
   http_connections_.clear();
 }
 
-bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection) {
+bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection,
+                                                  const std::vector<Network::FilterFactoryCb>&) {
   AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
       QueuedConnectionWrapperPtr{new QueuedConnectionWrapper(connection, true)}, stats_store_,
       http_type_, *this));
@@ -79,12 +80,12 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
 bool AutonomousUpstream::createListenerFilterChain(Network::ListenerFilterManager&) { return true; }
 
 void AutonomousUpstream::setLastRequestHeaders(const Http::HeaderMap& headers) {
-  std::unique_lock<std::mutex> lock(headers_lock_);
+  Thread::LockGuard lock(headers_lock_);
   last_request_headers_ = std::make_unique<Http::TestHeaderMapImpl>(headers);
 }
 
 std::unique_ptr<Http::TestHeaderMapImpl> AutonomousUpstream::lastRequestHeaders() {
-  std::unique_lock<std::mutex> lock(headers_lock_);
+  Thread::LockGuard lock(headers_lock_);
   return std::move(last_request_headers_);
 }
 

@@ -17,8 +17,8 @@ Supported load balancers
 
 .. _arch_overview_load_balancing_types_round_robin:
 
-Round robin
-^^^^^^^^^^^
+Weighted round robin
+^^^^^^^^^^^^^^^^^^^^
 
 This is a simple policy in which each healthy upstream host is selected in round
 robin order. If :ref:`weights
@@ -32,15 +32,27 @@ effective weighting.
 Weighted least request
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The least request load balancer uses an O(1) algorithm which selects two random healthy hosts and
-picks the host which has fewer active requests
-(`Research <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
-approach is nearly as good as an O(N) full scan). If any host in the cluster has a load balancing
-weight greater than 1, the load balancer shifts into a mode where it randomly picks a host and then
-uses that host <weight> times. This algorithm is simple and sufficient for load testing. It should
-not be used where true weighted least request behavior is desired (generally if request durations
-are variable and long in length). We may add a true full scan weighted least request variant in the
-future to cover this use case.
+The least request load balancer uses different algorithms depending on whether any of the hosts have
+weight greater than 1.
+
+* *all weights 1*: An O(1) algorithm which selects two random healthy hosts and
+  picks the host which has fewer active requests (`Research
+  <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
+  approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
+  choices). The P2C load balancer has the property that a host with the highest number of active
+  requests in the cluster will never receive new requests. It will be allowed to drain until it is
+  less than or equal to all of the other hosts.
+* *all weights not 1*:  If any host in the cluster has a load balancing weight greater than 1, the
+  load balancer shifts into a mode where it uses a weighted round robin schedule in which weights
+  are dynamically adjusted based on the host's request load at the time of selection (weight is
+  divided by the current active request count. For example, a host with weight 2 and an active
+  request count of 4 will have a synthetic weight of 2 / 4 = 0.5). This algorithm provides good
+  balance at steady state but may not adapt to load imbalance as quickly. Additionally, unlike P2C,
+  a host will never truly drain, though it will receive fewer requests over time.
+
+  .. note::
+    If all weights are not 1, but are the same (e.g., 42), Envoy will still use the weighted round
+    robin schedule instead of P2C.
 
 .. _arch_overview_load_balancing_types_ring_hash:
 
@@ -99,7 +111,7 @@ towards the host in the set that comes after a failed host.
 .. _arch_overview_load_balancing_types_original_destination:
 
 Original destination
-^^^^^^^^^^^^^^^^^^^^
+--------------------
 
 This is a special purpose load balancer that can only be used with :ref:`an original destination
 cluster <arch_overview_service_discovery_types_original_destination>`. Upstream host is selected
@@ -109,6 +121,15 @@ Envoy. New destinations are added to the cluster by the load balancer on-demand,
 :ref:`periodically <config_cluster_manager_cluster_cleanup_interval_ms>` cleans out unused hosts
 from the cluster. No other :ref:`load balancing type <config_cluster_manager_cluster_lb_type>` can
 be used with original destination clusters.
+
+.. _arch_overview_load_balancing_types_original_destination_request_header:
+
+Original destination host request header
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Envoy can also pick up the original destination from a HTTP header called ``x-envoy-original-destination-host``. 
+Please note that fully resolved IP address should be passed in this header. For example if a request has to be
+routed to a host with IP address 10.195.16.237 at port 8888, the request header value should be set as
+``10.195.16.237:8888``.
 
 .. _arch_overview_load_balancing_panic_threshold:
 

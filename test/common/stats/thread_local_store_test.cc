@@ -593,11 +593,19 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   h1.recordValue(1);
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_TRUE(name_histogram_map["h1"]->used());
+  EXPECT_FALSE(name_histogram_map["h1"]->used());
   EXPECT_FALSE(name_histogram_map["h2"]->used());
+
+  // Merge the histograms and validate that h1 is considered used.
+  store_->mergeHistograms([]() -> void {});
+  EXPECT_TRUE(name_histogram_map["h1"]->used());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 2));
   h2.recordValue(2);
+  EXPECT_FALSE(name_histogram_map["h2"]->used());
+
+  // Merge histograms again and validate that both h1 and h2 are used.
+  store_->mergeHistograms([]() -> void {});
 
   for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());

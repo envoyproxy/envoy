@@ -175,7 +175,8 @@ public:
     Runtime::MockLoader runtime;
     ContextManagerImpl manager(runtime);
     Stats::IsolatedStoreImpl store;
-    ServerContextPtr server_ctx(manager.createSslServerContext("", {}, store, cfg, true));
+    ServerContextPtr server_ctx(
+        manager.createSslServerContext(store, cfg, std::vector<std::string>{}));
   }
 
   static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg) {
@@ -328,7 +329,21 @@ TEST_F(SslServerContextImplTicketTest, CRLWithNoCA) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(loadConfigJson(json), EnvoyException,
-                          "^Failed to load CRL from .* without trusted CA certificates$");
+                          "^Failed to load CRL from .* without trusted CA$");
+}
+
+TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem",
+    "verify_subject_alt_name": [ "spiffe://lyft.com/testclient" ]
+  }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(loadConfigJson(json), EnvoyException,
+                            "SAN-based verification of peer certificates without trusted CA "
+                            "is insecure and not allowed");
 }
 
 // Validate that empty SNI (according to C string rules) fails config validation.
@@ -342,19 +357,35 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
                             EnvoyException, "SNI names containing NULL-byte are not allowed");
 }
 
-// Multiple certificate hashes are not yet supported.
-// TODO(htuch): Support multiple hashes.
-TEST(ClientContextConfigImplTest, MultipleValidationHashes) {
+// Validate that values other than a hex-encoded SHA-256 fail config validation.
+TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
-      ->add_verify_certificate_hash();
+      // This is valid hex-encoded string, but it doesn't represent SHA-256 (80 vs 64 chars).
+      ->add_verify_certificate_hash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ClientContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException, "Invalid hex-encoded SHA-256 .*");
+}
+
+// Validate that values other than a base64-encoded SHA-256 fail config validation.
+TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
-      ->add_verify_certificate_hash();
-  EXPECT_THROW_WITH_MESSAGE(ClientContextConfigImpl client_context_config(tls_context),
-                            EnvoyException,
-                            "Multiple TLS certificate verification hashes are not supported");
+      // Not a base64-encoded string.
+      ->add_verify_certificate_spki("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ClientContextConfigImpl client_context_config(tls_context);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
+                          EnvoyException, "Invalid base64-encoded SHA-256 .*");
 }
 
 // Multiple TLS certificates are not yet supported.
@@ -392,9 +423,46 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_MESSAGE(ServerContextPtr server_ctx(manager.createSslServerContext(
-                                "", {}, store, client_context_config, true)),
+                                store, client_context_config, std::vector<std::string>{})),
                             EnvoyException,
                             "Server TlsCertificates must have a certificate specified");
+}
+
+// Cannot ignore certificate expiration without a trusted CA.
+TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      tls_context.mutable_common_tls_context()->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
+                            EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+
+  server_validation_ctx->set_allow_expired_certificate(false);
+
+  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context));
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  EXPECT_THROW_WITH_MESSAGE(ServerContextConfigImpl server_context_config(tls_context),
+                            EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+
+  // But once you add a trusted CA, you should be able to create the context.
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+
+  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context));
 }
 
 } // namespace Ssl

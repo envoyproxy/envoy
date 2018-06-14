@@ -109,6 +109,8 @@ struct RequestInfoImpl : public RequestInfo {
     last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
   }
 
+  void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
+
   uint64_t bytesReceived() const override { return bytes_received_; }
 
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
@@ -116,6 +118,8 @@ struct RequestInfoImpl : public RequestInfo {
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
 
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
+
+  void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
@@ -129,6 +133,11 @@ struct RequestInfoImpl : public RequestInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
+  void setUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
+    upstream_local_address_ = upstream_local_address;
+  }
+
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
@@ -137,8 +146,18 @@ struct RequestInfoImpl : public RequestInfo {
 
   void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
 
+  void setDownstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
+    downstream_local_address_ = downstream_local_address;
+  }
+
   const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
     return downstream_local_address_;
+  }
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
+    downstream_remote_address_ = downstream_remote_address;
   }
 
   const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
@@ -166,17 +185,19 @@ struct RequestInfoImpl : public RequestInfo {
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;
-  uint64_t bytes_received_{};
   absl::optional<uint32_t> response_code_;
-  uint64_t bytes_sent_{};
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  Network::Address::InstanceConstSharedPtr upstream_local_address_;
   bool hc_request_{};
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+
+private:
+  uint64_t bytes_received_{};
+  uint64_t bytes_sent_{};
+  Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_local_address_;
+  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
 };
 
 } // namespace RequestInfo

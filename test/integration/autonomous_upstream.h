@@ -53,14 +53,16 @@ public:
                      Network::Address::IpVersion version)
       : FakeUpstream(port, type, version) {}
   ~AutonomousUpstream();
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
 
 private:
-  std::mutex headers_lock_;
+  Thread::MutexBasicLockable headers_lock_;
   std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
 };

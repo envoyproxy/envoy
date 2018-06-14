@@ -32,6 +32,58 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                    envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
 }
 
+// Simulate weighted LR load balancer.
+TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
+  const uint64_t num_hosts = 4;
+  const uint64_t weighted_subset_percent = 50;
+  const uint64_t weight = 2;          // weighted_subset_percent of hosts will have this weight.
+  const uint64_t active_requests = 3; // weighted_subset_percent will have this active requests.
+
+  PrioritySetImpl priority_set;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  HostSet& host_set = priority_set.getOrCreateHostSet(0);
+  HostVector hosts;
+  for (uint64_t i = 0; i < num_hosts; i++) {
+    const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
+    hosts.push_back(makeTestHost(info_, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
+                                 should_weight ? weight : 1));
+    if (should_weight) {
+      hosts.back()->stats().rq_active_.set(active_requests);
+    }
+  }
+  HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
+  HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
+  host_set.updateHosts(updated_hosts, updated_hosts, updated_locality_hosts, updated_locality_hosts,
+                       {}, hosts, {});
+
+  Stats::IsolatedStoreImpl stats_store;
+  ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
+  stats.max_host_weight_.set(weight);
+  NiceMock<Runtime::MockLoader> runtime;
+  Runtime::RandomGeneratorImpl random;
+  envoy::api::v2::Cluster::CommonLbConfig common_config;
+  LeastRequestLoadBalancer lb_{priority_set, nullptr, stats, runtime, random, common_config};
+
+  std::unordered_map<HostConstSharedPtr, uint64_t> host_hits;
+  const uint64_t total_requests = 100;
+  for (uint64_t i = 0; i < total_requests; i++) {
+    host_hits[lb_.chooseHost(nullptr)]++;
+  }
+
+  std::unordered_map<uint64_t, double> weight_to_percent;
+  for (const auto& host : host_hits) {
+    std::cout << fmt::format("url:{}, weight:{}, hits:{}, percent_of_total:{}\n",
+                             host.first->address()->asString(), host.first->weight(), host.second,
+                             (static_cast<double>(host.second) / total_requests) * 100);
+    weight_to_percent[host.first->weight()] +=
+        (static_cast<double>(host.second) / total_requests) * 100;
+  }
+
+  for (const auto& weight : weight_to_percent) {
+    std::cout << fmt::format("weight:{}, percent:{}\n", weight.first, weight.second);
+  }
+}
+
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */

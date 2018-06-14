@@ -13,6 +13,7 @@ import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/outlier_detection.proto";
+import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
@@ -41,7 +42,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 32]
+// [#comment:next free field: 34]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -156,6 +157,23 @@ message Cluster {
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // then hosts is required.
   repeated core.Address hosts = 7;
+
+  // Setting this is required for specifying members of
+  // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
+  // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
+  // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>` clusters.
+  // This field supersedes :ref:`hosts<envoy_api_field_Cluster.hosts>` field.
+  // [#comment:TODO(dio): Deprecate the hosts field and add it to DEPRECATED.md
+  // once load_assignment is implemented.]
+  //
+  // .. attention::
+  //
+  //   Setting this allows non-EDS cluster types to contain embedded EDS equivalent
+  //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
+  //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
+  //
+  // [#not-implemented-hide:]
+  ClusterLoadAssignment load_assignment = 33;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`
   // configuration for the cluster. If no

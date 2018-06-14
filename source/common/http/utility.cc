@@ -19,6 +19,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -29,6 +30,7 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
+  // TODO(alyssawilk) move over to the append utility.
   HeaderString& header = headers.insertForwardedFor().value();
   if (!header.empty()) {
     header.append(", ", 2);
@@ -36,6 +38,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
 
   const std::string& address_as_string = remote_address.ip()->addressAsString();
   header.append(address_as_string.c_str(), address_as_string.size());
+}
+
+void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+  HeaderString& header = headers.insertVia().value();
+  if (!header.empty()) {
+    header.append(", ", 2);
+  }
+  header.append(via.c_str(), via.size());
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
@@ -126,8 +136,23 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::chrono::seconds max_age) {
-  return fmt::format("{}=\"{}\"; Max-Age={}", key, value, max_age.count());
+                                        const std::string& path, const std::chrono::seconds max_age,
+                                        bool httponly) {
+  std::string cookie_value;
+  // Best effort attempt to avoid numerous string copies.
+  cookie_value.reserve(value.size() + path.size() + 30);
+
+  cookie_value = absl::StrCat(key, "=\"", value, "\"");
+  if (max_age != std::chrono::seconds::zero()) {
+    absl::StrAppend(&cookie_value, "; Max-Age=", max_age.count());
+  }
+  if (!path.empty()) {
+    absl::StrAppend(&cookie_value, "; Path=", path);
+  }
+  if (httponly) {
+    absl::StrAppend(&cookie_value, "; HttpOnly");
+  }
+  return cookie_value;
 }
 
 bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
@@ -267,7 +292,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
-  static const std::string seperator(", ");
+  static const std::string seperator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
     std::string::size_type last_comma = xff_string.rfind(seperator);
@@ -282,6 +307,10 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + seperator.size());
   }
+
+  // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).
+  xff_string = StringUtil::ltrim(xff_string);
+  xff_string = StringUtil::rtrim(xff_string);
 
   try {
     // This technically requires a copy because inet_pton takes a null terminated string. In
@@ -307,16 +336,6 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
-}
-
-void Utility::appendToHeader(HeaderString& header, const std::string& data) {
-  if (data.empty()) {
-    return;
-  }
-  if (!header.empty()) {
-    header.append(",", 1);
-  }
-  header.append(data.c_str(), data.size());
 }
 
 } // namespace Http

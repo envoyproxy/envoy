@@ -98,6 +98,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;
@@ -107,7 +108,9 @@ enum UpdateOrder { REMOVES_FIRST, SIMULTANEOUS };
 
 class SubsetLoadBalancerTest : public testing::TestWithParam<UpdateOrder> {
 public:
-  SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
+  SubsetLoadBalancerTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+    stats_.max_host_weight_.set(1UL);
+  }
 
   typedef std::map<std::string, std::string> HostMetadata;
   typedef std::map<std::string, HostMetadata> HostURLMetadataMap;

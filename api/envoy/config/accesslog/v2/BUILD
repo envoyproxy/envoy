@@ -9,3 +9,8 @@ api_proto_library(
         "//envoy/api/v2/core:grpc_service",
     ],
 )
+
+api_proto_library(
+    name = "file",
+    srcs = ["file.proto"],
+)
