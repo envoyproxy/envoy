@@ -2,7 +2,7 @@
 
 # Tests check_format.py. This must be run in a context where the clang
 # version and settings are compatible with the one in the Envoy
-# docker.  Normally this is run via check_format_test.sh, which
+# docker. Normally this is run via check_format_test.sh, which
 # executes it in under docker.
 
 import argparse
@@ -125,36 +125,43 @@ if __name__ == "__main__":
   os.makedirs(tmp)
   os.chdir(tmp)
   errors += fixFileExpectingSuccess("over_enthusiastic_spaces.cc")
+  errors += fixFileExpectingSuccess("extra_enthusiastic_spaces.cc")
   errors += fixFileExpectingSuccess("angle_bracket_include.cc")
   errors += fixFileExpectingFailure("proto_deps.cc",
-                                    "has unexpected direct dependency on google.protobuf")
+                                    "unexpected direct dependency on google.protobuf")
   errors += fixFileExpectingSuccess("proto_style.cc")
   errors += fixFileExpectingSuccess("long_line.cc")
   errors += fixFileExpectingSuccess("header_order.cc")
   errors += fixFileExpectingSuccess("license.BUILD")
   errors += fixFileExpectingFailure("no_namespace_envoy.cc",
                                     "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += fixFileExpectingFailure("mutex.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
+  errors += fixFileExpectingFailure("condition_variable.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
+  errors += fixFileExpectingFailure("condition_variable_any.cc",
+                                    "Don't use <mutex> or <condition_variable*>")
 
   errors += fixFileExpectingNoChange("ok_file.cc")
 
   errors += checkFileExpectingError("over_enthusiastic_spaces.cc",
                                     "./over_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
+  errors += checkFileExpectingError("extra_enthusiastic_spaces.cc",
+                                    "./extra_enthusiastic_spaces.cc:3: over-enthusiastic spaces")
   errors += checkFileExpectingError("angle_bracket_include.cc",
                                     "envoy includes should not have angle brackets")
   errors += checkFileExpectingError("no_namespace_envoy.cc",
                                     "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
   errors += checkFileExpectingError("proto_deps.cc",
-                                    "as unexpected direct dependency on google.protobuf")
+                                    "unexpected direct dependency on google.protobuf")
   errors += checkFileExpectingError("proto_style.cc", "incorrect protobuf type reference")
   errors += checkFileExpectingError("long_line.cc", "clang-format check failed")
   errors += checkFileExpectingError("header_order.cc", "header_order.py check failed")
   errors += checkFileExpectingError("license.BUILD", "envoy_build_fixer check failed")
   errors += checkFileExpectingOK("ok_file.cc")
 
-  # TODO(jmarantz): I think this is a bug in check_format.py: this dependency can't be
-  # fixed automatically, but the invalid BUILD file is not detected when a 'fix' is requested,
-  # and so it passes silently. But if you then call 'check' it will fail.
-  errors += fixFileExpectingSuccess("proto.BUILD")  # should be fixFileExpectingFailure.
+  errors += fixFileExpectingFailure("proto.BUILD",
+                                    "unexpected direct external dependency on protobuf")
   errors += checkFileExpectingError("proto.BUILD",
                                     "unexpected direct external dependency on protobuf")
 

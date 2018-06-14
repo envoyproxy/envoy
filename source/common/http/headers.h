@@ -64,6 +64,7 @@ public:
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
+  const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};

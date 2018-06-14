@@ -50,7 +50,6 @@ PROTOBUF_TYPE_ERRORS = {
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 }
 
-
 def checkNamespace(file_path):
   with open(file_path) as f:
     text = f.read()
@@ -59,10 +58,10 @@ def checkNamespace(file_path):
       return ["Unable to find Envoy namespace or NOLINT(namespace-envoy) for file: %s" % file_path]
   return []
 
-
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
-  return any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST)
+  return (file_path.endswith(PROTO_SUFFIX) or
+          any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -75,29 +74,8 @@ def findSubstringAndReturnError(pattern, file_path, error_message):
       return error_messages
     return []
 
-def checkProtobufExternalDepsBuild(file_path):
-  if whitelistedForProtobufDeps(file_path):
-    return []
-  message = ("unexpected direct external dependency on protobuf, use "
-    "//source/common/protobuf instead.")
-  return findSubstringAndReturnError('"protobuf"', file_path, message)
-
-
-def checkProtobufExternalDeps(file_path):
-  if whitelistedForProtobufDeps(file_path):
-    return []
-  with open(file_path) as f:
-    text = f.read()
-    if '"google/protobuf' in text or "google::protobuf" in text:
-      return [
-          "%s has unexpected direct dependency on google.protobuf, use "
-          "the definitions in common/protobuf/protobuf.h instead." % file_path]
-    return []
-
-
 def isApiFile(file_path):
   return file_path.startswith(args.api_prefix)
-
 
 def isBuildFile(file_path):
   basename = os.path.basename(file_path)
@@ -115,73 +93,103 @@ def hasInvalidAngleBracketDirectory(line):
   subdir = path[0:slash]
   return subdir in SUBDIR_SET
 
-def formatLineError(path, zero_based_line_number, message):
-  return "%s:%d: %s" % (path, zero_based_line_number + 1, message)
-
-def checkFileContents(file_path):
+def checkFileContents(file_path, checker):
   error_messages = []
   for line_number, line in enumerate(fileinput.input(file_path)):
-    if line.find(".  ") != -1:
-      error_messages.append(formatLineError(file_path, line_number, "over-enthusiastic spaces"))
-    if hasInvalidAngleBracketDirectory(line):
-      error_messages.append(formatLineError(file_path, line_number,
-                                            "envoy includes should not have angle brackets"))
-    for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
-      if invalid_construct in line:
-        error_messages.append(
-            formatLineError(file_path, line_number,
-                            "incorrect protobuf type reference %s; "
-                            "should be %s" % (invalid_construct, valid_construct)))
+    def reportError(message):
+      error_messages.append("%s:%d: %s" % (file_path, line_number + 1, message))
+    checker(line, file_path, reportError)
   return error_messages
 
-def fixFileContents(file_path):
-  for line in fileinput.input(file_path, inplace=True):
-    # Strip double space after '.'  This may prove overenthusiastic and need to
-    # be restricted to comments and metadata files but works for now.
-    line = line.replace('.  ', '. ')
+DOT_MULTI_SPACE_REGEX = re.compile('\\. +')
 
-    if hasInvalidAngleBracketDirectory(line):
-      line = line.replace('<', '"').replace(">", '"')
+def fixSourceLine(line):
+  # Strip double space after '.'  This may prove overenthusiastic and need to
+  # be restricted to comments and metadata files but works for now.
+  line = re.sub(DOT_MULTI_SPACE_REGEX, '. ', line)
 
-    # Fix incorrect protobuf namespace references.
-    for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
-      line = line.replace(invalid_construct, valid_construct)
+  if hasInvalidAngleBracketDirectory(line):
+    line = line.replace('<', '"').replace(">", '"')
 
-    sys.stdout.write(str(line))
+  # Fix incorrect protobuf namespace references.
+  for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+    line = line.replace(invalid_construct, valid_construct)
 
-def checkFilePath(file_path):
+  return line
+
+def checkSourceLine(line, file_path, reportError):
+  # Check fixable errors. These may have been fixed already.
+  if line.find(".  ") != -1:
+    reportError("over-enthusiastic spaces")
+  if hasInvalidAngleBracketDirectory(line):
+    reportError("envoy includes should not have angle brackets")
+  for invalid_construct, valid_construct in PROTOBUF_TYPE_ERRORS.items():
+    if invalid_construct in line:
+      reportError("incorrect protobuf type reference %s; "
+                  "should be %s" % (invalid_construct, valid_construct))
+
+  # Some errors cannot be fixed automatically, and actionable, consistent,
+  # navigable messages should be emitted to make it easy to find and fix
+  # the errors by hand.
+  if not whitelistedForProtobufDeps(file_path):
+    if '"google/protobuf' in line or "google::protobuf" in line:
+      reportError("unexpected direct dependency on google.protobuf, use "
+                  "the definitions in common/protobuf/protobuf.h instead.")
+  if line.startswith('#include <mutex>') or line.startswith('#include <condition_variable'):
+    # We don't check here for std::mutex because that may legitimately show up in
+    # comments, for example this one.
+    reportError("Don't use <mutex> or <condition_variable*>, switch to "
+                "Thread::MutexBasicLockable in source/common/common/thread.h")
+
+def checkBuildLine(line, file_path, reportError):
+  if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
+    reportError("unexpected direct external dependency on protobuf, use "
+                "//source/common/protobuf instead.")
+
+def fixBuildPath(file_path):
   error_messages = []
-  if isBuildFile(file_path):
-    # TODO(htuch): Add API specific BUILD fixer script.
-    if not isApiFile(file_path):
-      command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path,
-                                       file_path)
-      error_messages += executeCommand(
-          command, "envoy_build_fixer check failed", file_path)
+  # TODO(htuch): Add API specific BUILD fixer script.
+  if not isApiFile(file_path):
+    if os.system(
+        "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+      error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
+    if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+      error_messages += ["buildifier rewrite failed for file: %s" % file_path]
+  return error_messages
 
-    command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
-    error_messages += executeCommand(command, "buildifier check failed", file_path)
+def checkBuildPath(file_path):
+  error_messages = []
+  if not isApiFile(file_path):
+    command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
+    error_messages += executeCommand(
+        command, "envoy_build_fixer check failed", file_path)
 
-    error_messages += checkProtobufExternalDepsBuild(file_path)
-    return error_messages
+  command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
+  error_messages += executeCommand(command, "buildifier check failed", file_path)
+  error_messages += checkFileContents(file_path, checkBuildLine)
+  return error_messages
 
-  error_messages += checkFileContents(file_path)
+def fixSourcePath(file_path):
+  for line in fileinput.input(file_path, inplace=True):
+    sys.stdout.write(fixSourceLine(line))
 
-  if file_path.endswith(DOCS_SUFFIX):
-    return error_messages
+  error_messages = []
+  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
+    error_messages += fixHeaderOrder(file_path)
+    error_messages += clangFormat(file_path)
+  return error_messages
 
-  if not file_path.endswith(PROTO_SUFFIX):
+def checkSourcePath(file_path):
+  error_messages = checkFileContents(file_path, checkSourceLine)
+
+  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
     error_messages += checkNamespace(file_path)
-    error_messages += checkProtobufExternalDeps(file_path)
-
     command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
     error_messages += executeCommand(command, "header_order.py check failed", file_path)
-
-  command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
-  error_messages += executeCommand(command, "clang-format check failed", file_path)
+    command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
+    error_messages += executeCommand(command, "clang-format check failed", file_path)
 
   return error_messages
-
 
 # Example target outputs are:
 #   - "26,27c26"
@@ -216,37 +224,6 @@ def clangFormat(file_path):
     return ["clang-format rewrite error: %s" % (file_path)]
   return []
 
-def fixFilePath(file_path):
-  if isBuildFile(file_path):
-    # TODO(htuch): Add API specific BUILD fixer script.
-    if not isApiFile(file_path):
-      if os.system(
-          "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
-        return ["envoy_build_fixer rewrite failed for file: %s" % file_path]
-    if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
-      return ["buildifier rewrite failed for file: %s" % file_path]
-    return []
-  fixFileContents(file_path)
-
-  if file_path.endswith(DOCS_SUFFIX):
-    return []
-
-  error_messages = []
-  if not file_path.endswith(PROTO_SUFFIX):
-    error_messages = checkNamespace(file_path)
-    if error_messages == []:
-      error_messages = checkProtobufExternalDepsBuild(file_path)
-    if error_messages == []:
-      error_messages = checkProtobufExternalDeps(file_path)
-    if error_messages:
-      return error_messages + ["This cannot be automatically corrected. Please fix by hand."]
-
-    error_messages = []
-    error_messages += fixHeaderOrder(file_path)
-
-  error_messages += clangFormat(file_path)
-  return error_messages
-
 def checkFormat(file_path):
   if file_path.startswith(EXCLUDED_PREFIXES):
     return []
@@ -255,11 +232,17 @@ def checkFormat(file_path):
     return []
 
   error_messages = []
-  if operation_type == "check":
-    error_messages += checkFilePath(file_path)
-
-  if operation_type == "fix":
-    error_messages += fixFilePath(file_path)
+  # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
+  # an issue, but there's still an error, that's a problem.
+  try_to_fix = operation_type == "fix"
+  if isBuildFile(file_path):
+    if try_to_fix:
+      error_messages += fixBuildPath(file_path)
+    error_messages += checkBuildPath(file_path)
+  else:
+    if try_to_fix:
+      error_messages += fixSourcePath(file_path)
+    error_messages += checkSourcePath(file_path)
 
   if error_messages:
     return ["From %s" % file_path] + error_messages
@@ -294,9 +277,10 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Check or fix file format.')
   parser.add_argument('operation_type', type=str, choices=['check', 'fix'],
                       help="specify if the run should 'check' or 'fix' format.")
-  parser.add_argument('target_path', type=str, nargs="?", default=".", help="specify the root directory"
-                                                                            " for the script to recurse over. Default '.'.")
-  parser.add_argument('--add-excluded-prefixes', type=str, nargs="+", help="exclude additional prefixes.")
+  parser.add_argument('target_path', type=str, nargs="?", default=".",
+                      help="specify the root directory for the script to recurse over. Default '.'.")
+  parser.add_argument('--add-excluded-prefixes', type=str, nargs="+",
+                      help="exclude additional prefixes.")
   parser.add_argument('-j', '--num-workers', type=int, default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument('--api-prefix', type=str, default='./api/', help="path of the API tree")

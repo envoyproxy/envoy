@@ -6,6 +6,7 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
 
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/extensions/filters/common/rbac:engine_mocks",
+        "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],
@@ -41,5 +43,14 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+    ],
+)
+
+envoy_extension_cc_mock(
+    name = "route_config_mocks",
+    hdrs = ["mocks.h"],
+    extension_name = "envoy.filters.http.rbac",
+    deps = [
+        "//source/extensions/filters/http/rbac:rbac_filter_lib",
     ],
 )

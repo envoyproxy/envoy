@@ -211,15 +211,24 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
-bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
+const char* StringUtil::strtoul(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
-    return false;
+    return nullptr;
   }
 
   char* end_ptr;
   errno = 0;
-  out = strtoul(str, &end_ptr, base);
-  if (*end_ptr != '\0' || (out == ULONG_MAX && errno == ERANGE)) {
+  out = ::strtoul(str, &end_ptr, base);
+  if (end_ptr == str || (out == ULONG_MAX && errno == ERANGE)) {
+    return nullptr;
+  } else {
+    return end_ptr;
+  }
+}
+
+bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
+  const char* end_ptr = StringUtil::strtoul(str, out, base);
+  if (end_ptr == nullptr || *end_ptr != '\0') {
     return false;
   } else {
     return true;

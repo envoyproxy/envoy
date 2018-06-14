@@ -13,20 +13,12 @@ namespace RBAC {
 
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
 public:
-  RoleBasedAccessControlEngineImpl(const envoy::config::filter::http::rbac::v2::RBAC& config,
-                                   bool disabled);
-  RoleBasedAccessControlEngineImpl(
-      const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
+  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules);
 
   bool allowed(const Network::Connection& connection,
                const Envoy::Http::HeaderMap& headers) const override;
 
 private:
-  // Indicates that the engine will not evaluate an action and just return true for calls to
-  // allowed. This value is only set by route-local configuration.
-  const bool engine_disabled_;
-
-  // Indicates the behavior to take if a policy matches an action.
   const bool allowed_if_matched_;
 
   std::vector<PolicyMatcher> policies_;

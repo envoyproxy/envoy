@@ -468,6 +468,13 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
+   * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
+   * header, while 0 represents infinity.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
+
+  /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
    * @return the virtual cluster or nullptr if there is no match.

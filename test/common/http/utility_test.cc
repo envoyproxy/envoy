@@ -159,6 +159,39 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     EXPECT_FALSE(ret.single_address_);
   }
   {
+    const std::string first_address = "192.0.2.10";
+    const std::string second_address = "192.0.2.1";
+    const std::string third_address = "10.0.0.1";
+    const std::string fourth_address = "10.0.0.2";
+    TestHeaderMapImpl request_headers{
+        {"x-forwarded-for", "192.0.2.10, 192.0.2.1 ,10.0.0.1,10.0.0.2"}};
+
+    // No space on the left.
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(fourth_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No space on either side.
+    ret = Utility::getLastAddressFromXFF(request_headers, 1);
+    EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // Exercise rtrim() and ltrim().
+    ret = Utility::getLastAddressFromXFF(request_headers, 2);
+    EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No space trimming.
+    ret = Utility::getLastAddressFromXFF(request_headers, 3);
+    EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No address found.
+    ret = Utility::getLastAddressFromXFF(request_headers, 4);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
+  }
+  {
     TestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);

@@ -276,6 +276,7 @@ private:
   HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
   HEADER_FUNC(GrpcMessage)                                                                         \
   HEADER_FUNC(GrpcStatus)                                                                          \
+  HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
