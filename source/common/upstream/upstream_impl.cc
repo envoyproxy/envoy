@@ -640,13 +640,8 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-<<<<<<< HEAD
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                       cm.clusterManagerFactory().secretManager(), added_via_api),
-=======
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
-                      cm.clusterManagerFactory().secretManager()),
->>>>>>> Added secretManager() to ClusterManagerFactory interface
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
