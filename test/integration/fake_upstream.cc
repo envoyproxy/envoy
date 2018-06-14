@@ -145,9 +145,9 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
       Http::TestHeaderMapImpl{{"grpc-status", std::to_string(static_cast<uint32_t>(status))}});
 }
 
-FakeHttpConnection::FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper,
+FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
                                        Stats::Store& store, Type type)
-    : FakeConnectionBase(std::move(connection_wrapper)) {
+    : FakeConnectionBase(shared_connection) {
   if (type == Type::HTTP1) {
     codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
                                                        Http::Http1Settings()));
@@ -301,8 +301,9 @@ bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const std::vector<Network::FilterFactoryCb>&) {
   Thread::LockGuard lock(lock_);
   connection.readDisable(true);
-  new_connections_.emplace_back(
-      new QueuedConnectionWrapper(connection, allow_unexpected_disconnects_));
+  auto connection_wrapper =
+      std::make_unique<QueuedConnectionWrapper>(connection, allow_unexpected_disconnects_);
+  connection_wrapper->moveIntoListBack(std::move(connection_wrapper), new_connections_);
   new_connection_event_.notifyOne();
   return true;
 }
@@ -315,6 +316,11 @@ void FakeUpstream::threadRoutine() {
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
+  {
+    Thread::LockGuard lock(lock_);
+    new_connections_.clear();
+    consumed_connections_.clear();
+  }
 }
 
 FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher) {
@@ -330,9 +336,8 @@ FakeHttpConnectionPtr FakeUpstream::waitForHttpConnection(Event::Dispatcher& cli
     }
 
     ASSERT(!new_connections_.empty());
-    connection = std::make_unique<FakeHttpConnection>(std::move(new_connections_.front()),
-                                                      stats_store_, http_type_);
-    new_connections_.pop_front();
+    connection =
+        std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_);
   }
   connection->initialize();
   connection->readDisable(false);
@@ -354,10 +359,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         // Run the client dispatcher since we may need to process window updates, etc.
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
-        FakeHttpConnectionPtr connection(
-            new FakeHttpConnection(std::move(upstream.new_connections_.front()),
-                                   upstream.stats_store_, upstream.http_type_));
-        upstream.new_connections_.pop_front();
+        FakeHttpConnectionPtr connection(new FakeHttpConnection(
+            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_));
         lock.release();
         connection->initialize();
         connection->readDisable(false);
@@ -379,13 +382,20 @@ FakeRawConnectionPtr FakeUpstream::waitForRawConnection(std::chrono::millisecond
     if (new_connections_.empty()) {
       return nullptr;
     }
-    connection = std::make_unique<FakeRawConnection>(std::move(new_connections_.front()));
-    new_connections_.pop_front();
+    connection = std::make_unique<FakeRawConnection>(consumeConnection());
   }
   connection->initialize();
   connection->readDisable(false);
   connection->enableHalfClose(enable_half_close_);
   return connection;
+}
+
+SharedConnectionWrapper& FakeUpstream::consumeConnection() {
+  ASSERT(!new_connections_.empty());
+  auto* const connection_wrapper = new_connections_.front().get();
+  connection_wrapper->set_parented();
+  connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
+  return connection_wrapper->shared_connection();
 }
 
 std::string FakeRawConnection::waitForData(uint64_t num_bytes) {

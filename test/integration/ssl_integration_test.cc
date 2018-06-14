@@ -42,8 +42,6 @@ void SslIntegrationTest::initialize() {
 }
 
 void SslIntegrationTest::TearDown() {
-  test_server_.reset();
-  fake_upstreams_.clear();
   client_ssl_ctx_plain_.reset();
   client_ssl_ctx_alpn_.reset();
   client_ssl_ctx_san_.reset();

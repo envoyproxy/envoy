@@ -33,14 +33,16 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store,
+  AutonomousHttpConnection(SharedConnectionWrapperPtr shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream)
-      : FakeHttpConnection(std::move(connection_wrapper), store, type), upstream_(upstream) {}
+      : FakeHttpConnection(*shared_connection, store, type), upstream_(upstream),
+        shared_connection_(std::move(shared_connection)) {}
 
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
 
 private:
   AutonomousUpstream& upstream_;
+  SharedConnectionWrapperPtr shared_connection_;
   std::vector<FakeStreamPtr> streams_;
 };
 

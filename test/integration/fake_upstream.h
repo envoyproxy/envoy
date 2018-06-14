@@ -16,6 +16,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
@@ -215,6 +216,8 @@ private:
   const bool allow_unexpected_disconnects_;
 };
 
+typedef std::unique_ptr<SharedConnectionWrapper> SharedConnectionWrapperPtr;
+
 class QueuedConnectionWrapper;
 typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
 
@@ -227,7 +230,7 @@ typedef std::unique_ptr<QueuedConnectionWrapper> QueuedConnectionWrapperPtr;
  * TODO(htuch): We can simplify the storage lifetime by destructing if/when
  * removeConnectionCallbacks is added.
  */
-class QueuedConnectionWrapper {
+class QueuedConnectionWrapper : public LinkedObject<QueuedConnectionWrapper> {
 public:
   QueuedConnectionWrapper(Network::Connection& connection, bool allow_unexpected_disconnects)
       : shared_connection_(connection, allow_unexpected_disconnects), parented_(false),
@@ -268,7 +271,6 @@ public:
 
   virtual void initialize() {
     initialized_ = true;
-    connection_wrapper_->set_parented();
     shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
   }
   void enableHalfClose(bool enabled);
@@ -278,20 +280,14 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
 protected:
-  FakeConnectionBase(QueuedConnectionWrapperPtr connection_wrapper)
-      : shared_connection_(connection_wrapper->shared_connection()),
-        connection_wrapper_(std::move(connection_wrapper)) {}
+  FakeConnectionBase(SharedConnectionWrapper& shared_connection)
+      : shared_connection_(shared_connection) {}
 
   SharedConnectionWrapper& shared_connection_;
   bool initialized_{};
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
   bool half_closed_ GUARDED_BY(lock_){};
-
-private:
-  // We hold on to this as connection callbacks live for the entire life of the
-  // connection.
-  QueuedConnectionWrapperPtr connection_wrapper_;
 };
 
 /**
@@ -301,7 +297,7 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store, Type type);
+  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type);
   // By default waitForNewStream assumes the next event is a new stream and
   // fails an assert if an unexpected event occurs. If a caller truly wishes to
   // wait for a new stream, set ignore_spurious_events = true.
@@ -336,8 +332,8 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
  */
 class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
 public:
-  FakeRawConnection(QueuedConnectionWrapperPtr connection_wrapper)
-      : FakeConnectionBase(std::move(connection_wrapper)) {}
+  FakeRawConnection(SharedConnectionWrapper& shared_connection)
+      : FakeConnectionBase(shared_connection) {}
 
   std::string waitForData(uint64_t num_bytes);
   void write(const std::string& data, bool end_stream = false);
@@ -432,6 +428,7 @@ private:
   };
 
   void threadRoutine();
+  SharedConnectionWrapper& consumeConnection() EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   Network::SocketPtr socket_;
   ConditionalInitializer server_initialized_;
@@ -443,7 +440,11 @@ private:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
-  std::list<QueuedConnectionWrapperPtr> new_connections_; // Guarded by lock_
+  std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);
+  // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
+  // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
+  // deleted) on the same thread that allocated the connection.
+  std::list<QueuedConnectionWrapperPtr> consumed_connections_ GUARDED_BY(lock_);
   bool allow_unexpected_disconnects_;
   const bool enable_half_close_;
   FakeListener listener_;

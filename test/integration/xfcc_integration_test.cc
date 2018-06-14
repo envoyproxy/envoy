@@ -29,6 +29,7 @@ void XfccIntegrationTest::TearDown() {
   test_server_.reset();
   client_mtls_ssl_ctx_.reset();
   client_tls_ssl_ctx_.reset();
+  fake_upstream_connection_.reset();
   fake_upstreams_.clear();
   context_manager_.reset();
   runtime_.reset();
