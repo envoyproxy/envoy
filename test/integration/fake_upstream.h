@@ -16,6 +16,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/common/callback_impl.h"
 #include "common/common/linked_object.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
@@ -148,9 +149,9 @@ public:
     connection_.addConnectionCallbacks(*this);
   }
 
-  void addDisconnectCallback(DisconnectCallback callback) {
+  Common::CallbackHandle* addDisconnectCallback(DisconnectCallback callback) {
     Thread::LockGuard lock(lock_);
-    disconnect_callbacks_.emplace_back(callback);
+    return disconnect_callback_manager_.add(callback);
   }
 
   // Network::ConnectionCallbacks
@@ -163,9 +164,7 @@ public:
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
       disconnected_ = true;
-      for (const auto& disconnect_callback : disconnect_callbacks_) {
-        disconnect_callback();
-      }
+      disconnect_callback_manager_.runCallbacks();
     }
   }
 
@@ -211,7 +210,7 @@ public:
 private:
   Network::Connection& connection_;
   Thread::MutexBasicLockable lock_;
-  std::vector<DisconnectCallback> disconnect_callbacks_ GUARDED_BY(lock_);
+  Common::CallbackManager<> disconnect_callback_manager_ GUARDED_BY(lock_);
   bool disconnected_ GUARDED_BY(lock_){};
   const bool allow_unexpected_disconnects_;
 };
@@ -260,7 +259,10 @@ private:
  */
 class FakeConnectionBase {
 public:
-  virtual ~FakeConnectionBase() { ASSERT(initialized_); }
+  virtual ~FakeConnectionBase() {
+    ASSERT(initialized_);
+    disconnect_callback_handle_->remove();
+  }
   void close();
   void readDisable(bool disable);
   // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
@@ -271,7 +273,8 @@ public:
 
   virtual void initialize() {
     initialized_ = true;
-    shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
+    disconnect_callback_handle_ =
+        shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
   }
   void enableHalfClose(bool enabled);
   SharedConnectionWrapper& shared_connection() { return shared_connection_; }
@@ -283,6 +286,7 @@ protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection)
       : shared_connection_(shared_connection) {}
 
+  Common::CallbackHandle* disconnect_callback_handle_{};
   SharedConnectionWrapper& shared_connection_;
   bool initialized_{};
   Thread::CondVar connection_event_;
