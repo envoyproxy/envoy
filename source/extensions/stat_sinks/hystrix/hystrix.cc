@@ -365,7 +365,7 @@ void HystrixSink::unregisterConnection(Http::StreamDecoderFilterCallbacks* callb
   // map. When a new callback is assigned, the rollingWindow is initialized with current statistics
   // and within RollingWindow time, the results showed in the dashboard will be reliable
   if (callbacks_list_.empty()) {
-    cluster_stats_cache_map_.clear();
+    resetRollingWindow();
   }
 }
 

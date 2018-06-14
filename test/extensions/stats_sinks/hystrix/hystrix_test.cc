@@ -63,6 +63,25 @@ public:
     ON_CALL(success_counter_, value()).WillByDefault(Return(0));
   }
 
+  // Set counter return values to simulate traffic
+  void setCounterReturnValues(const uint64_t i,
+                              const uint64_t success_step, const uint64_t error_4xx_step,
+                              const uint64_t error_4xx_retry_step, const uint64_t error_5xx_step,
+                              const uint64_t error_5xx_retry_step, const uint64_t timeout_step,
+                              const uint64_t timeout_retry_step, const uint64_t rejected_step) {
+    ON_CALL(error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_5xx_step));
+    ON_CALL(retry_5xx_counter_, value())
+        .WillByDefault(Return((i + 1) * error_5xx_retry_step));
+    ON_CALL(error_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_step));
+    ON_CALL(retry_4xx_counter_, value())
+        .WillByDefault(Return((i + 1) * error_4xx_retry_step));
+    ON_CALL(success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
+    cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
+    cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
+    cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
+  }
+
+
   NiceMock<Upstream::MockCluster> cluster_;
   Upstream::MockClusterInfo* cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
   Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{cluster_info_};
@@ -119,9 +138,21 @@ public:
     return buffer;
   }
 
-  void validate_results(std::string data_message, uint64_t success_step, uint64_t error_step,
-                        uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
-                        uint64_t window_size) {
+  void addClusterToMap(const std::string& cluster_name, NiceMock<Upstream::MockCluster>& cluster){
+    cluster_map_.emplace(cluster_name, cluster);
+    // Redefining since cluster_map_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+  }
+
+  void removeClusterFromMap(const std::string& cluster_name){
+    cluster_map_.erase(cluster_name);
+    // Redefining since cluster_map_ is returned by value.
+    ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+  }
+
+  void validateResults(const std::string& data_message, uint64_t success_step, uint64_t error_step,
+                       uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
+                       uint64_t window_size) {
     EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"),
               std::to_string(window_size * rejected_step));
     EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"),
@@ -157,7 +188,8 @@ public:
     return cluster_message_map;
   }
 
-  uint64_t window_size_ = 10; // Arbitrary reasonable number.
+  TestRandomGenerator rand_;
+  uint64_t window_size_ = rand_.random() % 10 + 5; // Arbitrary reasonable number.
   const std::string cluster1_name_{"test_cluster1"};
   ClusterTestInfo cluster1_{cluster1_name_};
 
@@ -177,7 +209,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
   std::string data_message = TestUtility::bufferToString(buffer);
-  validate_results(data_message, 0, 0, 0, 0, 0, window_size_);
+  validateResults(data_message, 0, 0, 0, 0, 0, window_size_);
 }
 
 TEST_F(HystrixSinkTest, BasicFlow) {
@@ -186,18 +218,40 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
-  // Arbitrary numbers for testing. Make sure error > timeout.
-  uint64_t success_step = 44;
-  uint64_t error_step = 33;
-  uint64_t timeout_step = 22;
-  uint64_t rejected_step = 11;
+  // Only success traffic, check randomly increasing traffic
+  // Later in the test we'll "shortcut" by constant traffic
+  uint64_t traffic_counter = 0;;
+  sink_->flush(source_); // init window with 0
+  for (uint64_t i = 0; i < (window_size_-1); i++) {
+    buffer.drain(buffer.length());
+    traffic_counter += rand_.random() % 1000;
+    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(traffic_counter));
+    sink_->flush(source_);
+  }
+
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"),
+            std::to_string(traffic_counter));
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "requestCount"),
+            std::to_string(traffic_counter));
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorCount"), "0");
+  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorPercentage"), "0");
+
+  // check mixed traffic
+  // Arbitrary values for testing. Make sure error > timeout.
+  const uint64_t success_step = 13;
+  const uint64_t error_4xx_step = 12;
+  const uint64_t error_4xx_retry_step = 11;
+  const uint64_t error_5xx_step = 10;
+  const uint64_t error_5xx_retry_step = 9;
+  const uint64_t timeout_step = 8;
+  const uint64_t timeout_retry_step = 7;
+  const uint64_t rejected_step = 6;
 
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
-    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_step));
-    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
-    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
-    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
+    cluster1_.setCounterReturnValues(i, success_step, error_4xx_step, error_4xx_retry_step,
+                           error_5xx_step, error_5xx_retry_step, timeout_step, timeout_retry_step,
+                           rejected_step);
     sink_->flush(source_);
   }
 
@@ -205,14 +259,15 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"));
 
   // Check stream format and data.
-  validate_results(TestUtility::bufferToString(buffer), success_step, error_step, timeout_step, 0,
-                   rejected_step, window_size_);
+  validateResults(TestUtility::bufferToString(buffer), success_step,
+                  error_4xx_step + error_4xx_retry_step + error_5xx_step + error_5xx_retry_step,
+                  timeout_step, timeout_retry_step, rejected_step, window_size_);
 
   // Check the values are reset.
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
   sink_->flush(source_);
-  validate_results(TestUtility::bufferToString(buffer), 0, 0, 0, 0, 0, window_size_);
+  validateResults(TestUtility::bufferToString(buffer), 0, 0, 0, 0, 0, window_size_);
 }
 
 //
@@ -257,21 +312,14 @@ TEST_F(HystrixSinkTest, Disconnect) {
 TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   InSequence s;
 
-  // Arbitrary numbers for testing. Make sure error > timeout.
-  uint64_t success_step = 5;
-  uint64_t error_step = 4;
-  uint64_t timeout_step = 3;
-  uint64_t timeout_retry_step = 2;
-  uint64_t rejected_step = 1;
+  // Arbitrary values for testing. Make sure error > timeout.
+  const uint64_t success_step = 6;
+  const uint64_t error_step = 3;
+  const uint64_t timeout_step = 1;
 
-  uint64_t success_step2 = 13;
-  uint64_t error_4xx_step2 = 12;
-  uint64_t error_4xx_retry_step2 = 11;
-  uint64_t error_5xx_step2 = 10;
-  uint64_t error_5xx_retry_step2 = 9;
-  uint64_t timeout_step2 = 8;
-  uint64_t timeout_retry_step2 = 7;
-  uint64_t rejected_step2 = 6;
+  const uint64_t success_step2 = 44;
+  const uint64_t error_step2 = 33;
+  const uint64_t timeout_step2 = 22;
 
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
@@ -280,33 +328,13 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Add new cluster.
   const std::string cluster2_name{"test_cluster2"};
   ClusterTestInfo cluster2(cluster2_name);
-  cluster_map_.emplace(cluster2_name, cluster2.cluster_);
-  // Redefining since cluster_map_ is returned by value.
-  ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+  addClusterToMap(cluster2_name, cluster2.cluster_);
 
   // Generate data to both clusters.
-  sink_->flush(source_);
   for (uint64_t i = 0; i < (window_size_ + 1); i++) {
     buffer.drain(buffer.length());
-    // Cluster 1
-    ON_CALL(cluster1_.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_step));
-    ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
-    cluster1_.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
-    cluster1_.cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
-    cluster1_.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
-
-    // Cluster 2
-    ON_CALL(cluster2.error_5xx_counter_, value()).WillByDefault(Return((i + 1) * error_5xx_step2));
-    ON_CALL(cluster2.retry_5xx_counter_, value())
-        .WillByDefault(Return((i + 1) * error_5xx_retry_step2));
-    ON_CALL(cluster2.error_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_step2));
-    ON_CALL(cluster2.retry_4xx_counter_, value())
-        .WillByDefault(Return((i + 1) * error_4xx_retry_step2));
-    ON_CALL(cluster2.success_counter_, value()).WillByDefault(Return((i + 1) * success_step2));
-    cluster2.cluster_info_->stats().upstream_rq_timeout_.add(timeout_step2);
-    cluster2.cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step2);
-    cluster2.cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step2);
-
+    cluster1_.setCounterReturnValues(i, success_step, error_step, 0, 0, 0, timeout_step, 0, 0);
+    cluster2.setCounterReturnValues(i, success_step2, error_step2, 0, 0, 0, timeout_step2, 0, 0);
     sink_->flush(source_);
   }
 
@@ -316,19 +344,13 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
 
   // Check stream format and data.
-  validate_results(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step,
-                   timeout_retry_step, rejected_step, window_size_);
-  validate_results(cluster_message_map[cluster2_name], success_step2,
-                   error_4xx_step2 + error_4xx_retry_step2 + error_5xx_step2 +
-                       error_5xx_retry_step2,
-                   timeout_step2, timeout_retry_step2, rejected_step2, window_size_);
+  validateResults(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step, 0, 0, window_size_);
+  validateResults(cluster_message_map[cluster2_name], success_step2, error_step2, timeout_step2, 0, 0, window_size_);
 
   buffer.drain(buffer.length());
 
-  // Remove cluster.
-  cluster_map_.erase(cluster2_name);
-  // Redefining since cluster_map_ is returned by value.
-  ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+  // Remove cluster
+  removeClusterFromMap(cluster2_name);
   sink_->flush(source_);
 
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
@@ -338,13 +360,8 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Add cluster again.
   buffer.drain(buffer.length());
   cluster2.setCountersToZero();
-  cluster_map_.emplace(cluster2_name, cluster2.cluster_);
-  // Redefining since cluster_map_ is returned by value.
-  ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
+  addClusterToMap(cluster2_name, cluster2.cluster_);
 
-  cluster2.cluster_info_->stats().upstream_rq_timeout_.reset();
-  cluster2.cluster_info_->stats().upstream_rq_per_try_timeout_.reset();
-  cluster2.cluster_info_->stats().upstream_rq_pending_overflow_.reset();
   sink_->flush(source_);
 
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
@@ -352,7 +369,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
 
   // Check that old values of test_cluster2 were deleted.
-  validate_results(cluster_message_map[cluster2_name], 0, 0, 0, 0, 0, window_size_);
+  validateResults(cluster_message_map[cluster2_name], 0, 0, 0, 0, 0, window_size_);
 }
 } // namespace Hystrix
 } // namespace StatSinks
