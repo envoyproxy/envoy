@@ -88,6 +88,12 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
   return result.empty() ? NONE : result;
 }
 
+ResponseFlag ResponseFlagUtils::toResponseFlag(const std::string&) {
+  static const std::map<std::string, ResponseFlag> map = {
+      {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck}};
+  return map.find(ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK)->second;
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {

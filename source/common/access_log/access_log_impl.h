@@ -6,12 +6,12 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/request_info/request_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/request_info/request_info_impl.h"
 
 namespace Envoy {
 namespace AccessLog {
@@ -171,11 +171,14 @@ private:
  */
 class ResponseFlagFilter : public Filter {
 public:
-  ResponseFlagFilter() {}
+  ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
 
   // AccessLog::Filter
   bool evaluate(const RequestInfo::RequestInfo& info,
                 const Http::HeaderMap& request_headers) override;
+
+private:
+  RequestInfo::RequestInfoImpl info_;
 };
 
 /**
