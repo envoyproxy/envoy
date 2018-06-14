@@ -45,7 +45,7 @@ class ExtractorTest : public ::testing::Test {
 public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    extractor_ = createExtractor(config_);
+    extractor_ = Extractor::create(config_);
   }
 
   JwtAuthentication config_;
@@ -111,6 +111,8 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+
+  tokens[0]->removeJwt(headers);
 }
 
 // Test extracting token from the custom header: "token-header"
@@ -178,6 +180,8 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+
+  tokens[0]->removeJwt(headers);
 }
 
 // Test extracting multiple tokens.

@@ -34,6 +34,7 @@ EXTENSIONS = {
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
+    "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
