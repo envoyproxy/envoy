@@ -28,8 +28,6 @@ public:
   const std::string GRPC_WEB = "envoy.grpc_web";
   // Gzip filter
   const std::string ENVOY_GZIP = "envoy.gzip";
-  // Header to metadata filter
-  const std::string HEADER_TO_METADATA = "envoy.header_to_metadata";
   // IP tagging filter
   const std::string IP_TAGGING = "envoy.ip_tagging";
   // Rate limit filter
@@ -48,6 +46,8 @@ public:
   const std::string RBAC = "envoy.filters.http.rbac";
   // JWT authentication filter
   const std::string JWT_AUTHN = "envoy.filters.http.jwt_authn";
+  // Header to metadata filter
+  const std::string HEADER_TO_METADATA = "envoy.filters.http.header_to_metadata";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

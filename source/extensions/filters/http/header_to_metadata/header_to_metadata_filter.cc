@@ -1,4 +1,5 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
@@ -148,7 +149,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 }
 
 const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& nspace) const {
-  return nspace.empty() ? filterNamespace : nspace;
+  return nspace.empty() ? HttpFilterNames::get().HEADER_TO_METADATA : nspace;
 }
 
 void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,

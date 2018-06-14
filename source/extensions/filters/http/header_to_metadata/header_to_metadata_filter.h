@@ -35,8 +35,6 @@ typedef std::vector<Rule> HeaderToMetadataRules;
 typedef Protobuf::RepeatedPtrField<envoy::config::filter::http::header_to_metadata::v2::Rule>
     ProtobufRepeatedRule;
 
-const std::string filterNamespace = "envoy.header_to_metadata";
-
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
  *  configuration logic.
