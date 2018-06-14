@@ -160,9 +160,9 @@ public:
     // elsewhere where we also hold lock_, that the connection cannot disappear inside the locked
     // scope.
     Thread::LockGuard lock(lock_);
-    disconnected_ = true;
     if (event == Network::ConnectionEvent::RemoteClose ||
         event == Network::ConnectionEvent::LocalClose) {
+      disconnected_ = true;
       for (const auto& disconnect_callback : disconnect_callbacks_) {
         disconnect_callback();
       }
