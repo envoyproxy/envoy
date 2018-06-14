@@ -30,6 +30,7 @@ envoy_cc_binary(
         "benchmark",
     ],
     deps = [
+        "//source/common/network:listen_socket_lib",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
