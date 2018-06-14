@@ -1,4 +1,4 @@
-#include "config.h"
+#include "extensions/filters/http/header_to_metadata/config.h"
 
 #include <string>
 #include <tuple>
@@ -11,7 +11,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "filter.h"
+#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,9 +28,9 @@ Http::FilterFactoryCb
 HeaderToMetadataConfig::createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                                      const std::string&,
                                                      Server::Configuration::FactoryContext&) {
-  const auto& typed_config = dynamic_cast<
-      const envoy::config::filter::http::header_to_metadata::v2::HeaderToMetadataConfig&>(
-      proto_config);
+  const auto& typed_config =
+      dynamic_cast<const envoy::config::filter::http::header_to_metadata::v2::Config&>(
+          proto_config);
   ConfigSharedPtr filter_config(std::make_shared<Config>(typed_config));
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -41,7 +41,7 @@ HeaderToMetadataConfig::createFilterFactoryFromProto(const Protobuf::Message& pr
 
 ProtobufTypes::MessagePtr HeaderToMetadataConfig::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{
-      new envoy::config::filter::http::header_to_metadata::v2::HeaderToMetadataConfig()};
+      new envoy::config::filter::http::header_to_metadata::v2::Config()};
 }
 
 /**
