@@ -84,7 +84,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
+  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config, context.scope());
   return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 

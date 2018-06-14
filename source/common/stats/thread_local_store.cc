@@ -12,8 +12,9 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
+                                           StatDataAllocator& alloc)
+    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 

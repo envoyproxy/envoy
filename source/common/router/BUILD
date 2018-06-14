@@ -100,6 +100,7 @@ envoy_cc_library(
     hdrs = ["rds_subscription.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/config:utility_lib",

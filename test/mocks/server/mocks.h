@@ -68,7 +68,7 @@ public:
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
   MOCK_CONST_METHOD0(maxStats, uint64_t());
-  MOCK_CONST_METHOD0(maxObjNameLength, uint64_t());
+  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
 
   std::string config_path_;
@@ -79,6 +79,7 @@ public:
   std::string service_node_name_;
   std::string service_zone_name_;
   std::string log_path_;
+  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_{};
 };
 

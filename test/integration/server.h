@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
@@ -62,7 +63,7 @@ public:
   const std::string& serviceNodeName() const override { return service_node_name_; }
   const std::string& serviceZone() const override { return service_zone_; }
   uint64_t maxStats() const override { return 16384; }
-  uint64_t maxObjNameLength() const override { return 60; }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return false; }
 
   // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
@@ -76,6 +77,7 @@ private:
   const std::string service_cluster_name_;
   const std::string service_node_name_;
   const std::string service_zone_;
+  Stats::StatsOptionsImpl stats_options_;
   const std::string log_path_;
 };
 
@@ -138,9 +140,12 @@ public:
     return wrapped_scope_->histogram(name);
   }
 
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
+  Stats::StatsOptionsImpl stats_options_;
 };
 
 /**
@@ -168,6 +173,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {
@@ -196,6 +202,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
+  Stats::StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

@@ -37,32 +37,15 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
-uint64_t RawStatData::size() {
-  // Normally the compiler would do this, but because name_ is a flexible-array-length
-  // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
-  // it's important that each element starts on the required alignment for the type.
-  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
+// Normally the compiler would do this, but because name_ is a flexible-array-length
+// element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
+// it's important that each element starts on the required alignment for the type.
+uint64_t RawStatData::sizeGivenName(const std::string& name) {
+  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name.size() + 1);
 }
 
-uint64_t& RawStatData::initializeAndGetMutableMaxObjNameLength(uint64_t configured_size) {
-  // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
-  static uint64_t size = configured_size;
-  return size;
-}
-
-void RawStatData::configure(Server::Options& options) {
-  const uint64_t configured = options.maxObjNameLength();
-  RELEASE_ASSERT(configured > 0);
-  uint64_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
-
-  // If this fails, it means that this function was called too late during
-  // startup because things were already using this size before it was set.
-  RELEASE_ASSERT(max_obj_name_length == configured);
-}
-
-void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const uint64_t configured = options.maxObjNameLength();
-  initializeAndGetMutableMaxObjNameLength(configured) = configured;
+uint64_t RawStatData::sizeGivenStatsOptions(const StatsOptions& stats_options) {
+  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + stats_options.maxNameLength() + 1);
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {
@@ -153,14 +136,9 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
+  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::sizeGivenName(name), 1));
   data->initialize(name);
 
-  // Because the RawStatData object is initialized with and contains a truncated
-  // version of the std::string name, storing the stats in a map would require
-  // storing the name twice. Performing a lookup on the set is similarly
-  // expensive to performing a map lookup, since both require copying a truncated version of the
-  // string before doing the hash lookup.
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
@@ -355,16 +333,25 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
 
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
+  ref_count_ = 1;
+
+  uint64_t xfer_size = key.size();
+  memcpy(name_, key.data(), xfer_size);
+  name_[xfer_size] = '\0';
+}
+
+void RawStatData::safeInitialize(absl::string_view key, const StatsOptions& stats_options) {
+  ASSERT(!initialized());
+  if (key.size() > stats_options.maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), Stats::RawStatData::maxNameLength());
+        key.size(), stats_options.maxNameLength());
   }
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
-  uint64_t xfer_size = std::min(nameSize() - 1, key.size());
+  uint64_t xfer_size = std::min(stats_options.maxNameLength(), key.size());
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
 }

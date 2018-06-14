@@ -25,6 +25,20 @@ class Instance;
 namespace Stats {
 
 /**
+ * Struct stored under Server::Options to hold information about the maximum object name length and
+ * maximum stat suffix length of a stat. These have defaults in StatsOptionsImpl, and the maximum
+ * object name length can be overridden. The default initialization is used in IsolatedStatImpl, and
+ * the user-overridden struct is stored in Options.
+ */
+class StatsOptions {
+public:
+  virtual ~StatsOptions() {}
+  virtual uint64_t maxNameLength() const PURE;
+  virtual uint64_t maxObjNameLength() const PURE;
+  virtual uint64_t maxStatSuffixLength() const PURE;
+};
+
+/**
  * General representation of a tag.
  */
 struct Tag {
@@ -329,6 +343,12 @@ public:
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogram(const std::string& name) PURE;
+
+  /**
+   * @return a reference to the top-level StatsOptions struct, containing information about the
+   * maximum allowable object name length and stat suffix length.
+   */
+  virtual const Stats::StatsOptions& statsOptions() const PURE;
 };
 
 /**
