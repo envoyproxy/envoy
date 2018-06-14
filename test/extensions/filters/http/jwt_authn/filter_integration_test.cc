@@ -49,7 +49,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Bearer " + GoodToken},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
   });
 
   waitForNextUpstreamRequest();
@@ -79,7 +79,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Bearer " + ExpiredToken},
+      {"Authorization", "Bearer " + std::string(ExpiredToken)},
   });
 
   response->waitForEndStream();
@@ -151,7 +151,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Bearer " + GoodToken},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
   });
 
   waitForJwksResponse("200", PublicKey);
@@ -186,7 +186,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Bearer " + GoodToken},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
   });
 
   // Fails the jwks fetching.

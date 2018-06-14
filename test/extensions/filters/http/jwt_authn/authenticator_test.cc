@@ -74,7 +74,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 
   // Test OK pubkey and its cache
   for (int i = 0; i < 10; i++) {
-    auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+    auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
     MockAuthenticatorCallbacks mock_cb;
     EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -100,7 +100,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
   // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
   MockAuthenticatorCallbacks mock_cb;
   EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -118,7 +118,8 @@ TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
   // Test OK pubkey and its cache
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + JwtTextWithNonExistKid}};
+  auto headers =
+      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExistKidToken)}};
 
   MockAuthenticatorCallbacks mock_cb;
   EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
@@ -205,7 +206,7 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
     ASSERT_EQ(status, Status::JwtExpired);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + ExpiredToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
   auth_->verify(headers, &mock_cb_);
 }
 
@@ -216,7 +217,8 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
     ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + InvalidAudToken}};
+  auto headers =
+      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
   auth_->verify(headers, &mock_cb_);
 }
 
@@ -234,7 +236,7 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
     ASSERT_EQ(status, Status::JwksFetchFail);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 }
 
@@ -249,7 +251,7 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
     ASSERT_EQ(status, Status::JwtUnknownIssuer);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 }
 
@@ -282,7 +284,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
     ASSERT_EQ(status, Status::JwksFetchFail);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
@@ -306,7 +308,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFailWithEmptyBody) {
     ASSERT_EQ(status, Status::JwksFetchFail);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
@@ -330,7 +332,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFailWithOnFailure) {
     ASSERT_EQ(status, Status::JwksFetchFail);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 
   callbacks->onFailure(Http::AsyncClient::FailureReason::Reset);
@@ -365,7 +367,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkey) {
     ASSERT_EQ(status, Status::JwksParseError);
   }));
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
@@ -407,7 +409,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   // onComplete() should not be called.
   EXPECT_CALL(mock_cb_, onComplete(_)).Times(0);
 
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auth_->verify(headers, &mock_cb_);
 
   // Destroy the authenticating process.
@@ -422,7 +424,7 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + GoodToken}};
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   MockAuthenticatorCallbacks mock_cb;
   EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
