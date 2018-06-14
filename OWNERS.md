@@ -51,3 +51,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * Bazel/build.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * abseil and performance work.
+* Wayne Zhang ([qiwzhang](https://github.com/qiwzhang)) (qiwzhang@google.com)
+  * JWT(JSON Web Token) authentication http filter.

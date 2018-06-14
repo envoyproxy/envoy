@@ -344,7 +344,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {
-  std::string host, path;
+  absl::string_view host, path;
 
   // FQDN
   Utility::extractHostPathFromUri("scheme://dns.name/x/y/z", host, path);

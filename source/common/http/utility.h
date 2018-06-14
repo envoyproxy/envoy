@@ -13,6 +13,8 @@
 
 #include "common/json/json_loader.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -182,7 +184,8 @@ public:
    * @param the output host string.
    * @param the output path string.
    */
-  static void extractHostPathFromUri(const std::string& uri, std::string& host, std::string& path);
+  static void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path);
 
   /**
    * Prepare headers for a HttpUri.
