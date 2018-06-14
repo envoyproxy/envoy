@@ -15,10 +15,10 @@ ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Server::Admin& admin, Secret::SecretManager& secret_manager) {
-  return ClusterManagerPtr{
-      new ValidationClusterManager(bootstrap, *this, stats, tls, runtime, random, local_info,
-                                   log_manager, main_thread_dispatcher_, admin, secret_manager)};
+    Server::Admin& admin) {
+  return ClusterManagerPtr{new ValidationClusterManager(bootstrap, *this, stats, tls, runtime,
+                                                        random, local_info, log_manager,
+                                                        main_thread_dispatcher_, admin)};
 }
 
 CdsApiPtr ValidationClusterManagerFactory::createCds(
@@ -35,9 +35,9 @@ ValidationClusterManager::ValidationClusterManager(
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-    Server::Admin& admin, Secret::SecretManager& secret_manager)
+    Server::Admin& admin)
     : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                         main_thread_dispatcher, admin, secret_manager) {}
+                         main_thread_dispatcher, admin) {}
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,

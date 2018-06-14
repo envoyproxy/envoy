@@ -345,13 +345,15 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 }
 
-ClusterSharedPtr ClusterImplBase::create(
-    const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-    const LocalInfo::LocalInfo& local_info, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, Secret::SecretManager& secret_manager) {
+ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                         Stats::Store& stats, ThreadLocal::Instance& tls,
+                                         Network::DnsResolverSharedPtr dns_resolver,
+                                         Ssl::ContextManager& ssl_context_manager,
+                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                         Event::Dispatcher& dispatcher,
+                                         const LocalInfo::LocalInfo& local_info,
+                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                         bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -373,18 +375,18 @@ ClusterSharedPtr ClusterImplBase::create(
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, cm,
-                                            added_via_api, secret_manager));
+    new_cluster.reset(
+        new StaticClusterImpl(cluster, runtime, stats, ssl_context_manager, cm, added_via_api));
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, stats, ssl_context_manager,
-                                               selected_dns_resolver, cm, dispatcher, added_via_api,
-                                               secret_manager));
+                                               selected_dns_resolver, cm, dispatcher,
+                                               added_via_api));
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, stats, ssl_context_manager,
                                             selected_dns_resolver, tls, cm, dispatcher,
-                                            added_via_api, secret_manager));
+                                            added_via_api));
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:
     if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
@@ -396,7 +398,7 @@ ClusterSharedPtr ClusterImplBase::create(
           "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
     }
     new_cluster.reset(new OriginalDstCluster(cluster, runtime, stats, ssl_context_manager, cm,
-                                             dispatcher, added_via_api, secret_manager));
+                                             dispatcher, added_via_api));
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
@@ -405,7 +407,7 @@ ClusterSharedPtr ClusterImplBase::create(
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
     new_cluster.reset(new EdsClusterImpl(cluster, runtime, stats, ssl_context_manager, local_info,
-                                         cm, dispatcher, random, added_via_api, secret_manager));
+                                         cm, dispatcher, random, added_via_api));
     break;
   default:
     NOT_REACHED;
@@ -638,8 +640,13 @@ StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
+<<<<<<< HEAD
     : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                       cm.clusterManagerFactory().secretManager(), added_via_api),
+=======
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api,
+                      cm.clusterManagerFactory().secretManager()),
+>>>>>>> Added secretManager() to ClusterManagerFactory interface
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -795,8 +802,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            Ssl::ContextManager& ssl_context_manager,
                                            Network::DnsResolverSharedPtr dns_resolver,
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
-                                           bool added_via_api,
-                                           Secret::SecretManager& secret_manager)
+                                           bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                              cm.clusterManagerFactory().secretManager(), added_via_api),
       dns_resolver_(dns_resolver),

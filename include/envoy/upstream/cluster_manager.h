@@ -237,8 +237,7 @@ public:
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                           Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                           Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
-                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin,
-                          Secret::SecretManager& secret_manager) PURE;
+                          AccessLog::AccessLogManager& log_manager, Server::Admin& admin) PURE;
 
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
@@ -255,8 +254,7 @@ public:
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                            bool added_via_api,
-                                            Secret::SecretManager& secret_manager) PURE;
+                                            bool added_via_api) PURE;
 
   /**
    * Create a CDS API provider from configuration proto.
