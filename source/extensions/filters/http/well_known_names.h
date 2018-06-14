@@ -55,8 +55,8 @@ public:
   // NOTE: Do not add any new filters to this list. All future filters are v2 only.
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEADER_TO_METADATA, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
-                       EXT_AUTHORIZATION}) {}
+                       GRPC_WEB, HEADER_TO_METADATA, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER,
+                       LUA, EXT_AUTHORIZATION}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

@@ -1,8 +1,9 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
-#include "extensions/filters/http/well_known_names.h"
 
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/string_view.h"
 
