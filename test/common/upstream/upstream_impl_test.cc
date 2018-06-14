@@ -494,7 +494,6 @@ TEST(StaticClusterImplTest, OutlierDetector) {
   Stats::IsolatedStoreImpl stats;
   Ssl::MockContextManager ssl_context_manager;
   NiceMock<Runtime::MockLoader> runtime;
-
   const std::string json = R"EOF(
   {
     "name": "addressportconfig",
