@@ -261,7 +261,9 @@ class FakeConnectionBase {
 public:
   virtual ~FakeConnectionBase() {
     ASSERT(initialized_);
-    disconnect_callback_handle_->remove();
+    if (disconnect_callback_handle_ != nullptr) {
+      disconnect_callback_handle_->remove();
+    }
   }
   void close();
   void readDisable(bool disable);
@@ -273,8 +275,12 @@ public:
 
   virtual void initialize() {
     initialized_ = true;
-    disconnect_callback_handle_ =
-        shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
+    disconnect_callback_handle_ = shared_connection_.addDisconnectCallback([this] {
+      connection_event_.notifyOne();
+      ASSERT(disconnect_callback_handle_ != nullptr);
+      disconnect_callback_handle_->remove();
+      disconnect_callback_handle_ = nullptr;
+    });
   }
   void enableHalfClose(bool enabled);
   SharedConnectionWrapper& shared_connection() { return shared_connection_; }
