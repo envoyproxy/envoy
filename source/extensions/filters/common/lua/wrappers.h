@@ -140,8 +140,8 @@ private:
   /**
    * Get a metadata value from the map.
    * @param 1 (string): filter name.
-   * @param 2 (string): key.
-   * @param 1 (string): value.
+   * @param 2 (string or table): key.
+   * @param 3 (string or table): value.
    * @return nil.
    */
   DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaSet);
