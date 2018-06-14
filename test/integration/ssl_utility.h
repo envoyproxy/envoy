@@ -2,13 +2,15 @@
 
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager);
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager,
+                                      Secret::SecretManager& secret_manager);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);

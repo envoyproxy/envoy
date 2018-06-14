@@ -277,6 +277,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",

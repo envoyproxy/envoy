@@ -11,6 +11,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/hot_restart.h"
@@ -112,6 +113,11 @@ public:
    * @return the server's listener manager.
    */
   virtual ListenerManager& listenerManager() PURE;
+
+  /**
+   * @return the server's secret manager
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 
   /**
    * @return the server's CLI options.

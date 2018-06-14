@@ -4,6 +4,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/secret/secret_manager.h"
 
 #include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"
@@ -21,7 +22,7 @@ public:
                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                  const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
                  Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                 bool added_via_api);
+                 bool added_via_api, Secret::SecretManager& secret_manager);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }

@@ -2,7 +2,9 @@
 #include <list>
 #include <string>
 
+#include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
+#include "common/json/json_loader.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"

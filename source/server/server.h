@@ -19,6 +19,7 @@
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/logger_delegates.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
 #include "server/http/admin.h"
@@ -151,6 +152,7 @@ public:
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
+  Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
@@ -201,6 +203,7 @@ private:
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
