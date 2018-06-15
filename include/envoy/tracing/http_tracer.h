@@ -101,7 +101,9 @@ public:
                              SystemTime start_time) PURE;
 
   /**
-   * Set the span's sampled flag.
+   * This method overrides any previous sampling decision associated with the trace instance.
+   * If the sampled parameter is false, this span and any subsequent child spans
+   * are not reported to the tracing system.
    * @param sampled whether the span and any subsequent child spans should be sampled
    */
   virtual void setSampled(bool sampled) PURE;
