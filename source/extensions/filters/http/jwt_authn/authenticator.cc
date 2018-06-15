@@ -75,9 +75,10 @@ private:
 };
 
 void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& rule : config_->getProtoConfig().rules()) {
-    if (!rule.forward_payload_header().empty()) {
-      headers.remove(Http::LowerCaseString(rule.forward_payload_header()));
+  for (const auto& it : config_->getProtoConfig().providers()) {
+    const auto& provider = it.second;
+    if (!provider.forward_payload_header().empty()) {
+      headers.remove(Http::LowerCaseString(provider.forward_payload_header()));
     }
   }
 }
@@ -147,7 +148,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 }
 
 void AuthenticatorImpl::fetchRemoteJwks() {
-  const auto& http_uri = jwks_data_->getJwtRule().remote_jwks().http_uri();
+  const auto& http_uri = jwks_data_->getJwtProvider().remote_jwks().http_uri();
 
   Http::MessagePtr message = Http::Utility::prepareHeaders(http_uri);
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
@@ -218,13 +219,13 @@ void AuthenticatorImpl::verifyKey() {
   }
 
   // Forward the payload
-  const auto& rule = jwks_data_->getJwtRule();
-  if (!rule.forward_payload_header().empty()) {
-    headers_->addCopy(Http::LowerCaseString(rule.forward_payload_header()),
+  const auto& provider = jwks_data_->getJwtProvider();
+  if (!provider.forward_payload_header().empty()) {
+    headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
                       jwt_.payload_str_base64url_);
   }
 
-  if (!rule.forward()) {
+  if (!provider.forward()) {
     // Remove JWT from headers.
     token_->removeJwt(*headers_);
   }
@@ -233,10 +234,6 @@ void AuthenticatorImpl::verifyKey() {
 }
 
 bool AuthenticatorImpl::okToBypass() const {
-  if (config_->getProtoConfig().allow_missing_or_failed()) {
-    return true;
-  }
-
   // TODO(qiwzhang): use requirement field
   return false;
 }
@@ -244,11 +241,7 @@ bool AuthenticatorImpl::okToBypass() const {
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
-  if (status != Status::Ok && config_->getProtoConfig().allow_missing_or_failed()) {
-    callback_->onComplete(Status::Ok);
-  } else {
-    callback_->onComplete(status);
-  }
+  callback_->onComplete(status);
   callback_ = nullptr;
 }
 
