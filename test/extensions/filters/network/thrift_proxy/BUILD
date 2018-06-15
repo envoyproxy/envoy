@@ -134,3 +134,21 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "filter_integration_test",
+    srcs = ["filter_integration_test.cc"],
+    data = [
+        "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
+    ],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/filters/network/thrift_proxy:config",
+        "//source/extensions/filters/network/thrift_proxy:filter_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:printers_lib",
+    ],
+)

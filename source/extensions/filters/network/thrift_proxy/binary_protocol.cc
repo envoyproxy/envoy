@@ -97,7 +97,11 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
     if (buffer.length() < 3) {
       return false;
     }
-    field_id = BufferHelper::peekI16(buffer, 1);
+    int16_t id = BufferHelper::peekI16(buffer, 1);
+    if (id < 0) {
+      throw EnvoyException(fmt::format("invalid binary protocol field id {}", id));
+    }
+    field_id = id;
     buffer.drain(3);
   }
 
