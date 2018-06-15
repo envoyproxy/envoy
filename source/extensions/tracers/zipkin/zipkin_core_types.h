@@ -336,7 +336,7 @@ public:
   /**
    * Set the span's sampled flag.
    */
-  void setSampled(const bool val) { sampled_ = val; }
+  void setSampled(bool val) { sampled_ = val; }
 
   /**
    * @return a vector with all annotations added to the span.
