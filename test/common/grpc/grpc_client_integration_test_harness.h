@@ -225,6 +225,7 @@ public:
     if (fake_connection_) {
       fake_connection_->close();
       fake_connection_->waitForDisconnect();
+      fake_connection_.reset();
     }
   }
 
@@ -372,6 +373,7 @@ public:
     return stream;
   }
 
+  std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -379,7 +381,6 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
-  std::unique_ptr<FakeUpstream> fake_upstream_;
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
@@ -417,6 +418,7 @@ public:
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.
+    GrpcClientIntegrationTest::TearDown();
     fake_upstream_.reset();
     client_connection_.reset();
     mock_cluster_info_->transport_socket_factory_.reset();
