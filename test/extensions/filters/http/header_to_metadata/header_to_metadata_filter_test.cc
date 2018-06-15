@@ -21,7 +21,7 @@ class HeaderToMetadataTest : public testing::Test {
 public:
   HeaderToMetadataTest() {}
 
-  const std::string lb_request_config_yaml = R"EOF(
+  const std::string request_config_yaml = R"EOF(
 request_rules:
   - header: x-version
     on_header_present:
@@ -32,15 +32,6 @@ request_rules:
       metadata_namespace: envoy.lb
       key: default
       value: 'true'
-      type: STRING
-)EOF";
-
-  const std::string no_missing_rules_config_yaml = R"EOF(
-request_rules:
-  - header: x-version
-    on_header_present:
-      metadata_namespace: envoy.lb
-      key: version
       type: STRING
 )EOF";
 
@@ -82,7 +73,7 @@ MATCHER_P(MapEqNum, rhs, "") {
  * Basic use-case.
  */
 TEST_F(HeaderToMetadataTest, BasicRequestTest) {
-  initializeFilter(lb_request_config_yaml);
+  initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
@@ -95,7 +86,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
  * X-version not set, the on missing value should be set.
  */
 TEST_F(HeaderToMetadataTest, DefaultEndpointsTest) {
-  initializeFilter(lb_request_config_yaml);
+  initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-FOO", "bar"}};
   std::map<std::string, std::string> expected = {{"default", "true"}};
 
@@ -154,7 +145,15 @@ response_rules:
  * Headers not present.
  */
 TEST_F(HeaderToMetadataTest, HeaderNotPresent) {
-  initializeFilter(no_missing_rules_config_yaml);
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF";
+  initializeFilter(config);
   Http::TestHeaderMapImpl incoming_headers{};
 
   EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -196,7 +195,7 @@ request_rules:
  * No header value.
  */
 TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
-  initializeFilter(lb_request_config_yaml);
+  initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", ""}};
 
   EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -208,7 +207,7 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
  * Header value too long.
  */
 TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
-  initializeFilter(lb_request_config_yaml);
+  initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(101, 'x')}};
 
   EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
