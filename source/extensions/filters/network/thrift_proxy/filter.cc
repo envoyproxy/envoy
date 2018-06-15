@@ -19,7 +19,7 @@ Filter::Filter(const std::string& stat_prefix, Stats::Scope& scope)
 Filter::~Filter() {}
 
 void Filter::onEvent(Network::ConnectionEvent event) {
-  if (active_call_list_.empty() && req_ == nullptr && resp_ == nullptr) {
+  if (active_call_map_.empty() && req_ == nullptr && resp_ == nullptr) {
     return;
   }
 
@@ -122,7 +122,7 @@ void Filter::chargeDownstreamRequestStart(MessageType msg_type, int32_t seq_id) 
     throw EnvoyException("unexpected request messageStart callback");
   }
 
-  if (active_call_list_.size() >= 64) {
+  if (active_call_map_.size() >= 64) {
     throw EnvoyException("too many pending calls (64), disabling sniffing");
   }
 
@@ -153,7 +153,8 @@ void Filter::chargeDownstreamRequestComplete() {
     return;
   }
 
-  active_call_list_.emplace_back(std::move(req_));
+  int32_t seq_id = req_->seq_id_;
+  active_call_map_.emplace(seq_id, std::move(req_));
 }
 
 void Filter::chargeUpstreamResponseStart(MessageType msg_type, int32_t seq_id) {
@@ -161,18 +162,14 @@ void Filter::chargeUpstreamResponseStart(MessageType msg_type, int32_t seq_id) {
     throw EnvoyException("unexpected response messageStart callback");
   }
 
-  for (auto i = active_call_list_.begin(); i != active_call_list_.end(); i++) {
-    if ((*i)->seq_id_ == seq_id) {
-      resp_ = std::move(*i);
-      resp_->response_msg_type_ = msg_type;
-      active_call_list_.erase(i);
-      break;
-    }
-  }
-
-  if (resp_ == nullptr) {
+  auto i = active_call_map_.find(seq_id);
+  if (i == active_call_map_.end()) {
     throw EnvoyException(fmt::format("unknown reply seq_id {}", seq_id));
   }
+
+  resp_ = std::move(i->second);
+  resp_->response_msg_type_ = msg_type;
+  active_call_map_.erase(i);
 }
 
 void Filter::chargeUpstreamResponseField(FieldType field_type, int16_t field_id) {

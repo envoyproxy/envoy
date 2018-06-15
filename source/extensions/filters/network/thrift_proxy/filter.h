@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/stats.h"
@@ -159,7 +161,7 @@ private:
   ActiveMessagePtr resp_;
 
   // List of active request messages.
-  std::list<ActiveMessagePtr> active_call_list_;
+  std::unordered_map<int32_t, ActiveMessagePtr> active_call_map_;
 
   bool sniffing_{true};
   ThriftFilterStats stats_;
