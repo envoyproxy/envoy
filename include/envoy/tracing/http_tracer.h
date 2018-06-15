@@ -104,7 +104,7 @@ public:
    * Set the span's sampled flag.
    * @param sampled whether the span and any subsequent child spans should be sampled
    */
-  virtual void setSampled(const bool sampled) PURE;
+  virtual void setSampled(bool sampled) PURE;
 };
 
 /**

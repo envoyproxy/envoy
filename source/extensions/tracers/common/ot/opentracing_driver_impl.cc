@@ -120,7 +120,7 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 }
 
-void OpenTracingSpan::setSampled(const bool sampled) {
+void OpenTracingSpan::setSampled(bool sampled) {
   span_->SetTag(opentracing::ext::sampling_priority, sampled ? 1 : 0);
 }
 

@@ -41,7 +41,7 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
                       : ZipkinCoreConstants::get().NOT_SAMPLED);
 }
 
-void ZipkinSpan::setSampled(const bool sampled) { span_.setSampled(sampled); }
+void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                         SystemTime start_time) {

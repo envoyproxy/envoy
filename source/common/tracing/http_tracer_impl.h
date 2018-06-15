@@ -125,7 +125,7 @@ public:
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }
-  void setSampled(const bool) override {}
+  void setSampled(bool) override {}
 };
 
 class HttpNullTracer : public HttpTracer {
