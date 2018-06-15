@@ -16,24 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-enum class MetadataType { String, Number };
-
-struct MetadataKeyValue {
-  std::string metadataNamespace;
-  std::string key;
-  std::string value;
-  MetadataType type;
-};
-
-struct Rule {
-  Rule(const std::string& hdr) : header(hdr) {}
-  Http::LowerCaseString header;
-  MetadataKeyValue onHeaderPresent;
-  MetadataKeyValue onHeaderMissing;
-  bool remove;
-};
-
-typedef std::vector<Rule> HeaderToMetadataRules;
+typedef envoy::config::filter::http::header_to_metadata::v2::Config::Rule Rule;
+typedef envoy::config::filter::http::header_to_metadata::v2::Config::ValueType ValueType;
+typedef std::vector<std::pair<Http::LowerCaseString, Rule>> HeaderToMetadataRules;
 
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
@@ -49,9 +34,7 @@ public:
   bool doRequest() const { return request_set_; }
 
 private:
-  typedef Protobuf::RepeatedPtrField<
-      envoy::config::filter::http::header_to_metadata::v2::Config::Rule>
-      ProtobufRepeatedRule;
+  typedef Protobuf::RepeatedPtrField<Rule> ProtobufRepeatedRule;
 
   HeaderToMetadataRules request_rules_;
   HeaderToMetadataRules response_rules_;
@@ -70,12 +53,6 @@ private:
    */
   static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&);
 
-  static MetadataType
-  toType(const envoy::config::filter::http::header_to_metadata::v2::Config::ValueType& vtype);
-  static MetadataKeyValue toKeyValue(
-      const envoy::config::filter::http::header_to_metadata::v2::Config::KeyValuePair& keyValPair);
-  static Rule
-  toRule(const envoy::config::filter::http::header_to_metadata::v2::Config::Rule& entry);
   const std::string& decideNamespace(const std::string& nspace) const;
 };
 
@@ -137,7 +114,7 @@ private:
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,
                              Http::StreamFilterCallbacks& callbacks);
   bool addMetadata(StructMap&, const std::string&, const std::string&, const std::string&,
-                   MetadataType) const;
+                   ValueType) const;
   const std::string& decideNamespace(const std::string& nspace) const;
 };
 

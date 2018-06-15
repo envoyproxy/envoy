@@ -27,41 +27,6 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
   }
 }
 
-MetadataType Config::toType(
-    const envoy::config::filter::http::header_to_metadata::v2::Config::ValueType& vtype) {
-  switch (vtype) {
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
-    return MetadataType::String;
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER:
-    return MetadataType::Number;
-  default:
-    return MetadataType::String;
-  }
-}
-
-MetadataKeyValue Config::toKeyValue(
-    const envoy::config::filter::http::header_to_metadata::v2::Config::KeyValuePair& keyValPair) {
-  MetadataKeyValue ret;
-
-  ret.metadataNamespace = keyValPair.metadata_namespace();
-  ret.key = keyValPair.key();
-  ret.value = keyValPair.value();
-  ret.type = toType(keyValPair.type());
-
-  return ret;
-}
-
-Rule Config::toRule(
-    const envoy::config::filter::http::header_to_metadata::v2::Config::Rule& entry) {
-  Rule rule(entry.header());
-
-  rule.onHeaderPresent = toKeyValue(entry.on_header_present());
-  rule.onHeaderMissing = toKeyValue(entry.on_header_missing());
-  rule.remove = entry.remove();
-
-  return rule;
-}
-
 bool Config::configToVector(const ProtobufRepeatedRule& protoRules, HeaderToMetadataRules& vector) {
   if (protoRules.size() == 0) {
     ENVOY_LOG(debug, "no rules provided");
@@ -69,7 +34,8 @@ bool Config::configToVector(const ProtobufRepeatedRule& protoRules, HeaderToMeta
   }
 
   for (const auto& entry : protoRules) {
-    vector.push_back(toRule(entry));
+    std::pair<Http::LowerCaseString, Rule> rule = {Http::LowerCaseString(entry.header()), entry};
+    vector.push_back(rule);
   }
 
   return true;
@@ -106,7 +72,7 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
 
 bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& metaNamespace,
                                          const std::string& key, const std::string& value,
-                                         MetadataType type) const {
+                                         ValueType type) const {
   ProtobufWkt::Value val;
 
   if (value.empty()) {
@@ -123,7 +89,10 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   // Sane enough, add the key/value.
   switch (type) {
-  case MetadataType::Number:
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
+    val.set_string_value(value);
+    break;
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER:
     try {
       val.set_number_value(std::stod(value));
     } catch (...) {
@@ -131,9 +100,9 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
       return false;
     }
     break;
-  case MetadataType::String:
-    val.set_string_value(value);
-    break;
+  default:
+    ENVOY_LOG(debug, "unknown value type");
+    return false;
   }
 
   // Have we seen this namespace before?
@@ -158,30 +127,35 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    Http::StreamFilterCallbacks& callbacks) {
   StructMap structsByNamespace;
 
-  for (const auto& rule : rules) {
-    const Http::HeaderEntry* header_entry = headers.get(rule.header);
+  for (const auto& rulePair : rules) {
+    const auto& header = rulePair.first;
+    const auto& rule = rulePair.second;
+    const Http::HeaderEntry* header_entry = headers.get(header);
 
     if (header_entry != nullptr) {
-      const auto& value = rule.onHeaderPresent.value.empty()
+      const auto& keyval = rule.on_header_present();
+      const auto& value = keyval.value().empty()
                               ? std::string(header_entry->value().getStringView())
-                              : rule.onHeaderPresent.value;
-      const auto& nspace = decideNamespace(rule.onHeaderPresent.metadataNamespace);
+                              : keyval.value();
+      const auto& nspace = decideNamespace(keyval.metadata_namespace());
+      addMetadata(structsByNamespace, nspace, keyval.key(), value, keyval.type());
 
-      addMetadata(structsByNamespace, nspace, rule.onHeaderPresent.key, value,
-                  rule.onHeaderPresent.type);
-
-      if (rule.remove) {
-        headers.remove(rule.header);
+      if (rule.remove()) {
+        headers.remove(header);
       }
     } else {
       // Should we add metadata if the header is missing?
-      if (rule.onHeaderMissing.key.empty()) {
+
+      const auto& keyval = rule.on_header_missing();
+
+      // Key empty means keyval wasn't set.
+      // TODO(rgs): is there a more idiomatic way to do this?
+      if (keyval.key().empty()) {
         continue;
       }
 
-      const auto& nspace = decideNamespace(rule.onHeaderMissing.metadataNamespace);
-      addMetadata(structsByNamespace, nspace, rule.onHeaderMissing.key, rule.onHeaderMissing.value,
-                  rule.onHeaderMissing.type);
+      const auto& nspace = decideNamespace(keyval.metadata_namespace());
+      addMetadata(structsByNamespace, nspace, keyval.key(), keyval.value(), keyval.type());
     }
   }
 
