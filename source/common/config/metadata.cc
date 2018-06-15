@@ -1,5 +1,7 @@
 #include "common/config/metadata.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -45,6 +47,59 @@ ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::api::v2::core::Metadat
                                                    const std::string& filter,
                                                    const std::string& key) {
   return (*(*metadata.mutable_filter_metadata())[filter].mutable_fields())[key];
+}
+
+bool Metadata::match(const envoy::api::v2::core::MetadataMatcher& matcher,
+                     const envoy::api::v2::core::Metadata& metadata) {
+  const std::vector<std::string> path(matcher.path().begin(), matcher.path().end());
+  const auto& value = metadataValue(metadata, matcher.filter(), path);
+  for (const envoy::api::v2::core::MetadataMatcher::Value& m : matcher.values()) {
+    switch (m.match_specifier_case()) {
+    case envoy::api::v2::core::MetadataMatcher_Value::kNullMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kNullValue && m.null_match()) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kNumberMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kNumberValue &&
+          m.number_match() == value.number_value()) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kExactMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kStringValue &&
+          m.exact_match() == value.string_value()) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kPrefixMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kStringValue &&
+          absl::StartsWith(value.string_value(), m.prefix_match())) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kSuffixMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kStringValue &&
+          absl::EndsWith(value.string_value(), m.suffix_match())) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kBoolMatch:
+      if (value.kind_case() == ProtobufWkt::Value::kBoolValue &&
+          m.bool_match() == value.bool_value()) {
+        return true;
+      }
+      break;
+    case envoy::api::v2::core::MetadataMatcher_Value::kPresentMatch:
+      if (value.kind_case() != ProtobufWkt::Value::KIND_NOT_SET && m.present_match()) {
+        return true;
+      }
+      break;
+    default:
+      break;
+    }
+  }
+  return false;
 }
 
 } // namespace Config

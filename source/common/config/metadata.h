@@ -44,6 +44,15 @@ public:
   static ProtobufWkt::Value& mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key);
+
+  /**
+   * Check whether the metadata is matched to the matcher.
+   * @param matcher the matcher with the match condition.
+   * @param metadata the metadata to check.
+   * @return true if it's matched otherwise false.
+   */
+  static bool match(const envoy::api::v2::core::MetadataMatcher& matcher,
+                    const envoy::api::v2::core::Metadata& metadata);
 };
 
 } // namespace Config
