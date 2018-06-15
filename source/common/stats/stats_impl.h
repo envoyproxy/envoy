@@ -312,10 +312,10 @@ private:
 class RawStatDataAllocator : public StatDataAllocator {
 public:
   // StatDataAllocator
-  Counter* makeCounter(const std::string& name, std::string& tag_extracted_name,
-                       std::vector<Tag>& tags) override;
-  Gauge* makeGauge(const std::string& name, std::string& tag_extracted_name,
-                   std::vector<Tag>& tags) override;
+  CounterSharedPtr makeCounter(const std::string& name, std::string& tag_extracted_name,
+                               std::vector<Tag>& tags) override;
+  GaugeSharedPtr makeGauge(const std::string& name, std::string& tag_extracted_name,
+                           std::vector<Tag>& tags) override;
 
   /**
    * @param name the full name of the stat.
@@ -494,7 +494,7 @@ private:
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<Base*(const std::string& name)> Allocator;
+  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
@@ -504,8 +504,8 @@ public:
       return *stat->second;
     }
 
-    Base* new_stat = alloc_(name);
-    stats_.emplace(name, std::shared_ptr<Base>{new_stat});
+    std::shared_ptr<Base> new_stat = alloc_(name);
+    stats_.emplace(name, new_stat);
     return *new_stat;
   }
 
@@ -530,18 +530,19 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> Counter* {
+      : counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
           return alloc_.makeCounter(name, tag_extracted_name, tags);
         }),
-        gauges_([this](const std::string& name) -> Gauge* {
+        gauges_([this](const std::string& name) -> GaugeSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
           return alloc_.makeGauge(name, tag_extracted_name, tags);
         }),
-        histograms_([this](const std::string& name) -> HistogramImpl* {
-          return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());
+        histograms_([this](const std::string& name) -> HistogramSharedPtr {
+          return std::make_shared<HistogramImpl>(name, *this, std::string(name),
+                                                 std::vector<Tag>());
         }) {}
 
   // Stats::Scope

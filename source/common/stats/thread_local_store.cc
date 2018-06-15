@@ -169,18 +169,21 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (tls_ref && *tls_ref) {
     return **tls_ref;
   }
+
+  // We must now look in the central store so we must be locked. We grab a reference to the
+  // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
   std::shared_ptr<StatType>& central_ref = central_cache_map[name];
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-    StatType* stat = (parent_.alloc_.*make_stat)(name, tag_extracted_name, tags);
+    std::shared_ptr<StatType> stat = (parent_.alloc_.*make_stat)(name, tag_extracted_name, tags);
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
       stat = (parent_.heap_allocator_.*make_stat)(name, tag_extracted_name, tags);
       ASSERT(stat != nullptr);
     }
-    central_ref.reset(stat);
+    central_ref = stat;
   }
 
   // If we have a TLS location to store or allocation into, do it.

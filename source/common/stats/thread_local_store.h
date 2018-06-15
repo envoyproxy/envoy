@@ -226,13 +226,20 @@ private:
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
     template <class StatType>
-    using MakeStatFn = StatType* (StatDataAllocator::*)(const std::string& name,
-                                                        std::string& tag_extracted_name,
-                                                        std::vector<Tag>& tags);
+    using MakeStatFn = std::shared_ptr<StatType> (StatDataAllocator::*)(
+        const std::string& name, std::string& tag_extracted_name, std::vector<Tag>& tags);
 
-    // Makes a stat either by looking it up in the central cache,
-    // generating it from the the parent allocator, or as a last
-    // result, creating it with the heap allocator.
+    /**
+     * Makes a stat either by looking it up in the central cache,
+     * generating it from the the parent allocator, or as a last
+     * result, creating it with the heap allocator.
+     *
+     * @param name the full name of the stat (not tag extracted).
+     * @param central_cache_map a map from name to the desired object in the central cache.
+     * @param make_stat a function to generate the stat object, called if it's not in cache.
+     * @param tls_ref possibly null reference to a cache entry for this stat, which will be
+     *     used if non-empty, or filled in if empty (and non-null).
+     */
     template <class StatType>
     StatType&
     safeMakeStat(const std::string& name,

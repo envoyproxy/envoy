@@ -408,11 +408,10 @@ typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 struct RawStatData;
 
 /**
- * Abstract interface for allocating statistics. Alternate
- * implementations can be created utilizing a single fixed-size block
- * suitable for shared-memory, or in the heap, allowing for pointers
- * and sharing of substrings, with an opportunity for reduced memory
- * consumption.
+ * Abstract interface for allocating statistics. Implementations can
+ * be created utilizing a single fixed-size block suitable for
+ * shared-memory, or in the heap, allowing for pointers and sharing of
+ * substrings, with an opportunity for reduced memory consumption.
  */
 class StatDataAllocator {
 public:
@@ -424,8 +423,8 @@ public:
    * @param tags the extracted tag values.
    * @return Counter* a counter, or nullptr if allocation failed.
    */
-  virtual Counter* makeCounter(const std::string& name, std::string& tag_extracted_name,
-                               std::vector<Tag>& tags) PURE;
+  virtual CounterSharedPtr makeCounter(const std::string& name, std::string& tag_extracted_name,
+                                       std::vector<Tag>& tags) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -433,8 +432,12 @@ public:
    * @param tags the extracted tag values.
    * @return Counter* a gauge, or nullptr if allocation failed.
    */
-  virtual Gauge* makeGauge(const std::string& name, std::string& tag_extracted_name,
-                           std::vector<Tag>& tags) PURE;
+  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string& tag_extracted_name,
+                                   std::vector<Tag>& tags) PURE;
+
+  // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
+  // the moment, histograms don't fit the same pattern of counters and gaugaes
+  // as they are not actually created in the context of a stats allocator.
 };
 
 } // namespace Stats
