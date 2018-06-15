@@ -27,12 +27,12 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
   }
 }
 
-MetadataType
-Config::toType(const envoy::config::filter::http::header_to_metadata::v2::ValueType& vtype) {
+MetadataType Config::toType(
+    const envoy::config::filter::http::header_to_metadata::v2::Config::ValueType& vtype) {
   switch (vtype) {
-  case envoy::config::filter::http::header_to_metadata::v2::ValueType::STRING:
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
     return MetadataType::String;
-  case envoy::config::filter::http::header_to_metadata::v2::ValueType::NUMBER:
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER:
     return MetadataType::Number;
   default:
     return MetadataType::String;
@@ -40,7 +40,7 @@ Config::toType(const envoy::config::filter::http::header_to_metadata::v2::ValueT
 }
 
 MetadataKeyValue Config::toKeyValue(
-    const envoy::config::filter::http::header_to_metadata::v2::KeyValuePair& keyValPair) {
+    const envoy::config::filter::http::header_to_metadata::v2::Config::KeyValuePair& keyValPair) {
   MetadataKeyValue ret;
 
   ret.metadataNamespace = keyValPair.metadata_namespace();
@@ -51,7 +51,8 @@ MetadataKeyValue Config::toKeyValue(
   return ret;
 }
 
-Rule Config::toRule(const envoy::config::filter::http::header_to_metadata::v2::Rule& entry) {
+Rule Config::toRule(
+    const envoy::config::filter::http::header_to_metadata::v2::Config::Rule& entry) {
   Rule rule(entry.header());
 
   rule.onHeaderPresent = toKeyValue(entry.on_header_present());
@@ -63,6 +64,7 @@ Rule Config::toRule(const envoy::config::filter::http::header_to_metadata::v2::R
 
 bool Config::configToVector(const ProtobufRepeatedRule& protoRules, HeaderToMetadataRules& vector) {
   if (protoRules.size() == 0) {
+    ENVOY_LOG(debug, "no rules provided");
     return false;
   }
 
@@ -109,11 +111,13 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   if (value.empty()) {
     // No value, skip. we could allow this though.
+    ENVOY_LOG(debug, "no metadata value provided");
     return false;
   }
 
   if (value.size() >= MAX_HEADER_VALUE_LEN) {
     // Too long, go away.
+    ENVOY_LOG(debug, "metadata value is too long");
     return false;
   }
 
@@ -123,9 +127,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     try {
       val.set_number_value(std::stod(value));
     } catch (...) {
-      // If the type conversion fails, then ignore.
-      // TODO(dereka) might be helpful to add a metric to count how often this occurs for
-      // debugging.
+      ENVOY_LOG(debug, "value to number conversion failed");
       return false;
     }
     break;

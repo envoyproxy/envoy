@@ -1,7 +1,8 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
+#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -12,18 +13,15 @@ namespace HeaderToMetadataFilter {
 /**
  * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
  */
-class HeaderToMetadataConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
+class HeaderToMetadataConfig
+    : public Common::FactoryBase<envoy::config::filter::http::header_to_metadata::v2::Config> {
 public:
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override;
+  HeaderToMetadataConfig() : FactoryBase(HttpFilterNames::get().HEADER_TO_METADATA) {}
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::FactoryContext&) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string name() override { return HttpFilterNames::get().HEADER_TO_METADATA; }
+private:
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::header_to_metadata::v2::Config& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace HeaderToMetadataFilter

@@ -7,6 +7,8 @@
 #include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/common/logger.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -31,26 +33,26 @@ struct Rule {
   bool remove;
 };
 
-typedef std::map<std::string, ProtobufWkt::Struct> StructMap;
 typedef std::vector<Rule> HeaderToMetadataRules;
-typedef Protobuf::RepeatedPtrField<envoy::config::filter::http::header_to_metadata::v2::Rule>
-    ProtobufRepeatedRule;
 
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
  *  configuration logic.
  */
-class Config {
+class Config : public Logger::Loggable<Logger::Id::config> {
 public:
   Config(const envoy::config::filter::http::header_to_metadata::v2::Config config);
 
-  // getters
   HeaderToMetadataRules requestRules() const { return request_rules_; }
   HeaderToMetadataRules responseRules() const { return response_rules_; }
   bool doResponse() const { return response_set_; }
   bool doRequest() const { return request_set_; }
 
 private:
+  typedef Protobuf::RepeatedPtrField<
+      envoy::config::filter::http::header_to_metadata::v2::Config::Rule>
+      ProtobufRepeatedRule;
+
   HeaderToMetadataRules request_rules_;
   HeaderToMetadataRules response_rules_;
   bool response_set_;
@@ -69,10 +71,11 @@ private:
   static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&);
 
   static MetadataType
-  toType(const envoy::config::filter::http::header_to_metadata::v2::ValueType& vtype);
-  static MetadataKeyValue
-  toKeyValue(const envoy::config::filter::http::header_to_metadata::v2::KeyValuePair& keyValPair);
-  static Rule toRule(const envoy::config::filter::http::header_to_metadata::v2::Rule& entry);
+  toType(const envoy::config::filter::http::header_to_metadata::v2::Config::ValueType& vtype);
+  static MetadataKeyValue toKeyValue(
+      const envoy::config::filter::http::header_to_metadata::v2::Config::KeyValuePair& keyValPair);
+  static Rule
+  toRule(const envoy::config::filter::http::header_to_metadata::v2::Config::Rule& entry);
   const std::string& decideNamespace(const std::string& nspace) const;
 };
 
@@ -82,7 +85,8 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * Header-To-Metadata examines request/response headers and either copies or
  * moves the values into request metadata based on configuration information.
  */
-class HeaderToMetadataFilter : public Http::StreamFilter {
+class HeaderToMetadataFilter : public Http::StreamFilter,
+                               public Logger::Loggable<Logger::Id::filter> {
 public:
   HeaderToMetadataFilter(const ConfigSharedPtr config);
   ~HeaderToMetadataFilter();
@@ -114,6 +118,8 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
+  typedef std::map<std::string, ProtobufWkt::Struct> StructMap;
+
   const ConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

@@ -1,42 +1,60 @@
 syntax = "proto3";
 
 package envoy.config.filter.http.header_to_metadata.v2;
+option go_package = "v2";
 
-enum ValueType {
-  STRING = 0;
-  NUMBER = 1;
-}
+import "validate/validate.proto";
 
-message KeyValuePair {
-  // The namespace. If this is empty, the filter's namespace will be used.
-  string metadata_namespace = 1;
-
-  // The key — must be present.
-  string key = 2;
-
-  // The value — may be absent.
-  string value = 3;
-
-  // The type.
-  ValueType type = 4;
-}
-
-message Rule {
-  // The header from which to extract a value.
-  string header = 1;
-
-  // The metadata key with which the extracted value will be paired.
-  KeyValuePair on_header_present = 2;
-
-  // If the header is not present — and this is set — insert this key/value pair instead.
-  KeyValuePair on_header_missing = 3;
-
-  // Whether or not to remove the header after it's been copied to metadata. By allowing the
-  // configuration to express header removal, we easily prevent internal metadata from leaking.
-  bool remove = 4;
-}
+// [#protodoc-title: Header-To-Metadata Fitlter]
+//
+// The configuration for transforming headers into metadata. This is useful
+// for matching load balancer subsets, logging, etc.
+//
+// :ref:`configuration overview <config_http_filters_header_to_metadata>`.
 
 message Config {
+  enum ValueType {
+    STRING = 0;
+    NUMBER = 1;
+  }
+
+  message KeyValuePair {
+    // The namespace — if this is empty, the filter's namespace will be used.
+    string metadata_namespace = 1;
+
+    // The key to use within the namespace.
+    string key = 2 [(validate.rules).string.min_bytes = 1];
+
+    // The value to be used when there is no header value.
+    // A non-empty value is needed for `on_header_missing` case.
+    string value = 3;
+
+    // The value's type — defaults to string.
+    ValueType type = 4;
+  }
+
+  message Rule {
+    // The header from which to extract a value — required.
+    string header = 1 [(validate.rules).string.min_bytes = 1];
+
+    // The metadata key with which the extracted value will be paired.
+    //
+    // The value field is ignored for this case, since the header value
+    // will be used.
+    KeyValuePair on_header_present = 2;
+
+    // If the header is not present, add this metadata KeyValue pair.
+    //
+    // Because the header is missing, the KeyValue pair must have a
+    // value set which will be used in lieu of a header value.
+    KeyValuePair on_header_missing = 3;
+
+    // Whether or not to remove the header after a rule is applied.
+    //
+    // This prevents headers from leaking.
+    bool remove = 4;
+  }
+
   repeated Rule request_rules = 1;
   repeated Rule response_rules = 2;
 }
