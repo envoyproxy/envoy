@@ -120,7 +120,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       proxy_100_continue_(config.proxy_100_continue()) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
-                                                                   route_config_provider_manager_);
+                                                                   route_config_provider_manager_,
+                                                                   ProdSystemTimeSource::instance_);
 
   switch (config.forward_client_cert_details()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:

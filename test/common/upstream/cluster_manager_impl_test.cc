@@ -116,7 +116,8 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
+        monotonic_time_source_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -142,6 +143,8 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
+  NiceMock<MockSystemTimeSource> system_time_source_;
+  NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
@@ -174,6 +177,9 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
+  EXPECT_CALL(system_time_source_, currentTime())
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
@@ -195,6 +201,8 @@ static_clusters:
     protocol_selection: USE_DOWNSTREAM_PROTOCOL
 dynamic_active_clusters:
 dynamic_warming_clusters:
+last_updated:
+  seconds: 1234567890
 )EOF");
 }
 
@@ -642,6 +650,9 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
+  EXPECT_CALL(system_time_source_, currentTime())
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+
   const std::string json = fmt::sprintf(
       R"EOF(
   {
@@ -762,6 +773,8 @@ dynamic_active_clusters:
           port_value: 11001
       dns_lookup_family: V4_ONLY
 dynamic_warming_clusters:
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
@@ -837,6 +850,9 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
+  EXPECT_CALL(system_time_source_, currentTime())
+      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+
   const std::string json = R"EOF(
   {
     "clusters": []
@@ -869,6 +885,8 @@ dynamic_warming_clusters:
           address: "127.0.0.1"
           port_value: 11001
       dns_lookup_family: V4_ONLY
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
