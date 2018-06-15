@@ -297,12 +297,20 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
 
-  int status;
-  switch (orig_addr.ss_family) {
+  int socket_domain;
+  socklen_t domain_len = sizeof(socket_domain);
+  int status = getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
+  if (status != 0) {
+    return nullptr;
+  }
+
+  switch (socket_domain) {
   case AF_INET:
     status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
   case AF_INET6:
     status = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  default:
+    return nullptr;
   }
 
   if (status != 0) {
