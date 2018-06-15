@@ -12,6 +12,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -33,6 +34,7 @@
 #include "common/upstream/original_dst_cluster.h"
 
 #include "extensions/transport_sockets/well_known_names.h"
+#include "server/configuration_impl.h" // TODO(alanconway): bad dependency
 
 namespace Envoy {
 namespace Upstream {
@@ -135,6 +137,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
       address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
       connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  cluster.createNetworkFilters(*connection);
   return connection;
 }
 
@@ -253,6 +256,30 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
+// TODO(alanconway): dummy factory context, how do we implement this?  Some of
+// the methods are listener specific, should they throw, return null values, return
+// values derived from the Cluster or be moved/removed?
+class ClusterInfoImpl::FactoryContextImpl : public Server::Configuration::FactoryContext {
+ public:
+  AccessLog::AccessLogManager& accessLogManager() override { NOT_IMPLEMENTED; }
+  Upstream::ClusterManager& clusterManager() override { NOT_IMPLEMENTED; }
+  Event::Dispatcher& dispatcher() override { NOT_IMPLEMENTED; }
+  bool healthCheckFailed() override { NOT_IMPLEMENTED; }
+  Tracing::HttpTracer& httpTracer() override { NOT_IMPLEMENTED; }
+  const LocalInfo::LocalInfo& localInfo() const override { NOT_IMPLEMENTED; }
+  Envoy::Runtime::RandomGenerator& random() override { NOT_IMPLEMENTED; }
+  RateLimit::ClientPtr rateLimitClient(const absl::optional<std::chrono::milliseconds>&) override { NOT_IMPLEMENTED; }
+  Envoy::Runtime::Loader& runtime() override { NOT_IMPLEMENTED; }
+  Singleton::Manager& singletonManager() override { NOT_IMPLEMENTED; }
+  ThreadLocal::Instance& threadLocal() override { NOT_IMPLEMENTED; }
+  Server::Admin& admin() override { NOT_IMPLEMENTED; }
+  Init::Manager& initManager() override { NOT_IMPLEMENTED; }
+  Stats::Scope& listenerScope() override { NOT_IMPLEMENTED; }
+  Stats::Scope& scope() override { NOT_IMPLEMENTED; }
+  const envoy::api::v2::core::Metadata& listenerMetadata() const override { NOT_IMPLEMENTED; }
+  Network::DrainDecision& drainDecision() override { NOT_IMPLEMENTED; }
+};
+
 ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
@@ -340,6 +367,30 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
   }
+
+  auto filters = config.filters();
+  for (ssize_t i = 0; i < filters.size(); i++) {
+    const auto& proto_config = filters[i];
+    const ProtobufTypes::String name = proto_config.name();
+    const Json::ObjectSharedPtr filter_config =
+        MessageUtil::getJsonObjectFromMessage(proto_config.config());
+    ENVOY_LOG(debug, "filter #{} name: {} config: {}", i, name, filter_config->asJsonString());
+    // Now see if there is a factory that will accept the config.
+    auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::NamedNetworkFilterConfigFactory>(name);
+    Network::FilterFactoryCb callback;
+    if (filter_config->getBoolean("deprecated_v1", false)) {
+      callback = factory.createFilterFactory(*filter_config->getObject("value", true), *factory_context_);
+    } else {
+      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+      callback = factory.createFilterFactoryFromProto(*message, *factory_context_);
+    }
+    filter_factories_.push_back(callback);
+  }
+}
+
+void ClusterInfoImpl::createNetworkFilters(Network::Connection& connection) const {
+  Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories_);
 }
 
 ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,

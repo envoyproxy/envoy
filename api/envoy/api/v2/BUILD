@@ -72,6 +72,7 @@ api_proto_library(
         "//envoy/api/v2/core:health_check",
         "//envoy/api/v2/core:protocol",
         "//envoy/api/v2/endpoint",
+        "//envoy/api/v2/listener", # TODO(alanconway): for Filter definition
         "//envoy/type:percent",
     ],
 )
