@@ -5,7 +5,7 @@
 
 #ifndef IP6T_SO_ORIGINAL_DST
 // From linux/netfilter_ipv6/ip6_tables.h
-# define IP6T_SO_ORIGINAL_DST 80
+#define IP6T_SO_ORIGINAL_DST 80
 #endif
 
 #include <netinet/ip.h>
@@ -296,21 +296,25 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 
   int status;
   switch (orig_addr.ss_family) {
-      case AF_INET:
-        status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
-      case AF_INET6:
-        status = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  case AF_INET:
+    status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  case AF_INET6:
+    status = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
   }
 
   if (status == 0) {
-    if orig_addr.ss_family == AF_INET {
-      return Address::InstanceConstSharedPtr{
-        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-    } else if orig_addr.ss_family == AF_INET6 {
+    if
+      orig_addr.ss_family == AF_INET {
         return Address::InstanceConstSharedPtr{
-          new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-    } else {
-        return nullptr;
+            new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+      }
+    else if
+      orig_addr.ss_family == AF_INET6 {
+        return Address::InstanceConstSharedPtr{
+            new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+      }
+    else {
+      return nullptr;
     }
   }
 #else
