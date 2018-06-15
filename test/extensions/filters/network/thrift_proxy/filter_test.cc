@@ -254,6 +254,23 @@ TEST_F(ThriftFilterTest, OnDataHandlesProtocolErrorOnWrite) {
   EXPECT_EQ(0, len);
 }
 
+TEST_F(ThriftFilterTest, OnDataStopsSniffingWithTooManyPendingCalls) {
+  initializeFilter();
+  for (int i = 0; i < 64; i++) {
+    writeFramedBinaryMessage(buffer_, MessageType::Call, i);
+  }
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(64U, store_.gauge("test.request_active").value());
+  buffer_.drain(buffer_.length());
+
+  // Sniffing is now disabled.
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 100);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::Continue);
+  EXPECT_EQ(64U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+}
+
 TEST_F(ThriftFilterTest, OnWriteHandlesThriftReply) {
   initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F); // set up request

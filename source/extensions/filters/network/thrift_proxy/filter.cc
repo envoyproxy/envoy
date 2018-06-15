@@ -19,13 +19,15 @@ Filter::Filter(const std::string& stat_prefix, Stats::Scope& scope)
 Filter::~Filter() {}
 
 void Filter::onEvent(Network::ConnectionEvent event) {
-  bool any_active_request = !active_call_list_.empty() || req_ != nullptr || resp_ != nullptr;
+  if (active_call_list_.empty() && req_ == nullptr && resp_ == nullptr) {
+    return;
+  }
 
-  if (event == Network::ConnectionEvent::RemoteClose && any_active_request) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     stats_.cx_destroy_local_with_active_rq_.inc();
   }
 
-  if (event == Network::ConnectionEvent::LocalClose && any_active_request) {
+  if (event == Network::ConnectionEvent::LocalClose) {
     stats_.cx_destroy_remote_with_active_rq_.inc();
   }
 }
@@ -118,6 +120,10 @@ Network::FilterStatus Filter::onWrite(Buffer::Instance& data, bool) {
 void Filter::chargeDownstreamRequestStart(MessageType msg_type, int32_t seq_id) {
   if (req_ != nullptr) {
     throw EnvoyException("unexpected request messageStart callback");
+  }
+
+  if (active_call_list_.size() >= 64) {
+    throw EnvoyException("too many pending calls (64), disabling sniffing");
   }
 
   req_ = std::make_unique<ActiveMessage>(*this, msg_type, seq_id);
