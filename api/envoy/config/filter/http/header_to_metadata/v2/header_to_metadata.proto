@@ -25,8 +25,14 @@ message Config {
     // The key to use within the namespace.
     string key = 2 [(validate.rules).string.min_bytes = 1];
 
-    // The value to be used when there is no header value.
-    // A non-empty value is needed for `on_header_missing` case.
+    // The value to pair with the given key.
+    //
+    // When used for a `on_header_present` case, if value is non-empty it'll be used
+    // instead of the header value. If the header value is empty, no metadata will
+    // be added.
+    //
+    // When used for a `on_header_missing` case, a non-empty value must be provided
+    // otherwise no metadata will be added.
     string value = 3;
 
     // The value's type — defaults to string.
