@@ -25,7 +25,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    RouteConfigProviderManager& route_config_provider_manager) {
+    RouteConfigProviderManager& route_config_provider_manager,
+    SystemTimeSource& system_time_source) {
   switch (config.route_specifier_case()) {
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
       kRouteConfig:
@@ -33,7 +34,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
                                                                       factory_context);
   case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds:
     return route_config_provider_manager.getRdsRouteConfigProvider(config.rds(), factory_context,
-                                                                   stat_prefix);
+                                                                   stat_prefix, system_time_source);
   default:
     NOT_REACHED;
   }
@@ -49,13 +50,14 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager)
+    const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
+    SystemTimeSource& system_time_source)
     : factory_context_(factory_context), tls_(factory_context.threadLocal().allocateSlot()),
       route_config_name_(rds.route_config_name()),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
+      manager_identifier_(manager_identifier), system_time_source_(system_time_source) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
@@ -94,6 +96,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 
 void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
+  route_config_provider_manager_.routes_config_update_time = system_time_source_.currentTime();
+
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
     stats_.update_empty_.inc();
@@ -183,7 +187,8 @@ RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    SystemTimeSource& system_time_source) {
 
   // RdsRouteConfigProviders are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a
@@ -196,7 +201,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
     // around it. However, since this is not a performance critical path we err on the side
     // of simplicity.
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{new RdsRouteConfigProviderImpl(
-        rds, manager_identifier, factory_context, stat_prefix, *this)};
+        rds, manager_identifier, factory_context, stat_prefix, *this, system_time_source)};
 
     new_provider->registerInitTarget(factory_context.initManager());
 
@@ -224,6 +229,9 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
+
+  config_dump->mutable_last_updated()->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
+      std::chrono::system_clock::to_time_t(routes_config_update_time)));
 
   for (const auto& provider : getRdsRouteConfigProviders()) {
     auto config_info = provider->configInfo();

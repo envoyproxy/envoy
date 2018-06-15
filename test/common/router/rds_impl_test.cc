@@ -68,6 +68,7 @@ public:
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -105,9 +106,9 @@ public:
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
     EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
-    rds_ =
-        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                        factory_context_, "foo.", *route_config_provider_manager_);
+    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                           factory_context_, "foo.",
+                                           *route_config_provider_manager_, system_time_source_);
     expectRequest();
     factory_context_.init_manager_.initialize();
   }
@@ -130,9 +131,9 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     }
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(
+                   parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
+                   *route_config_provider_manager_, system_time_source_),
                EnvoyException);
 }
 
@@ -153,9 +154,9 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
 
   factory_context_.local_info_.node_.set_cluster("");
   factory_context_.local_info_.node_.set_id("");
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(
+                   parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
+                   *route_config_provider_manager_, system_time_source_),
                EnvoyException);
 }
 
@@ -178,7 +179,8 @@ TEST_F(RdsImplTest, UnknownCluster) {
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                      factory_context_, "foo.", *route_config_provider_manager_),
+                                      factory_context_, "foo.", *route_config_provider_manager_,
+                                      system_time_source_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
@@ -372,8 +374,10 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                          "foo_prefix.");
+    ON_CALL(system_time_source_, currentTime())
+        .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(
+        rds_, factory_context_, "foo_prefix.", system_time_source_);
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -396,16 +400,18 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
+
   auto message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
-  // No routes at all.
+  // No routes at all, no last_updated timestamp
   envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
 dynamic_route_configs:
+last_updated: { }
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump.DebugString());
@@ -438,6 +444,7 @@ static_route_configs:
           - match: { prefix: "/" }
             route: { cluster: baz }
 dynamic_route_configs:
+last_updated: { }
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump2.DebugString());
@@ -476,6 +483,8 @@ dynamic_route_configs:
     route_config:
       name: foo_route_config
       virtual_hosts:
+last_updated:
+  seconds: 1234567890
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
@@ -493,7 +502,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   // shared_ptr to the same provider as the one above.
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                "foo_prefix");
+                                                                "foo_prefix", system_time_source_);
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider_, provider2);
   EXPECT_EQ(2UL, provider_.use_count());
@@ -520,7 +529,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   new Event::MockTimer(&factory_context_.dispatcher_);
   RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->getRdsRouteConfigProvider(rds2, factory_context_,
-                                                                "foo_prefix");
+                                                                "foo_prefix", system_time_source_);
   EXPECT_NE(provider3, provider_);
   EXPECT_EQ(2UL, provider_.use_count());
   EXPECT_EQ(1UL, provider3.use_count());

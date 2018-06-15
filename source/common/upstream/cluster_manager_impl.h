@@ -155,7 +155,9 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     SystemTimeSource& system_time_source,
+                     MonotonicTimeSource& monotonic_time_source);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -348,6 +350,7 @@ private:
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateGauges();
 
+  SystemTime cluster_config_update_time_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;

@@ -52,7 +52,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(new ListenerManagerImpl(server_, listener_factory_, worker_factory_));
+    manager_.reset(
+        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, system_time_source_));
   }
 
   /**
@@ -113,6 +114,7 @@ public:
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
@@ -387,6 +389,9 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+
   InSequence s;
 
   // Add foo listener.
@@ -413,6 +418,8 @@ static_listeners:
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   // Update foo listener. Should be blocked.
@@ -438,6 +445,9 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+
   InSequence s;
 
   MockLdsApi* lds_api = new MockLdsApi();
@@ -451,6 +461,7 @@ static_listeners:
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
+last_updated: { }
 )EOF");
 
   // Add foo listener.
@@ -483,6 +494,8 @@ dynamic_active_listeners:
     filter_chains: {}
 dynamic_warming_listeners:
 dynamic_draining_listeners:
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   // Update duplicate should be a NOP.
@@ -521,6 +534,8 @@ dynamic_active_listeners:
     per_connection_buffer_limit_bytes: 10
 dynamic_warming_listeners:
 dynamic_draining_listeners:
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   // Start workers.
@@ -568,6 +583,8 @@ dynamic_draining_listeners:
         port_value: 1234
     filter_chains: {}
     per_connection_buffer_limit_bytes: 10
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -644,6 +661,8 @@ dynamic_warming_listeners:
           port_value: 1236
       filter_chains: {}
 dynamic_draining_listeners:
+last_updated:
+  seconds: 1234567890
 )EOF");
 
   // Update a duplicate baz that is currently warming.

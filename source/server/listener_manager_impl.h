@@ -97,7 +97,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory);
+                      WorkerFactory& worker_factory, SystemTimeSource& system_time_source);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -116,7 +116,9 @@ public:
   void stopWorkers() override;
 
   Instance& server_;
+  SystemTimeSource& system_time_source_;
   ListenerComponentFactory& factory_;
+  SystemTime listener_config_update_time_;
 
 private:
   typedef std::list<ListenerImplPtr> ListenerList;

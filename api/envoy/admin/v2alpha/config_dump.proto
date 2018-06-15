@@ -8,6 +8,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
 
 import "gogoproto/gogo.proto";
 
@@ -35,6 +36,9 @@ message ConfigDump {
 // configuration for another Envoy.
 message BootstrapConfigDump {
   envoy.config.bootstrap.v2.Bootstrap bootstrap = 1 [(gogoproto.nullable) = false];
+
+  // The timestamp when the BootstrapConfig was last updated.
+  google.protobuf.Timestamp last_updated = 2;
 }
 
 // Envoy's listener manager fills this message with all currently known listeners. Listener
@@ -76,6 +80,9 @@ message ListenersConfigDump {
   // recreate an Envoy configuration from a configuration dump, the draining listeners should
   // generally be discarded.
   repeated DynamicListener dynamic_draining_listeners = 5 [(gogoproto.nullable) = false];
+
+  // The timestamp when the ListenersConfig was last updated.
+  google.protobuf.Timestamp last_updated = 6;
 }
 
 // Envoy's cluster manager fills this message with all currently known clusters. Cluster
@@ -111,6 +118,9 @@ message ClustersConfigDump {
   // Envoy configuration from a configuration dump, the warming clusters should generally be
   // discarded.
   repeated DynamicCluster dynamic_warming_clusters = 4 [(gogoproto.nullable) = false];
+
+  // The timestamp when the ClustersConfig was last updated.
+  google.protobuf.Timestamp last_updated = 5;
 }
 
 // Envoy's RDS implementation fills this message with all currently loaded routes, as described by
@@ -134,4 +144,7 @@ message RoutesConfigDump {
 
   // The dynamically loaded route configs.
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
+
+  // The timestamp when the RoutesConfig was last updated.
+  google.protobuf.Timestamp last_updated = 4;
 }
