@@ -183,6 +183,15 @@ message JwtHeader {
   string value_prefix = 2;
 }
 
+// Specify a required provider with audiences.
+message ProviderWithAudiences {
+  // Specify a required provider name.
+  string provider_name = 1;
+
+  // This field overrides the one specified in the JwtProvider.
+  repeated string audiences = 2;
+}
+
 // This message specifies a Jwt requirement. An empty message means JWT verification is not
 // required. Here are some config examples:
 //
@@ -228,13 +237,16 @@ message JwtRequirement {
     // Specify a required provider name.
     string provider_name = 1;
 
+    // Specify a required provider with audiences.
+    ProviderWithAudiences provider_and_audiences = 2;
+
     // Specify list of JwtRequirement. Their results are OR-ed.
     // If any one of them passes, the result is passed.
-    JwtRequirementOrList requires_any = 2;
+    JwtRequirementOrList requires_any = 3;
 
     // Specify list of JwtRequirement. Their results are AND-ed.
     // All of them must pass, if one of them fails or missing, it fails.
-    JwtRequirementAndList requires_all = 3;
+    JwtRequirementAndList requires_all = 4;
   }
 }
 
