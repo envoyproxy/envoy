@@ -39,11 +39,11 @@ response and request allow.
 By *default* compression will be *skipped* when:
 
 - A request does NOT contain *accept-encoding* header.
-- A request includes *accept-encoding* header, but it does not contain "gzip" or "*".
-- A request inclues *accept-encoding* with "gzip" or "*" with the weight "q=0". Note
-  that the "gzip" will have a higher weight then "*". For example, if *accept-encoding*
-  is "gzip;q=0,*;q=1", the filter will not compress. But if the header is set to
-  "*;q=0,gzip;q=1", the filter will compress.
+- A request includes *accept-encoding* header, but it does not contain "gzip" or "\*".
+- A request includes *accept-encoding* with "gzip" or "\*" with the weight "q=0". Note
+  that the "gzip" will have a higher weight then "\*". For example, if *accept-encoding*
+  is "gzip;q=0,\*;q=1", the filter will not compress. But if the header is set to
+  "\*;q=0,gzip;q=1", the filter will compress.
 - A request includes *accept-encoding* header includes "identity".
 - A response contains a *content-encoding* header.
 - A response contains a *cache-control* header whose value includes "no-transform".
