@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/compressor/zlib_compressor_impl.h"
@@ -19,13 +20,41 @@ namespace HttpFilters {
 namespace Gzip {
 
 /**
+ * All gzip filter stats. @see stats_macros.h
+ * Note that the total_bytes is only if the response
+ * is expected to be compressed. This does not get counted if
+ * the bytes are not expected to be compressed.
+ */
+// clang-format off
+#define ALL_GZIP_STATS(COUNTER) \
+  COUNTER(compressed)   \
+  COUNTER(not_compressed) \
+  COUNTER(no_accept_header) \
+  COUNTER(header_identity)\
+  COUNTER(header_gzip)\
+  COUNTER(header_wildcard)\
+  COUNTER(header_not_valid)\
+  COUNTER(has_etag)\
+  COUNTER(total_uncompressed_bytes)\
+  COUNTER(total_compressed_bytes)                 \
+// clang-format on
+
+/**
+ * Struct definition for gzip stats. @see stats_macros.h
+ */
+struct GzipStats {
+  ALL_GZIP_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Configuration for the gzip filter.
  */
 class GzipFilterConfig {
 
 public:
   GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
-                   Runtime::Loader& runtime);
+                    const std::string& stats_prefix,
+                   Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;
@@ -35,6 +64,8 @@ public:
   }
 
   Runtime::Loader& runtime() { return runtime_; }
+  Stats::Scope& scope() { return scope_; }
+  const std::string stats_prefix() { return stats_prefix_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
@@ -62,9 +93,10 @@ private:
   int32_t window_bits_;
 
   StringUtil::CaseUnorderedSet content_type_values_;
-
   bool disable_on_etag_header_;
   bool remove_accept_encoding_header_;
+  const std::string stats_prefix_;
+  Stats::Scope& scope_;
   Runtime::Loader& runtime_;
 };
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -119,10 +151,15 @@ private:
   void sanitizeEtagHeader(Http::HeaderMap& headers);
   void insertVaryHeader(Http::HeaderMap& headers);
 
+  static GzipStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return GzipStats{ALL_GZIP_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
+
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
   Compressor::ZlibCompressorImpl compressor_;
   GzipFilterConfigSharedPtr config_;
+  GzipStats stats_;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

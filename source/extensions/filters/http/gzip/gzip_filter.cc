@@ -38,6 +38,7 @@ const std::vector<std::string>& defaultContentEncoding() {
 } // namespace
 
 GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
@@ -46,7 +47,8 @@ GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
       disable_on_etag_header_(gzip.disable_on_etag_header()),
-      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()), runtime_(runtime) {}
+      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()),
+      stats_prefix_(stats_prefix + "gzip."), scope_(scope), runtime_(runtime) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
     envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level) {
@@ -99,7 +101,8 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 }
 
 GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
-    : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
+    : skip_compression_{true}, compressed_data_(), compressor_(), config_(config),
+      stats_(generateStats(config->stats_prefix(), config->scope())) {}
 
 Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
   if (config_->runtime().snapshot().featureEnabled("gzip.filter_enabled", 100) &&
@@ -108,6 +111,8 @@ Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bo
     if (config_->removeAcceptEncodingHeader()) {
       headers.removeAcceptEncoding();
     }
+  } else {
+    stats_.not_compressed_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -123,16 +128,20 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
                      config_->windowBits(), config_->memoryLevel());
+
   } else {
     skip_compression_ = true;
+    stats_.not_compressed_.inc();
   }
-
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
+    stats_.total_uncompressed_bytes_.add(data.length());
     compressor_.compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
+    stats_.total_compressed_bytes_.add(data.length());
+    stats_.compressed_.inc();
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -163,19 +172,36 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        if (is_gzip) {
+          stats_.header_gzip_.inc();
+          return true;
+        }
+        stats_.header_not_valid_.inc();
+        return false;
       }
-      // If value is the identity coding, just check the qvalue and return.
+      // If value is the identity coding, return false. The data needs should
+      // not be transformed in this case.
+      // https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.5.
       if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
-        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        stats_.header_identity_.inc();
+        return false;
       }
+      // Otherwise, check if the header contains the wildcard. If so
+      // return true.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
         is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
     }
-    // If neither identity nor gzip codings are present, we return the wildcard.
-    return is_wildcard;
+    // If neither identity nor gzip codings are present, return the result of the wildcard.
+    if (is_wildcard) {
+      stats_.header_wildcard_.inc();
+      return true;
+    }
+    stats_.header_not_valid_.inc();
+    return false;
   }
+  stats_.no_accept_header_.inc();
   // If no accept-encoding header is present, return false.
   return false;
 }
