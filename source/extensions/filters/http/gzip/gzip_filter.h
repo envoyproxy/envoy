@@ -26,17 +26,18 @@ namespace Gzip {
  * the bytes are not expected to be compressed.
  */
 // clang-format off
-#define ALL_GZIP_STATS(COUNTER) \
-  COUNTER(compressed)   \
-  COUNTER(not_compressed) \
-  COUNTER(no_accept_header) \
-  COUNTER(header_identity)\
-  COUNTER(header_gzip)\
-  COUNTER(header_wildcard)\
-  COUNTER(header_not_valid)\
-  COUNTER(has_etag)\
+#define ALL_GZIP_STATS(COUNTER)    \
+  COUNTER(compressed)              \
+  COUNTER(not_compressed)          \
+  COUNTER(no_accept_header)        \
+  COUNTER(header_identity)         \
+  COUNTER(header_gzip)             \
+  COUNTER(header_wildcard)         \
+  COUNTER(header_not_valid)        \
   COUNTER(total_uncompressed_bytes)\
-  COUNTER(total_compressed_bytes)                 \
+  COUNTER(total_compressed_bytes)  \
+  COUNTER(content_length_too_small)\
+  COUNTER(not_compressed_etag)     \
 // clang-format on
 
 /**

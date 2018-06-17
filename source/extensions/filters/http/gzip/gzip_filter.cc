@@ -129,7 +129,7 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
                      config_->windowBits(), config_->memoryLevel());
 
-  } else {
+  } else if (!skip_compression_) {
     skip_compression_ = true;
     stats_.not_compressed_.inc();
   }
@@ -217,15 +217,23 @@ bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
 }
 
 bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
-  return !(config_->disableOnEtagHeader() && headers.Etag());
+  bool isEtagAllowed = !(config_->disableOnEtagHeader() && headers.Etag());
+  if (!isEtagAllowed) {
+    stats_.not_compressed_etag_.inc();
+  }
+  return isEtagAllowed;
 }
 
 bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    return StringUtil::atoul(content_length->value().c_str(), length) &&
-           length >= config_->minimumLength();
+    bool isMinimumContentLength = StringUtil::atoul(content_length->value().c_str(), length) &&
+                                  length >= config_->minimumLength();
+    if (!isMinimumContentLength) {
+      stats_.content_length_too_small_.inc();
+    }
+    return isMinimumContentLength;
   }
 
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();

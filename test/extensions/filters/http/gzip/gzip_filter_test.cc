@@ -115,6 +115,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
     Http::TestHeaderMapImpl trailers;
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
   }
 
   GzipFilterConfigSharedPtr config_;
@@ -502,28 +503,34 @@ TEST_F(GzipFilterTest, isEtagAllowed) {
   {
     Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
 
   setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
   {
     Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_FALSE(isEtagAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_FALSE(isEtagAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.not_compressed_etag").value());
   }
 }
 
@@ -533,6 +540,7 @@ TEST_F(GzipFilterTest, EtagNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
+  EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed_etag").value());
 }
 
 // Verifies that compression is skipped when etag header is NOT allowed.
