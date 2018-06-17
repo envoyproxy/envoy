@@ -53,7 +53,8 @@ public:
   RawHttpClientImpl client_;
 };
 
-TEST_F(ExtAuthzHttpClientTest, BasicOK) {
+// Test the client when an ok response is received. 
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "200", false);
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
@@ -66,7 +67,8 @@ TEST_F(ExtAuthzHttpClientTest, BasicOK) {
   client_.onSuccess(std::move(check_response));
 }
 
-TEST_F(ExtAuthzHttpClientTest, BasicDenied) {
+// Test the client when a denied response is received.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "403", false);
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
@@ -81,6 +83,7 @@ TEST_F(ExtAuthzHttpClientTest, BasicDenied) {
   client_.onSuccess(std::move(check_response));
 }
 
+// Test the client when an OK response with additional HTTP attributes is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   const auto expected_body = std::string{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "401", false);
@@ -97,7 +100,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   client_.onSuccess(std::move(check_response));
 }
 
-TEST_F(ExtAuthzHttpClientTest, BasicError) {
+// Test the client when an unknown error occurs.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   envoy::service::auth::v2alpha::CheckRequest request;
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
@@ -106,9 +110,9 @@ TEST_F(ExtAuthzHttpClientTest, BasicError) {
   client_.onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
-TEST_F(ExtAuthzHttpClientTest, Cancel) {
+// Test the client when the request is canceled.
+TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   envoy::service::auth::v2alpha::CheckRequest request;
-
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
