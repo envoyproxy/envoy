@@ -14,6 +14,8 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+MATCHER_P(AuthzErrorResponse, status, "") { return arg->status == status; }
+
 MATCHER_P(AuthzDeniedResponse, response, "") {
   if (arg->status_code != response.status_code) {
     return false;

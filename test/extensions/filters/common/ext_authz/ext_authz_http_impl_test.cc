@@ -101,10 +101,8 @@ TEST_F(ExtAuthzHttpClientTest, BasicError) {
   envoy::service::auth::v2alpha::CheckRequest request;
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  auto authz_response = Response{};
-  authz_response.status = CheckStatus::Error;
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_.onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 

@@ -31,9 +31,11 @@ namespace ExtAuthz {
 class ExtAuthzGrpcClientTest : public testing::Test {
 public:
   ExtAuthzGrpcClientTest()
-      : async_client_(new Grpc::MockAsyncClient()),
-        client_(Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>()) {}
+      : async_client_(new Grpc::MockAsyncClient()), timeout_(10),
+        client_(Grpc::AsyncClientPtr{async_client_}, timeout_) {}
+
   Grpc::MockAsyncClient* async_client_;
+  absl::optional<std::chrono::milliseconds> timeout_;
   Grpc::MockAsyncRequest async_request_;
   GrpcClientImpl client_;
   MockRequestCallbacks request_callbacks_;
@@ -41,14 +43,16 @@ public:
 
   void expectCallSend(envoy::service::auth::v2alpha::CheckRequest& request) {
     EXPECT_CALL(*async_client_, send(_, ProtoEq(request), Ref(client_), _, _))
-        .WillOnce(
-            Invoke([this](const Protobuf::MethodDescriptor& service_method,
-                          const Protobuf::Message&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
-                          const absl::optional<std::chrono::milliseconds>&) -> Grpc::AsyncRequest* {
+        .WillOnce(Invoke(
+            [this](
+                const Protobuf::MethodDescriptor& service_method, const Protobuf::Message&,
+                Grpc::AsyncRequestCallbacks&, Tracing::Span&,
+                const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
               // TODO(dio): Use a defined constant value.
               EXPECT_EQ("envoy.service.auth.v2alpha.Authorization",
                         service_method.service()->full_name());
               EXPECT_EQ("Check", service_method.name());
+              EXPECT_EQ(timeout_->count(), timeout->count());
               return &async_request_;
             }));
   }
@@ -91,8 +95,8 @@ TEST_F(ExtAuthzGrpcClientTest, BasicDenied) {
 }
 
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
-  auto expected_body = std::string{"test"};
-  auto expected_headers = TestCommon::makeHeaderValueOption("foo", "bar", false);
+  const std::string expected_body{"test"};
+  const auto expected_headers = TestCommon::makeHeaderValueOption("foo", "bar", false);
   auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
                                                       envoy::type::StatusCode::Unauthorized,
                                                       expected_body, expected_headers);
@@ -118,22 +122,28 @@ TEST_F(ExtAuthzGrpcClientTest, BasicError) {
   expectCallSend(request);
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
-  auto authz_response = Response{};
-  authz_response.status = CheckStatus::Error;
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_.onFailure(Grpc::Status::Unknown, "", span_);
 }
 
 TEST_F(ExtAuthzGrpcClientTest, Cancel) {
   envoy::service::auth::v2alpha::CheckRequest request;
-
   EXPECT_CALL(*async_client_, send(_, _, _, _, _)).WillOnce(Return(&async_request_));
-
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
 
   EXPECT_CALL(async_request_, cancel());
   client_.cancel();
+}
+
+TEST_F(ExtAuthzGrpcClientTest, TimeoutFailure) {
+  envoy::service::auth::v2alpha::CheckRequest request;
+  expectCallSend(request);
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  client_.onFailure(Grpc::Status::DeadlineExceeded, "", span_);
 }
 
 } // namespace ExtAuthz
