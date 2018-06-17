@@ -17,13 +17,17 @@
             filename: certs/servercert.pem
           private_key:
             filename: certs/serverkey.pem
-      {% if kwargs.get('pin_double_proxy_client', False) %}
-      validation_context:
-        trusted_ca:
-          filename: certs/cacert.pm
-        #update comment from conflicting commit here
-        verify_certificate_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-      {% endif %}
+        {% if kwargs.get('pin_double_proxy_client', False) %}
+        validation_context:
+          trusted_ca:
+            filename: certs/cacert.pm
+          #This should be the hash of the /etc/envoy/envoy-double-proxy.pem cert used in the
+          #double proxy configuration.
+          verify_certificate_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+        {% endif %}
+    {%if proxy_proto%}
+    use_proxy_proto: true
+    {%endif%}
   {%endif %}
     filters:
     - name: envoy.http_connection_manager
@@ -41,16 +45,16 @@
           config:
             max_request_bytes: 5242880
             max_request_time: 120s
-        - name: envoy.router
-          config: {}
-        - name: envoy.rate_limit
-          config:
-            domain: envoy_front
-            request_type: external
         - name: envoy.health_check
           config:
             pass_through_mode: false
             endpoint: "/healthcheck"
+        - name: envoy.rate_limit
+          config:
+            domain: envoy_front
+            request_type: external
+        - name: envoy.router
+          config: {}
         add_user_agent: true
         tracing:
           operation_name: INGRESS
@@ -76,15 +80,16 @@
           config:
             path: /var/log/envoy/access_error.log
             format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
-    {%if proxy_proto%}
-    use_proxy_proto: true
-    {%endif%}
 {% endmacro -%}
 static_resources:
   listeners:
+    # TCP listeners for public HTTP/HTTPS endpoints. Assumes a TCP LB in front such as ELB which
+    # supports proxy proto.
   - {{ listener("TCP", "0.0.0.0", "9300", True, True)|indent(2) }}
   - {{ listener("TCP", "0.0.0.0", "9301", True, True)|indent(2) }}
-  - {{ listener("TCP", "0.0.0.0", "9400", True, True)|indent(2) }}
+    # TCP listener for backhaul traffic from the double proxy.
+    # See envoy_double_proxy.template.json
+  - {{ listener("TCP", "0.0.0.0", "9400", True, True, pin_double_proxy_client=True)|indent(2) }}
   clusters:
   - name: sds
     type: STRICT_DNS
@@ -113,6 +118,7 @@ static_resources:
         protocol: TCP
         address: collector-grpc.lightstep.com
         port_value: 443
+    http2_protocol_options: {}
   - name: main_website
     connect_timeout: 0.25s
     type: LOGICAL_DNS
@@ -135,6 +141,12 @@ rate_limit_service:
  grpc_service:
    envoy_grpc:
      cluster_name: ratelimit
+tracing:
+  http:
+    name: envoy.lightstep
+    config:
+      collector_cluster: lightstep_saas
+      access_token_file: "/etc/envoy/lightstep_access_token"
 runtime:
   symlink_root: /srv/runtime_data/current
   subdirectory: envoy
