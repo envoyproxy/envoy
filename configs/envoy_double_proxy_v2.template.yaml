@@ -1,4 +1,4 @@
-{%- macro listener(protocol, address, port_value, proxy_proto, tls) -%}
+{%- macro listener(protocol, address, port_value, tls, proxy_proto) -%}
 - name: listener_created_from_configgen
   address:
     socket_address:
@@ -17,6 +17,9 @@
           private_key:
             filename: certs/serverkey.pem
     {% endif %}
+    {% if proxy_proto %}
+    use_proxy_proto: true
+    {%endif -%}
     filters:
     - name: envoy.http_connection_manager
       config:
@@ -32,7 +35,8 @@
                 prefix: "/"
               route:
                 cluster: backhaul
-                timeout: 20000s
+                #Generally allow front proxy to control timeout and use this as a backstop
+                timeout: 20s
         http_filters:
         - name: envoy.health_check
           config:
@@ -71,14 +75,15 @@
         {% if proxy_proto %}
         use_remote_address: true
         {%endif -%}
-   {% if proxy_proto %}
-    use_proxy_proto: true
-   {%endif -%}
 {% endmacro -%}
 static_resources:
   listeners:
+  # TCP listener for external port 443 (TLS). Assumes a TCP LB in front such as ELB which
+  # supports proxy proto
   {{ listener("TCP", "0.0.0.0",9300,True, True)|indent(2) }}
-  {{ listener("TCP", "0.0.0.0",9301,True, True)|indent(2) }}
+  # TCP listener for external port 80 (non-TLS). Assumes a TCP LB in front such as ELB which
+  # supports proxy proto.
+  {{ listener("TCP", "0.0.0.0",9301,False, True)|indent(2) }}
   clusters:
   - name: statsd
     type: STATIC
@@ -98,6 +103,10 @@ static_resources:
         protocol: TCP
         address: front-proxy.yourcompany.net
         port_value: 9400
+    # There are so few connections going back
+    # that we can get some imbalance. Until we come up
+    # with a better solution just limit the requests
+    # so we can cycle and get better spread.
     max_requests_per_connection: 25000
     tls_context:
       common_tls_context:
@@ -111,6 +120,7 @@ static_resources:
             filename: certs/cacert.pem
           verify_subject_alt_name:
             - front-proxy.yourcompany.net
+    http2_protocol_options: {}
   - name: lightstep_saas
     type: LOGICAL_DNS
     connect_timeout: 1s
