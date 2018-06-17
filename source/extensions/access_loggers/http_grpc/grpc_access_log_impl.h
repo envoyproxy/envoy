@@ -118,7 +118,7 @@ public:
                     GrpcAccessLogStreamerSharedPtr grpc_access_log_streamer);
 
   static void responseFlagsToAccessLogResponseFlags(
-      envoy::config::filter::accesslog::v2::AccessLogCommon& common_access_log,
+      envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
       const RequestInfo::RequestInfo& request_info);
 
   // AccessLog::Instance

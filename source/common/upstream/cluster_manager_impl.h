@@ -287,6 +287,7 @@ private:
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;
     const PrioritySet* local_priority_set_{};
+    bool destroying_{};
   };
 
   struct ClusterData {

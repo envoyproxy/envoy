@@ -6,6 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
+#include "common/stats/stats_impl.h"
 
 #include "server/options_impl.h"
 
@@ -18,6 +19,9 @@
 using testing::HasSubstr;
 
 namespace Envoy {
+
+namespace {
+
 // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
 // separated by a single space: no fancy quoting or escaping.
 std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
@@ -26,36 +30,34 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
   for (const std::string& s : words) {
     argv.push_back(s.c_str());
   }
-  return std::unique_ptr<OptionsImpl>(new OptionsImpl(argv.size(), const_cast<char**>(&argv[0]),
-                                                      [](uint64_t, uint64_t, bool) { return "1"; },
-                                                      spdlog::level::warn));
+  return std::make_unique<OptionsImpl>(
+      argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
 }
 
+} // namespace
+
 TEST(OptionsImplTest, HotRestartVersion) {
-  try {
-    createOptionsImpl("envoy --hot-restart-version");
-    FAIL();
-  } catch (const NoServingException& e) {
-    SUCCEED();
+  // There's an evil static local in
+  // Stats::RawStatsData::initializeAndGetMutableMaxObjNameLength, which causes
+  // problems when all test.cc files are linked together for coverage-testing.
+  // This resets the static to the default options-value of 60. Note; this is only
+  // needed in coverage tests.
+  {
+    auto options = createOptionsImpl("envoy");
+    Stats::RawStatData::configureForTestsOnly(*options);
   }
+
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
+                          "NoServingException");
 }
 
 TEST(OptionsImplTest, InvalidMode) {
-  try {
-    createOptionsImpl("envoy --mode bogus");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("bogus"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --mode bogus"), MalformedArgvException, "bogus");
 }
 
 TEST(OptionsImplTest, InvalidCommandLine) {
-  try {
-    createOptionsImpl("envoy --blah");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("Couldn't find match for argument"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --blah"), MalformedArgvException,
+                          "Couldn't find match for argument");
 }
 
 TEST(OptionsImplTest, All) {
@@ -81,6 +83,58 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+
+  options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_EQ(Server::Mode::InitOnly, options->mode());
+}
+
+TEST(OptionsImplTest, SetAll) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  bool v2_config_only = options->v2ConfigOnly();
+  bool hot_restart_disabled = options->v2ConfigOnly();
+  options->setBaseId(109876);
+  options->setConcurrency(42);
+  options->setConfigPath("foo");
+  options->setConfigYaml("bogus:");
+  options->setV2ConfigOnly(!options->v2ConfigOnly());
+  options->setAdminAddressPath("path");
+  options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
+  options->setDrainTime(std::chrono::seconds(42));
+  options->setLogLevel(spdlog::level::trace);
+  options->setLogFormat("%L %n %v");
+  options->setLogPath("/foo/bar");
+  options->setParentShutdownTime(std::chrono::seconds(43));
+  options->setRestartEpoch(44);
+  options->setFileFlushIntervalMsec(std::chrono::milliseconds(45));
+  options->setMode(Server::Mode::Validate);
+  options->setServiceClusterName("cluster_foo");
+  options->setServiceNodeName("node_foo");
+  options->setServiceZone("zone_foo");
+  options->setMaxStats(12345);
+  options->setMaxObjNameLength(54321);
+  options->setHotRestartDisabled(!options->hotRestartDisabled());
+
+  EXPECT_EQ(109876, options->baseId());
+  EXPECT_EQ(42U, options->concurrency());
+  EXPECT_EQ("foo", options->configPath());
+  EXPECT_EQ("bogus:", options->configYaml());
+  EXPECT_EQ(!v2_config_only, options->v2ConfigOnly());
+  EXPECT_EQ("path", options->adminAddressPath());
+  EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
+  EXPECT_EQ(std::chrono::seconds(42), options->drainTime());
+  EXPECT_EQ(spdlog::level::trace, options->logLevel());
+  EXPECT_EQ("%L %n %v", options->logFormat());
+  EXPECT_EQ("/foo/bar", options->logPath());
+  EXPECT_EQ(std::chrono::seconds(43), options->parentShutdownTime());
+  EXPECT_EQ(44, options->restartEpoch());
+  EXPECT_EQ(std::chrono::milliseconds(45), options->fileFlushIntervalMsec());
+  EXPECT_EQ(Server::Mode::Validate, options->mode());
+  EXPECT_EQ("cluster_foo", options->serviceClusterName());
+  EXPECT_EQ("node_foo", options->serviceNodeName());
+  EXPECT_EQ("zone_foo", options->serviceZone());
+  EXPECT_EQ(12345U, options->maxStats());
+  EXPECT_EQ(54321U, options->maxObjNameLength());
+  EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
 }
 
 TEST(OptionsImplTest, DefaultParams) {
@@ -94,20 +148,18 @@ TEST(OptionsImplTest, DefaultParams) {
 }
 
 TEST(OptionsImplTest, BadCliOption) {
-  try {
-    createOptionsImpl("envoy -c hello --local-address-ip-version foo");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("error: unknown IP address version 'foo'"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
+                          MalformedArgvException, "error: unknown IP address version 'foo'");
 }
 
 TEST(OptionsImplTest, BadObjNameLenOption) {
-  try {
-    createOptionsImpl("envoy --max-obj-name-len 1");
-    FAIL();
-  } catch (const MalformedArgvException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("'max-obj-name-len' value specified"));
-  }
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
+                          "'max-obj-name-len' value specified");
 }
+
+TEST(OptionsImplTest, BadMaxStatsOption) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
+                          "'max-stats' value specified");
+}
+
 } // namespace Envoy

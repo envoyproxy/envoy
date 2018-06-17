@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/http/filter.h"
+#include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
@@ -16,6 +17,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
@@ -36,6 +38,7 @@ namespace Server {
  * Implementation of Server::Admin.
  */
 class AdminImpl : public Admin,
+                  public Network::FilterChainManager,
                   public Network::FilterChainFactory,
                   public Http::FilterChainFactory,
                   public Http::ConnectionManagerConfig,
@@ -59,8 +62,15 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
+  // Network::FilterChainManager
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+    return admin_filter_chain_.get();
+  }
+
   // Network::FilterChainFactory
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
@@ -82,6 +92,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
   uint32_t xffNumTrustedHops() const override { return 0; }
+  bool skipXffAppend() const override { return false; }
+  const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }
@@ -135,7 +147,7 @@ private:
                       Buffer::Instance& response);
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool pretty_print = false);
+                                 bool show_all, bool pretty_print = false);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -198,11 +210,9 @@ private:
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)) {}
 
     // Network::ListenerConfig
+    Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
-    Network::TransportSocketFactory& transportSocketFactory() override {
-      return parent_.transport_socket_factory_;
-    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() override { return 0; }
@@ -216,11 +226,28 @@ private:
     Http::ConnectionManagerListenerStats stats_;
   };
 
+  class AdminFilterChain : public Network::FilterChain {
+  public:
+    AdminFilterChain() {}
+
+    // Network::FilterChain
+    const Network::TransportSocketFactory& transportSocketFactory() const override {
+      return transport_socket_factory_;
+    }
+
+    const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+      return empty_network_filter_factory_;
+    }
+
+  private:
+    const Network::RawBufferSocketFactory transport_socket_factory_;
+    const std::vector<Network::FilterFactoryCb> empty_network_filter_factory_;
+  };
+
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
   Network::SocketPtr socket_;
-  Network::RawBufferSocketFactory transport_socket_factory_;
   Http::ConnectionManagerStats stats_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
@@ -235,6 +262,7 @@ private:
   AdminListener listener_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
+  const Network::FilterChainSharedPtr admin_filter_chain_;
 };
 
 /**

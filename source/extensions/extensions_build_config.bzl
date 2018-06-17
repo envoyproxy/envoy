@@ -8,6 +8,12 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
+    # gRPC Credentials Plugins
+    #
+
+    "envoy.grpc_credentials.file_based_metadata":      "//source/extensions/grpc_credentials/file_based_metadata:config",
+
+    #
     # Health checkers
     #
 
@@ -28,8 +34,10 @@ EXTENSIONS = {
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
+    "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
+    "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.squash":                        "//source/extensions/filters/http/squash:config",
 
@@ -59,6 +67,8 @@ EXTENSIONS = {
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
+    # TODO(zuercher): switch to config target once a filter exists
+    "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:transport_lib",
 
     #
     # Stat sinks

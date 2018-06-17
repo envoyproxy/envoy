@@ -1,5 +1,7 @@
 #include <vector>
 
+#include "common/network/listen_socket_impl.h"
+
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/mocks/api/mocks.h"
@@ -38,18 +40,6 @@ public:
   Event::Dispatcher& dispatcher_;
 };
 
-class FastMockConnectionSocket : public Network::MockConnectionSocket {
-public:
-  int fd() const override { return 42; }
-  void setRequestedServerName(absl::string_view server_name) override {
-    if (server_name == "example.com") {
-      got_server_name_ = true;
-    }
-  }
-
-  bool got_server_name_{false};
-};
-
 // Don't inherit from the mock implementation at all, because this is instantiated
 // in the hot loop.
 class FastMockFileEvent : public Event::FileEvent {
@@ -82,11 +72,12 @@ public:
 };
 
 static void BM_TlsInspector(benchmark::State& state) {
-  NiceMock<FastMockOsSysCalls> os_sys_calls(Tls::Test::generateClientHello("example.com"));
+  NiceMock<FastMockOsSysCalls> os_sys_calls(
+      Tls::Test::generateClientHello("example.com", "\x02h2\x08http/1.1"));
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  FastMockConnectionSocket socket;
+  Network::ConnectionSocketImpl socket(-1, nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 
@@ -94,8 +85,13 @@ static void BM_TlsInspector(benchmark::State& state) {
     Filter filter(cfg);
     filter.onAccept(cb);
     dispatcher.file_event_callback_(Event::FileReadyType::Read);
-    RELEASE_ASSERT(socket.got_server_name_);
-    socket.got_server_name_ = false;
+    RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls");
+    RELEASE_ASSERT(socket.requestedServerName() == "example.com");
+    RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
+                   socket.requestedApplicationProtocols().front() == "h2");
+    socket.setDetectedTransportProtocol("");
+    socket.setRequestedServerName("");
+    socket.setRequestedApplicationProtocols({});
   }
 }
 

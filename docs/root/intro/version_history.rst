@@ -4,11 +4,15 @@ Version history
 1.7.0 (Pending)
 ===============
 
-* access log: ability to log response trailers
-* access log: ability to format START_TIME
+* access log: added ability to log response trailers.
+* access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
-  to filter logs based on request headers
+  to filter logs based on request headers.
+* access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
+* access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
+  <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
+* access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
@@ -29,6 +33,9 @@ Version history
 * cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
 * cluster: fixed bug preventing the deletion of all endpoints in a priority
+* debug: added symbolized stack traces (where supported)
+* grpc: support added for the full set of :ref:`Google gRPC call credentials
+  <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -42,6 +49,7 @@ Version history
   to trigger health check response. Deprecated the
   :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: health check connections can now be configured to use http/2.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -52,22 +60,62 @@ Version history
 * http: local responses to gRPC requests are now sent as trailers-only gRPC responses instead of plain HTTP responses.
   Notably the HTTP response code is always "200" in this case, and the gRPC error code is carried in "grpc-status"
   header, optionally accompanied with a text message in "grpc-message" header.
+* http: added support for :ref:`via header
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.via>`
+  append.
+* http: added a :ref:`configuration option
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
+  to elide *x-forwarded-for* header modifications.
+* http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
+  encountering inline headers with multiple instances.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
-* load balancing: added :ref:`weighted round robin
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
+  (e.g. ALPN for TLS protocol).
+* listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
+  :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
+* listeners: removed restriction on all filter chains having identical filters.
+* load balancer: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
 * load balancer: :ref:`Locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
 * load balancer: ability to configure zone aware load balancer settings :ref:`through the API
-  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`
+  <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`.
+* load balancer: the :ref:`weighted least request
+  <arch_overview_load_balancing_types_least_request>` load balancing algorithm has been improved
+  to have better balance when operating in weighted mode.
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
-* router: The behavior of per-try timeouts have changed in the case where a portion of the response has 
-  already been proxied downstream when the timeout occurs. Previously, the response would be reset 
-  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the 
-  timeout will be ignored and the response will continue to proxy up to the global request timeout. 
+* rbac http filter: a :ref:`role-based access control http filter <config_http_filters_rbac>` has been added.
+* router: The behavior of per-try timeouts have changed in the case where a portion of the response has
+  already been proxied downstream when the timeout occurs. Previously, the response would be reset
+  leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
+  timeout will be ignored and the response will continue to proxy up to the global request timeout.
+* router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
+  to ignore the source port.
+* router: added an :ref:`prefix_match <envoy_api_field_route.HeaderMatcher.prefix_match>` match type
+  to explicitly match based on the prefix of a header value.
+* router: added an :ref:`suffix_match <envoy_api_field_route.HeaderMatcher.suffix_match>` match type
+  to explicitly match based on the suffix of a header value.
+* router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
+  to explicitly match based on a header's presence.
+* router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
+  which supports inverting all other match types to match based on headers which are not a desired value.
+* router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
+  generate session cookies.
+* router: added START_TIME as one of supported variables in :ref:`header
+  formatters <config_http_conn_man_headers_custom_request_headers>`.
+* router: added a :ref:`max_grpc_timeout <envoy_api_field_route.RouteAction.max_grpc_timeout>`
+  config option to specify the maximum allowable value for timeouts decoded from gRPC header field
+  `grpc-timeout`.
+* router: added a :ref:`configuration option
+  <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
+  header generation.
+* router: added 'unavailable' to the retriable gRPC status codes that can be specified
+  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -82,12 +130,26 @@ Version history
 * stats: added support for histograms.
 * stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
 * stats: updated stats sink interface to flush through a single call.
+* tls: added support for
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
+* tls: added support for multiple
+  :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
+  values.
+* tls: added support for using
+  :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`
+  and :ref:`verify_certificate_hash <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`
+  without :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+* tls: added support for allowing expired certificates with
+  :ref:`allow_expired_certificate <envoy_api_field_auth.CertificateValidationContext.allow_expired_certificate>`.
+* tls: added support for :ref:`renegotiation <envoy_api_field_auth.UpstreamTlsContext.allow_renegotiation>`
+  when acting as a client.
 * tls: removed support for legacy SHA-2 CBC cipher suites.
 * tracing: the sampling decision is now delegated to the tracers, allowing the tracer to decide when and if
   to use it. For example, if the :ref:`x-b3-sampled <config_http_conn_man_headers_x-b3-sampled>` header
   is supplied with the client request, its value will override any sampling decision made by the Envoy proxy.
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
+* upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
 
 1.6.0 (March 20, 2018)
 ======================
@@ -243,7 +305,7 @@ Version history
 * redis: the :ref:`redis proxy filter <config_network_filters_redis_proxy>` is now considered
   production ready.
 * redis: added :ref:`"drain close" <arch_overview_draining>` functionality.
-* router: added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded>` support.
+* router: added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded_set>` support.
 * router: added :ref:`regex <envoy_api_field_route.RouteMatch.regex>` route matching.
 * router: added :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
   for upstream requests.

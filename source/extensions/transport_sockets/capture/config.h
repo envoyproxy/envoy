@@ -34,10 +34,10 @@ class DownstreamCaptureSocketConfigFactory
     : public Server::Configuration::DownstreamTransportSocketConfigFactory,
       public CaptureSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr createTransportSocketFactory(
-      const std::string& listener_name, const std::vector<std::string>& server_names,
-      bool skip_context_update, const Protobuf::Message& config,
-      Server::Configuration::TransportSocketFactoryContext& context) override;
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message& config,
+                               Server::Configuration::TransportSocketFactoryContext& context,
+                               const std::vector<std::string>& server_names) override;
 };
 
 } // namespace Capture

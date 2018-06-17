@@ -44,7 +44,8 @@ namespace Server {
   GAUGE(parent_connections)                                                                        \
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
-  GAUGE(days_until_first_cert_expiring)
+  GAUGE(days_until_first_cert_expiring)                                                            \
+  GAUGE(hot_restart_epoch)
 // clang-format on
 
 struct ServerStats {

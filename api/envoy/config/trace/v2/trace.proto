@@ -55,6 +55,10 @@ message ZipkinConfig {
   // using a standard Zipkin installation, the API endpoint is typically
   // /api/v1/spans, which is the default value.
   string collector_endpoint = 2 [(validate.rules).string.min_bytes = 1];
+
+  // Determines whether a 128bit trace id will be used when creating a new
+  // trace instance. The default value is false, which will result in a 64 bit trace id being used.
+  bool trace_id_128bit = 3;
 }
 
 // DynamicOtConfig is used to dynamically load a tracer from a shared library

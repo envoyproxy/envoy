@@ -33,9 +33,9 @@ private:
 // An upstream which creates AutonomousStreams for new incoming streams.
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
-  AutonomousHttpConnection(QueuedConnectionWrapperPtr connection_wrapper, Stats::Store& store,
+  AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream)
-      : FakeHttpConnection(std::move(connection_wrapper), store, type), upstream_(upstream) {}
+      : FakeHttpConnection(shared_connection, store, type), upstream_(upstream) {}
 
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
 
@@ -53,16 +53,19 @@ public:
                      Network::Address::IpVersion version)
       : FakeUpstream(port, type, version) {}
   ~AutonomousUpstream();
-  bool createNetworkFilterChain(Network::Connection& connection) override;
+  bool
+  createNetworkFilterChain(Network::Connection& connection,
+                           const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
 
 private:
-  std::mutex headers_lock_;
+  Thread::MutexBasicLockable headers_lock_;
   std::unique_ptr<Http::TestHeaderMapImpl> last_request_headers_;
   std::vector<AutonomousHttpConnectionPtr> http_connections_;
+  std::vector<SharedConnectionWrapperPtr> shared_connections_;
 };
 
 } // namespace Envoy

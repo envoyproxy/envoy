@@ -12,7 +12,10 @@ envoy_package()
 envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
-    external_deps = ["backward"],
+    external_deps = [
+        "backward",
+        "abseil_symbolize",
+    ],
     tags = ["backtrace"],
     deps = ["//source/common/common:minimal_logger_lib"],
 )
@@ -203,6 +206,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
@@ -211,6 +215,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/ssl:context_config_lib",
         "//source/extensions/filters/listener:well_known_names",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2:lds_cc",

@@ -37,6 +37,12 @@ public:
    * balancing.
    */
   virtual const Network::Connection* downstreamConnection() const PURE;
+
+  /**
+   * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
+   * balancing.
+   */
+  virtual const Http::HeaderMap* downstreamHeaders() const PURE;
 };
 
 /**

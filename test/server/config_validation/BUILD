@@ -11,6 +11,7 @@ envoy_cc_test(
         "//include/envoy/http:message_interface",
         "//source/common/http:message_lib",
         "//source/server/config_validation:async_client_lib",
+        "//source/server/config_validation:dns_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],
@@ -25,6 +26,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/server/config_validation:cluster_manager_lib",
+        "//source/server/config_validation:dns_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
@@ -64,6 +66,7 @@ envoy_cc_test(
     deps = [
         "//source/common/event:libevent_lib",
         "//source/server/config_validation:api_lib",
+        "//source/server/config_validation:dns_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],

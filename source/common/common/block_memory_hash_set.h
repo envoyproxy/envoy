@@ -38,7 +38,7 @@ struct BlockMemoryHashSetOptions {
  * construction time. Value must provide these methods:
  *    absl::string_view Value::key()
  *    void Value::initialize(absl::string_view key)
- *    static size_t Value::size()
+ *    static uint64_t Value::size()
  *    static uint64_t Value::hash()
  *
  * This set may also be suitable for persisting a hash-table to long
@@ -82,13 +82,13 @@ public:
    * backing-store (eg) in memory, which we do after
    * constructing the object with the desired sizing.
    */
-  static uint32_t numBytes(const BlockMemoryHashSetOptions& options) {
-    uint32_t size =
+  static uint64_t numBytes(const BlockMemoryHashSetOptions& options) {
+    uint64_t size =
         cellOffset(options.capacity) + sizeof(Control) + options.num_slots * sizeof(uint32_t);
     return align(size);
   }
 
-  uint32_t numBytes() const { return numBytes(control_->options); }
+  uint64_t numBytes() const { return numBytes(control_->options); }
 
   /**
    * Returns the options structure that was used to construct the set.
@@ -103,7 +103,7 @@ public:
     // reachable from the slots, each of which has a valid
     // char_offset.
     //
-    // Avoid infinite loops if there is a next_cell cycle within a
+    // Avoid infinite loops if there is a next_cell_index cycle within a
     // slot. Note that the num_values message will be emitted outside
     // the loop.
     uint32_t num_values = 0;
@@ -115,7 +115,7 @@ public:
         Cell& cell = getCell(cell_index);
         absl::string_view key = cell.value.key();
         RELEASE_ASSERT(computeSlot(key) == slot);
-        next = cell.next_cell;
+        next = cell.next_cell_index;
         ++num_values;
       }
     }
@@ -127,7 +127,7 @@ public:
     // Don't infinite-loop with a corruption; break when we see there's a problem.
     for (uint32_t cell_index = control_->free_cell_index;
          (cell_index != Sentinal) && (num_free_entries <= expected_free_entries);
-         cell_index = getCell(cell_index).next_cell) {
+         cell_index = getCell(cell_index).next_cell_index) {
       ++num_free_entries;
     }
     RELEASE_ASSERT(num_free_entries == expected_free_entries);
@@ -158,8 +158,8 @@ public:
     const uint32_t slot = computeSlot(key);
     const uint32_t cell_index = control_->free_cell_index;
     Cell& cell = getCell(cell_index);
-    control_->free_cell_index = cell.next_cell;
-    cell.next_cell = slots_[slot];
+    control_->free_cell_index = cell.next_cell_index;
+    cell.next_cell_index = slots_[slot];
     slots_[slot] = cell_index;
     value = &cell.value;
     value->initialize(key);
@@ -180,16 +180,16 @@ public:
       Cell& cell = getCell(cell_index);
       if (cell.value.key() == key) {
         // Splice current cell out of slot-chain.
-        *cptr = cell.next_cell;
+        *cptr = cell.next_cell_index;
 
         // Splice current cell into free-list.
-        cell.next_cell = control_->free_cell_index;
+        cell.next_cell_index = control_->free_cell_index;
         control_->free_cell_index = cell_index;
 
         --control_->size;
         return true;
       }
-      next = &cell.next_cell;
+      next = &cell.next_cell_index;
     }
     return false;
   }
@@ -203,7 +203,7 @@ public:
    */
   Value* get(absl::string_view key) {
     const uint32_t slot = computeSlot(key);
-    for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell) {
+    for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell_index) {
       Cell& cell = getCell(c);
       if (cell.value.key() == key) {
         return &cell.value;
@@ -216,8 +216,8 @@ public:
    * Computes a version signature based on the options and the hash function.
    */
   std::string version() {
-    return fmt::format("options={} hash={}", control_->options.toString(),
-                       control_->hash_signature);
+    return fmt::format("options={} hash={} size={}", control_->options.toString(),
+                       control_->hash_signature, numBytes());
   }
 
 private:
@@ -244,9 +244,9 @@ private:
     const uint32_t last_cell = options.capacity - 1;
     for (uint32_t cell_index = 0; cell_index < last_cell; ++cell_index) {
       Cell& cell = getCell(cell_index);
-      cell.next_cell = cell_index + 1;
+      cell.next_cell_index = cell_index + 1;
     }
-    getCell(last_cell).next_cell = Sentinal;
+    getCell(last_cell).next_cell_index = Sentinal;
   }
 
   /**
@@ -292,7 +292,7 @@ private:
   struct Control {
     BlockMemoryHashSetOptions options; // Options established at map construction time.
     uint64_t hash_signature;           // Hash of a constant signature string.
-    uint32_t num_bytes;                // Bytes allocated on behalf of the map.
+    uint64_t num_bytes;                // Bytes allocated on behalf of the map.
     uint32_t size;                     // Number of values currently stored.
     uint32_t free_cell_index;          // Offset of first free cell.
   };
@@ -301,17 +301,17 @@ private:
    * Represents a value-cell, which is stored in a linked-list from each slot.
    */
   struct Cell {
-    uint32_t next_cell; // Offset of next cell in map->cells_, terminated with Sentinal.
-    Value value;        // Templated value field.
+    uint32_t next_cell_index; // Index of next cell in map->cells_, terminated with Sentinal.
+    Value value;              // Templated value field.
   };
 
   // It seems like this is an obvious constexpr, but it won't compile as one.
-  static size_t calculateAlignment() {
+  static uint64_t calculateAlignment() {
     return std::max(alignof(Cell), std::max(alignof(uint32_t), alignof(Control)));
   }
 
-  static uint32_t align(uint32_t size) {
-    const size_t alignment = calculateAlignment();
+  static uint64_t align(uint64_t size) {
+    const uint64_t alignment = calculateAlignment();
     // Check that alignment is a power of 2:
     // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
     RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0));
@@ -323,10 +323,10 @@ private:
    * simply an array index because we don't know the size of a key at
    * compile-time.
    */
-  static uint32_t cellOffset(uint32_t cell_index) {
+  static uint64_t cellOffset(uint32_t cell_index) {
     // sizeof(Cell) includes 'sizeof Value' which may not be accurate. So we need to
     // subtract that off, and add the template method's view of the actual value-size.
-    uint32_t cell_size = align(sizeof(Cell) + Value::size() - sizeof(Value));
+    uint64_t cell_size = align(sizeof(Cell) + Value::size() - sizeof(Value));
     return cell_index * cell_size;
   }
 

@@ -52,6 +52,8 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
+        ":listen_socket_interface",
+        ":transport_socket_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/upstream:host_description_interface",
     ],
@@ -67,7 +69,6 @@ envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
-        ":connection_interface",
         "//include/envoy/ssl:connection_interface",
     ],
 )

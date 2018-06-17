@@ -52,10 +52,12 @@ PROTO_RST="
   /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
   /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
   /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
+  /envoy/api/v2/core/http_uri/envoy/api/v2/core/http_uri.proto.rst
   /envoy/api/v2/core/config_source/envoy/api/v2/core/config_source.proto.rst
   /envoy/api/v2/core/grpc_service/envoy/api/v2/core/grpc_service.proto.rst
   /envoy/api/v2/core/health_check/envoy/api/v2/core/health_check.proto.rst
   /envoy/api/v2/core/protocol/envoy/api/v2/core/protocol.proto.rst
+  /envoy/api/v2/discovery/envoy/api/v2/discovery.proto.rst
   /envoy/api/v2/auth/cert/envoy/api/v2/auth/cert.proto.rst
   /envoy/api/v2/eds/envoy/api/v2/eds.proto.rst
   /envoy/api/v2/endpoint/endpoint/envoy/api/v2/endpoint/endpoint.proto.rst
@@ -67,8 +69,9 @@ PROTO_RST="
   /envoy/api/v2/lds/envoy/api/v2/lds.proto.rst
   /envoy/api/v2/listener/listener/envoy/api/v2/listener/listener.proto.rst
   /envoy/api/v2/ratelimit/ratelimit/envoy/api/v2/ratelimit/ratelimit.proto.rst
+  /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
+  /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
-  /envoy/api/v2/discovery/envoy/api/v2/discovery.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
   /envoy/config/metrics/v2/stats/envoy/config/metrics/v2/stats.proto.rst
@@ -76,24 +79,32 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
+  /envoy/config/filter/http/ext_authz/v2alpha/ext_authz/envoy/config/filter/http/ext_authz/v2alpha/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
   /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
   /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
   /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
   /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
+  /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
   /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
   /envoy/config/filter/http/squash/v2/squash/envoy/config/filter/http/squash/v2/squash.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
+  /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
   /envoy/config/filter/network/mongo_proxy/v2/mongo_proxy/envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.proto.rst
   /envoy/config/filter/network/rate_limit/v2/rate_limit/envoy/config/filter/network/rate_limit/v2/rate_limit.proto.rst
   /envoy/config/filter/network/redis_proxy/v2/redis_proxy/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto.rst
   /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
+  /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
   /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
-  /envoy/extensions/common/tap/v2alpha/capture/envoy/extensions/common/tap/v2alpha/capture.proto.rst
+  /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
+  /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
+  /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
+  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
+  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
 "

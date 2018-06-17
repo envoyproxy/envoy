@@ -83,28 +83,23 @@ message GrpcService {
 
         // Google Compute Engine credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
-        // [#not-implemented-hide:]
         google.protobuf.Empty google_compute_engine = 2;
 
         // Google refresh token credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a96901c997b91bc6513b08491e0dca37c.
-        // [#not-implemented-hide:]
         string google_refresh_token = 3;
 
         // Service Account JWT Access credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a92a9f959d6102461f66ee973d8e9d3aa.
-        // [#not-implemented-hide:]
         ServiceAccountJWTAccessCredentials service_account_jwt_access = 4;
 
         // Google IAM credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a9fc1fc101b41e680d47028166e76f9d0.
-        // [#not-implemented-hide:]
         GoogleIAMCredentials google_iam = 5;
 
         // Custom authenticator credentials.
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a823c6a4b19ffc71fb33e90154ee2ad07.
         // https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms.
-        // [#not-implemented-hide:]
         MetadataCredentialsFromPlugin from_plugin = 6;
       }
     }

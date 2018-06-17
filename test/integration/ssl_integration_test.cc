@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/config/transport_socket/capture/v2alpha/capture.pb.h"
-#include "envoy/extensions/common/tap/v2alpha/capture.pb.h"
+#include "envoy/data/tap/v2alpha/capture.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -42,8 +42,6 @@ void SslIntegrationTest::initialize() {
 }
 
 void SslIntegrationTest::TearDown() {
-  test_server_.reset();
-  fake_upstreams_.clear();
   client_ssl_ctx_plain_.reset();
   client_ssl_ctx_alpn_.reset();
   client_ssl_ctx_san_.reset();
@@ -192,7 +190,7 @@ public:
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       // Configure inner SSL transport socket based on existing config.
       envoy::api::v2::core::TransportSocket ssl_transport_socket;
-      ssl_transport_socket.set_name("ssl");
+      ssl_transport_socket.set_name("tls");
       MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
       // Configure outer capture transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
@@ -249,7 +247,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
                                              expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::common::tap::v2alpha::Trace trace;
+  envoy::data::tap::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.connection().id());
@@ -294,7 +292,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::extensions::common::tap::v2alpha::Trace trace;
+  envoy::data::tap::v2alpha::Trace trace;
   MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));

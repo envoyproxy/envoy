@@ -2,8 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
     "envoy_basic_cc_library",
+    "envoy_cc_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -39,6 +39,7 @@ envoy_cc_test_library(
     hdrs = ["network_utility.h"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:address_lib",
         "//source/common/network:raw_buffer_socket_lib",

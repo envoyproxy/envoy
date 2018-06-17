@@ -150,6 +150,7 @@ envoy_cc_library(
     hdrs = ["raw_buffer_socket.h"],
     deps = [
         ":utility_lib",
+        "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",

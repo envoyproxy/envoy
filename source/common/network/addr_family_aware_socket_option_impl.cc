@@ -10,11 +10,11 @@
 namespace Envoy {
 namespace Network {
 
-bool AddrFailyAwareSocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
+bool AddrFamilyAwareSocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
-bool AddrFailyAwareSocketOptionImpl::setIpSocketOption(
+bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
     Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
     const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   // If this isn't IP, we're out of luck.

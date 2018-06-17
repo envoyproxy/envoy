@@ -49,6 +49,7 @@ envoy_cc_test(
         "//source/server:connection_handler_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:network_utility_lib",
     ],
 )
 
@@ -102,6 +103,7 @@ envoy_cc_test(
     srcs = ["options_impl_test.cc"],
     deps = [
         "//source/common/common:utility_lib",
+        "//source/common/stats:stats_lib",
         "//source/server:options_lib",
         "//test/test_common:utility_lib",
     ],
@@ -135,7 +137,9 @@ envoy_cc_test(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
+        "//source/common/ssl:ssl_socket_lib",
         "//source/extensions/filters/listener/original_dst:config",
+        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/ssl:config",

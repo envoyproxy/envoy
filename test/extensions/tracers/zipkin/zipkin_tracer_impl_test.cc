@@ -466,6 +466,34 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   EXPECT_TRUE(zipkin_span->span().sampled());
 }
 
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
+  setupValidDriver();
+
+  const uint64_t trace_id_high = Util::generateRandom64();
+  const uint64_t trace_id_low = Util::generateRandom64();
+  const std::string trace_id = Hex::uint64ToHex(trace_id_high) + Hex::uint64ToHex(trace_id_low);
+  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+
+  request_headers_.insertXB3TraceId().value(trace_id);
+  request_headers_.insertXB3SpanId().value(span_id);
+  request_headers_.insertXB3ParentSpanId().value(parent_id);
+
+  // New span will have an SR annotation - so its span and parent ids will be
+  // the same as the supplied span context (i.e. shared context)
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+
+  EXPECT_EQ(trace_id_high, zipkin_span->span().traceIdHigh());
+  EXPECT_EQ(trace_id_low, zipkin_span->span().traceId());
+  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->span().sampled());
+}
+
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   setupValidDriver();
 
@@ -500,6 +528,40 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
+}
+
+TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
+  setupValidDriver();
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  span->setSampled(false);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to not sample
+  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
+}
+
+TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
+  setupValidDriver();
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, false});
+
+  span->setSampled(true);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to sample
+  EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
 }
 
 } // namespace Zipkin

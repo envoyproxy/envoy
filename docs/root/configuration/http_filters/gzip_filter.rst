@@ -20,6 +20,15 @@ Configuration
   automatically set to 9. This issue might be solved in future releases of
   the library.
 
+Runtime
+-------
+
+The Gzip filter supports the following runtime settings:
+
+gzip.filter_enabled
+    The % of requests for which the filter is enabled. Default is 100.
+
+
 How it works
 ------------
 When gzip filter is enabled, request and response headers are inspected to
