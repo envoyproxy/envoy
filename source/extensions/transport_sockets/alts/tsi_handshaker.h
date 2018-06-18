@@ -36,7 +36,7 @@ public:
   typedef std::unique_ptr<NextResult> NextResultPtr;
 
   /**
-   * Called when `next` is done, this may be called in line in `next` if the handshaker is not
+   * Called when `next` is done, this may be called inline in `next` if the handshaker is not
    * asynchronous.
    * @param result
    */
