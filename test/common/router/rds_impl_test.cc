@@ -108,7 +108,7 @@ public:
     EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
     rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
                                            factory_context_, "foo.",
-                                           *route_config_provider_manager_, system_time_source_);
+                                           *route_config_provider_manager_);
     expectRequest();
     factory_context_.init_manager_.initialize();
   }
@@ -133,7 +133,7 @@ TEST_F(RdsImplTest, RdsAndStatic) {
 
   EXPECT_THROW(RouteConfigProviderUtil::create(
                    parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
-                   *route_config_provider_manager_, system_time_source_),
+                   *route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -156,7 +156,7 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
   factory_context_.local_info_.node_.set_id("");
   EXPECT_THROW(RouteConfigProviderUtil::create(
                    parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
-                   *route_config_provider_manager_, system_time_source_),
+                   *route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -179,8 +179,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
       RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                      factory_context_, "foo.", *route_config_provider_manager_,
-                                      system_time_source_),
+                                      factory_context_, "foo.", *route_config_provider_manager_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
@@ -369,15 +368,16 @@ public:
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
+    ON_CALL(system_time_source_, currentTime())
+        .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+    ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    ON_CALL(system_time_source_, currentTime())
-        .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
     provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(
-        rds_, factory_context_, "foo_prefix.", system_time_source_);
+        rds_, factory_context_, "foo_prefix.");
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -502,7 +502,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   // shared_ptr to the same provider as the one above.
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                "foo_prefix", system_time_source_);
+                                                                "foo_prefix");
   // So this means that both shared_ptrs should be the same.
   EXPECT_EQ(provider_, provider2);
   EXPECT_EQ(2UL, provider_.use_count());
@@ -529,7 +529,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   new Event::MockTimer(&factory_context_.dispatcher_);
   RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->getRdsRouteConfigProvider(rds2, factory_context_,
-                                                                "foo_prefix", system_time_source_);
+                                                                "foo_prefix");
   EXPECT_NE(provider3, provider_);
   EXPECT_EQ(2UL, provider_.use_count());
   EXPECT_EQ(1UL, provider3.use_count());
