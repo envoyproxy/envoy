@@ -53,7 +53,7 @@ public:
   RawHttpClientImpl client_;
 };
 
-// Test the client when an ok response is received. 
+// Test the client when an ok response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "200", false);
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);

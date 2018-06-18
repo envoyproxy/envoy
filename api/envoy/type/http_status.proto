@@ -4,9 +4,9 @@ package envoy.type;
 
 import "validate/validate.proto";
 
+// HTTP response codes supported in Envoy <http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml>
 enum StatusCode {
-  // `Empty` is not part of the HTTP response code specification.
-  // http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+  // Empty - Not part of the HTTP status code specification, and not supported in Envoy. This code is needed to allow using `enum` type.
   Empty                         = 0;
   
   Continue                      = 100;
@@ -72,7 +72,7 @@ enum StatusCode {
   
 }
 
-// HTTP status code.
+// HTTP status.
 message HttpStatus {
   // Supplies HTTP response code.
   StatusCode code = 1 [

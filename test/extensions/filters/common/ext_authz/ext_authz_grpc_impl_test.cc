@@ -58,7 +58,7 @@ public:
   }
 };
 
-// Test the client when an ok response is received.  
+// Test the client when an ok response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::Ok);
   auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
