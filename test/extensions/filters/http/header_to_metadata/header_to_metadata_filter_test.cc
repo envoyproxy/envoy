@@ -240,6 +240,45 @@ response_rules:
   EXPECT_EQ(empty_headers, incoming_headers);
 }
 
+/**
+ * No rules set.
+ */
+TEST_F(HeaderToMetadataTest, NoRules) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-something
+response_rules:
+  - header: x-something-else
+)EOF";
+  initializeFilter(config);
+  Http::TestHeaderMapImpl headers{};
+
+  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+}
+
+/**
+ * Empty values not added to metadata.
+ */
+TEST_F(HeaderToMetadataTest, NoEmptyValues) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF";
+  initializeFilter(config);
+  Http::TestHeaderMapImpl headers{{"x-version", ""}};
+
+  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

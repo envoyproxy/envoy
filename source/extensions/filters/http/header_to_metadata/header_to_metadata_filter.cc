@@ -132,30 +132,32 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
     const auto& rule = rulePair.second;
     const Http::HeaderEntry* header_entry = headers.get(header);
 
-    if (header_entry != nullptr) {
+    if (header_entry != nullptr && rule.has_on_header_present()) {
       const auto& keyval = rule.on_header_present();
       const auto& value = keyval.value().empty()
                               ? std::string(header_entry->value().getStringView())
                               : keyval.value();
-      const auto& nspace = decideNamespace(keyval.metadata_namespace());
-      addMetadata(structsByNamespace, nspace, keyval.key(), value, keyval.type());
+
+      if (!value.empty()) {
+        const auto& nspace = decideNamespace(keyval.metadata_namespace());
+        addMetadata(structsByNamespace, nspace, keyval.key(), value, keyval.type());
+      } else {
+        ENVOY_LOG(debug, "value is empty, not adding metadata");
+      }
 
       if (rule.remove()) {
         headers.remove(header);
       }
-    } else {
-      // Should we add metadata if the header is missing?
-
+    } else if (rule.has_on_header_missing()) {
+      // Add metadata for the header missing case.
       const auto& keyval = rule.on_header_missing();
 
-      // Key empty means keyval wasn't set.
-      // TODO(rgs): is there a more idiomatic way to do this?
-      if (keyval.key().empty()) {
-        continue;
+      if (!keyval.value().empty()) {
+        const auto& nspace = decideNamespace(keyval.metadata_namespace());
+        addMetadata(structsByNamespace, nspace, keyval.key(), keyval.value(), keyval.type());
+      } else {
+        ENVOY_LOG(debug, "value is empty, not adding metadata");
       }
-
-      const auto& nspace = decideNamespace(keyval.metadata_namespace());
-      addMetadata(structsByNamespace, nspace, keyval.key(), keyval.value(), keyval.type());
     }
   }
 
