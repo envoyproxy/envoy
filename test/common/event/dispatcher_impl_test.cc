@@ -96,7 +96,8 @@ TEST_F(DispatcherImplTest, Post) {
   }
 }
 
-// Ensure that n
+// Ensure that there is no deadlock related to calling a posted callback, or
+// destructing a closure when finished calling it.
 TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
   class PostOnDestruct {
   public:
