@@ -60,7 +60,7 @@ TEST_F(TsiHandshakerTest, DoHandshake) {
   CHandshakerResultPtr server_result;
 
   client_callbacks_.expectDone(TSI_OK, client_sent, client_result);
-  client_handshaker_.next(server_sent); // Intially server_sent is empty.
+  client_handshaker_.next(server_sent); // Initially server_sent is empty.
   EXPECT_EQ(nullptr, client_result);
   EXPECT_EQ("CLIENT_INIT", TestUtility::bufferToString(client_sent).substr(4));
 
@@ -114,7 +114,7 @@ TEST_F(TsiHandshakerTest, IncompleteData) {
   CHandshakerResultPtr server_result;
 
   client_callbacks_.expectDone(TSI_OK, client_sent, client_result);
-  client_handshaker_.next(server_sent); // Intially server_sent is empty.
+  client_handshaker_.next(server_sent); // Initially server_sent is empty.
   EXPECT_EQ(nullptr, client_result);
   EXPECT_EQ("CLIENT_INIT", TestUtility::bufferToString(client_sent).substr(4));
 
