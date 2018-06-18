@@ -129,7 +129,8 @@ private:
   RdsRouteConfigProviderImpl(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager);
+      const std::string& stat_prefix,
+      RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
@@ -161,7 +162,8 @@ public:
 
   RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) override;
+      Server::Configuration::FactoryContext& factory_context,
+      const std::string& stat_prefix) override;
 
   RouteConfigProviderSharedPtr
   getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

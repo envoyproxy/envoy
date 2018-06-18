@@ -380,8 +380,8 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
-  MOCK_METHOD0(systemTimeSource,  SystemTimeSource&());
-  MOCK_METHOD0(monotonicTimeSource,  MonotonicTimeSource&());
+  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
+  MOCK_METHOD0(monotonicTimeSource, MonotonicTimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
