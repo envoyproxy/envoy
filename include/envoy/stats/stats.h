@@ -423,8 +423,8 @@ public:
    * @param tags the extracted tag values.
    * @return Counter* a counter, or nullptr if allocation failed.
    */
-  virtual CounterSharedPtr makeCounter(const std::string& name, std::string& tag_extracted_name,
-                                       std::vector<Tag>& tags) PURE;
+  virtual CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                                       std::vector<Tag>&& tags) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -432,8 +432,8 @@ public:
    * @param tags the extracted tag values.
    * @return Counter* a gauge, or nullptr if allocation failed.
    */
-  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string& tag_extracted_name,
-                                   std::vector<Tag>& tags) PURE;
+  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                                   std::vector<Tag>&& tags) PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gaugaes

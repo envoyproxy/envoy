@@ -177,10 +177,12 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-    std::shared_ptr<StatType> stat = (parent_.alloc_.*make_stat)(name, tag_extracted_name, tags);
+    std::shared_ptr<StatType> stat =
+        (parent_.alloc_.*make_stat)(name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      stat = (parent_.heap_allocator_.*make_stat)(name, tag_extracted_name, tags);
+      stat = (parent_.heap_allocator_.*make_stat)(name, std::move(tag_extracted_name),
+                                                  std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;

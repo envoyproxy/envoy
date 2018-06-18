@@ -364,8 +364,8 @@ void SourceImpl::clearCache() {
 }
 
 CounterSharedPtr RawStatDataAllocator::makeCounter(const std::string& name,
-                                                   std::string& tag_extracted_name,
-                                                   std::vector<Tag>& tags) {
+                                                   std::string&& tag_extracted_name,
+                                                   std::vector<Tag>&& tags) {
   RawStatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;
@@ -375,8 +375,8 @@ CounterSharedPtr RawStatDataAllocator::makeCounter(const std::string& name,
 }
 
 GaugeSharedPtr RawStatDataAllocator::makeGauge(const std::string& name,
-                                               std::string& tag_extracted_name,
-                                               std::vector<Tag>& tags) {
+                                               std::string&& tag_extracted_name,
+                                               std::vector<Tag>&& tags) {
   RawStatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;

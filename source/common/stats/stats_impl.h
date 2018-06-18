@@ -312,10 +312,10 @@ private:
 class RawStatDataAllocator : public StatDataAllocator {
 public:
   // StatDataAllocator
-  CounterSharedPtr makeCounter(const std::string& name, std::string& tag_extracted_name,
-                               std::vector<Tag>& tags) override;
-  GaugeSharedPtr makeGauge(const std::string& name, std::string& tag_extracted_name,
-                           std::vector<Tag>& tags) override;
+  CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                               std::vector<Tag>&& tags) override;
+  GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags) override;
 
   /**
    * @param name the full name of the stat.
@@ -533,12 +533,12 @@ public:
       : counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_.makeCounter(name, tag_extracted_name, tags);
+          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
         }),
         gauges_([this](const std::string& name) -> GaugeSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_.makeGauge(name, tag_extracted_name, tags);
+          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
         }),
         histograms_([this](const std::string& name) -> HistogramSharedPtr {
           return std::make_shared<HistogramImpl>(name, *this, std::string(name),
