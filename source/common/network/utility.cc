@@ -303,17 +303,13 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
   }
 
   if (status == 0) {
-    if
-      orig_addr.ss_family == AF_INET {
-        return Address::InstanceConstSharedPtr{
-            new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-      }
-    else if
-      orig_addr.ss_family == AF_INET6 {
-        return Address::InstanceConstSharedPtr{
-            new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-      }
-    else {
+    if (orig_addr.ss_family == AF_INET) {
+      return Address::InstanceConstSharedPtr{
+          new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+    } else if (orig_addr.ss_family == AF_INET6) {
+      return Address::InstanceConstSharedPtr{
+          new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+    } else {
       return nullptr;
     }
   }
