@@ -65,7 +65,7 @@ public:
   }
 
   Runtime::Loader& runtime() { return runtime_; }
-  Stats::Scope& scope() { return scope_; }
+  GzipStats& stats() { return stats_; }
   const std::string stats_prefix() { return stats_prefix_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
@@ -86,6 +86,10 @@ private:
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
   static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
 
+  static GzipStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return GzipStats{ALL_GZIP_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  }
+
   Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
   Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
 
@@ -97,7 +101,7 @@ private:
   bool disable_on_etag_header_;
   bool remove_accept_encoding_header_;
   const std::string stats_prefix_;
-  Stats::Scope& scope_;
+  GzipStats stats_;
   Runtime::Loader& runtime_;
 };
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
@@ -152,15 +156,10 @@ private:
   void sanitizeEtagHeader(Http::HeaderMap& headers);
   void insertVaryHeader(Http::HeaderMap& headers);
 
-  static GzipStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return GzipStats{ALL_GZIP_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
-  }
-
   bool skip_compression_;
   Buffer::OwnedImpl compressed_data_;
   Compressor::ZlibCompressorImpl compressor_;
   GzipFilterConfigSharedPtr config_;
-  GzipStats stats_;
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

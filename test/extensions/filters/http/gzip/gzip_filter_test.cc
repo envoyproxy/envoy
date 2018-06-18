@@ -63,7 +63,6 @@ protected:
     envoy::config::filter::http::gzip::v2::Gzip gzip;
     MessageUtil::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
-    EXPECT_EQ("test.gzip.", config_->stats_prefix());
     filter_.reset(new GzipFilter(config_));
   }
 
