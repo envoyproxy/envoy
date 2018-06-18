@@ -462,8 +462,7 @@ void InstanceImpl::shutdownAdmin() {
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
-  config_dump->mutable_last_updated()->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
-      std::chrono::system_clock::to_time_t(bootstrap_config_update_time_)));
+  DurationUtil::writeSystemClockTime(bootstrap_config_update_time_, config_dump->mutable_last_updated());
   return config_dump;
 }
 
