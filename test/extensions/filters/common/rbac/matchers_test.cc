@@ -223,13 +223,13 @@ TEST(MetadataMatcher, MetadataMatcher) {
   metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("rbac", label));
 
-  envoy::api::v2::core::MetadataMatcher matcher;
+  envoy::type::matchers::MetadataMatcher matcher;
   matcher.set_filter("rbac");
   matcher.add_path("label");
 
-  matcher.add_values()->set_exact_match("test");
+  matcher.add_values()->mutable_string_match()->set_exact("test");
   checkMatcher(MetadataMatcher(matcher), false, conn, header, metadata);
-  matcher.add_values()->set_exact_match("prod");
+  matcher.add_values()->mutable_string_match()->set_exact("prod");
   checkMatcher(MetadataMatcher(matcher), true, conn, header, metadata);
 }
 

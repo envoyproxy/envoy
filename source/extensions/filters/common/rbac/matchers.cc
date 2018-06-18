@@ -1,7 +1,6 @@
 #include "extensions/filters/common/rbac/matchers.h"
 
 #include "common/common/assert.h"
-#include "common/config/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -138,7 +137,7 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
                               const envoy::api::v2::core::Metadata& metadata) const {
-  return Envoy::Config::Metadata::match(matcher_, metadata);
+  return matcher_.match(metadata);
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,

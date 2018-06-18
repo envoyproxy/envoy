@@ -114,6 +114,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "matchers_lib",
+    srcs = ["matchers.cc"],
+    hdrs = ["matchers.h"],
+    deps = [
+        ":utility_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/type/matchers:metadata_cc",
+        "@envoy_api//envoy/type/matchers:number_cc",
+        "@envoy_api//envoy/type/matchers:string_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "non_copyable",
     hdrs = ["non_copyable.h"],
 )

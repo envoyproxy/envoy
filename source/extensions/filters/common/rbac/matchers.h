@@ -2,10 +2,12 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/rbac/v2alpha/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
@@ -31,6 +33,7 @@ public:
    * @param connection the downstream connection used to match against.
    * @param headers    the request headers used to match against. An empty map should be used if
    *                   there are none headers available.
+   * @param metadata   the additional information about the action/principal.
    */
   virtual bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                        const envoy::api::v2::core::Metadata& metadata) const PURE;
@@ -174,13 +177,13 @@ private:
 
 class MetadataMatcher : public Matcher {
 public:
-  MetadataMatcher(const envoy::api::v2::core::MetadataMatcher& matcher) : matcher_(matcher) {}
+  MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata& metadata) const override;
 
 private:
-  const envoy::api::v2::core::MetadataMatcher matcher_;
+  const Envoy::Matchers::MetadataMatcher matcher_;
 };
 
 } // namespace RBAC
