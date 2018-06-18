@@ -307,11 +307,11 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager();
 
-  MOCK_METHOD4(getRdsRouteConfigProvider,
+  MOCK_METHOD3(getRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, SystemTimeSource& system_time_source));
+                   const std::string& stat_prefix));
   MOCK_METHOD2(
       getStaticRouteConfigProvider,
       RouteConfigProviderSharedPtr(const envoy::api::v2::RouteConfiguration& route_config,

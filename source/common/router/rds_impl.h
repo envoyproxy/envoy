@@ -38,8 +38,7 @@ public:
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-         RouteConfigProviderManager& route_config_provider_manager,
-         SystemTimeSource& system_time_source);
+         RouteConfigProviderManager& route_config_provider_manager);
 };
 
 /**
@@ -130,8 +129,7 @@ private:
   RdsRouteConfigProviderImpl(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
-      SystemTimeSource& system_time_source);
+      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
@@ -148,7 +146,6 @@ private:
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
-  SystemTimeSource& system_time_source_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -164,8 +161,7 @@ public:
 
   RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-      SystemTimeSource& system_time_source) override;
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) override;
 
   RouteConfigProviderSharedPtr
   getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,

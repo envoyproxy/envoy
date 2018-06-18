@@ -128,6 +128,16 @@ public:
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return SystemTimeSource& a reference to the top-level SystemTime source.
+   */
+  virtual SystemTimeSource& systemTimeSource() PURE;
+
+  /**
+   * @return MonotonicTimeSource& a reference to the top-level MonotonicTime source.
+   */
+  virtual MonotonicTimeSource& monotonicTimeSource() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

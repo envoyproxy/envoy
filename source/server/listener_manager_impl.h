@@ -270,6 +270,12 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
+   SystemTimeSource& systemTimeSource()  override {
+    return ProdSystemTimeSource::instance_;
+  }
+   MonotonicTimeSource& monotonicTimeSource()  override {
+    return ProdMonotonicTimeSource::instance_;
+  }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
