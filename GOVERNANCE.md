@@ -76,7 +76,8 @@
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
   "1.6.0". Get a review and merge.
-* **Wait for tests to pass on master.**
+* **Wait for tests to pass on
+  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
@@ -92,6 +93,8 @@
   notes](docs/root/intro/version_history.rst) for the following version. E.g., "1.7.0".
 * Update [DEPRECATED.md](DEPRECATED.md) to remove the '(pending)' comment on the current version,
   replacing it with the release date. Add a placeholder for the next version.
+* Run the deprecate_versions.py script to file tracking issues for code which
+  can be removed.
 
 ## When does a maintainer lose maintainer status
 
