@@ -56,9 +56,13 @@ private:
 
   // A container to hold a specifiers (%f, %Nf, %s) found in a format string.
   struct Specifier {
-    Specifier(const size_t position, const size_t width, const std::string& segment,
-              const bool second = false)
-        : position_(position), width_(width), segment_(segment), second_(second) {}
+    // To build a subsecond-specifier.
+    Specifier(const size_t position, const size_t width, const std::string& segment)
+        : position_(position), width_(width), segment_(segment), second_(false) {}
+
+    // To build a second-specifier (%s), the number of characters to be replaced is always 2.
+    Specifier(const size_t position, const std::string& segment)
+        : position_(position), width_(2), segment_(segment), second_(true) {}
 
     // The position/index of a specifier in a format string.
     const size_t position_;

@@ -126,22 +126,24 @@ std::string DateFormatter::parse(const std::string& format_string) {
     const std::string& width_specifier = matched[2];
     const std::string& second_specifier = matched[3];
 
-    // If %f is the specifier, the width value should be 9 (the number of nanosecond digits).
-    // While if the specifier is %s, the width of it should be 2.
-    const size_t width =
-        width_specifier.empty() ? (second_specifier.empty() ? 9 : 2) : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(), std::string(width, '?'));
+    // In the template string to be used in runtime substitution, the width is the number of
+    // characters to be replaced.
+    const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
+    new_format_string.replace(matched.position(), matched.length(),
+                              std::string(second_specifier.empty() ? width : 2, '?'));
 
     ASSERT(step < new_format_string.size());
 
     // This records matched position, the width of current subsecond pattern, and also the string
     // segment before the matched position. These values will be used later at data path.
-    Specifier specifier(matched.position(), width,
-                        new_format_string.substr(step, matched.position() - step),
-                        !second_specifier.empty());
-    specifiers_.emplace_back(specifier);
+    specifiers_.emplace_back(
+        second_specifier.empty()
+            ? Specifier(matched.position(), width,
+                        new_format_string.substr(step, matched.position() - step))
+            : Specifier(matched.position(),
+                        new_format_string.substr(step, matched.position() - step)));
 
-    step = specifier.position_ + specifier.width_;
+    step = specifiers_.back().position_ + specifiers_.back().width_;
   }
 
   // To capture the segment after the last specifier pattern of a format string by creating a zero
