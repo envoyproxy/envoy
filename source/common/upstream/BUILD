@@ -171,7 +171,6 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
-        "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
     ],
 )
 

@@ -13,7 +13,7 @@ HDSReporter::HDSReporter(const envoy::api::v2::core::Node& node,
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")) {
+          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck"))  {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendHealthCheckRequest(); });
@@ -67,6 +67,7 @@ void HDSReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response ", message->DebugString());
   stats_.requests_.inc();
+  stream_->sendMessage(health_check_request_, false);
 }
 
 void HDSReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
