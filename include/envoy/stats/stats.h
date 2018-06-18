@@ -421,7 +421,8 @@ public:
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the extracted tag values.
-   * @return Counter* a counter, or nullptr if allocation failed.
+   * @return Counter* a counter, or nullptr if allocation failed, in which case tag_extracted_name
+   *     and tags are not moved.
    */
   virtual CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
                                        std::vector<Tag>&& tags) PURE;
@@ -430,7 +431,8 @@ public:
    * @param name the full name of the stat.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the extracted tag values.
-   * @return Counter* a gauge, or nullptr if allocation failed.
+   * @return Counter* a gauge, or nullptr if allocation failed, in which case tag_extracted_name
+   *     and tags are not moved.
    */
   virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
                                    std::vector<Tag>&& tags) PURE;
