@@ -106,9 +106,9 @@ public:
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
     EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
-    rds_ = RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                           factory_context_, "foo.",
-                                           *route_config_provider_manager_);
+    rds_ =
+        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                        factory_context_, "foo.", *route_config_provider_manager_);
     expectRequest();
     factory_context_.init_manager_.initialize();
   }
@@ -131,9 +131,9 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     }
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(
-                   parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
-                   *route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                               factory_context_, "foo.",
+                                               *route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -154,9 +154,9 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
 
   factory_context_.local_info_.node_.set_cluster("");
   factory_context_.local_info_.node_.set_id("");
-  EXPECT_THROW(RouteConfigProviderUtil::create(
-                   parseHttpConnectionManagerFromJson(config_json), factory_context_, "foo.",
-                   *route_config_provider_manager_),
+  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+                                               factory_context_, "foo.",
+                                               *route_config_provider_manager_),
                EnvoyException);
 }
 
@@ -376,8 +376,8 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(
-        rds_, factory_context_, "foo_prefix.");
+    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
+                                                                          "foo_prefix.");
   }
 
   RouteConfigProviderManagerImplTest() {

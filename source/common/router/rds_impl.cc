@@ -94,7 +94,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 
 void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
-  route_config_provider_manager_.routes_config_update_time = factory_context_.systemTimeSource().currentTime();
+  route_config_provider_manager_.routes_config_update_time =
+      factory_context_.systemTimeSource().currentTime();
 
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
@@ -227,7 +228,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
 
-  DurationUtil::writeSystemClockTime(routes_config_update_time, config_dump->mutable_last_updated());
+  DurationUtil::writeSystemClockTime(routes_config_update_time,
+                                     config_dump->mutable_last_updated());
 
   for (const auto& provider : getRdsRouteConfigProviders()) {
     auto config_info = provider->configInfo();
