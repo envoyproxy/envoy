@@ -30,12 +30,3 @@ RoleBasedAccessControlFilterConfigFactory::createRouteSpecificFilterConfigTyped(
 
 /**
  * Static registration for the RBAC filter. @see RegisterFactory
- */
-static Registry::RegisterFactory<RoleBasedAccessControlFilterConfigFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
-
-} // namespace RBACFilter
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
