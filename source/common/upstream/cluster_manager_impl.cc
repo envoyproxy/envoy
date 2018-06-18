@@ -628,8 +628,7 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
 
-  config_dump->mutable_last_updated()->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
-      std::chrono::system_clock::to_time_t(cluster_config_update_time_)));
+  DurationUtil::writeSystemClockTime(cluster_config_update_time_, config_dump->mutable_last_updated());
 
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {

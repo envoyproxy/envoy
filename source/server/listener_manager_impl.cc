@@ -471,8 +471,9 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 
 ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
-  config_dump->mutable_last_updated()->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
-      std::chrono::system_clock::to_time_t(listener_config_update_time_)));
+
+  DurationUtil::writeSystemClockTime(listener_config_update_time_, config_dump->mutable_last_updated());
+
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
   for (const auto& listener : active_listeners_) {
     if (listener->blockRemove()) {

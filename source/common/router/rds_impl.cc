@@ -227,8 +227,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
 
-  config_dump->mutable_last_updated()->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
-      std::chrono::system_clock::to_time_t(routes_config_update_time)));
+  DurationUtil::writeSystemClockTime(routes_config_update_time, config_dump->mutable_last_updated());
 
   for (const auto& provider : getRdsRouteConfigProviders()) {
     auto config_info = provider->configInfo();
