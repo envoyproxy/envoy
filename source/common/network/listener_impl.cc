@@ -66,7 +66,8 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
           fmt::format("cannot listen on socket: {}", socket.localAddress()->asString()));
     }
 
-    if (!Network::Socket::applyOptions(socket.options(), socket, Socket::SocketState::Listening)) {
+    if (!Network::Socket::applyOptions(socket.options(), socket,
+                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
       throw CreateListenerException(fmt::format(
           "cannot set post-listen socket option on socket: {}", socket.localAddress()->asString()));
     }

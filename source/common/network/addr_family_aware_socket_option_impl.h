@@ -17,13 +17,15 @@ namespace Network {
 class AddrFamilyAwareSocketOptionImpl : public Socket::Option,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
-  AddrFamilyAwareSocketOptionImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
-                                  SocketOptionName ipv6_optname, int value)
+  AddrFamilyAwareSocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+                                  SocketOptionName ipv4_optname, SocketOptionName ipv6_optname,
+                                  int value)
       : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
         ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
   // Socket::Option
-  bool setOption(Socket& socket, Socket::SocketState state) const override;
+  bool setOption(Socket& socket,
+                 envoy::api::v2::core::SocketOption::SocketState state) const override;
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
@@ -42,7 +44,8 @@ public:
    * platform for fd after the above option level fallback semantics are taken into account or the
    *         socket is non-IP.
    */
-  static bool setIpSocketOption(Socket& socket, Socket::SocketState state,
+  static bool setIpSocketOption(Socket& socket,
+                                envoy::api::v2::core::SocketOption::SocketState state,
                                 const std::unique_ptr<SocketOptionImpl>& ipv4_option,
                                 const std::unique_ptr<SocketOptionImpl>& ipv6_option);
 
