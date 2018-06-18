@@ -128,10 +128,11 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
                      config_->windowBits(), config_->memoryLevel());
-
   } else if (!skip_compression_) {
     skip_compression_ = true;
     stats_.not_compressed_.inc();
+  } else {
+    stats_.compressed_.inc();
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -141,7 +142,6 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
     stats_.total_uncompressed_bytes_.add(data.length());
     compressor_.compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
     stats_.total_compressed_bytes_.add(data.length());
-    stats_.compressed_.inc();
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -217,11 +217,11 @@ bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
 }
 
 bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
-  bool isEtagAllowed = !(config_->disableOnEtagHeader() && headers.Etag());
-  if (!isEtagAllowed) {
+  bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
+  if (!is_etag_allowed) {
     stats_.not_compressed_etag_.inc();
   }
-  return isEtagAllowed;
+  return is_etag_allowed;
 }
 
 bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {

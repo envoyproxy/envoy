@@ -44,7 +44,7 @@ By *default* compression will be *skipped* when:
   that the "gzip" will have a higher weight then "\*". For example, if *accept-encoding*
   is "gzip;q=0,\*;q=1", the filter will not compress. But if the header is set to
   "\*;q=0,gzip;q=1", the filter will compress.
-- A request includes *accept-encoding* header includes "identity".
+- A request whose *accept-encoding* header includes "identity".
 - A response contains a *content-encoding* header.
 - A response contains a *cache-control* header whose value includes "no-transform".
 - A response contains a *transfer-encoding* header whose value includes "gzip".
@@ -63,3 +63,27 @@ When compression is *applied*:
 - Response headers contain "*transfer-encoding: chunked*" and
   "*content-encoding: gzip*".
 - The "*vary: accept-encoding*" header is inserted on every response.
+
+.. _gzip-statistics:
+
+Statistics
+----------
+
+Every configured Gzip filter has statistics rooted at <stat_prefix>.gzip.* with the following:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  compressed, Counter, Number of requests compressed.
+  not_compressed, Counter, Number of requests not compressed.
+  no_accept_header, Counter, Number of requests with no accept header sent.
+  header_identity, Counter, Number of requests sent with the "identity" set as the *accept-encoding*.
+  header_gzip, Counter, Number of requests sent with the "gzip" set as the *accept-encoding*.
+  header_wildcard, Counter, Number of requests sent with the "\*" set as the *accept-encoding*.
+  header_not_valid, Counter, Number of requests sent with the a not valid *accept-encoding* header (aka "q=0" or an unsupported encoding type).
+  total_uncompressed_bytes, Counter, The total uncompressed bytes of all the requests that were marked for compression.
+  total_compressed_bytes, Counter, The total compressed bytes of all the requests that were marked for compression.
+  content_length_too_small, Counter, Number of requests that accepted gzip encoding but did not compress because the payload was too small.
+  not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. *disable_on_etag_header* must be turned on for this to happen.
+  
