@@ -15,7 +15,7 @@ namespace TransportSockets {
 namespace Alts {
 
 /**
- * An interface to get callback from TsiHandshaker. TsiHandshaker will call this callback in the
+ * An interface to get callbacks from TsiHandshaker. TsiHandshaker will call this callbacks in the
  * thread which its dispatcher posts to.
  */
 class TsiHandshakerCallbacks {
