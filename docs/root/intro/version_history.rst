@@ -16,11 +16,11 @@ Version history
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
-* admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
+* admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
   :http:post:`/cpuprofiler`, :http:post:`/healthcheck/fail`, :http:post:`/healthcheck/ok`,
   :http:post:`/logging`, :http:post:`/quitquitquit`, :http:post:`/reset_counters`,
-  :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`,
+  :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`.
 * admin: removed `/routes` endpoint; route configs can now be found at the :ref:`/config_dump endpoint <operations_admin_interface_config_dump>`.
 * buffer filter: the buffer filter can be optionally
   :ref:`disabled <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.disabled>` or
@@ -28,12 +28,12 @@ Version history
   route-local configuration.
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
-* cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
+* cluster: added :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
   to close tcp_proxy upstream connections when health checks fail.
-* cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
+* cluster: added :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
-* cluster: fixed bug preventing the deletion of all endpoints in a priority
-* debug: added symbolized stack traces (where supported)
+* cluster: fixed bug preventing the deletion of all endpoints in a priority.
+* debug: added symbolized stack traces (where supported).
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers
@@ -90,7 +90,7 @@ Version history
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
 * rbac http filter: a :ref:`role-based access control http filter <config_http_filters_rbac>` has been added.
-* router: The behavior of per-try timeouts have changed in the case where a portion of the response has
+* router: the behavior of per-try timeouts have changed in the case where a portion of the response has
   already been proxied downstream when the timeout occurs. Previously, the response would be reset
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
@@ -115,7 +115,7 @@ Version history
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.
 * router: added 'unavailable' to the retriable gRPC status codes that can be specified
-  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
+  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -128,7 +128,7 @@ Version history
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * stats: added support for histograms.
-* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
+* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`.
 * stats: updated stats sink interface to flush through a single call.
 * tls: added support for
   :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
@@ -177,7 +177,7 @@ Version history
   based xDS the backing cluster must be statically defined and be of non-EDS type.
 * grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
   overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_core.GrpcService>`.
-* grpc-json: Added support for :ref:`inline descriptors
+* grpc-json: added support for :ref:`inline descriptors
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.proto_descriptor_bin>`.
 * health check: added :ref:`gRPC health check <envoy_api_field_core.HealthCheck.grpc_health_check>`
   based on `grpc.health.v1.Health <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_
