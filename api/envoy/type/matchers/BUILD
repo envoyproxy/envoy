@@ -15,6 +15,10 @@ api_proto_library(
 api_go_proto_library(
     name = "metadata",
     proto = ":metadata",
+    deps = [
+        ":number_go_proto",
+        ":string_go_proto",
+    ],
 )
 
 api_proto_library(
@@ -29,6 +33,9 @@ api_proto_library(
 api_go_proto_library(
     name = "number",
     proto = ":number",
+    deps = [
+        "//envoy/type:range_go_proto",
+    ],
 )
 
 api_proto_library(
