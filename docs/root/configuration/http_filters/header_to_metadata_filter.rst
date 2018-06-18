@@ -4,9 +4,10 @@ Envoy Header-To-Metadata Filter
 ===============================
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.header_to_metadata.v2.Config>`
 
-This filter enables matching against present or missing headers and transforming
-those matches into dynamic metadata. The metadata can then be used for load balancing
-decisions, consumed from logs, etc.
+This filter is configured with rules that will be matched against requests and responses.
+Each rule has a header and can be triggered either when the header is present or missing. When
+a rule is triggered, dynamic metadata will be added based on the configuration of the rule.
+The metadata can then be used for load balancing decisions, consumed from logs, etc.
 
 A typical use case for this filter is to dynamically match requests with load balancer
 subsets. For this, a given header's value would be extracted and attached to the request
