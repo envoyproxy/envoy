@@ -104,14 +104,14 @@ public:
   void initialize() override {
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      // Setup load reporting and corresponding gRPC cluster.
+      // Setup hds and corresponding gRPC cluster.
       auto* hds_confid = bootstrap.mutable_cluster_manager()->mutable_hds_config();
       hds_confid->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-      hds_confid->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("load_report");
+      hds_confid->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_report");
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       hds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       hds_cluster->mutable_circuit_breakers()->Clear();
-      hds_cluster->set_name("load_report");
+      hds_cluster->set_name("hds_report");
       hds_cluster->mutable_http2_protocol_options();
       // Put ourselves in a locality that will be used in
       // updateClusterLoadAssignment()
