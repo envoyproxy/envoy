@@ -130,6 +130,7 @@ TEST_F(TsiHandshakerTest, DeferredDelete) {
 
   TsiHandshakerPtr handshaker{new TsiHandshaker({tsi_create_fake_handshaker(0)}, dispatcher_)};
   handshaker->deferredDelete();
+  // The handshaker is now in dispatcher_ to delete queue.
   EXPECT_EQ(dispatcher_.to_delete_.back().get(), handshaker.get());
   handshaker.release();
 }
@@ -148,9 +149,17 @@ TEST_F(TsiHandshakerTest, DeleteOnDone) {
   handshaker->next(empty);
   handshaker->deferredDelete();
 
+  // Make sure the handshaker is not in dispatcher_ queue, since the next call is not done.
   EXPECT_NE(dispatcher_.to_delete_.back().get(), handshaker.get());
+
+  // After deferredDelete, the callback should be never invoked, in real use it might be already
+  // a dangling pointer.
   EXPECT_CALL(client_callbacks_, onNextDone_(_)).Times(0);
+
+  // Simulate the next call is completed.
   done();
+
+  // The handshaker is now in dispatcher_ to delete queue.
   EXPECT_EQ(dispatcher_.to_delete_.back().get(), handshaker.get());
   handshaker.release();
 }

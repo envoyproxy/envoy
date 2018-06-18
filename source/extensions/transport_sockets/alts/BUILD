@@ -1,5 +1,7 @@
 licenses(["notice"])  # Apache 2
 
+# TODO(lizan): Add link to docs when it is ready.
+
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",

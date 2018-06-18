@@ -23,10 +23,10 @@ public:
   virtual ~TsiHandshakerCallbacks() {}
 
   struct NextResult {
-    // A enum of the result
+    // A enum of the result.
     tsi_result status_;
 
-    // The buffer to be sent to the peer
+    // The buffer to be sent to the peer.
     Buffer::InstancePtr to_send_;
 
     // A pointer to tsi_handshaker_result struct. Owned by instance.
@@ -38,7 +38,7 @@ public:
   /**
    * Called when `next` is done, this may be called inline in `next` if the handshaker is not
    * asynchronous.
-   * @param result
+   * @param result a unique pointer to NextResult struct including the result returned by TSI.
    */
   virtual void onNextDone(NextResultPtr&& result) PURE;
 };
@@ -55,21 +55,23 @@ public:
 
   /**
    * Conduct next step of handshake, see
-   * https://github.com/grpc/grpc/blob/v1.10.0/src/core/tsi/transport_security_interface.h#L416
-   * It is callers responsibility to not call this method again until the onNextDone is called.
+   * https://github.com/grpc/grpc/blob/v1.12.0/src/core/tsi/transport_security_interface.h#L418
+   * It is callers responsibility to not call this method again until the
+   * TsiHandshakerCallbacks::onNextDone is called.
    * @param received the buffer received from peer.
    */
   tsi_result next(Buffer::Instance& received);
 
   /**
-   * Set handshaker callbacks, this must be called before calling next.
+   * Set handshaker callbacks. This must be called before calling next.
    * @param callbacks supplies the callback instance.
    */
   void setHandshakerCallbacks(TsiHandshakerCallbacks& callbacks) { callbacks_ = &callbacks; }
 
   /**
    * Delete the handshaker when it is ready. This must be called after releasing from a smart
-   * pointer. The actual delete happens after ongoing next call are processed.
+   * pointer. If there is no call in progress, this calls dispatcher_.deferredDelete(). If there is
+   * a call in progress dispatcher_.deferredDelete happens after ongoing next call are processed.
    */
   void deferredDelete();
 
@@ -80,7 +82,8 @@ private:
   CHandshakerPtr handshaker_;
   TsiHandshakerCallbacks* callbacks_{};
 
-  // This is set to true when there is an ongoing next call to handshaker.
+  // This is set to true when there is an ongoing next call to handshaker, and set to false when
+  // the callback posted to dispatcher_ by TsiHandshaker::onNextDone is executed.
   bool calling_{false};
 
   // This will be set when deferredDelete is called. If there is an ongoing next call,
@@ -91,6 +94,7 @@ private:
 };
 
 typedef std::unique_ptr<TsiHandshaker> TsiHandshakerPtr;
+
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

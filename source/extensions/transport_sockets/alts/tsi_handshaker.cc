@@ -41,6 +41,7 @@ TsiHandshaker::TsiHandshaker(CHandshakerPtr&& handshaker, Event::Dispatcher& dis
 TsiHandshaker::~TsiHandshaker() { ASSERT(!calling_); }
 
 tsi_result TsiHandshaker::next(Envoy::Buffer::Instance& received) {
+  ASSERT(callbacks_);
   ASSERT(!calling_);
   calling_ = true;
 
