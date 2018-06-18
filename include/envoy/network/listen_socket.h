@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -35,11 +36,11 @@ public:
 
   enum class SocketState {
     // Socket options are applied after socket creation but before binding the socket to a port
-    PreBind,
+    PreBind = envoy::api::v2::core::SocketOption::STATE_PREBIND,
     // Socket options are applied after binding the socket to a port but before calling listen()
-    PostBind,
+    PostBind = envoy::api::v2::core::SocketOption::STATE_POSTBIND,
     // Socket options are applied after calling listen()
-    Listening,
+    Listening = envoy::api::v2::core::SocketOption::STATE_LISTENING,
   };
 
   /**

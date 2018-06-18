@@ -74,6 +74,29 @@ message TcpKeepalive {
   google.protobuf.UInt32Value keepalive_interval = 3;
 }
 
+// Generic socket option message. This would be used to set socket options that
+// might not exist in upstream kernels or precompiled Envoy binaries.
+message SocketOption {
+  // An optional name to give this socket option
+  // No special meaning is assumed.
+  string readable_name = 1;
+  // Corresponding to the level value passed to setsockopt, such as IPPROTO_TCP
+  int32 level = 2;
+  // The numeric name as passed to setsockopt
+  int32 name = 3;
+  // The setsopt option value. Integers should be encoded in network byte order.
+  bytes value = 4;
+  enum SocketState {
+    option (gogoproto.goproto_enum_prefix) = false;
+    STATE_PREBIND = 0;
+    STATE_POSTBIND = 1;
+    STATE_LISTENING = 2;
+  }
+  // For listeners the option can only be used on sockets in the given state.
+  // For BindConfig, state is ignored.
+  SocketState state = 5 [(validate.rules).enum.defined_only = true];
+}
+
 message BindConfig {
   // The address to bind to when creating a socket.
   SocketAddress source_address = 1
@@ -87,6 +110,10 @@ message BindConfig {
   // flag is not set (default), the socket is not modified, i.e. the option is
   // neither enabled nor disabled.
   google.protobuf.BoolValue freebind = 2;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated SocketOption socket_options = 3;
 }
 
 // Addresses specify either a logical or physical address and port, which are
