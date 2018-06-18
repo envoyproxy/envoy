@@ -14,7 +14,8 @@ namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager) {
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager,
+                                      Secret::SecretManager& secret_manager) {
   const std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
@@ -58,7 +59,7 @@ createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& conte
     target = san ? json_san : json_plain;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  ClientContextConfigImpl cfg(*loader);
+  ClientContextConfigImpl cfg(*loader, secret_manager);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
       new Ssl::ClientSslSocketFactory(cfg, context_manager, *client_stats_store)};
