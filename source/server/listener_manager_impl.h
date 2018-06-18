@@ -254,7 +254,7 @@ public:
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() override { return parent_.server_.localInfo(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {

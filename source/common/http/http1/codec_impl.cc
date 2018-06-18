@@ -659,6 +659,7 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
 }
 
 void ClientConnectionImpl::onMessageComplete() {
+  ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
     return;
@@ -686,9 +687,20 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   }
 }
 
-void ClientConnectionImpl::onAboveHighWatermark() { request_encoder_->runHighWatermarkCallbacks(); }
+void ClientConnectionImpl::onAboveHighWatermark() {
+  // This should never happen without an active stream/request.
+  ASSERT(!pending_responses_.empty());
+  request_encoder_->runHighWatermarkCallbacks();
+}
 
-void ClientConnectionImpl::onBelowLowWatermark() { request_encoder_->runLowWatermarkCallbacks(); }
+void ClientConnectionImpl::onBelowLowWatermark() {
+  // This can get called without an active stream/request when upstream decides to do bad things
+  // such as sending multiple responses to the same request, causing us to close the connection, but
+  // in doing so go below low watermark.
+  if (!pending_responses_.empty()) {
+    request_encoder_->runLowWatermarkCallbacks();
+  }
+}
 
 } // namespace Http1
 } // namespace Http

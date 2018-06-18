@@ -44,6 +44,19 @@ std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   return addresses;
 }
 
+std::shared_ptr<const HostVector>
+makeHostsFromHostsPerLocality(HostsPerLocalityConstSharedPtr hosts_per_locality) {
+  HostVector hosts;
+
+  for (const auto& locality_hosts : hosts_per_locality->get()) {
+    for (const auto& host : locality_hosts) {
+      hosts.emplace_back(host);
+    }
+  }
+
+  return std::make_shared<const HostVector>(hosts);
+}
+
 struct ResolverData {
   ResolverData(Network::MockDnsResolver& dns_resolver, Event::MockDispatcher& dispatcher) {
     timer_ = new Event::MockTimer(&dispatcher);
@@ -941,12 +954,25 @@ TEST_F(HostSetImplLocalityTest, Empty) {
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
 }
 
+// When no hosts are healthy we should fail to select a locality
+TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, std::make_shared<const HostVector>(), hosts_per_locality,
+                        hosts_per_locality, locality_weights, {}, {});
+  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+}
+
 // When all locality weights are the same we have unweighted RR behavior.
 TEST_F(HostSetImplLocalityTest, Unweighted) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
@@ -959,7 +985,9 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
 TEST_F(HostSetImplLocalityTest, Weighted) {
   HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
@@ -973,7 +1001,9 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 0, 1}};
-  host_set_.updateHosts({}, {}, hosts_per_locality, hosts_per_locality, locality_weights, {}, {});
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
@@ -994,8 +1024,11 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
     }
     HostsPerLocalitySharedPtr healthy_hosts_per_locality =
         makeHostsPerLocality({healthy_hosts, {hosts_[5]}});
-    host_set_.updateHosts({}, {}, hosts_per_locality, healthy_hosts_per_locality, locality_weights,
-                          {}, {});
+
+    auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+    host_set_.updateHosts(makeHostsFromHostsPerLocality(hosts_per_locality),
+                          makeHostsFromHostsPerLocality(healthy_hosts_per_locality),
+                          hosts_per_locality, healthy_hosts_per_locality, locality_weights, {}, {});
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {

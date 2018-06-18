@@ -12,6 +12,7 @@
 #include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"
+#include "common/common/empty_string.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -202,7 +203,7 @@ public:
     ON_CALL(route_entry, useWebSocket()).WillByDefault(Return(true));
     ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
         .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
-                                                   const RequestInfo::RequestInfo& request_info,
+                                                   RequestInfo::RequestInfo& request_info,
                                                    Http::WebSocketProxyCallbacks& callbacks,
                                                    Upstream::ClusterManager& cluster_manager,
                                                    Network::ReadFilterCallbacks* read_callbacks) {
@@ -257,6 +258,8 @@ public:
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   uint32_t xffNumTrustedHops() const override { return 0; }
+  bool skipXffAppend() const override { return false; }
+  const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -1066,64 +1069,6 @@ TEST_F(HttpConnectionManagerImplTest, DoNotStartSpanIfTracingIsNotEnabled) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, StartSpanOnlyHealthCheckRequest) {
-  setup(false, "");
-
-  NiceMock<Tracing::MockSpan>* span = new NiceMock<Tracing::MockSpan>();
-
-  EXPECT_CALL(tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
-  EXPECT_CALL(*span, finishSpan()).Times(0);
-
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
-      .WillOnce(Return(true));
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(filter);
-      }));
-
-  EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
-        filter->callbacks_->requestInfo().healthCheck(true);
-        return FilterHeadersStatus::StopIteration;
-      }));
-
-  // Treat request as internal, otherwise x-request-id header will be overwritten.
-  use_remote_address_ = false;
-  EXPECT_CALL(random_, uuid()).Times(0);
-
-  StreamDecoder* decoder = nullptr;
-  NiceMock<MockStreamEncoder> encoder;
-  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-    decoder = &conn_manager_->newStream(encoder);
-
-    HeaderMapPtr headers{
-        new TestHeaderMapImpl{{":method", "GET"},
-                              {":authority", "host"},
-                              {":path", "/healthcheck"},
-                              {"x-request-id", "125a4afb-6f55-94ba-ad80-413f09f48a28"}}};
-    decoder->decodeHeaders(std::move(headers), true);
-
-    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
-    filter->callbacks_->encodeHeaders(std::move(response_headers), true);
-
-    data.drain(4);
-  }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  // Force dtor of active stream to be called so that we can capture tracing HC stat.
-  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-
-  // HC request, but was originally sampled, so check for two stats here.
-  EXPECT_EQ(1UL, tracing_stats_.random_sampling_.value());
-  EXPECT_EQ(1UL, tracing_stats_.health_check_.value());
-  EXPECT_EQ(0UL, tracing_stats_.service_forced_.value());
-}
-
 TEST_F(HttpConnectionManagerImplTest, NoPath) {
   setup(false, "");
 
@@ -1396,7 +1341,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_,
-              finalizeRequestHeaders(_, _));
+              finalizeRequestHeaders(_, _, _));
   EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, autoHostRewrite())
       .WillOnce(Return(true));
 

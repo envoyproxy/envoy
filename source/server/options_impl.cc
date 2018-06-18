@@ -123,22 +123,22 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     throw NoServingException();
   }
 
-  if (max_obj_name_len.getValue() < 60) {
-    const std::string message = fmt::format(
-        "error: the 'max-obj-name-len' value specified ({}) is less than the minimum value of 60",
-        max_obj_name_len.getValue());
-    std::cerr << message << std::endl;
-    throw MalformedArgvException(message);
-  }
+  auto check_numeric_arg = [](bool is_error, uint64_t value, absl::string_view pattern) {
+    if (is_error) {
+      const std::string message = fmt::format(std::string(pattern), value);
+      std::cerr << message << std::endl;
+      throw MalformedArgvException(message);
+    }
+  };
+  check_numeric_arg(max_obj_name_len.getValue() < 60, max_obj_name_len.getValue(),
+                    "error: the 'max-obj-name-len' value specified ({}) is less than the minimum "
+                    "value of 60");
+  check_numeric_arg(max_stats.getValue() > 100 * 1000 * 1000, max_stats.getValue(),
+                    "error: the 'max-stats' value specified ({}) is more than the maximum value "
+                    "of 100M");
+  // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-  if (hot_restart_version_option.getValue()) {
-    std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength(),
-                                        !hot_restart_disabled_);
-    throw NoServingException();
-  }
 
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
@@ -189,5 +189,14 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   max_obj_name_length_ = max_obj_name_len.getValue();
+
+  if (hot_restart_version_option.getValue()) {
+    Stats::RawStatData::configure(*this);
+    std::cerr << hot_restart_version_cb(max_stats.getValue(),
+                                        max_obj_name_len.getValue() +
+                                            Stats::RawStatData::maxStatSuffixLength(),
+                                        !hot_restart_disabled_);
+    throw NoServingException();
+  }
 }
 } // namespace Envoy

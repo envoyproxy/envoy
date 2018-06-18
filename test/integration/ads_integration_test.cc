@@ -62,6 +62,9 @@ public:
   AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -399,6 +402,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -444,6 +450,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }

@@ -46,7 +46,7 @@ ValidationInstance::ValidationInstance(Options& options,
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
-    thread_local_.shutdownThread();
+    shutdown();
     throw;
   }
 }

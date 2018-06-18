@@ -70,6 +70,11 @@ public:
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
+   * @param bytes_received denotes number of bytes to add to total received bytes.
+   */
+  virtual void addBytesReceived(uint64_t bytes_received) PURE;
+
+  /**
    * @return the number of body bytes received in the request.
    */
   virtual uint64_t bytesReceived() const PURE;
@@ -199,6 +204,11 @@ public:
   virtual void resetUpstreamTimings() PURE;
 
   /**
+   * @param bytes_sent denotes the number of bytes to add to total sent bytes.
+   */
+  virtual void addBytesSent(uint64_t bytes_sent) PURE;
+
+  /**
    * @return the number of body bytes sent in the response.
    */
   virtual uint64_t bytesSent() const PURE;
@@ -212,6 +222,13 @@ public:
    * @return upstream host description.
    */
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
+
+  /**
+   * @param upstream_local_address sets the local address of the upstream connection. Note that it
+   * can be different than the local address of the downstream connection.
+   */
+  virtual void setUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
 
   /**
    * @return the upstream local address.
@@ -229,9 +246,22 @@ public:
   virtual void healthCheck(bool is_hc) PURE;
 
   /**
+   * @param downstream_local_address sets the local address of the downstream connection. Note that
+   * it can be different than the local address of the upstream connection.
+   */
+  virtual void setDownstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_local_address) PURE;
+
+  /**
    * @return the downstream local address. Note that this will never be nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const PURE;
+
+  /**
+   * @param downstream_remote_address sets the remote address of downstream connection.
+   */
+  virtual void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) PURE;
 
   /**
    * @return the downstream remote address. Note that this will never be nullptr. Additionally note

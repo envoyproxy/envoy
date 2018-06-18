@@ -26,7 +26,7 @@ namespace Server {
 
 // Increment this whenever there is a shared memory / RPC change that will prevent a hot restart
 // from working. Operations code can then cope with this and do a full restart.
-const uint64_t SharedMemory::VERSION = 9;
+const uint64_t SharedMemory::VERSION = 10;
 
 static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   BlockMemoryHashSetOptions hash_set_options;
@@ -37,7 +37,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   return hash_set_options;
 }
 
-SharedMemory& SharedMemory::initialize(uint32_t stats_set_size, Options& options) {
+SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::size();
@@ -109,7 +109,7 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-std::string SharedMemory::version(size_t max_num_stats, size_t max_stat_name_len) {
+std::string SharedMemory::version(uint64_t max_num_stats, uint64_t max_stat_name_len) {
   return fmt::format("{}.{}.{}.{}", VERSION, sizeof(SharedMemory), max_num_stats,
                      max_stat_name_len);
 }
@@ -479,16 +479,16 @@ std::string HotRestartImpl::version() {
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
-std::string HotRestartImpl::hotRestartVersion(size_t max_num_stats, size_t max_stat_name_len) {
+std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len) {
   const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
-  const size_t bytes = RawStatDataSet::numBytes(options);
+  const uint64_t bytes = RawStatDataSet::numBytes(options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
   RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
 
   return versionHelper(max_num_stats, max_stat_name_len, stats_set);
 }
 
-std::string HotRestartImpl::versionHelper(size_t max_num_stats, size_t max_stat_name_len,
+std::string HotRestartImpl::versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                           RawStatDataSet& stats_set) {
   return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
 }

@@ -155,9 +155,12 @@ address of the nearest client to the XFF list before proxying the request. Some 
 3. ``x-forwarded-for: 50.0.0.1, 10.0.0.1`` (internal proxy hop)
 
 Envoy will only append to XFF if the :ref:`use_remote_address
-<config_http_conn_man_use_remote_address>` HTTP connection manager option is set to true.
-This means that if *use_remote_address* is false (which is the default), the connection manager
-operates in a transparent mode where it does not modify XFF.
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
+HTTP connection manager option is set to true and the `skip_xff_append
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
+is set false: This means that if *use_remote_address* is false (which is the default) or
+*skip_xff_append* is true, the connection manager operates in a transparent mode where it does not
+modify XFF.
 
 .. attention::
 
@@ -472,3 +475,19 @@ Supported variable names are:
     found, or if the selected value is not a supported type, then no header is emitted. The
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
+
+%START_TIME%
+    Request start time. START_TIME can be customized with specifiers as specified in
+    :ref:`access log format rules<config_access_log_format_start_time>`.
+
+    An example of setting a custom header with current time in seconds with the milliseconds resolution:
+
+    .. code-block:: none
+
+      route:
+        cluster: www
+        request_headers_to_add:
+          - header:
+              key: "x-request-start"
+              value: "%START_TIME(%s.%3f)%"
+            append: true

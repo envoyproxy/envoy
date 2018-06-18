@@ -69,8 +69,8 @@ public:
   size_t num_open_;
   Thread::MutexBasicLockable write_mutex_;
   Thread::MutexBasicLockable open_mutex_;
-  std::condition_variable_any write_event_;
-  std::condition_variable_any open_event_;
+  Thread::CondVar write_event_;
+  Thread::CondVar open_event_;
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;
   std::map<SockOptKey, bool> boolsockopts_;

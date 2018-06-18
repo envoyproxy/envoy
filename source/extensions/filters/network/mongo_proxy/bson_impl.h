@@ -22,7 +22,7 @@ namespace Bson {
  */
 class BufferHelper {
 public:
-  static int32_t peakInt32(Buffer::Instance& data);
+  static int32_t peekInt32(Buffer::Instance& data);
   static uint8_t removeByte(Buffer::Instance& data);
   static void removeBytes(Buffer::Instance& data, uint8_t* out, size_t out_len);
   static std::string removeCString(Buffer::Instance& data);

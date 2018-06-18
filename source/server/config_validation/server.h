@@ -62,7 +62,9 @@ public:
   Upstream::ClusterManager& clusterManager() override { return *config_->clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
-  Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
+  Network::DnsResolverSharedPtr dnsResolver() override {
+    return dispatcher().createDnsResolver({});
+  }
   void drainListeners() override { NOT_IMPLEMENTED; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
@@ -142,7 +144,6 @@ private:
   Runtime::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   std::unique_ptr<Configuration::Main> config_;
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{new Network::ValidationDnsResolver};
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;

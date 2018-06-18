@@ -30,6 +30,8 @@ routing PRs, questions, etc. to the right place.
     (metadata, etc.), and OSX build.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
+* Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
+  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 
 # Emeritus maintainers
 
@@ -45,8 +47,6 @@ matter expert reviews. Feel free to loop them in as needed.
   * TLS, BoringSSL, and core networking (listeners, connections, etc.).
 * Shriram Rajagopalan ([rshriram](https://github.com/rshriram)) (shriram@us.ibm.com)
   * Istio, APIs, HTTP routing, and WebSocket.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
-  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * John Millikin ([jmillikin-stripe](https://github.com/jmillikin-stripe)) (jmillikin@stripe.com)
   * Bazel/build.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)

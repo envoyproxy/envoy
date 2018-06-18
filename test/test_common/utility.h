@@ -2,9 +2,7 @@
 
 #include <stdlib.h>
 
-#include <condition_variable>
 #include <list>
-#include <mutex>
 #include <random>
 #include <string>
 #include <vector>
@@ -293,8 +291,8 @@ public:
   void waitReady();
 
 private:
-  std::condition_variable cv_;
-  std::mutex mutex_;
+  Thread::CondVar cv_;
+  Thread::MutexBasicLockable mutex_;
   bool ready_{false};
 };
 

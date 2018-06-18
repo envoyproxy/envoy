@@ -14,6 +14,7 @@ set -e
 # openssl genrsa -out san_uri_key.pem 1024
 # openssl genrsa -out selfsigned_key.pem 1024
 # openssl genrsa -out expired_key.pem 1024
+# openssl genrsa -out expired_san_uri_key.pem 1024
 
 # Generate ca_cert.pem.
 openssl req -new -key ca_key.pem -out ca_cert.csr -config ca_cert.cfg -batch -sha256
@@ -64,9 +65,13 @@ openssl x509 -req -days 730 -in san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey 
 # Generate selfsigned_cert.pem.
 openssl req -new -x509 -days 730 -key selfsigned_key.pem -out selfsigned_cert.pem -config selfsigned_cert.cfg -batch -sha256
 
-# Generate expired_cert.pem (will fail on Mac OS 10.13+ because of negative days value).
+# Generate expired_cert.pem as a self-signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
 openssl req -new -key expired_key.pem -out expired_cert.csr -config selfsigned_cert.cfg -batch -sha256
 openssl x509 -req -days -365 -in expired_cert.csr -signkey expired_key.pem -out expired_cert.pem
+
+# Generate expired_san_uri_cert.pem as a CA signed, expired cert (will fail on Mac OS 10.13+ because of negative days value).
+openssl req -new -key expired_san_uri_key.pem -out expired_san_uri_cert.csr -config san_uri_cert.cfg -batch -sha256
+openssl x509 -req -days -365 -in expired_san_uri_cert.csr -sha256 -CA ca_cert.pem -CAkey ca_key.pem -CAcreateserial -out expired_san_uri_cert.pem -extensions v3_ca -extfile san_uri_cert.cfg
 
 # Initialize information for CRL process
 touch crl_index.txt crl_index.txt.attr

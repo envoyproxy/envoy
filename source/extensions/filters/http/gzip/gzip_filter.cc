@@ -37,7 +37,8 @@ const std::vector<std::string>& defaultContentEncoding() {
 
 } // namespace
 
-GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip)
+GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+                                   Runtime::Loader& runtime)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
       content_length_(contentLengthUint(gzip.content_length().value())),
@@ -45,7 +46,7 @@ GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
       disable_on_etag_header_(gzip.disable_on_etag_header()),
-      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()) {}
+      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()), runtime_(runtime) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
     envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level) {
@@ -101,7 +102,8 @@ GzipFilter::GzipFilter(const GzipFilterConfigSharedPtr& config)
     : skip_compression_{true}, compressed_data_(), compressor_(), config_(config) {}
 
 Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  if (isAcceptEncodingAllowed(headers)) {
+  if (config_->runtime().snapshot().featureEnabled("gzip.filter_enabled", 100) &&
+      isAcceptEncodingAllowed(headers)) {
     skip_compression_ = false;
     if (config_->removeAcceptEncodingHeader()) {
       headers.removeAcceptEncoding();
