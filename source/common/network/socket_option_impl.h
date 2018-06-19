@@ -84,11 +84,13 @@ typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(Socket::SocketState in_state, Network::SocketOptionName optname, int value)
+  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+                   Network::SocketOptionName optname, int value)
       : in_state_(in_state), optname_(optname), value_(value) {}
 
   // Socket::Option
-  bool setOption(Socket& socket, Socket::SocketState state) const override;
+  bool setOption(Socket& socket,
+                 envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
@@ -98,7 +100,7 @@ public:
   static int setSocketOption(Socket& socket, Network::SocketOptionName optname, int value);
 
 private:
-  const Socket::SocketState in_state_;
+  const envoy::api::v2::core::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
   const int value_;
 };

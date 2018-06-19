@@ -88,13 +88,17 @@ message SocketOption {
   bytes value = 4;
   enum SocketState {
     option (gogoproto.goproto_enum_prefix) = false;
+    // Socket options are applied after socket creation but before binding the socket to a port
     STATE_PREBIND = 0;
-    STATE_POSTBIND = 1;
+    // Socket options are applied after binding the socket to a port but before calling listen()
+    STATE_BOUND = 1;
+    // Socket options are applied after calling listen()
     STATE_LISTENING = 2;
   }
   // For listeners the option can only be used on sockets in the given state.
   // For BindConfig, state is ignored.
-  SocketState state = 5 [(validate.rules).enum.defined_only = true];
+  SocketState state = 5
+      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
 }
 
 message BindConfig {

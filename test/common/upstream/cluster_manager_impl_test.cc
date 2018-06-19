@@ -1581,8 +1581,8 @@ public:
             EXPECT_NE(nullptr, options.get());
             EXPECT_EQ(1, options->size());
             NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
-                                                        Network::Socket::SocketState::PreBind)));
+            EXPECT_FALSE((Network::Socket::applyOptions(
+                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
             return connection_;
           }));
       cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
@@ -1599,8 +1599,8 @@ public:
               EXPECT_NE(nullptr, options.get());
               EXPECT_EQ(1, options->size());
               NiceMock<Network::MockConnectionSocket> socket;
-              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
-                                                         Network::Socket::SocketState::PreBind)));
+              EXPECT_TRUE((Network::Socket::applyOptions(
+                  options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
@@ -1732,8 +1732,8 @@ public:
             EXPECT_NE(nullptr, options.get());
             EXPECT_EQ(1, options->size());
             NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
-                                                        Network::Socket::SocketState::PreBind)));
+            EXPECT_FALSE((Network::Socket::applyOptions(
+                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
             return connection_;
           }));
       cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
@@ -1749,8 +1749,8 @@ public:
                        -> Network::ClientConnection* {
               EXPECT_NE(nullptr, options.get());
               NiceMock<Network::MockConnectionSocket> socket;
-              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
-                                                         Network::Socket::SocketState::PreBind)));
+              EXPECT_TRUE((Network::Socket::applyOptions(
+                  options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first,

@@ -438,7 +438,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
     bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            Network::Socket::SocketState::PostBind);
+                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -448,7 +448,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       ENVOY_LOG(debug, "{}", message);
     }
 
-    // Add the options to the socket_ so that SocketState::Listening options can be
+    // Add the options to the socket_ so that STATE_LISTENING options can be
     // set in the worker after listen()/evconnlistener_new() is called.
     socket_->addOptions(listen_socket_options_);
   }
