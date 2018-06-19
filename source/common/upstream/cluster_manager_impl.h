@@ -19,8 +19,8 @@
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
-#include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/health_discovery_service.h"
+#include "common/upstream/load_stats_reporter.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {

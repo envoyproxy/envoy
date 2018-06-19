@@ -5,15 +5,13 @@
 namespace Envoy {
 namespace Upstream {
 
-HDSReporter::HDSReporter(const envoy::api::v2::core::Node& node,
-                                     ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::AsyncClientPtr async_client,
-                                     Event::Dispatcher& dispatcher)
-    : cm_(cluster_manager), stats_{ALL_HDS_STATS(
-                                POOL_COUNTER_PREFIX(scope, "hds_reporter."))},
+HDSReporter::HDSReporter(const envoy::api::v2::core::Node& node, ClusterManager& cluster_manager,
+                         Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
+                         Event::Dispatcher& dispatcher)
+    : cm_(cluster_manager), stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck"))  {
+          "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")) {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendHealthCheckRequest(); });
@@ -37,10 +35,10 @@ void HDSReporter::establishNewStream() {
 }
 
 void HDSReporter::sendHealthCheckRequest() {
- ENVOY_LOG(debug, "Sending HealthCheckRequest");
+  ENVOY_LOG(debug, "Sending HealthCheckRequest");
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
-  ENVOY_LOG(debug, "Counter responses: " + std::to_string( stats_.responses_.value()));
+  ENVOY_LOG(debug, "Counter responses: " + std::to_string(stats_.responses_.value()));
 }
 
 void HDSReporter::handleFailure() {
@@ -58,15 +56,14 @@ void HDSReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
 
-
 void HDSReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response ", message->DebugString());
   stats_.requests_.inc();
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
-  ENVOY_LOG(debug, "Counter requests: " + std::to_string( stats_.requests_.value()));
-  ENVOY_LOG(debug, "Counter responses: " + std::to_string( stats_.responses_.value()));
+  ENVOY_LOG(debug, "Counter requests: " + std::to_string(stats_.requests_.value()));
+  ENVOY_LOG(debug, "Counter responses: " + std::to_string(stats_.responses_.value()));
 }
 
 void HDSReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {

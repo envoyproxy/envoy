@@ -15,7 +15,7 @@ namespace Envoy {
 namespace {
 
 class HDSIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+                           public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   HDSIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     // We rely on some fairly specific load balancing picks in this test, so
@@ -94,7 +94,6 @@ public:
     hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
   }
 
-
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
     fake_upstream_connection_ =
         service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_);
@@ -130,7 +129,6 @@ public:
     }
   }
 
-
   void requestHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
     server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
@@ -139,10 +137,6 @@ public:
     // Wait until the request has been received by Envoy.
     test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
   }
-
-
-
-
 
   void sendAndReceiveUpstream(uint32_t endpoint_index, uint32_t response_code = 200) {
     initiateClientConnection();
@@ -170,7 +164,6 @@ INSTANTIATE_TEST_CASE_P(IpVersions, HDSIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-
 // Test connectivity of Envoy and the Server
 TEST_P(HDSIntegrationTest, Simple) {
   initialize();
@@ -179,7 +172,6 @@ TEST_P(HDSIntegrationTest, Simple) {
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
   server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
 
-
   // Server <--> Envoy
   fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
   hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
@@ -187,7 +179,6 @@ TEST_P(HDSIntegrationTest, Simple) {
 
   EXPECT_EQ(0, test_server_->counter("hds_reporter.requests")->value());
   EXPECT_EQ(1, test_server_->counter("hds_reporter.responses")->value());
-
 
   // Send a message to Envoy, and wait until it's received
   hds_stream_->startGrpcStream();
@@ -200,13 +191,8 @@ TEST_P(HDSIntegrationTest, Simple) {
   EXPECT_EQ(1, test_server_->counter("hds_reporter.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_reporter.responses")->value());
 
-
-
   cleanupHDSConnection();
 }
-
-
-
 
 } // namespace
 } // namespace Envoy
