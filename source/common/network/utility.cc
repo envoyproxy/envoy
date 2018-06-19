@@ -323,7 +323,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
   case AF_INET6:
     return Address::InstanceConstSharedPtr{
-        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(orig_addr))};
+        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
   default:
     return nullptr;
   }
