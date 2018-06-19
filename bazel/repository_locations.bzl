@@ -58,6 +58,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
         remote = "https://github.com/google/googleapis",
     ),
+    com_github_google_jwt_verify = dict(
+        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",
+        remote = "https://github.com/google/jwt_verify_lib",
+    ),
     com_github_nodejs_http_parser = dict(
         # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available

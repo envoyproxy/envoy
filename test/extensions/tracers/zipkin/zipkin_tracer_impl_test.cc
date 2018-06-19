@@ -530,6 +530,40 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   EXPECT_NE(nullptr, dynamic_cast<Tracing::NullSpan*>(span.get()));
 }
 
+TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
+  setupValidDriver();
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  span->setSampled(false);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to not sample
+  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
+}
+
+TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
+  setupValidDriver();
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, false});
+
+  span->setSampled(true);
+
+  request_headers_.removeXB3Sampled();
+
+  span->injectContext(request_headers_);
+
+  // Check B3 sampled flag is set to sample
+  EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED,
+            request_headers_.XB3Sampled()->value().getStringView());
+}
+
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

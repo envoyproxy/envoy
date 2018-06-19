@@ -70,7 +70,6 @@ public:
 
   void removeJwt(Http::HeaderMap&) const override {
     // TODO(qiwzhang): remove JWT from parameter.
-    NOT_REACHED;
   }
 };
 
@@ -191,7 +190,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
 
 } // namespace
 
-ExtractorConstPtr createExtractor(const JwtAuthentication& config) {
+ExtractorConstPtr Extractor::create(const JwtAuthentication& config) {
   return ExtractorConstPtr(new ExtractorImpl(config));
 }
 

@@ -18,6 +18,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 
@@ -134,6 +135,39 @@ public:
   NiceMock<MockLoadBalancer> lb_;
 };
 
+class MockClusterManagerFactory : public ClusterManagerFactory {
+public:
+  MockClusterManagerFactory() {}
+  ~MockClusterManagerFactory() {}
+
+  Secret::MockSecretManager& secretManager() override { return secret_manager_; };
+
+  MOCK_METHOD8(clusterManagerFromProto,
+               ClusterManagerPtr(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                                 Stats::Store& stats, ThreadLocal::Instance& tls,
+                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                 const LocalInfo::LocalInfo& local_info,
+                                 AccessLog::AccessLogManager& log_manager, Server::Admin& admin));
+
+  MOCK_METHOD5(allocateConnPool, Http::ConnectionPool::InstancePtr(
+                                     Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                                     ResourcePriority priority, Http::Protocol protocol,
+                                     const Network::ConnectionSocket::OptionsSharedPtr& options));
+
+  MOCK_METHOD4(clusterFromProto,
+               ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+                                Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                bool added_via_api));
+
+  MOCK_METHOD3(createCds,
+               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
+                         const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
+                         ClusterManager& cm));
+
+private:
+  Secret::MockSecretManager secret_manager_;
+};
+
 class MockClusterManager : public ClusterManager {
 public:
   MockClusterManager();
@@ -144,6 +178,8 @@ public:
     MockHost::MockCreateConnectionData data = tcpConnForCluster_(cluster, context);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
+
+  ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
   MOCK_METHOD2(addOrUpdateCluster,
@@ -176,6 +212,7 @@ public:
   NiceMock<Config::MockGrpcMux> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   std::string local_cluster_name_;
+  NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
 };
 
 class MockHealthChecker : public HealthChecker {

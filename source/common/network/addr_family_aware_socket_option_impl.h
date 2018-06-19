@@ -14,11 +14,11 @@
 namespace Envoy {
 namespace Network {
 
-class AddrFailyAwareSocketOptionImpl : public Socket::Option,
-                                       Logger::Loggable<Logger::Id::connection> {
+class AddrFamilyAwareSocketOptionImpl : public Socket::Option,
+                                        Logger::Loggable<Logger::Id::connection> {
 public:
-  AddrFailyAwareSocketOptionImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
-                                 SocketOptionName ipv6_optname, int value)
+  AddrFamilyAwareSocketOptionImpl(Socket::SocketState in_state, SocketOptionName ipv4_optname,
+                                  SocketOptionName ipv6_optname, int value)
       : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
         ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
