@@ -13,6 +13,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
 #include "source/common/ratelimit/ratelimit.pb.h"
@@ -34,7 +35,9 @@ typedef ConstSingleton<ConstantValues> Constants;
 // TODO(htuch): We should have only one client per thread, but today we create one per filter stack.
 // This will require support for more than one outstanding request per client (limit() assumes only
 // one today).
-class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
+class GrpcClientImpl : public Client,
+                       public RateLimitAsyncCallbacks,
+                       public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,

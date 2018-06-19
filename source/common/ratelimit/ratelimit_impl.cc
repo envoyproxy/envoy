@@ -98,6 +98,8 @@ ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds
         async_client_factory_->create(), timeout,
         "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
   }
+  ENVOY_LOG_MISC(warn, "legacy ratelimit client is deprecated, update your service to support "
+                       "data-plane-api defined rate limit service");
   return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout,
                                           "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
 }

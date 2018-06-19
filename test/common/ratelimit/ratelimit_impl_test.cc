@@ -153,7 +153,7 @@ TEST(RateLimitGrpcFactoryTest, Create) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -170,7 +170,7 @@ TEST(RateLimitGrpcFactoryTest, CreateLegacy) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   GrpcFactoryImpl factory(config, async_client_manager, scope);
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
+  factory.create(absl::optional<std::chrono::milliseconds>());
 }
 
 TEST(RateLimitNullFactoryTest, Basic) {
