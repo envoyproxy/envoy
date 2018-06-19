@@ -177,9 +177,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
-          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })) {
+          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
+      system_time_source_(system_time_source), monotonic_time_source_(monotonic_time_source) {
 
-  cluster_config_update_time_ = system_time_source.currentTime();
+  cluster_config_update_time_ = system_time_source_.currentTime();
 
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
@@ -344,6 +345,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                                             const std::string& version_info) {
+  cluster_config_update_time_ = system_time_source_.currentTime();
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -504,8 +506,9 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
     });
   }
 
-  cluster_map[cluster_reference.info()->name()] =
-      std::make_unique<ClusterData>(cluster, version_info, added_via_api, std::move(new_cluster));
+  cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
+      cluster, version_info, added_via_api, std::move(new_cluster), system_time_source_);
+
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init
@@ -640,6 +643,8 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
       dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+      DurationUtil::writeSystemClockTime(cluster.last_updated_,
+                                         dynamic_cluster.mutable_last_updated());
     }
   }
 
@@ -648,6 +653,8 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
     dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+    DurationUtil::writeSystemClockTime(cluster.last_updated_,
+                                       dynamic_cluster.mutable_last_updated());
   }
 
   return config_dump;
