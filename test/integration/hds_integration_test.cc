@@ -174,15 +174,35 @@ INSTANTIATE_TEST_CASE_P(IpVersions, HDSIntegrationTest,
 // Send and Receive a message
 TEST_P(HDSIntegrationTest, Simple) {
   initialize();
-  waitForHDSStream();
+  envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
+  envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
+  server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
+
+
+  // Server --> Envoy
+  fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
+  hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
   hds_stream_->startGrpcStream();
 
-  envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
-  requestHealthCheckSpecifier();
+  // Envoy --> Server
+  fake_upstream_connection_ =
+       service_upstream_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  upstream_request_->startGrpcStream();
 
+  // Send a message to Envoy, and wait until it's received
+  hds_stream_->sendGrpcMessage(server_health_check_specifier);
+  test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
+
+  // Receive a response
+  upstream_request_->waitForGrpcMessage(*dispatcher_, envoy_msg);
+
+  cleanupUpstreamConnection();
   cleanupHDSConnection();
   //EXPECT_EQ(1,0);
 }
+
+
 
 
 } // namespace
