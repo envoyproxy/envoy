@@ -293,6 +293,56 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   // Success criteria is that no ASSERTs fire and there are no leaks.
 }
 
+TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
+  enable_half_close_ = false;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
+    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+            .count());
+    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  tcp_client->waitForDisconnect(true);
+  fake_upstream_connection->waitForDisconnect(true);
+}
+
+TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
+  config_helper_.setBufferLimits(1024, 1024);
+  enable_half_close_ = false;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_config();
+
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy_config;
+    MessageUtil::jsonConvert(*config_blob, tcp_proxy_config);
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
+    MessageUtil::jsonConvert(tcp_proxy_config, *config_blob);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+
+  std::string data(1024 * 16, 'a');
+  tcp_client->write(data);
+  fake_upstream_connection->write(data);
+
+  tcp_client->waitForDisconnect(true);
+  fake_upstream_connection->waitForDisconnect(true);
+}
+
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
