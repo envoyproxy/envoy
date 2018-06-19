@@ -162,9 +162,15 @@ void IntegrationTcpClient::waitForData(const std::string& data) {
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 
-void IntegrationTcpClient::waitForDisconnect() {
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(disconnected_);
+void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
+  if (ignore_spurious_events) {
+    while (!disconnected_) {
+      connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    }
+  } else {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+    EXPECT_TRUE(disconnected_);
+  }
 }
 
 void IntegrationTcpClient::waitForHalfClose() {
