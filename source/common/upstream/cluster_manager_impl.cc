@@ -178,7 +178,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      system_time_source_(system_time_source), monotonic_time_source_(monotonic_time_source) {
+      system_time_source_(system_time_source) {
 
   cluster_config_update_time_ = system_time_source_.currentTime();
 
@@ -963,8 +963,7 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Server::Admin& admin) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin, ProdSystemTimeSource::instance_,
-                                                  ProdMonotonicTimeSource::instance_)};
+                                                  admin, ProdSystemTimeSource::instance_, ProdMonotonicTimeSource::instance_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

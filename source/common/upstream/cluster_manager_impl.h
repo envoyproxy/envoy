@@ -156,8 +156,7 @@ public:
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     SystemTimeSource& system_time_source,
-                     MonotonicTimeSource& monotonic_time_source);
+                     SystemTimeSource& system_time_source, MonotonicTimeSource& monotonic_time_source);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -374,7 +373,6 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTimeSource& system_time_source_;
-  MonotonicTimeSource& monotonic_time_source_;
 };
 
 } // namespace Upstream
