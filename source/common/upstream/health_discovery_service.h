@@ -32,9 +32,8 @@ class HDSReporter
     : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  HDSReporter(const envoy::api::v2::core::Node& node, ClusterManager& cluster_manager,
-              Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
-              Event::Dispatcher& dispatcher);
+  HDSReporter(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
+              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -53,7 +52,6 @@ private:
   void sendHealthCheckRequest();
   void handleFailure();
 
-  ClusterManager& cm_;
   HDSReporterStats stats_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
