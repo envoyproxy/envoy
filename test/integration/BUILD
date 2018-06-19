@@ -187,6 +187,7 @@ envoy_cc_test(
         "//include/envoy/http:header_map_interface",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 
