@@ -758,26 +758,29 @@ void AdminFilter::onComplete() {
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
   RELEASE_ASSERT(request_headers_);
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
-  header_map->insertStatus().value(std::to_string(enumToInt(code)));
-  const auto& headers = Http::Headers::get();
-  if (header_map->ContentType() == nullptr) {
-    // Default to text-plain if unset.
-    header_map->insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
-  }
-  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map->CacheControl() == nullptr) {
-    header_map->insertCacheControl().value().setReference(
-        headers.CacheControlValues.NoCacheMaxAge0);
-  }
-
-  // Under no circumstance should browsers sniff content-type.
-  header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
+  populateFallbackResponseHeaders(code, *header_map);
   callbacks_->encodeHeaders(std::move(header_map),
                             end_stream_on_complete_ && response.length() == 0);
 
   if (response.length() > 0) {
     callbacks_->encodeData(response, end_stream_on_complete_);
   }
+}
+
+void AdminFilter::populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
+  header_map.insertStatus().value(std::to_string(enumToInt(code)));
+  const auto& headers = Http::Headers::get();
+  if (header_map.ContentType() == nullptr) {
+    // Default to text-plain if unset.
+    header_map.insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
+  }
+  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
+  if (header_map.CacheControl() == nullptr) {
+    header_map.insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
+  }
+
+  // Under no circumstance should browsers sniff content-type.
+  header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
 }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
@@ -990,6 +993,29 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
     return true;
   }
   return false;
+}
+
+void AdminImpl::dispatch(absl::string_view request, const Http::Utility::QueryParams& params,
+                         absl::string_view method,
+                         const Instance::AdminResponseHandler& response_handler) {
+  AdminFilter filter(*this);
+  Http::HeaderMapImpl request_headers, response_headers;
+  request_headers.insertMethod().value(method.data(), method.size());
+  filter.decodeHeaders(request_headers, false);
+
+  // TODO(jmarantz): make QueryParams a real class and put this serializer there,
+  // along with proper URL escaping of the name and value.
+  std::string path_and_query = std::string(request);
+  std::string delim = "?";
+  for (auto p : params) {
+    absl::StrAppend(&path_and_query, delim, p.first, "=", p.second);
+    delim = "&";
+  }
+
+  Buffer::OwnedImpl response;
+  Http::Code code = runCallback(path_and_query, response_headers, response, filter);
+  AdminFilter::populateFallbackResponseHeaders(code, response_headers);
+  response_handler(code, response_headers, response.toString());
 }
 
 } // namespace Server

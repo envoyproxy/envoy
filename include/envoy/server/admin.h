@@ -44,6 +44,7 @@ public:
    */
   virtual const Http::HeaderMap& getRequestHeaders() const PURE;
 };
+
 /**
  * This macro is used to add handlers to the Admin HTTP Endpoint. It builds
  * a callback that executes X when the specified admin handler is hit. This macro can be

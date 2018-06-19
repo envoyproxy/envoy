@@ -168,6 +168,10 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  void adminGet(absl::string_view request, const Http::Utility::QueryParams& params,
+                AdminResponseHandler& response_handler) override;
+  void adminPost(absl::string_view request, const Http::Utility::QueryParams& params,
+                 AdminResponseHandler& response_handler) override;
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();

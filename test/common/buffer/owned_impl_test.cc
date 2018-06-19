@@ -134,6 +134,14 @@ TEST_F(OwnedImplTest, read) {
   EXPECT_EQ(0, buffer.length());
 }
 
+TEST_F(OwnedImplTest, toString) {
+  Buffer::OwnedImpl buffer;
+  auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
+  append("Hello, ");
+  append("world!");
+  EXPECT_EQ("Hello, world!", buffer.toString());
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

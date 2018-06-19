@@ -107,6 +107,9 @@ public:
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
+  void dispatch(absl::string_view request, const Http::Utility::QueryParams& params,
+                absl::string_view method, const Instance::AdminResponseHandler& response_handler);
+
 private:
   /**
    * Individual admin handler including prefix, help text, and callback.
@@ -290,6 +293,8 @@ public:
   void addOnDestroyCallback(std::function<void()> cb) override;
   const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
+
+  static void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map);
 
 private:
   /**

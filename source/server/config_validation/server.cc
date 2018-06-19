@@ -102,5 +102,23 @@ void ValidationInstance::shutdown() {
   thread_local_.shutdownThread();
 }
 
+void ValidationInstance::adminGet(absl::string_view request,
+                                  const Http::Utility::QueryParams& params,
+                                  AdminResponseHandler& response_handler) {
+  UNREFERENCED_PARAMETER(request);
+  UNREFERENCED_PARAMETER(params);
+  UNREFERENCED_PARAMETER(response_handler);
+  NOT_REACHED;
+}
+
+void ValidationInstance::adminPost(absl::string_view request,
+                                   const Http::Utility::QueryParams& params,
+                                   AdminResponseHandler& response_handler) {
+  UNREFERENCED_PARAMETER(request);
+  UNREFERENCED_PARAMETER(params);
+  UNREFERENCED_PARAMETER(response_handler);
+  NOT_REACHED;
+}
+
 } // namespace Server
 } // namespace Envoy

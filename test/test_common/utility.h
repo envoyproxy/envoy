@@ -102,7 +102,10 @@ public:
    * @param buffer supplies the buffer to convert.
    * @return std::string the converted string.
    */
-  static std::string bufferToString(const Buffer::Instance& buffer);
+  static std::string bufferToString(const Buffer::Instance& buffer) {
+    // TODO(jmarantz): remove this indirection and update all ~53 call sites.
+    return buffer.toString();
+  }
 
   /**
    * Feed a buffer with random characters.
