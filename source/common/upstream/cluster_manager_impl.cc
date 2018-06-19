@@ -631,8 +631,8 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
 
-  DurationUtil::writeSystemClockTime(cluster_config_update_time_,
-                                     *(config_dump->mutable_last_updated()));
+  TimestampUtil::systemClockToTimestamp(cluster_config_update_time_,
+                                        *(config_dump->mutable_last_updated()));
 
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
@@ -643,8 +643,8 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
       dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
-      DurationUtil::writeSystemClockTime(cluster.last_updated_,
-                                         *(dynamic_cluster.mutable_last_updated()));
+      TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
+                                            *(dynamic_cluster.mutable_last_updated()));
     }
   }
 
@@ -653,8 +653,8 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
     dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
-    DurationUtil::writeSystemClockTime(cluster.last_updated_,
-                                       *(dynamic_cluster.mutable_last_updated()));
+    TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
+                                          *(dynamic_cluster.mutable_last_updated()));
   }
 
   return config_dump;

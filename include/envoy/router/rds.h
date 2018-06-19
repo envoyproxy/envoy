@@ -39,6 +39,9 @@ public:
    */
   virtual absl::optional<ConfigInfo> configInfo() const PURE;
 
+  /**
+   * @return the last time this RouteConfigProvider was updated. Used for config dumps.
+   */
   virtual SystemTime lastUpdated() const PURE;
 };
 
