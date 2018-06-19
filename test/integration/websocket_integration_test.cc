@@ -23,8 +23,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, WebsocketIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-ConfigHelper::HttpModifierFunction setRouteUsingWebsocket(
-    const envoy::api::v2::route::RouteAction::WebSocketProxyConfig* ws_config = nullptr) {
+ConfigHelper::HttpModifierFunction
+setRouteUsingWebsocket(const envoy::api::v2::route::RouteAction::WebSocketProxyConfig* ws_config) {
   return
       [ws_config](
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
@@ -40,94 +40,107 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket(
       };
 }
 
-TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+void WebsocketIntegrationTest::initialize() {
   // Set a less permissive default route so it does not pick up the /websocket query.
   config_helper_.setDefaultHostAndRoute("*", "/asd");
-  // Enable websockets for the path /websocket/test
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  HttpIntegrationTest::initialize();
+}
+
+void WebsocketIntegrationTest::validateInitialUpstreamData(const std::string& received_data) {
+  // The request path gets rewritten from /websocket/test to /websocket.
+  // The size of headers received by the destination is 228 bytes.
+  EXPECT_EQ(received_data.size(), 228);
+  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
+  // content-length header is present. No body websocket upgrade request send to upstream has
+  // content-length header and has no transfer-encoding header.
+  EXPECT_NE(received_data.find("content-length:"), std::string::npos);
+  EXPECT_EQ(received_data.find("transfer-encoding:"), std::string::npos);
+}
+
+void WebsocketIntegrationTest::validateInitialDownstreamData(const std::string& received_data) {
+  ASSERT_EQ(received_data, upgrade_resp_str_);
+}
+
+void WebsocketIntegrationTest::validateFinalDownstreamData(const std::string& received_data,
+                                                           const std::string& expected_data) {
+  EXPECT_EQ(received_data, expected_data);
+}
+
+TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
+  config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr));
   initialize();
 
   // WebSocket upgrade, send some data and disconnect downstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
 
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
-  // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 228 bytes.
-  tcp_client->write(upgrade_req_str);
+  tcp_client->write(upgrade_req_str_);
   test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  const std::string data = fake_upstream_connection->waitForData(228);
-  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
-  // content-length header is present. No body websocket upgrade request send to upstream has
-  // content-length header and has no transfer-encoding header.
-  EXPECT_NE(data.find("content-length:"), std::string::npos);
-  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
+  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  validateInitialUpstreamData(data);
+
   // Accept websocket upgrade request
-  fake_upstream_connection->write(upgrade_resp_str);
-  tcp_client->waitForData(upgrade_resp_str);
+  fake_upstream_connection->write(upgrade_resp_str_);
+  tcp_client->waitForData("\r\n\r\n", false);
+  validateInitialDownstreamData(tcp_client->data());
+
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 228 + strlen(hello)
-  fake_upstream_connection->waitForData(233);
+
+  fake_upstream_connection->waitForData("hello", false);
   fake_upstream_connection->write("world");
-  tcp_client->waitForData(upgrade_resp_str + "world");
+  tcp_client->waitForData("world", false);
   tcp_client->write("bye!");
+
   // downstream disconnect
   tcp_client->close();
-  // datalen = 228 + strlen(hello) + strlen(bye!)
-  fake_upstream_connection->waitForData(237);
+  std::string final_data = fake_upstream_connection->waitForData("bye", false);
   fake_upstream_connection->waitForDisconnect();
+
+  validateFinalDownstreamData(tcp_client->data(), upgrade_resp_str_ + "world");
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
-  config_helper_.setDefaultHostAndRoute("*", "/asd");
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr));
   initialize();
 
   // WebSocket upgrade, send some data and disconnect upstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
-  tcp_client->write(upgrade_req_str);
+  tcp_client->write(upgrade_req_str_);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 228 bytes.
-  const std::string data = fake_upstream_connection->waitForData(228);
-  // In HTTP1, the transfer-length is defined by use of the "chunked" transfer-coding, even if
-  // content-length header is present. No body websocket upgrade request send to upstream has
-  // content-length header and has no transfer-encoding header.
-  EXPECT_NE(data.find("content-length:"), std::string::npos);
-  EXPECT_EQ(data.find("transfer-encoding:"), std::string::npos);
+  ASSERT_TRUE(fake_upstream_connection != nullptr);
+  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  validateInitialUpstreamData(data);
+
   // Accept websocket upgrade request
-  fake_upstream_connection->write(upgrade_resp_str);
-  tcp_client->waitForData(upgrade_resp_str);
+  fake_upstream_connection->write(upgrade_resp_str_);
+  tcp_client->waitForData("\r\n\r\n", false);
+  validateInitialDownstreamData(tcp_client->data());
+
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 228 + strlen(hello)
-  fake_upstream_connection->waitForData(233);
+
+  fake_upstream_connection->waitForData("hello", false);
+
   fake_upstream_connection->write("world");
   // upstream disconnect
   fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForData("world", false);
   tcp_client->waitForDisconnect();
+  ASSERT(!fake_upstream_connection->connected());
 
-  EXPECT_EQ(upgrade_resp_str + "world", tcp_client->data());
+  validateFinalDownstreamData(tcp_client->data(), upgrade_resp_str_ + "world");
 }
 
-TEST_P(WebsocketIntegrationTest, WebSocketConnectionEarlyData) {
-  config_helper_.setDefaultHostAndRoute("*", "/asd");
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+TEST_P(WebsocketIntegrationTest, EarlyData) {
+  config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr));
   initialize();
 
   // WebSocket upgrade with early data (HTTP body)
@@ -139,63 +152,57 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionEarlyData) {
       fmt::format("GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
                   "keep-alive, Upgrade\r\nUpgrade: websocket\r\nContent-Length: {}\r\n\r\n",
                   early_data_req_str.length());
-  const std::string upgrade_resp_str =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send early data alongside websocket upgrade request
   tcp_client->write(upgrade_req_str + early_data_req_str);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  // The request path gets rewritten from /websocket/test to /websocket.
-  // The size of headers received by the destination is 228 bytes
-  // and we add the early data to that.
-  const std::string data = fake_upstream_connection->waitForData(228 + early_data_req_str.length());
+
+  // Wait for both the upgrade, and the early data.
+  const std::string data = fake_upstream_connection->waitForData(early_data_req_str.c_str(), false);
   // We expect to find the early data on the upstream side
   EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
   // Accept websocket upgrade request
-  fake_upstream_connection->write(upgrade_resp_str);
+  fake_upstream_connection->write(upgrade_resp_str_);
   // Reply also with early data
   fake_upstream_connection->write(early_data_resp_str);
   // upstream disconnect
   fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
+  tcp_client->waitForData(early_data_resp_str, false);
   tcp_client->waitForDisconnect();
 
-  EXPECT_EQ(upgrade_resp_str + early_data_resp_str, tcp_client->data());
+  validateFinalDownstreamData(tcp_client->data(), upgrade_resp_str_ + "world");
 }
 
-TEST_P(WebsocketIntegrationTest, WebSocketIdleTimeout) {
+TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   envoy::api::v2::route::RouteAction::WebSocketProxyConfig ws_config;
   ws_config.mutable_idle_timeout()->set_nanos(
       std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100)).count());
   *ws_config.mutable_stat_prefix() = "my-stat-prefix";
-  config_helper_.setDefaultHostAndRoute("*", "/asd");
   config_helper_.addConfigModifier(setRouteUsingWebsocket(&ws_config));
   initialize();
 
   // WebSocket upgrade, send some data and disconnect downstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
-
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
-  tcp_client->write(upgrade_req_str);
+  tcp_client->write(upgrade_req_str_);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  const std::string data = fake_upstream_connection->waitForData(228);
+  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  validateInitialUpstreamData(data);
+
   // Accept websocket upgrade request
-  fake_upstream_connection->write(upgrade_resp_str);
-  tcp_client->waitForData(upgrade_resp_str);
+  fake_upstream_connection->write(upgrade_resp_str_);
+  tcp_client->waitForData("\r\n\r\n", false);
+  validateInitialDownstreamData(tcp_client->data());
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
-  // datalen = 228 + strlen(hello)
-  fake_upstream_connection->waitForData(233);
+  tcp_client->write("hello");
   fake_upstream_connection->write("world");
-  tcp_client->waitForData(upgrade_resp_str + "world");
+  tcp_client->waitForData("world", false);
 
   test_server_->waitForCounterGe("tcp.my-stat-prefix.idle_timeout", 1);
   tcp_client->waitForDisconnect();
@@ -208,7 +215,6 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
       std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100)).count());
   *ws_config.mutable_stat_prefix() = "my-stat-prefix";
 
-  config_helper_.setDefaultHostAndRoute("*", "/asd");
   config_helper_.addConfigModifier(setRouteUsingWebsocket(&ws_config));
 
   std::string expected_log_template = "bytes_sent={0} "
@@ -218,7 +224,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
                                       "upstream_local_address={4}";
 
   std::string access_log_path = TestEnvironment::temporaryPath(fmt::format(
-      "websocket_access_log{}.txt", GetParam() == Network::Address::IpVersion::v4 ? "v4" : "v6"));
+      "websocket_access_log{}.txt", version_ == Network::Address::IpVersion::v4 ? "v4" : "v6"));
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* filter_chain = listener->mutable_filter_chains(0);
@@ -245,27 +251,23 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
   // WebSocket upgrade, send some data and disconnect downstream
   IntegrationTcpClientPtr tcp_client;
   FakeRawConnectionPtr fake_upstream_connection;
-  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                      "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
 
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
-  tcp_client->write(upgrade_req_str);
+  tcp_client->write(upgrade_req_str_);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   const std::string data = fake_upstream_connection->waitForData(228);
   // Accept websocket upgrade request
-  fake_upstream_connection->write(upgrade_resp_str);
-  tcp_client->waitForData(upgrade_resp_str);
+  fake_upstream_connection->write(upgrade_resp_str_);
+  tcp_client->waitForData(upgrade_resp_str_);
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
   // datalen = 228 + strlen(hello)
   fake_upstream_connection->waitForData(233);
   fake_upstream_connection->write("world");
-  tcp_client->waitForData(upgrade_resp_str + "world");
+  tcp_client->waitForData(upgrade_resp_str_ + "world");
 
   fake_upstream_connection->close();
   fake_upstream_connection->waitForDisconnect();
@@ -278,7 +280,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
     log_result = Filesystem::fileReadToEnd(access_log_path);
   } while (log_result.empty());
 
-  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+  const std::string ip_port_regex = (version_ == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                         : R"EOF(\[::1\]:[0-9]+)EOF";
 

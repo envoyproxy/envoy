@@ -76,7 +76,7 @@ public:
                        Network::Address::IpVersion version, bool enable_half_close = false);
 
   void close();
-  void waitForData(const std::string& data);
+  void waitForData(const std::string& data, bool exact_match = true);
   void waitForDisconnect();
   void waitForHalfClose();
   void readDisable(bool disabled);

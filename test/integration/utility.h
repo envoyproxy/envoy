@@ -153,7 +153,10 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
-  void set_data_to_wait_for(const std::string& data) { data_to_wait_for_ = data; }
+  void set_data_to_wait_for(const std::string& data, bool exact_match = true) {
+    data_to_wait_for_ = data;
+    exact_match_ = exact_match;
+  }
   const std::string& data() { return data_; }
   bool readLastByte() { return read_end_stream_; }
 
@@ -161,6 +164,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::string data_to_wait_for_;
   std::string data_;
+  bool exact_match_{};
   bool read_end_stream_{};
 };
 

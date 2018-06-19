@@ -153,12 +153,13 @@ IntegrationTcpClient::IntegrationTcpClient(Event::Dispatcher& dispatcher,
 
 void IntegrationTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
-void IntegrationTcpClient::waitForData(const std::string& data) {
-  if (payload_reader_->data().find(data) == 0) {
+void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
+  auto found = payload_reader_->data().find(data);
+  if ((exact_match && found != std::string::npos) || (!exact_match && found == 0)) {
     return;
   }
 
-  payload_reader_->set_data_to_wait_for(data);
+  payload_reader_->set_data_to_wait_for(data, exact_match);
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
 }
 

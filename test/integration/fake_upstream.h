@@ -347,6 +347,7 @@ public:
       : FakeConnectionBase(shared_connection) {}
 
   std::string waitForData(uint64_t num_bytes);
+  std::string waitForData(const char* data, bool exact_match);
   void write(const std::string& data, bool end_stream = false);
 
   void initialize() override {

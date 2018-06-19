@@ -407,6 +407,16 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
+std::string FakeRawConnection::waitForData(const char* data, bool exact_match) {
+  Thread::LockGuard lock(lock_);
+  while ((exact_match && data_ != data) ||
+         (!exact_match && data_.find(data) == std::string::npos)) {
+    ENVOY_LOG(debug, "waiting for data");
+    connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
+  }
+  return data_;
+}
+
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
   shared_connection_.executeOnDispatcher([&data, end_stream](Network::Connection& connection) {
     Buffer::OwnedImpl to_write(data);
