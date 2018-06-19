@@ -107,6 +107,9 @@ message ClustersConfigDump {
 
     // The cluster config.
     envoy.api.v2.Cluster cluster = 2;
+
+    // The timestamp when the Cluster was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded cluster configs.

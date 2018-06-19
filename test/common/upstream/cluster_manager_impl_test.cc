@@ -182,7 +182,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -655,7 +655,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -758,6 +758,8 @@ dynamic_active_clusters:
           address: "127.0.0.1"
           port_value: 11001
       dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567890
   - version_info: "version2"
     cluster:
       name: "cluster4"
@@ -767,6 +769,8 @@ dynamic_active_clusters:
           address: "127.0.0.1"
           port_value: 11001
       dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567890
   - version_info: "version3"
     cluster:
       name: "cluster5"
@@ -776,6 +780,8 @@ dynamic_active_clusters:
           address: "127.0.0.1"
           port_value: 11001
       dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567890
 dynamic_warming_clusters:
 last_updated:
   seconds: 1234567890
@@ -855,7 +861,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillOnce(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
 
   const std::string json = R"EOF(
   {
@@ -889,6 +895,8 @@ dynamic_warming_clusters:
           address: "127.0.0.1"
           port_value: 11001
       dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567890
 last_updated:
   seconds: 1234567890
 )EOF");
