@@ -317,7 +317,7 @@ public:
    * @param timestamp a pointer to the mutable protobuf member to be written into.
    */
   static void
-  writeSystemClockTime(const std::chrono::time_point<std::chrono::system_clock> system_clock_time,
+  writeSystemClockTime(const SystemTime system_clock_time,
                        google::protobuf::Timestamp* timestamp);
 };
 
