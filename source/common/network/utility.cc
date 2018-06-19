@@ -319,11 +319,11 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 
   switch (orig_addr.ss_family) {
   case AF_INET:
-  return Address::InstanceConstSharedPtr{
-      new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
+    return Address::InstanceConstSharedPtr{
+        new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
   case AF_INET6:
-  return Address::InstanceConstSharedPtr{
-      new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(orig_addr))};
+    return Address::InstanceConstSharedPtr{
+        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in*>(orig_addr))};
   default:
     return nullptr;
   }
