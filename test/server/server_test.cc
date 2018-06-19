@@ -237,13 +237,15 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
   }
 }
 
-TEST_P(ServerInstanceImplTest, NoOptionsPassed){EXPECT_THROW_WITH_MESSAGE(
-    server_.reset(new InstanceImpl(
-        options_,
-        Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
-        hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
-    EnvoyException, "unable to read file: ")}
+TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
+  EXPECT_THROW_WITH_MESSAGE(
+      server_.reset(new InstanceImpl(
+          options_,
+          Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
+          hooks_, restart_, stats_store_, fakelock_, component_factory_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
+      EnvoyException, "unable to read file: ");
+}
 
 TEST_P(ServerInstanceImplTest, AdminGet) {
   initialize("test/server/node_bootstrap.yaml");
