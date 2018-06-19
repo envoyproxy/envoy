@@ -224,7 +224,7 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 
 void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
-  if (file_event_ == nullptr) {
+  if (state() != State::Open || file_event_ == nullptr) {
     // If readDisable is called on a closed connection in error, do not crash.
     return;
   }
