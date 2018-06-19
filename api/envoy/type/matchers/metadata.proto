@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package envoy.type.matchers;
-option go_package = "matchers";
+package envoy.type.matcher;
+option go_package = "matcher";
 
 import "envoy/type/matchers/string.proto";
 import "envoy/type/matchers/number.proto";
@@ -43,7 +43,7 @@ message MetadataMatcher {
       // If specified, value match will be performed based on whether the path is referring to a
       // valid primitive value in the metadata. If the path is referring to a non-primitive value,
       // the result is always not matched.
-      bool present_match = 7;
+      bool present_match = 5;
     }
   }
 
@@ -51,6 +51,7 @@ message MetadataMatcher {
   string filter = 1 [(validate.rules).string.min_bytes = 1];
 
   // Required. The multi-key path to retrieve the Value from the Struct.
+  // Note: Array is not supported and will result a not match discarding any specified values.
   repeated string path = 2 [(validate.rules).repeated .min_items = 1];
 
   // Required. A set of values to match. The MetadataMatcher is matched if at least one value is

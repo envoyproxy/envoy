@@ -20,7 +20,7 @@ TEST(MetadataTest, MatchNullValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_null_value(ProtobufWkt::NullValue::NULL_VALUE);
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -39,7 +39,7 @@ TEST(MetadataTest, MatchDoubleValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_number_value(9);
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -75,7 +75,7 @@ TEST(MetadataTest, MatchStringExactValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("prod");
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -92,7 +92,7 @@ TEST(MetadataTest, MatchStringPrefixValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("prodabc");
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -111,7 +111,7 @@ TEST(MetadataTest, MatchStringSuffixValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("abcprod");
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -131,7 +131,7 @@ TEST(MetadataTest, MatchBoolValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_bool_value(true);
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 
@@ -150,7 +150,7 @@ TEST(MetadataTest, MatchPresentValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_number_value(1);
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path("label");
 

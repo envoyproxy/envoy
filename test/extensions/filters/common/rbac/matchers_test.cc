@@ -223,7 +223,7 @@ TEST(MetadataMatcher, MetadataMatcher) {
   metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("rbac", label));
 
-  envoy::type::matchers::MetadataMatcher matcher;
+  envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("rbac");
   matcher.add_path("label");
 

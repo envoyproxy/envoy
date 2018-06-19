@@ -12,9 +12,9 @@ namespace Matchers {
 
 bool DoubleMatcher::match(double value) const {
   switch (matcher_.match_pattern_case()) {
-  case envoy::type::matchers::DoubleMatcher::kRange:
+  case envoy::type::matcher::DoubleMatcher::kRange:
     return matcher_.range().start() <= value && value < matcher_.range().end();
-  case envoy::type::matchers::DoubleMatcher::kExact:
+  case envoy::type::matcher::DoubleMatcher::kExact:
     return matcher_.exact() == value;
   default:
     return false;
@@ -23,40 +23,40 @@ bool DoubleMatcher::match(double value) const {
 
 bool StringMatcher::match(const std::string& value) const {
   switch (matcher_.match_pattern_case()) {
-  case envoy::type::matchers::StringMatcher::kExact:
+  case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;
-  case envoy::type::matchers::StringMatcher::kPrefix:
+  case envoy::type::matcher::StringMatcher::kPrefix:
     return absl::StartsWith(value, matcher_.prefix());
-  case envoy::type::matchers::StringMatcher::kSuffix:
+  case envoy::type::matcher::StringMatcher::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
-  case envoy::type::matchers::StringMatcher::kRegex:
+  case envoy::type::matcher::StringMatcher::kRegex:
     return std::regex_match(value, regex_);
   default:
     return false;
   }
 }
 
-MetadataMatcher::MetadataMatcher(const envoy::type::matchers::MetadataMatcher& matcher)
+MetadataMatcher::MetadataMatcher(const envoy::type::matcher::MetadataMatcher& matcher)
     : matcher_(matcher), path_(matcher.path().begin(), matcher.path().end()) {
-  for (const envoy::type::matchers::MetadataMatcher::Value& m : matcher_.values()) {
+  for (const envoy::type::matcher::MetadataMatcher::Value& m : matcher_.values()) {
     switch (m.match_pattern_case()) {
-    case envoy::type::matchers::MetadataMatcher_Value::kNullMatch:
+    case envoy::type::matcher::MetadataMatcher_Value::kNullMatch:
       null_matcher_ |= m.null_match();
       break;
-    case envoy::type::matchers::MetadataMatcher_Value::kDoubleMatch:
+    case envoy::type::matcher::MetadataMatcher_Value::kDoubleMatch:
       double_matcher_.push_back(DoubleMatcher(m.double_match()));
       break;
-    case envoy::type::matchers::MetadataMatcher_Value::kStringMatch:
+    case envoy::type::matcher::MetadataMatcher_Value::kStringMatch:
       string_matcher_.push_back(StringMatcher(m.string_match()));
       break;
-    case envoy::type::matchers::MetadataMatcher_Value::kBoolMatch:
+    case envoy::type::matcher::MetadataMatcher_Value::kBoolMatch:
       if (m.bool_match()) {
         bool_matcher_allow_true_ = true;
       } else {
         bool_matcher_allow_false_ = true;
       }
       break;
-    case envoy::type::matchers::MetadataMatcher_Value::kPresentMatch:
+    case envoy::type::matcher::MetadataMatcher_Value::kPresentMatch:
       present_matcher_ |= m.present_match();
       break;
     default:

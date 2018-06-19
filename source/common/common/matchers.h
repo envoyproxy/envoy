@@ -14,7 +14,7 @@ namespace Matchers {
 
 class DoubleMatcher {
 public:
-  DoubleMatcher(const envoy::type::matchers::DoubleMatcher& matcher) : matcher_(matcher) {}
+  DoubleMatcher(const envoy::type::matcher::DoubleMatcher& matcher) : matcher_(matcher) {}
 
   /**
    * Check whether the value is matched to the matcher.
@@ -24,13 +24,13 @@ public:
   bool match(double value) const;
 
 private:
-  const envoy::type::matchers::DoubleMatcher matcher_;
+  const envoy::type::matcher::DoubleMatcher matcher_;
 };
 
 class StringMatcher {
 public:
-  StringMatcher(const envoy::type::matchers::StringMatcher& matcher) : matcher_(matcher) {
-    if (matcher.match_pattern_case() == envoy::type::matchers::StringMatcher::kRegex) {
+  StringMatcher(const envoy::type::matcher::StringMatcher& matcher) : matcher_(matcher) {
+    if (matcher.match_pattern_case() == envoy::type::matcher::StringMatcher::kRegex) {
       regex_ = RegexUtil::parseRegex(matcher_.regex());
     }
   }
@@ -43,13 +43,13 @@ public:
   bool match(const std::string& value) const;
 
 private:
-  const envoy::type::matchers::StringMatcher matcher_;
+  const envoy::type::matcher::StringMatcher matcher_;
   std::regex regex_;
 };
 
 class MetadataMatcher {
 public:
-  MetadataMatcher(const envoy::type::matchers::MetadataMatcher& matcher);
+  MetadataMatcher(const envoy::type::matcher::MetadataMatcher& matcher);
 
   /**
    * Check whether the metadata is matched to the matcher.
@@ -59,7 +59,7 @@ public:
   bool match(const envoy::api::v2::core::Metadata& metadata) const;
 
 private:
-  const envoy::type::matchers::MetadataMatcher matcher_;
+  const envoy::type::matcher::MetadataMatcher matcher_;
   const std::vector<std::string> path_;
 
   bool null_matcher_{false};

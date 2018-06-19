@@ -114,7 +114,7 @@ message Permission {
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
 
     // A metadata that describes additional information about the action.
-    envoy.type.matchers.MetadataMatcher metadata = 7;
+    envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }
 
@@ -156,6 +156,6 @@ message Principal {
     envoy.api.v2.route.HeaderMatcher header = 6;
 
     // A metadata that describes additional information about the principal.
-    envoy.type.matchers.MetadataMatcher metadata = 7;
+    envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }

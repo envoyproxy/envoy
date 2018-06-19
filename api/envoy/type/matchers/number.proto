@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-package envoy.type.matchers;
-option go_package = "matchers";
+package envoy.type.matcher;
+option go_package = "matcher";
 
 import "envoy/type/range.proto";
 
