@@ -224,6 +224,11 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 
 void ConnectionImpl::readDisable(bool disable) {
   ASSERT(state() == State::Open);
+  if (state() != State::Open || file_event_ == nullptr) {
+    // If readDisable is called on a closed connection in error, do not crash.
+    return;
+  }
+
   ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
