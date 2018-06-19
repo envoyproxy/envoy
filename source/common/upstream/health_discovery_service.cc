@@ -10,7 +10,7 @@ HDSReporter::HDSReporter(const envoy::api::v2::core::Node& node,
                                      Grpc::AsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_HDS_STATS(
-                                POOL_COUNTER_PREFIX(scope, "load_reporter."))},
+                                POOL_COUNTER_PREFIX(scope, "hds_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck"))  {
@@ -68,6 +68,7 @@ void HDSReporter::onReceiveMessage(
   ENVOY_LOG(debug, "New health check response ", message->DebugString());
   stats_.requests_.inc();
   stream_->sendMessage(health_check_request_, false);
+  ENVOY_LOG(debug, "Counter: " + std::to_string( stats_.requests_.value()));
 }
 
 void HDSReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
