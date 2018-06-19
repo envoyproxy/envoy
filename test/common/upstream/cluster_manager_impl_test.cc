@@ -178,7 +178,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -202,7 +202,8 @@ static_clusters:
 dynamic_active_clusters:
 dynamic_warming_clusters:
 last_updated:
-  seconds: 1234567890
+  seconds: 1234567891
+  nanos: 234000000
 )EOF");
 }
 
@@ -651,7 +652,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -755,7 +756,8 @@ dynamic_active_clusters:
           port_value: 11001
       dns_lookup_family: V4_ONLY
     last_updated:
-      seconds: 1234567890
+      seconds: 1234567891
+      nanos: 234000000
   - version_info: "version2"
     cluster:
       name: "cluster4"
@@ -766,7 +768,8 @@ dynamic_active_clusters:
           port_value: 11001
       dns_lookup_family: V4_ONLY
     last_updated:
-      seconds: 1234567890
+      seconds: 1234567891
+      nanos: 234000000
   - version_info: "version3"
     cluster:
       name: "cluster5"
@@ -777,10 +780,12 @@ dynamic_active_clusters:
           port_value: 11001
       dns_lookup_family: V4_ONLY
     last_updated:
-      seconds: 1234567890
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_warming_clusters:
 last_updated:
-  seconds: 1234567890
+  seconds: 1234567891
+  nanos: 234000000
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
@@ -857,7 +862,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(system_time_source_, currentTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = R"EOF(
   {
@@ -892,9 +897,11 @@ dynamic_warming_clusters:
           port_value: 11001
       dns_lookup_family: V4_ONLY
     last_updated:
-      seconds: 1234567890
+      seconds: 1234567891
+      nanos: 234000000
 last_updated:
-  seconds: 1234567890
+  seconds: 1234567891
+  nanos: 234000000
 )EOF");
 
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));

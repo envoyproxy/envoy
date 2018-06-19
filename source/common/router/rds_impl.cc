@@ -231,8 +231,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
 
-  DurationUtil::writeSystemClockTime(routes_config_update_time,
-                                     *(config_dump->mutable_last_updated()));
+  TimestampUtil::systemClockToTimestamp(routes_config_update_time,
+                                        *(config_dump->mutable_last_updated()));
 
   for (const auto& provider : getRdsRouteConfigProviders()) {
     auto config_info = provider->configInfo();
@@ -240,8 +240,8 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(config_info.value().version_);
       dynamic_config->mutable_route_config()->MergeFrom(config_info.value().config_);
-      DurationUtil::writeSystemClockTime(provider->lastUpdated(),
-                                         *(dynamic_config->mutable_last_updated()));
+      TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
+                                            *(dynamic_config->mutable_last_updated()));
     }
   }
 

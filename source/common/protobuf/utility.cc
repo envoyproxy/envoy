@@ -209,10 +209,14 @@ uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) 
   return Protobuf::util::TimeUtil::DurationToSeconds(duration);
 }
 
-void DurationUtil::writeSystemClockTime(const SystemTime system_clock_time,
-                                        google::protobuf::Timestamp& timestamp) {
-  timestamp.MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
-      std::chrono::system_clock::to_time_t(system_clock_time)));
+void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
+                                           google::protobuf::Timestamp& timestamp) {
+  // Converts to millisecond-precision Timestamp by explicitly casting to millisecond-precision
+  // time_point.
+  timestamp.MergeFrom(Protobuf::util::TimeUtil::MillisecondsToTimestamp(
+      std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
+          .time_since_epoch()
+          .count()));
 }
 
 } // namespace Envoy

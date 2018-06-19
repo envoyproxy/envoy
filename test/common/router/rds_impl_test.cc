@@ -369,7 +369,7 @@ public:
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
     ON_CALL(system_time_source_, currentTime())
-        .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567890000))));
+        .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
     ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
@@ -484,9 +484,11 @@ dynamic_route_configs:
       name: foo_route_config
       virtual_hosts:
     last_updated:
-      seconds: 1234567890
+      seconds: 1234567891
+      nanos: 234000000
 last_updated:
-  seconds: 1234567890
+  seconds: 1234567891
+  nanos: 234000000
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());

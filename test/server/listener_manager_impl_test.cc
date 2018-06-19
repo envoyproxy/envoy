@@ -390,7 +390,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
 
   InSequence s;
 
@@ -420,6 +420,7 @@ dynamic_warming_listeners:
 dynamic_draining_listeners:
 last_updated:
   seconds: 1001001001
+  nanos: 1000000
 )EOF");
 
   // Update foo listener. Should be blocked.
@@ -446,7 +447,7 @@ last_updated:
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
 
   InSequence s;
 
@@ -494,10 +495,12 @@ dynamic_active_listeners:
     filter_chains: {}
   last_updated:
     seconds: 1001001001
+    nanos: 1000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 last_updated:
   seconds: 1001001001
+  nanos: 1000000
 )EOF");
 
   // Update duplicate should be a NOP.
@@ -516,7 +519,7 @@ per_connection_buffer_limit_bytes: 10
   )EOF";
 
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002002))));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -539,10 +542,12 @@ dynamic_active_listeners:
     per_connection_buffer_limit_bytes: 10
   last_updated:
     seconds: 2002002002
+    nanos: 2000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 last_updated:
   seconds: 2002002002
+  nanos: 2000000
 )EOF");
 
   // Start workers.
@@ -557,7 +562,7 @@ last_updated:
   checkStats(1, 1, 0, 0, 1, 0);
 
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003003))));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -584,6 +589,7 @@ dynamic_active_listeners:
     filter_chains: {}
   last_updated:
     seconds: 3003003003
+    nanos: 3000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
   version_info: "version2"
@@ -597,8 +603,10 @@ dynamic_draining_listeners:
     per_connection_buffer_limit_bytes: 10
   last_updated:
     seconds: 2002002002
+    nanos: 2000000
 last_updated:
   seconds: 3003003003
+  nanos: 3000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -609,7 +617,7 @@ last_updated:
   checkStats(1, 2, 0, 0, 1, 0);
 
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004004))));
 
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
@@ -631,7 +639,7 @@ filter_chains: {}
   checkStats(2, 2, 0, 0, 2, 0);
 
   ON_CALL(system_time_source_, currentTime())
-      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005000))));
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005005))));
 
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(
@@ -665,6 +673,7 @@ dynamic_active_listeners:
       filter_chains: {}
     last_updated:
       seconds: 3003003003
+      nanos: 3000000
   - version_info: "version4"
     listener:
       name: "bar"
@@ -675,6 +684,7 @@ dynamic_active_listeners:
       filter_chains: {}
     last_updated:
       seconds: 4004004004
+      nanos: 4000000
 dynamic_warming_listeners:
   - version_info: "version5"
     listener:
@@ -686,9 +696,11 @@ dynamic_warming_listeners:
       filter_chains: {}
     last_updated:
       seconds: 5005005005
+      nanos: 5000000
 dynamic_draining_listeners:
 last_updated:
   seconds: 5005005005
+  nanos: 5000000
 )EOF");
 
   // Update a duplicate baz that is currently warming.
