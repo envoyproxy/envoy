@@ -143,6 +143,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
   const ProtobufTypes::String method = headers.Method()->value().c_str();
   ProtobufTypes::String path = headers.Path()->value().c_str();
+  absl::string_view content_type =
+      headers.ContentType() == nullptr ? "" : headers.ContentType()->value().c_str();
   ProtobufTypes::String args;
 
   const size_t pos = path.find('?');
@@ -155,7 +157,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
   std::vector<VariableBinding> variable_bindings;
   method_descriptor =
       path_matcher_->Lookup(method, path, args, &variable_bindings, &request_info.body_field_path);
-  if (!method_descriptor) {
+  if (!method_descriptor ||
+      StringUtil::caseCompare(content_type, Http::Headers::get().ContentTypeValues.Grpc)) {
     return ProtobufUtil::Status(Code::NOT_FOUND, "Could not resolve " + path + " to a method");
   }
 
