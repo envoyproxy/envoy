@@ -282,6 +282,7 @@ envoy_cc_test_library(
         "//source/server:test_hooks_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",

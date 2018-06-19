@@ -19,8 +19,9 @@ public:
   MOCK_CONST_METHOD2(findTlsCertificate,
                      Ssl::TlsCertificateConfig*(const std::string& config_source_hash,
                                                 const std::string& name));
-  MOCK_METHOD1(addOrUpdateSdsService,
-               std::string(const envoy::api::v2::core::ConfigSource& config_source));
+  MOCK_METHOD2(addOrUpdateSdsService,
+               std::string(const envoy::api::v2::core::ConfigSource& config_source,
+                           std::string config_name));
 };
 
 } // namespace Secret

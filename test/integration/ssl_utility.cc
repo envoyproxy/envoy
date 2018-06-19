@@ -15,8 +15,7 @@ namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager,
-                                      Secret::SecretManager& secret_manager) {
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager) {
   const std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",

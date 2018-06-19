@@ -17,7 +17,7 @@ namespace Secret {
 namespace {
 
 class MockServer : public Server::MockInstance {
-}
+};
 
 class SecretManagerImplTest : public testing::Test {
 };
@@ -39,11 +39,11 @@ tls_certificate:
 
   Server::MockInstance server;
 
-  server.secretManager().addOrUpdateSecret(secret_config);
+  server.secretManager().addOrUpdateSecret("", secret_config);
 
-  ASSERT_EQ(server.secretManager().findTlsCertificate("undefined"), nullptr);
+  ASSERT_EQ(server.secretManager().findTlsCertificate("", "undefined"), nullptr);
 
-  ASSERT_NE(server.secretManager().findTlsCertificate("abc.com"), nullptr);
+  ASSERT_NE(server.secretManager().findTlsCertificate("", "abc.com"), nullptr);
 
   EXPECT_EQ(
       TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
