@@ -60,6 +60,9 @@ message ListenersConfigDump {
 
     // The listener config.
     envoy.api.v2.Listener listener = 2;
+
+    // The timestamp when the Listener was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded listener configs.
