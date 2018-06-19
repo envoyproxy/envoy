@@ -30,7 +30,7 @@ public:
   MOCK_METHOD1(complete, void(LimitStatus status));
 };
 
-// TODO(junr03): remove the boolean parameter after 1.7.0.
+// TODO(junr03): legacy rate limit is deprecated. Remove the boolean parameter after 1.7.0.
 class RateLimitGrpcClientTest : public testing::TestWithParam<bool> {
 public:
   RateLimitGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()) {}

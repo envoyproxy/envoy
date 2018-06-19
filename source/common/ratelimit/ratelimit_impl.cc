@@ -92,13 +92,13 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  // TODO(junr03): remove support for the lyft proto after 1.7.0.
+  // TODO(junr03): legacy rate limit is deprecated. Remove support for the lyft proto after 1.7.0.
   if (use_data_plane_proto_) {
     return std::make_unique<GrpcClientImpl>(
         async_client_factory_->create(), timeout,
         "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
   }
-  ENVOY_LOG_MISC(warn, "legacy ratelimit client is deprecated, update your service to support "
+  ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
                        "data-plane-api defined rate limit service");
   return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout,
                                           "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");

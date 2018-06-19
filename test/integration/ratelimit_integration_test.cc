@@ -12,7 +12,8 @@
 namespace Envoy {
 namespace {
 
-// TODO(junr03): go back to having only one GrpcClientIntegrationParamTest after 1.7.0.
+// TODO(junr03): legacy rate limit is deprecated. Go back to having only one
+// GrpcClientIntegrationParamTest after 1.7.0.
 class RatelimitGrpcClientIntegrationParamTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<
