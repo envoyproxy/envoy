@@ -32,8 +32,3 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
     ],
 )
-
-envoy_cc_library(
-    name = "tls_certificate_config_interface",
-    hdrs = ["tls_certificate_config.h"],
-)

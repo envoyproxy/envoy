@@ -12,7 +12,6 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -26,7 +25,6 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Runtime::MockRandomGenerator> random;
-  Secret::MockSecretManager secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   Ssl::ContextManagerImpl ssl_context_manager{runtime};
   NiceMock<Event::MockDispatcher> dispatcher;
@@ -34,8 +32,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   NiceMock<Server::MockAdmin> admin;
 
   ValidationClusterManagerFactory factory(runtime, stats, tls, random, dns_resolver,
-                                          ssl_context_manager, dispatcher, local_info,
-                                          secret_manager);
+                                          ssl_context_manager, dispatcher, local_info);
 
   AccessLog::MockAccessLogManager log_manager;
   const envoy::config::bootstrap::v2::Bootstrap bootstrap;

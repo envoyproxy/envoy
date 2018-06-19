@@ -96,7 +96,6 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
@@ -173,7 +172,6 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/protobuf",
     ],

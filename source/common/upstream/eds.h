@@ -4,7 +4,6 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/secret/secret_manager.h"
 
 #include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"

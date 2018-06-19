@@ -18,6 +18,5 @@ envoy_cc_mock(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_interface",
-        "//test/mocks/secret:secret_mocks",
     ],
 )

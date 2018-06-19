@@ -11,7 +11,6 @@
 #include "common/common/assert.h"
 #include "common/router/rds_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -74,7 +73,6 @@ public:
   HotRestart& hotRestart() override { NOT_IMPLEMENTED; }
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return listener_manager_; }
-  Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
@@ -151,7 +149,6 @@ private:
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   InitManagerImpl init_manager_;
   ListenerManagerImpl listener_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 } // namespace Server

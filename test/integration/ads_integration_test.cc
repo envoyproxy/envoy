@@ -19,7 +19,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -85,7 +84,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
+    Ssl::ServerContextConfigImpl cfg(tls_context);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -243,7 +242,6 @@ public:
     }
   }
 
-  Secret::MockSecretManager secret_manager_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeHttpConnectionPtr ads_connection_;

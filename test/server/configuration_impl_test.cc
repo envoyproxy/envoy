@@ -2,9 +2,7 @@
 #include <list>
 #include <string>
 
-#include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
-#include "common/json/json_loader.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "server/configuration_impl.h"
@@ -55,7 +53,7 @@ protected:
       : cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
                                  server_.random(), server_.dnsResolver(),
                                  server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager()) {}
+                                 server_.localInfo()) {}
 
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;

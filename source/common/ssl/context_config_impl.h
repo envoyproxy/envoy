@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_config.h"
 
 #include "common/json/json_loader.h"
@@ -55,8 +54,7 @@ public:
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
 protected:
-  ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
-                    Secret::SecretManager& secret_manager);
+  ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config);
 
 private:
   static unsigned
@@ -88,10 +86,8 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config,
-                                   Secret::SecretManager& secret_manager);
-  explicit ClientContextConfigImpl(const Json::Object& config,
-                                   Secret::SecretManager& secret_manager);
+  explicit ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config);
+  explicit ClientContextConfigImpl(const Json::Object& config);
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -104,10 +100,8 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config,
-                                   Secret::SecretManager& secret_manager);
-  explicit ServerContextConfigImpl(const Json::Object& config,
-                                   Secret::SecretManager& secret_manager);
+  explicit ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config);
+  explicit ServerContextConfigImpl(const Json::Object& config);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }

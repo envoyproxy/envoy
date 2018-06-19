@@ -17,7 +17,6 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
@@ -314,7 +313,7 @@ public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  Secret::SecretManager& secret_manager, bool added_via_api);
+                  bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -364,8 +363,6 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
-  Secret::SecretManager& secretManager() override { return secret_manager_; }
-
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -405,7 +402,6 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
-  Secret::SecretManager& secret_manager_;
 };
 
 /**
@@ -459,7 +455,7 @@ protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  Secret::SecretManager& secret_manager, bool added_via_api);
+                  bool added_via_api);
 
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);

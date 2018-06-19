@@ -9,8 +9,6 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats.h"
 
-#include "test/mocks/secret/mocks.h"
-
 #include "gmock/gmock.h"
 
 namespace Envoy {
