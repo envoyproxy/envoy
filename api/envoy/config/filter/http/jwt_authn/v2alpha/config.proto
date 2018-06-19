@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
 import "envoy/api/v2/route/route.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 // This message specifies how a JSON Web Token (JWT) can be verified. JWT format is defined
@@ -247,6 +248,12 @@ message JwtRequirement {
     // Specify list of JwtRequirement. Their results are AND-ed.
     // All of them must pass, if one of them fails or missing, it fails.
     JwtRequirementAndList requires_all = 4;
+
+    // The requirement is always satisfied even if JWT is missing or the JWT
+    // verification fails. A typical usage is: this filter is used to only verify
+    // JWTs and pass the verified JWT payloads to another filter, the other filter
+    // will make decision. In this mode, all JWT tokens will be verified.
+    google.protobuf.BoolValue allow_missing_or_failed = 5;
   }
 }
 
@@ -273,7 +280,7 @@ message JwtRequirementAndList {
 //         prefix: "/healthz"
 //
 // In above example, "requires" field is empty for /healthz prefix match,
-// it means that requrests matched the path prefix don't require jwt authentication.
+// it means that requests matching the path prefix don't require JWT authentication.
 //
 // Example 2:
 //
@@ -391,11 +398,5 @@ message JwtAuthentication {
   //           - provider_name: "provider1"
   //           - provider_name: "provider2"
   //
-  // A special handling if rules is empty: all JWTs in a request will be verified, but the request
-  // will pass even the verifications fail. A typical usage is: this filter is used to only verify
-  // JWTs and pass the verified JWT payloads to another filter, the other filter will make decision.
-  // This usage has impact on the process flow. For example, normally for "requires_any"
-  // requirements, if the first requirement passes, the rest requiements will not be verified. But
-  // under this special usage, all requirements will be verified.
   repeated RequirementRule rules = 2;
 }
