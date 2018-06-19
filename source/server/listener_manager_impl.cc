@@ -410,6 +410,7 @@ void ListenerImpl::debugLog(const std::string& message) {
 }
 
 void ListenerImpl::initialize() {
+  last_updated_ = systemTimeSource().currentTime();
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // with initialize_canceled_.
@@ -433,6 +434,7 @@ Init::Manager& ListenerImpl::initManager() {
 
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   ASSERT(!socket_);
+  last_updated_ = systemTimeSource().currentTime();
   socket_ = socket;
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {
@@ -483,6 +485,8 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
       auto& dynamic_listener = *config_dump->mutable_dynamic_active_listeners()->Add();
       dynamic_listener.set_version_info(listener->versionInfo());
       dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+      DurationUtil::writeSystemClockTime(listener->last_updated_,
+                                         dynamic_listener.mutable_last_updated());
     }
   }
 
@@ -490,12 +494,16 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     auto& dynamic_listener = *config_dump->mutable_dynamic_warming_listeners()->Add();
     dynamic_listener.set_version_info(listener->versionInfo());
     dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+    DurationUtil::writeSystemClockTime(listener->last_updated_,
+                                       dynamic_listener.mutable_last_updated());
   }
 
   for (const auto& listener : draining_listeners_) {
     auto& dynamic_listener = *config_dump->mutable_dynamic_draining_listeners()->Add();
     dynamic_listener.set_version_info(listener.listener_->versionInfo());
     dynamic_listener.mutable_listener()->MergeFrom(listener.listener_->config());
+    DurationUtil::writeSystemClockTime(listener.listener_->last_updated_,
+                                       dynamic_listener.mutable_last_updated());
   }
 
   return config_dump;

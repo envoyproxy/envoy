@@ -270,9 +270,9 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  SystemTimeSource& systemTimeSource() override { return ProdSystemTimeSource::instance_; }
-  MonotonicTimeSource& monotonicTimeSource() override { return ProdMonotonicTimeSource::instance_; }
+  SystemTimeSource& systemTimeSource() override { return parent_.system_time_source_; }
   void ensureSocketOptions() {
+    last_updated_ = systemTimeSource().currentTime();
     if (!listen_socket_options_) {
       listen_socket_options_ =
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -302,6 +302,8 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
+
+  SystemTime last_updated_;
 
 private:
   void addFilterChain(const std::vector<std::string>& server_names,
