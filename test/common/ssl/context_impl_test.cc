@@ -361,12 +361,12 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
 
   tls_context.set_sni(std::string("\000", 1));
   EXPECT_THROW_WITH_MESSAGE(
-      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "SNI names containing NULL-byte are not allowed");
+      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "SNI names containing NULL-byte are not allowed");
   tls_context.set_sni(std::string("a\000b", 3));
   EXPECT_THROW_WITH_MESSAGE(
-      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "SNI names containing NULL-byte are not allowed");
+      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "SNI names containing NULL-byte are not allowed");
 }
 
 // Validate that values other than a hex-encoded SHA-256 fail config validation.
@@ -410,8 +410,8 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   EXPECT_THROW_WITH_MESSAGE(
-      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "Multiple TLS certificates are not supported for client contexts");
+      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "Multiple TLS certificates are not supported for client contexts");
 }
 
 TEST(ClientContextConfigImplTest, TlsCertificatesAndSdsConfig) {
@@ -420,8 +420,8 @@ TEST(ClientContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
-      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "Multiple TLS certificates are not supported for client contexts");
+      ClientContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "Multiple TLS certificates are not supported for client contexts");
 }
 
 TEST(ClientContextConfigImplTest, StaticTlsCertificates) {
@@ -492,13 +492,13 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   Server::MockInstance server;
   EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      ServerContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "A single TLS certificate is required for server contexts");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl client_context_config(tls_context, server.secretManager()), EnvoyException,
-      "A single TLS certificate is required for server contexts");
+      ServerContextConfigImpl client_context_config(tls_context, server.secretManager()),
+      EnvoyException, "A single TLS certificate is required for server contexts");
 }
 
 TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
@@ -541,8 +541,8 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
   server_validation_ctx->set_allow_expired_certificate(true);
 
   EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()), EnvoyException,
-      "Certificate validity period is always ignored without trusted CA");
+      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()),
+      EnvoyException, "Certificate validity period is always ignored without trusted CA");
 
   envoy::api::v2::auth::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -553,19 +553,21 @@ TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   server_validation_ctx->set_allow_expired_certificate(false);
 
-  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context, server.secretManager()));
+  EXPECT_NO_THROW(
+      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()));
 
   server_validation_ctx->set_allow_expired_certificate(true);
 
   EXPECT_THROW_WITH_MESSAGE(
-      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()), EnvoyException,
-      "Certificate validity period is always ignored without trusted CA");
+      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()),
+      EnvoyException, "Certificate validity period is always ignored without trusted CA");
 
   // But once you add a trusted CA, you should be able to create the context.
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
 
-  EXPECT_NO_THROW(ServerContextConfigImpl server_context_config(tls_context, server.secretManager()));
+  EXPECT_NO_THROW(
+      ServerContextConfigImpl server_context_config(tls_context, server.secretManager()));
 }
 
 } // namespace Ssl
