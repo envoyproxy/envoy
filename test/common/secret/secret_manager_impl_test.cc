@@ -5,6 +5,7 @@
 
 #include "common/secret/secret_manager_impl.h"
 
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -14,6 +15,8 @@
 namespace Envoy {
 namespace Secret {
 namespace {
+
+class MockServer : public Server::MockInstance {}
 
 class SecretManagerImplTest : public testing::Test {};
 
@@ -32,21 +35,54 @@ tls_certificate:
 
   MessageUtil::loadFromYaml(yaml, secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+  Server::MockInstance server;
 
-  secret_manager->addOrUpdateSecret(secret_config);
+  server.secretManager().addOrUpdateSecret(secret_config);
 
-  ASSERT_EQ(secret_manager->findTlsCertificate("undefined"), nullptr);
+  ASSERT_EQ(server.secretManager().findTlsCertificate("undefined"), nullptr);
 
-  ASSERT_NE(secret_manager->findTlsCertificate("abc.com"), nullptr);
+  ASSERT_NE(server.secretManager().findTlsCertificate("abc.com"), nullptr);
 
   EXPECT_EQ(
       TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
-      secret_manager->findTlsCertificate("abc.com")->certificateChain());
+      server.secretManager().findTlsCertificate("abc.com")->certificateChain());
 
   EXPECT_EQ(
       TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      secret_manager->findTlsCertificate("abc.com")->privateKey());
+      server.secretManager().findTlsCertificate("abc.com")->privateKey());
+}
+
+TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
+  envoy::api::v2::core::ConfigSource config_source;
+  envoy::api::v2::auth::Secret secret_config;
+
+  std::string yaml =
+      R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+
+  MessageUtil::loadFromYaml(yaml, secret_config);
+
+  Server::MockInstance server;
+
+  std::string config_source_hash = server.secretManager().addOrUpdateSdsService(config_source);
+
+  server.secretManager().addOrUpdateSecret(config_source_hash, secret_config);
+
+  ASSERT_EQ(server.secretManager().findTlsCertificate(config_source_hash, "undefined"), nullptr);
+
+  EXPECT_EQ(
+      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
+      server.secretManager().findTlsCertificate(config_source_hash, "abc.com")->certificateChain());
+
+  EXPECT_EQ(
+      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
+      server.secretManager().findTlsCertificate(config_source_hash, "abc.com")->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
@@ -62,9 +98,10 @@ session_ticket_keys:
 
   MessageUtil::loadFromYaml(yaml, secret_config);
 
-  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+  Server::MockInstance server;
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(server));
 
-  EXPECT_THROW_WITH_MESSAGE(secret_manager->addOrUpdateSecret(secret_config), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(server.secretManager().addOrUpdateSecret(secret_config), EnvoyException,
                             "Secret type not implemented");
 }
 

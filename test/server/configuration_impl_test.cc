@@ -303,6 +303,55 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
                             "Provided name for static registration lookup was empty.");
 }
 
+TEST_F(ConfigurationImplTest, StaticSecretRead) {
+  std::string json =
+      R"EOF(
+    {
+      "listeners" : [
+        {
+          "address": "tcp://127.0.0.1:1234",
+          "filters": []
+        }
+      ],
+      "cluster_manager": {
+        "clusters": []
+      },
+      "admin": {"access_log_path": "/dev/null", "address": "tcp://1.2.3.4:5678"}
+    }
+    )EOF";
+
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
+
+  auto secret_config = bootstrap.mutable_static_resources()->mutable_secrets()->Add();
+
+  std::string yaml =
+      R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+
+  MessageUtil::loadFromYaml(yaml, *secret_config);
+
+  MainImpl config;
+  config.initialize(bootstrap, server_, cluster_manager_factory_);
+
+  auto secret = server_.secretManager().findTlsCertificate("", "abc.com");
+
+  ASSERT_NE(secret, nullptr);
+
+  EXPECT_EQ(
+      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
+      secret->certificateChain());
+
+  EXPECT_EQ(
+      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
+      secret->privateKey());
+}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
