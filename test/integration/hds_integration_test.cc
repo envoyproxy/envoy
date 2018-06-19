@@ -171,35 +171,38 @@ INSTANTIATE_TEST_CASE_P(IpVersions, HDSIntegrationTest,
                         TestUtility::ipTestParamsToString);
 
 
-// Send and Receive a message
+// Test connectivity of Envoy and the Server
 TEST_P(HDSIntegrationTest, Simple) {
   initialize();
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
+  envoy::service::discovery::v2::HealthCheckRequest envoy_msg_2;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
   server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
 
 
-  // Server --> Envoy
+  // Server <--> Envoy
   fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
   hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
-  hds_stream_->startGrpcStream();
+  hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg);
 
-  // Envoy --> Server
-  fake_upstream_connection_ =
-       service_upstream_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->startGrpcStream();
+  EXPECT_EQ(0, test_server_->counter("hds_reporter.requests")->value());
+  EXPECT_EQ(1, test_server_->counter("hds_reporter.responses")->value());
+
 
   // Send a message to Envoy, and wait until it's received
+  hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier);
   test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
 
-  // Receive a response
-  upstream_request_->waitForGrpcMessage(*dispatcher_, envoy_msg);
+  // Wait for Envoy to reply
+  hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2);
 
-  cleanupUpstreamConnection();
+  EXPECT_EQ(1, test_server_->counter("hds_reporter.requests")->value());
+  EXPECT_EQ(2, test_server_->counter("hds_reporter.responses")->value());
+
+
+
   cleanupHDSConnection();
-  //EXPECT_EQ(1,0);
 }
 
 
