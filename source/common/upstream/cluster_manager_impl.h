@@ -151,7 +151,8 @@ public:
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
                      Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     SystemTimeSource& system_time_source, MonotonicTimeSource& monotonic_time_source);
+                     SystemTimeSource& system_time_source,
+                     MonotonicTimeSource& monotonic_time_source);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

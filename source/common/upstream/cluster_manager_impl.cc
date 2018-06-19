@@ -963,7 +963,8 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     Server::Admin& admin) {
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin, ProdSystemTimeSource::instance_, ProdMonotonicTimeSource::instance_)};
+                                                  admin, ProdSystemTimeSource::instance_,
+                                                  ProdMonotonicTimeSource::instance_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
