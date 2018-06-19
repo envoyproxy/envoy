@@ -4,9 +4,10 @@ package envoy.type;
 
 import "validate/validate.proto";
 
-// HTTP response codes supported in Envoy <http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml>
+// HTTP response codes supported in Envoy. 
+// For more details: http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
 enum StatusCode {
-  // Empty - Not part of the HTTP status code specification, and not supported in Envoy. This code is needed to allow using `enum` type.
+  // Empty - This code not part of the HTTP status code specification, but it is needed for proto `enum` type.
   Empty                         = 0;
   
   Continue                      = 100;

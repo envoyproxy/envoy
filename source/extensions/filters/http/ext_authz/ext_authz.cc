@@ -1,16 +1,9 @@
 #include "extensions/filters/http/ext_authz/ext_authz.h"
 
-#include <string>
-#include <vector>
-
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
 #include "common/router/config_impl.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
-
-#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {

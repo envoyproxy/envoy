@@ -45,7 +45,7 @@ A sample filter configuration for a gRPC authorization server:
       hosts:
         - socket_address: { address: 127.0.0.1, port_value: 10003 }
 
-A sample filter configuration for a HTTP authorization server:
+A sample filter configuration for a raw HTTP authorization server:
 
 .. code-block:: yaml
 
@@ -55,12 +55,12 @@ A sample filter configuration for a HTTP authorization server:
         http_service:
             server_uri:
               uri: 127.0.0.1:10003
-              cluster: ext_authz
+              cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
 
   clusters:
-    - name: ext_authz
+    - name: ext-authz
       connect_timeout: 0.25s
       type: logical_dns
       lb_policy: round_robin

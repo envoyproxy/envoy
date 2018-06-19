@@ -4,6 +4,8 @@ Version history
 1.7.0 (Pending)
 ===============
 
+* ext-authz filter: added support to raw HTTP authorizationg.
+* ext-authz filter: added support to gRPC responses to carry HTTP attributes. 
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
