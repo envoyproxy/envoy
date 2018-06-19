@@ -203,8 +203,8 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority)
-      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
+  HostSetImpl(uint32_t priority, const uint32_t over_provisioning_factor)
+      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()), over_provisioning_factor_(over_provisioning_factor) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
@@ -263,6 +263,7 @@ private:
   };
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  const uint32_t over_provisioning_factor_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -282,7 +283,7 @@ public:
   }
   std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority);
+  HostSet& getOrCreateHostSet(uint32_t priority, const uint32_t over_provisioning_factor = kDefaultOverProvisioningFactor);
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
