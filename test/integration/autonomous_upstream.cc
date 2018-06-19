@@ -69,9 +69,9 @@ AutonomousUpstream::~AutonomousUpstream() {
 
 bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connection,
                                                   const std::vector<Network::FilterFactoryCb>&) {
-  AutonomousHttpConnectionPtr http_connection(new AutonomousHttpConnection(
-      QueuedConnectionWrapperPtr{new QueuedConnectionWrapper(connection, true)}, stats_store_,
-      http_type_, *this));
+  shared_connections_.emplace_back(new SharedConnectionWrapper(connection, true));
+  AutonomousHttpConnectionPtr http_connection(
+      new AutonomousHttpConnection(*shared_connections_.back(), stats_store_, http_type_, *this));
   http_connection->initialize();
   http_connections_.push_back(std::move(http_connection));
   return true;

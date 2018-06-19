@@ -182,6 +182,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
   test_server_.reset();
+  fake_upstream_connection_.reset();
   fake_upstreams_.clear();
 }
 

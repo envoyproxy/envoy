@@ -77,7 +77,7 @@ public:
 
   void close();
   void waitForData(const std::string& data);
-  void waitForDisconnect();
+  void waitForDisconnect(bool ignore_spurious_events = false);
   void waitForHalfClose();
   void readDisable(bool disabled);
   void write(const std::string& data, bool end_stream = false, bool verify = true);
