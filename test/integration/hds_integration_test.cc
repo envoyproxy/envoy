@@ -1,6 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
-//#include "envoy/api/v2/endpoint/load_report.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
 
 #include "common/config/resources.h"
@@ -43,58 +42,6 @@ public:
     const uint32_t weight_{};
   };
 
-  // We need to supply the endpoints via EDS to provide locality information for
-  // load reporting. Use a filesystem delivery to simplify test mechanics.
-  void updateClusterLoadAssignment(const LocalityAssignment& winter_upstreams,
-                                   const LocalityAssignment& dragon_upstreams,
-                                   const LocalityAssignment& p1_winter_upstreams,
-                                   const LocalityAssignment& p1_dragon_upstreams) {
-    uint32_t num_endpoints = 0;
-    envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
-    cluster_load_assignment.set_cluster_name("cluster_0");
-
-    auto* winter = cluster_load_assignment.add_endpoints();
-    winter->mutable_locality()->set_region("some_region");
-    winter->mutable_locality()->set_zone("zone_name");
-    winter->mutable_locality()->set_sub_zone("winter");
-    if (winter_upstreams.weight_ > 0) {
-      winter->mutable_load_balancing_weight()->set_value(winter_upstreams.weight_);
-    }
-    for (uint32_t index : winter_upstreams.endpoints_) {
-      addEndpoint(*winter, index, num_endpoints);
-    }
-
-    auto* dragon = cluster_load_assignment.add_endpoints();
-    dragon->mutable_locality()->set_region("some_region");
-    dragon->mutable_locality()->set_zone("zone_name");
-    dragon->mutable_locality()->set_sub_zone("dragon");
-    if (dragon_upstreams.weight_ > 0) {
-      dragon->mutable_load_balancing_weight()->set_value(dragon_upstreams.weight_);
-    }
-    for (uint32_t index : dragon_upstreams.endpoints_) {
-      addEndpoint(*dragon, index, num_endpoints);
-    }
-
-    auto* winter_p1 = cluster_load_assignment.add_endpoints();
-    winter_p1->set_priority(1);
-    winter_p1->mutable_locality()->set_region("some_region");
-    winter_p1->mutable_locality()->set_zone("zone_name");
-    winter_p1->mutable_locality()->set_sub_zone("winter");
-    for (uint32_t index : p1_winter_upstreams.endpoints_) {
-      addEndpoint(*winter_p1, index, num_endpoints);
-    }
-
-    auto* dragon_p1 = cluster_load_assignment.add_endpoints();
-    dragon_p1->set_priority(1);
-    dragon_p1->mutable_locality()->set_region("some_region");
-    dragon_p1->mutable_locality()->set_zone("zone_name");
-    dragon_p1->mutable_locality()->set_sub_zone("dragon");
-    for (uint32_t index : p1_dragon_upstreams.endpoints_) {
-      addEndpoint(*dragon_p1, index, num_endpoints);
-    }
-    eds_helper_.setEds({cluster_load_assignment}, *test_server_);
-  }
-
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     hds_upstream_ = fake_upstreams_.back().get();
@@ -125,16 +72,12 @@ public:
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
-      if (locality_weighted_lb_) {
-        cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
-      }
     });
     HttpIntegrationTest::initialize();
     hds_upstream_ = fake_upstreams_[0].get();
     for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
       service_upstream_[i] = fake_upstreams_[i + 1].get();
     }
-    updateClusterLoadAssignment({}, {}, {}, {});
   }
 
   void initiateClientConnection() {
@@ -188,15 +131,13 @@ public:
   }
 
 
-void requestHealthCheckSpecifier() {
+  void requestHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
     server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
-    //for (const auto& cluster : clusters) {
-    //  server_health_check_specifier.add_clusters(cluster);
-    //}
+
     hds_stream_->sendGrpcMessage(server_health_check_specifier);
     // Wait until the request has been received by Envoy.
-    test_server_->waitForCounterGe("load_reporter.requests", ++hds_requests_);
+    test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
   }
 
 
@@ -233,14 +174,12 @@ INSTANTIATE_TEST_CASE_P(IpVersions, HDSIntegrationTest,
 // Send and Receive a message
 TEST_P(HDSIntegrationTest, Simple) {
   initialize();
-
   waitForHDSStream();
   hds_stream_->startGrpcStream();
+
+  envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
   requestHealthCheckSpecifier();
 
-  initiateClientConnection();
-
-  cleanupUpstreamConnection();
   cleanupHDSConnection();
   //EXPECT_EQ(1,0);
 }
