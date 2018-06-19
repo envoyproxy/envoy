@@ -84,8 +84,15 @@ message SocketOption {
   int32 level = 2;
   // The numeric name as passed to setsockopt
   int32 name = 3;
-  // The setsopt option value. Integers should be encoded in network byte order.
-  bytes value = 4;
+  // The setsockopt option value. Integers should be encoded in network byte order.
+  oneof value {
+    option (validate.required) = true;
+
+    // Because many sockopts take an int value.
+    int32 int = 4;
+    // Otherwise it's a byte buffer.
+    bytes buf = 5;
+  }
   enum SocketState {
     option (gogoproto.goproto_enum_prefix) = false;
     // Socket options are applied after socket creation but before binding the socket to a port
@@ -97,7 +104,7 @@ message SocketOption {
   }
   // For listeners the option can only be used on sockets in the given state.
   // For BindConfig, state is ignored.
-  SocketState state = 5
+  SocketState state = 6
       [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
 }
 
