@@ -44,12 +44,12 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: health check connections can now be configured to use http/2.
 * health check http filter: added
   :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
   to trigger health check response. Deprecated the
   :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
-* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
-* health check: health check connections can now be configured to use http/2.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -66,7 +66,7 @@ Version history
 * http: added a :ref:`configuration option
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
   to elide *x-forwarded-for* header modifications.
-* http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
+* http: fixed a bug in inline headers where addCopy and addViaMove didn't add header values when
   encountering inline headers with multiple instances.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
@@ -79,7 +79,7 @@ Version history
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
-* load balancer: :ref:`Locality weighted load balancing
+* load balancer: :ref:`locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
 * load balancer: ability to configure zone aware load balancer settings :ref:`through the API
   <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`.
@@ -189,7 +189,7 @@ Version history
   <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>`.
 * health check: added setting for :ref:`no-traffic
   interval<envoy_api_field_core.HealthCheck.no_traffic_interval>`.
-* http : added idle timeout for :ref:`upstream http connections
+* http: added idle timeout for :ref:`upstream http connections
   <envoy_api_field_core.HttpProtocolOptions.idle_timeout>`.
 * http: added support for :ref:`proxying 100-Continue responses
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.proxy_100_continue>`.
