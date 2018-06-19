@@ -89,6 +89,12 @@ Version history
 * logger: added the ability to optionally set the log format via the :option:`--log-format` option.
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
+* ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`. 
+  Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
+  Envoy can use either proto to send client requests to a ratelimit server with the use of the
+  :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
+  boolean flag in the ratelimit configuration.
+  Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.8.0 release cycle.
 * rbac http filter: a :ref:`role-based access control http filter <config_http_filters_rbac>` has been added.
 * router: The behavior of per-try timeouts have changed in the case where a portion of the response has
   already been proxied downstream when the timeout occurs. Previously, the response would be reset

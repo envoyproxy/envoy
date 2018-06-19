@@ -27,4 +27,10 @@ message RateLimitServiceConfig {
     // requests.
     envoy.api.v2.core.GrpcService grpc_service = 2;
   }
+
+  // Specifies if Envoy should use the data-plane-api client
+  // :repo:`api/envoy/service/ratelimit/v2/rls.proto` or the legacy 
+  // client :repo:`source/common/ratelimit/ratelimit.proto` when
+  // making requests to the rate limit service.
+  bool use_data_plane_proto = 3;
 }

@@ -22,7 +22,9 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
         "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 

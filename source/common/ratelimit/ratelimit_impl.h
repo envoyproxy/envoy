@@ -9,6 +9,7 @@
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/ratelimit/ratelimit.h"
+#include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -19,7 +20,7 @@
 namespace Envoy {
 namespace RateLimit {
 
-typedef Grpc::TypedAsyncRequestCallbacks<pb::lyft::ratelimit::RateLimitResponse>
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
     RateLimitAsyncCallbacks;
 
 struct ConstantValues {
@@ -36,10 +37,11 @@ typedef ConstSingleton<ConstantValues> Constants;
 class GrpcClientImpl : public Client, public RateLimitAsyncCallbacks {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout,
+                 const std::string& method_name);
   ~GrpcClientImpl();
 
-  static void createRequest(pb::lyft::ratelimit::RateLimitRequest& request,
+  static void createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
                             const std::string& domain, const std::vector<Descriptor>& descriptors);
 
   // RateLimit::Client
@@ -49,7 +51,7 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -72,6 +74,7 @@ public:
 
 private:
   Grpc::AsyncClientFactoryPtr async_client_factory_;
+  const bool use_data_plane_proto_;
 };
 
 class NullClientImpl : public Client {
