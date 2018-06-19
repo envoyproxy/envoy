@@ -1,5 +1,6 @@
 @import "theme.css";
 
+/* align multi line csv table columns */
 table.docutils div.line-block {
     margin-left: 0;
 }

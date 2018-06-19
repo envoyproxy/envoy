@@ -121,7 +121,7 @@ All http2 statistics are rooted at *http2.*
    :widths: 1, 1, 2
 
    header_overflow, Counter, "| Total number of connections reset due to the headers being 
-   | larger than max header size"
+   | larger than Envoy::Http::Http2::ConnectionImpl::StreamImpl::MAX_HEADER_SIZE (63k)"
    headers_cb_no_stream, Counter, "| Total number of errors where a header callback is called
    | without an associated stream. This tracks an unexpected
    | occurrence due to an as yet undiagnosed bug"

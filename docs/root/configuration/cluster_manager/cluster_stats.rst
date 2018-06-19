@@ -26,7 +26,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
 
 .. csv-table::
   :header: Name, Type, Description
-  :widths: 1, 1, 2
+  :widths: 1, 1, 9
 
   upstream_cx_total, Counter, Total connections
   upstream_cx_active, Gauge, Total active connections
@@ -36,8 +36,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
   upstream_cx_connect_attempts_exceeded, Counter, "| Total consecutive connection failures
-  | exceeding configured connection
-  | attempts"
+  | exceeding configured connection attempts"
   upstream_cx_overflow, Counter, "| Total times that the cluster's 
   | circuit breaker overflowed"
   upstream_cx_connect_ms, Histogram, Connection establishment milliseconds
@@ -45,48 +44,46 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_destroy, Counter, Total destroyed connections
   upstream_cx_destroy_local, Counter, Total connections destroyed locally
   upstream_cx_destroy_remote, Counter, Total connections destroyed remotely
-  upstream_cx_destroy_with_active_rq, Counter, "| Total connections destroyed with
-  | 1+ active request"
-  upstream_cx_destroy_local_with_active_rq, Counter, "| Total connections destroyed
-  | locally with 1+ active request"
-  upstream_cx_destroy_remote_with_active_rq, Counter, "| Total connections destroyed
-  | remotely with 1+ active request"
+  upstream_cx_destroy_with_active_rq, Counter, "| Total connections destroyed with 1+
+  | active request"
+  upstream_cx_destroy_local_with_active_rq, Counter, "| Total connections destroyed locally
+  | with 1+ active request"
+  upstream_cx_destroy_remote_with_active_rq, Counter, "| Total connections destroyed remotely
+  | with 1+ active request"
   upstream_cx_close_notify, Counter, "| Total connections closed via HTTP/1.1
   | connection close header or 
   | HTTP/2 GOAWAY"
   upstream_cx_rx_bytes_total, Counter, Total received connection bytes
-  upstream_cx_rx_bytes_buffered, Gauge, "| Received connection bytes 
-  | currently buffered"
+  upstream_cx_rx_bytes_buffered, Gauge, "| Received connection bytes currently
+  | buffered"
   upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
-  upstream_cx_tx_bytes_buffered, Gauge, "| Send connection bytes 
-  | currently buffered"
+  upstream_cx_tx_bytes_buffered, Gauge, "| Send connection bytes currently
+  | buffered"
   upstream_cx_protocol_error, Counter, Total connection protocol errors
   upstream_cx_max_requests, Counter, "| Total connections closed due to 
   | maximum requests"
-  upstream_cx_none_healthy, Counter, "| Total times connection not 
-  | established due to no healthy hosts"
+  upstream_cx_none_healthy, Counter, "| Total times connection not established
+  | due to no healthy hosts"
   upstream_rq_total, Counter, Total requests
   upstream_rq_active, Gauge, Total active requests
-  upstream_rq_pending_total, Counter, "| Total requests pending 
-  | a connection pool connection"
+  upstream_rq_pending_total, Counter, "| Total requests pending a connection pool
+  | connection"
   upstream_rq_pending_overflow, Counter, "| Total requests that overflowed
   | connection pool circuit breaking 
   | and were failed"
-  upstream_rq_pending_failure_eject, Counter, "| Total requests that were 
-  | failed due to a connection 
-  | pool connection failure"
+  upstream_rq_pending_failure_eject, Counter, "| Total requests that were failed due to a
+  | connection pool connection failure"
   upstream_rq_pending_active, Gauge, "| Total active requests pending a 
   | connection pool connection"
   upstream_rq_cancelled, Counter, "| Total requests cancelled before 
   | obtaining a connection pool 
   | connection"
   upstream_rq_maintenance_mode, Counter, "| Total requests that resulted in an 
-  | immediate 503 due to 
-  | :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`"
+  | immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`"
   upstream_rq_timeout, Counter, "| Total requests that timed out waiting
   | for a response"
-  upstream_rq_per_try_timeout, Counter, "| Total requests that hit the 
-  | per try timeout"
+  upstream_rq_per_try_timeout, Counter, "| Total requests that hit the per try
+  | timeout"
   upstream_rq_rx_reset, Counter, Total requests that were reset remotely
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
@@ -111,8 +108,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   retry_or_shadow_abandoned, Counter, "| Total number of times shadowing 
   | or retry buffering was canceled 
   | due to buffer limits"
-  config_reload, Counter, "| Total API fetches that resulted 
-  | in a config reload 
+  config_reload, Counter, "| Total API fetches that resulted in a config reload
   | due to a different config"
   update_attempt, Counter, "| Total cluster membership update 
   | attempts"
@@ -128,12 +124,11 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   | updates that didn't result in any 
   | cluster load balancing structure
   | rebuilds"
-  version, Gauge, "| Hash of the contents from 
-  | the last successful API fetch"
-  max_host_weight, Gauge, "| Maximum weight of any host 
-  | in the cluster"
-  bind_errors, Counter, "| Total errors binding the socket to 
-  | the configured source address"
+  version, Gauge, "| Hash of the contents from the last
+  | successful API fetch"
+  max_host_weight, Gauge, "| Maximum weight of any host in the cluster"
+  bind_errors, Counter, "| Total errors binding the socket to the
+  | configured source address"
 
 Health check statistics
 -----------------------
@@ -268,10 +263,10 @@ the following statistics:
   lb_local_cluster_not_ok, Counter, "| Local host set is not set or it is panic mode for 
   | local cluster"
   lb_zone_number_differs, Counter, Number of zones in local and upstream cluster different
-  lb_zone_no_capacity_left, Counter, "| Total number of times ended with 
-  | random zone selection due to rounding error"
-  original_dst_host_invalid, Counter, "| Total number of invalid hosts passed
-  | to original destination load balancer"
+  lb_zone_no_capacity_left, Counter, "| Total number of times ended with random zone 
+  | selection due to rounding error"
+  original_dst_host_invalid, Counter, "| Total number of invalid hosts passed to original destination
+  | load balancer"
   
 Load balancer subset statistics
 -------------------------------
