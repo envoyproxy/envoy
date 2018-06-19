@@ -55,9 +55,9 @@ envoy_cc_library(
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         ":cds_api_lib",
+        ":health_discovery_service_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
-        ":health_discovery_service_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
         "//include/envoy/event:dispatcher_interface",

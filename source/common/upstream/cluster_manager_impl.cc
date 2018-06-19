@@ -305,15 +305,13 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
 
   if (cm_config.has_hds_config()) {
     const auto& hds_config = cm_config.hds_config();
-    hds_reporter_.reset(
-        new HDSReporter(bootstrap.node(), *this, stats,
-                              Config::Utility::factoryForGrpcApiConfigSource(
-                                  *async_client_manager_, hds_config, stats)
-                                  ->create(),
-                              main_thread_dispatcher));
+    hds_reporter_.reset(new HDSReporter(
+        bootstrap.node(), *this, stats,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats)
+            ->create(),
+        main_thread_dispatcher));
   }
 }
-
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
   const std::string final_prefix = "cluster_manager.";
