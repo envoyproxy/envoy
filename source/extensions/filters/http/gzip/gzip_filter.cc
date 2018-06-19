@@ -178,15 +178,17 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
         config_->stats().header_not_valid_.inc();
         return false;
       }
-      // If value is the identity coding, return false. The data needs should
+      // If value is the identity coding, return false. The data should
       // not be transformed in this case.
       // https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.5.
       if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
         config_->stats().header_identity_.inc();
         return false;
       }
-      // Otherwise, check if the header contains the wildcard. If so
-      // return true.
+      // Otherwise, check if the header contains the wildcard. If so,
+      // mark as true. Use this as the very last resort, as gzip or 
+      // identity is weighted higher. Note that this filter disregards
+      // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
         is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
