@@ -163,7 +163,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
 
   if (accept_encoding) {
-    const bool is_wildcard = false; // true if found and not followed by `q=0`.
+    bool is_wildcard = false; // true if found and not followed by `q=0`.
     for (const auto token : StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",",
                                                    false /* keep_empty */)) {
       const auto value = StringUtil::trim(StringUtil::cropRight(token, ";"));

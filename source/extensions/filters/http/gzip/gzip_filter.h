@@ -103,7 +103,6 @@ private:
   StringUtil::CaseUnorderedSet content_type_values_;
   bool disable_on_etag_header_;
   bool remove_accept_encoding_header_;
-  const std::string stats_prefix_;
   GzipStats stats_;
   Runtime::Loader& runtime_;
 };
