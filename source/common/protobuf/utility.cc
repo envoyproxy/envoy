@@ -211,8 +211,8 @@ uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) 
 }
 
 void DurationUtil::writeSystemClockTime(const SystemTime system_clock_time,
-                                        google::protobuf::Timestamp* timestamp) {
-  timestamp->MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
+                                        google::protobuf::Timestamp& timestamp) {
+  timestamp.MergeFrom(Protobuf::util::TimeUtil::TimeTToTimestamp(
       std::chrono::system_clock::to_time_t(system_clock_time)));
 }
 

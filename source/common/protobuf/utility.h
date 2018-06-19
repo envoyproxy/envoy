@@ -317,7 +317,7 @@ public:
    * @param timestamp a pointer to the mutable protobuf member to be written into.
    */
   static void writeSystemClockTime(const SystemTime system_clock_time,
-                                   google::protobuf::Timestamp* timestamp);
+                                   google::protobuf::Timestamp& timestamp);
 };
 
 } // namespace Envoy
