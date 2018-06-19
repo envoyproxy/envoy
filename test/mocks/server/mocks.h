@@ -17,6 +17,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread/thread.h"
 
+#include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -29,6 +30,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -273,6 +275,8 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -303,6 +307,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
@@ -365,7 +370,6 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
-  MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
@@ -374,6 +378,7 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
+  MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

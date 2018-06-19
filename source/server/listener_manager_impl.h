@@ -254,7 +254,7 @@ public:
   bool healthCheckFailed() override { return parent_.server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return parent_.server_.httpTracer(); }
   Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() override { return parent_.server_.localInfo(); }
+  const LocalInfo::LocalInfo& localInfo() const override { return parent_.server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return parent_.server_.random(); }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
@@ -298,6 +298,7 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
+  Secret::SecretManager& secretManager() override { return parent_.server_.secretManager(); }
 
 private:
   void addFilterChain(const std::vector<std::string>& server_names,

@@ -42,8 +42,7 @@ TcpProxy::ConfigSharedPtr Config(const envoy::api::v2::route::RouteAction& route
   return std::make_shared<TcpProxy::Config>(tcp_config, factory_context);
 }
 
-WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers,
-                             const RequestInfo::RequestInfo& request_info,
+WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
                              const Router::RouteEntry& route_entry,
                              WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
@@ -109,7 +108,7 @@ Network::FilterStatus WsHandlerImpl::onData(Buffer::Instance& data, bool end_str
 
 void WsHandlerImpl::onConnectionSuccess() {
   // path and host rewrites
-  route_entry_.finalizeRequestHeaders(request_headers_, request_info_);
+  route_entry_.finalizeRequestHeaders(request_headers_, request_info_, true);
   // for auto host rewrite
   if (route_entry_.autoHostRewrite() && !read_callbacks_->upstreamHost()->hostname().empty()) {
     request_headers_.Host()->value(read_callbacks_->upstreamHost()->hostname());
@@ -143,6 +142,8 @@ void WsHandlerImpl::onConnectionSuccess() {
     ASSERT(queued_data_.length() == 0);
   }
 }
+
+RequestInfo::RequestInfo& WsHandlerImpl::getRequestInfo() { return request_info_; }
 
 } // namespace WebSocket
 } // namespace Http

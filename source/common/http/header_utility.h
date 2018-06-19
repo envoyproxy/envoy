@@ -16,7 +16,7 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present };
+  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix };
 
   // A HeaderData specifies one of exact value or regex or range element
   // to match in a request's header, specified in the header_match_type_ member.
@@ -42,6 +42,8 @@ public:
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
                            const std::vector<HeaderData>& config_headers);
+
+  static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
 };
 } // namespace Http
 } // namespace Envoy

@@ -4,12 +4,16 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/message.h"
 
 #include "common/json/json_loader.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -27,6 +31,13 @@ public:
    * @param remote_address supplies the remote address to append.
    */
   static void appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address);
+
+  /**
+   * Append to via header.
+   * @param headers supplies the headers to append to.
+   * @param via supplies the via header to append.
+   */
+  static void appendVia(HeaderMap& headers, const std::string& via);
 
   /**
    * Creates an SSL (https) redirect path based on the input host and path headers.
@@ -70,12 +81,15 @@ public:
    * Produce the value for a Set-Cookie header with the given parameters.
    * @param key is the name of the cookie that is being set.
    * @param value the value to set the cookie to; this value is trusted.
+   * @param path the path for the cookie, or the empty string to not set a path.
    * @param max_age the length of time for which the cookie is valid, or zero
+   * @param httponly true if the cookie should have HttpOnly appended.
    * to create a session cookie.
    * @return std::string a valid Set-Cookie header value string
    */
   static std::string makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::chrono::seconds max_age);
+                                        const std::string& path, const std::chrono::seconds max_age,
+                                        bool httponly);
 
   /**
    * Get the response status from the response headers.
@@ -163,12 +177,20 @@ public:
   static const std::string& getProtocolString(const Protocol p);
 
   /**
-   * Appends data to header. If header already has a value, the string ',' is added between the
-   * existing value and data.
-   * @param header the header to append to.
-   * @param data to append to the header.
+   * Extract host and path from a URI. The host may contain port.
+   * This function doesn't validate if the URI is valid. It only parses the URI with following
+   * format: scheme://host/path.
+   * @param the input URI string
+   * @param the output host string.
+   * @param the output path string.
    */
-  static void appendToHeader(HeaderString& header, const std::string& data);
+  static void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path);
+
+  /**
+   * Prepare headers for a HttpUri.
+   */
+  static MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 };
 
 } // namespace Http

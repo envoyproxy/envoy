@@ -44,8 +44,8 @@ namespace Logger {
   FUNCTION(tracing)              \
   FUNCTION(upstream)             \
   FUNCTION(grpc)                 \
-  FUNCTION(stats)
-
+  FUNCTION(stats)                \
+  FUNCTION(thrift)
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)

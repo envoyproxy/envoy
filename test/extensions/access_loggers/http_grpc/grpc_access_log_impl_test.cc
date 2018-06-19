@@ -149,8 +149,8 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     request_info.start_time_ = SystemTime(1h);
     request_info.start_time_monotonic_ = MonotonicTime(1h);
     request_info.last_downstream_tx_byte_sent_ = 2ms;
-    request_info.downstream_local_address_ =
-        std::make_shared<Network::Address::PipeInstance>("/foo");
+    request_info.setDownstreamLocalAddress(
+        std::make_shared<Network::Address::PipeInstance>("/foo"));
 
     expectLog(R"EOF(
 http_logs:
@@ -213,11 +213,11 @@ http_logs:
     request_info.first_downstream_tx_byte_sent_ = 12ms;
     request_info.last_downstream_tx_byte_sent_ = 14ms;
 
-    request_info.upstream_local_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2");
+    request_info.setUpstreamLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2"));
     request_info.protocol_ = Http::Protocol::Http10;
-    request_info.bytes_received_ = 10;
-    request_info.bytes_sent_ = 20;
+    request_info.addBytesReceived(10);
+    request_info.addBytesSent(20);
     request_info.response_code_ = 200;
     ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
@@ -415,10 +415,10 @@ http_logs:
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<RequestInfo::MockRequestInfo> request_info;
   ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
-  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log;
+  envoy::data::accesslog::v2::AccessLogCommon common_access_log;
   HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
 
-  envoy::config::filter::accesslog::v2::AccessLogCommon common_access_log_expected;
+  envoy::data::accesslog::v2::AccessLogCommon common_access_log_expected;
   common_access_log_expected.mutable_response_flags()->set_failed_local_healthcheck(true);
   common_access_log_expected.mutable_response_flags()->set_no_healthy_upstream(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_request_timeout(true);
@@ -432,7 +432,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_fault_injected(true);
   common_access_log_expected.mutable_response_flags()->set_rate_limited(true);
   common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-      envoy::config::filter::accesslog::v2::ResponseFlags_Unauthorized_Reason::
+      envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());

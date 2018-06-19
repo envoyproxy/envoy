@@ -447,6 +447,17 @@ TEST_P(ConnectionImplTest, ReadDisable) {
   disconnect(false);
 }
 
+// Regression test for (at least one failure mode of)
+// https://github.com/envoyproxy/envoy/issues/3639 where readDisable on a close
+// connection caused a crash.
+TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
+  setUpBasicConnection();
+  disconnect(false);
+
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+}
+
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
 #ifdef __APPLE__
   // On our current OSX build, the client connection does not get the early

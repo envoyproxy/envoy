@@ -145,6 +145,7 @@ protected:
   void testAbsolutePathWithPort();
   void testAbsolutePathWithoutPort();
   void testConnect();
+  void testInlineHeaders();
   void testAllowAbsoluteSameRelative();
   // Test that a request returns the same content with both allow_absolute_urls enabled and
   // allow_absolute_urls disabled
@@ -162,7 +163,8 @@ protected:
   void testGrpcRetry();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
-  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false);
+  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
+                                    const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
                                     bool with_encoder_filter = false);
 

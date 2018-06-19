@@ -4,6 +4,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/compressor/zlib_compressor_impl.h"
@@ -23,7 +24,8 @@ namespace Gzip {
 class GzipFilterConfig {
 
 public:
-  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
+  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+                   Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;
@@ -32,6 +34,7 @@ public:
     return compression_strategy_;
   }
 
+  Runtime::Loader& runtime() { return runtime_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
@@ -62,6 +65,7 @@ private:
 
   bool disable_on_etag_header_;
   bool remove_accept_encoding_header_;
+  Runtime::Loader& runtime_;
 };
 typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
 

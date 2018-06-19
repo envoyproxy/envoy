@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/secret/secret_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/upstream/cluster_manager_impl.h"
@@ -20,7 +21,8 @@ public:
                                   Network::DnsResolverSharedPtr dns_resolver,
                                   Ssl::ContextManager& ssl_context_manager,
                                   Event::Dispatcher& main_thread_dispatcher,
-                                  const LocalInfo::LocalInfo& local_info);
+                                  const LocalInfo::LocalInfo& local_info,
+                                  Secret::SecretManager& secret_manager);
 
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

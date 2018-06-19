@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
@@ -52,7 +53,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_py",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_py",
     ],
 )
 
@@ -136,6 +137,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
@@ -298,6 +300,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
@@ -401,9 +404,10 @@ envoy_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/extensions/common/tap/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 
@@ -423,6 +427,7 @@ envoy_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -469,6 +474,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )
