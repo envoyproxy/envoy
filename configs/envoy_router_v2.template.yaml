@@ -11,11 +11,12 @@ virtual_hosts:
         default_value: 0
         runtime_key: routing.www.use_service_2
     route:
-      {{ helper.make_route('main_website')|indent(4) }}
+      {{ helper.make_route('service2')|indent(4) }}
   - match:
       prefix: "/"
     route:
-      {{ helper.make_route('main_website')|indent(4) }}
+      {{ helper.make_route('service1')|indent(4) }}
+  require_tls: ALL
   rate_limits:
     actions:
       remote_address: {}
@@ -27,6 +28,7 @@ virtual_hosts:
       prefix: "/"
     redirect:
       host_redirect: www.yourcompany.net
+  require_tls: ALL
   rate_limits:
   - actions:
       remote_address: {}
@@ -37,11 +39,12 @@ virtual_hosts:
   - match:
       path: "/foo/bar"
     route:
-      {{ helper.make_route('main_website')|indent(4) }}
+      {{ helper.make_route('service3')|indent(4) }}
   - match:
       prefix: "/"
     route:
-      {{ helper.make_route('main_website')|indent(4) }}
+      {{ helper.make_route('service1')|indent(4) }}
+  require_tls: EXTERNAL_ONLY
   rate_limits:
   - actions:
       remote_address: {}

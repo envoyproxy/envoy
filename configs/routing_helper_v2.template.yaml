@@ -18,7 +18,7 @@
       api_config_source:
         api_type: REST
         cluster_names:
-        - main_website
+        - sds
         refresh_delay: 30s
     service_name: {{ service }}
   lb_policy: LEAST_REQUEST
@@ -34,9 +34,10 @@
       service_name: accidents
     timeout: 2s
     interval: 5s
-    interval_jitter: 15s
+    interval_jitter: 5s
     unhealthy_threshold: 2
     healthy_threshold: 2
   outlier_detection:
     success_rate_stdev_factor: 1900
+  http2_protocol_options: {}
 {% endmacro -%}

@@ -41,14 +41,14 @@
         route_config:
           {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
         http_filters:
-        - name: envoy.buffer
-          config:
-            max_request_bytes: 5242880
-            max_request_time: 120s
         - name: envoy.health_check
           config:
             pass_through_mode: false
             endpoint: "/healthcheck"
+        - name: envoy.buffer
+          config:
+            max_request_bytes: 5242880
+            max_request_time: 120s
         - name: envoy.rate_limit
           config:
             domain: envoy_front
@@ -130,8 +130,6 @@ static_resources:
         port_value: 443
   {% for service, options in clusters.iteritems() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
-  {% if not loop.last %}
-  {% endif %}
   {% endfor %}
 cluster_manager:
   outlier_detection:

@@ -45,6 +45,12 @@
         access_log:
         - name: envoy.file_access_log
           filter:
+            not_health_check_filter:  {}
+          config:
+            path: "/var/log/envoy/ingress_http.log"
+            {{ access_log_helper.ingress_full()|indent(10)}}
+        - name: envoy.file_access_log
+          filter:
             and_filter:
               filters:
                 - or_filter:
@@ -69,8 +75,18 @@
                             runtime_key: access_log.access_error.duration
                 - not_health_check_filter: {}
           config:
-            path: /var/log/envoy/access_error.log
-            format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+            path: "/var/log/envoy/ingress_http_error.log"
+            {{ access_log_helper.ingress_sampled_log()|indent(10)}}
+        - name: envoy.file_access_log
+          filter:
+            and_filter:
+              filters:
+              - not_health_check_filter: {}
+              - runtime_filter:
+                  runtime_key:  access_log.ingress_http
+          config:
+            path: "/var/log/envoy/ingress_http_sampled.log"
+            {{ access_log_helper.ingress_sampled_log()|indent(10)}}
         idle_timeout: 840s
         tracing:
           operation_name: INGRESS
@@ -78,7 +94,6 @@
 static_resources:
   listeners:
   {{ ingress_listener("tcp", "0.0.0.0", 9211) | indent(2)}}
-  #listener at 127.0.0.1:9001 is to be updated after internal_cluster_definition update
   - address:
       socket_address:
         protocol: TCP
@@ -102,7 +117,6 @@ static_resources:
                   prefix: "/"
                 route:
                   {{ helper.make_route_internal(service, options)|indent(16) }}
-              #add ratelimits here
             {% endfor %}
           add_user_agent: true
           tracing:
@@ -128,7 +142,7 @@ static_resources:
                   - traceable_filter: {}
             config:
               path: /var/log/envoy/access_error.log
-              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+              {{ access_log_helper.egress_error_log()|indent(10)}}
           use_remote_address: true
           http_filters:
           - name: envoy.rate_limit
@@ -181,7 +195,7 @@ static_resources:
                   - traceable_filter: {}
             config:
               path: /var/log/envoy/access_error.log
-              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+              {{ access_log_helper.egress_error_log()|indent(10) }}
           use_remote_address: true
           http_filters:
           - name: envoy.rate_limit
@@ -259,7 +273,11 @@ static_resources:
                   {% endif %}
             config:
               path: /var/log/envoy/access_error.log
-              format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+              {% if mapping.get('is_amzn_service', False) -%}
+              {{ access_log_helper.egress_error_amazon_service()|indent(10) }}
+              {% else -%}
+              {{ access_log_helper.egress_error_log()|indent(10) }}
+              {% endif %}
   {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
   {% endfor -%}
   {% for key, value in mongos_servers.iteritems() -%}
@@ -298,8 +316,22 @@ static_resources:
   {% for mapping in external_virtual_hosts -%}
   {% for host in mapping['hosts'] -%}
   - name: egress_{{ host['name'] }}
-    #need to update tls and timeout accordingly
+    {% if host.get('ssl', False) %}
+    tls_context:
+      common_tls_context:
+        validation_context:
+          trusted_ca:
+            filename: certs/cacert.pem
+          {% if host.get('verify_subject_alt_name', False) %}
+          verify_subject_alt_name: "{{host['verify_subject_alt_name'] }}"
+          {% endif %}
+      {% if host.get('sni', False) %}
+      sni: "{{ host['sni'] }}"
+      {% endif %}
+    connect_timeout: 1s
+    {% else %}
     connect_timeout: 0.25s
+    {% endif %}
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     hosts:
@@ -405,6 +437,21 @@ static_resources:
         protocol: TCP
         address: cds.yourcompany.net
         port_value: 80
+  - name: sds
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts:
+    - socket_address:
+        protocol: TCP
+        address: discovery.yourcompany.net
+        port_value: 80
+dynamic_resources:
+  cds_config:
+    api_config_source:
+      cluster_names:
+      - cds_cluster
+      refresh_delay: 30s
 flags_path: /etc/envoy/flags
 stats_sinks:
   - name: envoy.statsd
