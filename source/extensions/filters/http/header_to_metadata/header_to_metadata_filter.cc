@@ -35,6 +35,15 @@ bool Config::configToVector(const ProtobufRepeatedRule& protoRules, HeaderToMeta
 
   for (const auto& entry : protoRules) {
     std::pair<Http::LowerCaseString, Rule> rule = {Http::LowerCaseString(entry.header()), entry};
+
+    // Rule must have at least one of the `on_header_*` fields set.
+    if (!entry.has_on_header_present() && !entry.has_on_header_missing()) {
+      const auto& error = fmt::format("header to metadata filter: rule for header '{}' has neither "
+                                      "`on_header_present` nor `on_header_missing` set",
+                                      entry.header());
+      throw EnvoyException(error);
+    }
+
     vector.push_back(rule);
   }
 

@@ -241,22 +241,16 @@ response_rules:
 }
 
 /**
- * No rules set.
+ * Rules with no on_header{present,missing} fields should be rejected.
  */
-TEST_F(HeaderToMetadataTest, NoRules) {
+TEST_F(HeaderToMetadataTest, RejectInvalidRule) {
   const std::string config = R"EOF(
 request_rules:
   - header: x-something
-response_rules:
-  - header: x-something-else
 )EOF";
-  initializeFilter(config);
-  Http::TestHeaderMapImpl headers{};
-
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  auto expected = "header to metadata filter: rule for header 'x-something' has neither "
+                  "`on_header_present` nor `on_header_missing` set";
+  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), Envoy::EnvoyException, expected);
 }
 
 /**
