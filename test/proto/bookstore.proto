@@ -187,9 +187,3 @@ message GetAuthorRequest {
   // The ID of the author resource to retrieve.
   int64 author = 1;
 }
-
-// Request message for CreateAuthor method.
-message CreateAuthorRequest {
-  // The ID of the author resource to retrieve.
-  int64 author = 1;
-}
