@@ -483,6 +483,8 @@ dynamic_route_configs:
     route_config:
       name: foo_route_config
       virtual_hosts:
+    last_updated:
+      seconds: 1234567890
 last_updated:
   seconds: 1234567890
 )EOF",

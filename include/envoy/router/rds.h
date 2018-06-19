@@ -38,6 +38,8 @@ public:
    * returned.
    */
   virtual absl::optional<ConfigInfo> configInfo() const PURE;
+
+  virtual SystemTime lastUpdated() const PURE;
 };
 
 typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;

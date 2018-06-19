@@ -143,6 +143,9 @@ message RoutesConfigDump {
 
     // The route config.
     envoy.api.v2.RouteConfiguration route_config = 2;
+
+    // The timestamp when the Route was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded route configs.
