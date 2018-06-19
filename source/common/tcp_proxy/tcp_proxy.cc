@@ -487,7 +487,6 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::onIdleTimeout() {
-  ENVOY_CONN_LOG(debug, "Session timed out", read_callbacks_->connection());
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
