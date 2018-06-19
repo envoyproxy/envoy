@@ -224,11 +224,8 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   ASSERT(!locality_hosts.empty());
   const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
-  // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
-  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
-  // Eventually the overprovision factor will likely be made configurable.
   const double effective_locality_health_ratio =
-      std::min(1.0, (kOverProvisioningFactor / 100.0) * locality_healthy_ratio);
+      std::min(1.0, (over_provisioning_factor_ / 100.0) * locality_healthy_ratio);
   return weight * effective_locality_health_ratio;
 }
 
