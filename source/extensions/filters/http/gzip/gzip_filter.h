@@ -54,7 +54,7 @@ class GzipFilterConfig {
 
 public:
   GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
-                    const std::string& stats_prefix,
+                   const std::string& stats_prefix,
                    Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
