@@ -143,7 +143,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
   if (Grpc::Common::hasGrpcContentType(headers)) {
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
-                                "This request headers has application/grpc content-type");
+                                "Request headers has application/grpc content-type");
   }
   const ProtobufTypes::String method = headers.Method()->value().c_str();
   ProtobufTypes::String path = headers.Path()->value().c_str();
