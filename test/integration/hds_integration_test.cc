@@ -80,38 +80,18 @@ public:
     }
   }
 
-  void initiateClientConnection() {
-    auto conn = makeClientConnection(lookupPort("http"));
-    codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestHeaderMapImpl headers{{":method", "POST"},       {":path", "/test/long/url"},
-                                    {":scheme", "http"},       {":authority", "host"},
-                                    {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
-    response_ = codec_client_->makeRequestWithBody(headers, request_size_);
-  }
-
   void waitForHDSStream() {
     fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
     hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
   }
 
-  void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
-    fake_upstream_connection_ =
-        service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-    upstream_request_->waitForEndStream(*dispatcher_);
+  void requestHealthCheckSpecifier() {
+    envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
+    server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
 
-    upstream_request_->encodeHeaders(
-        Http::TestHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
-    upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
-
-    ASSERT_TRUE(upstream_request_->complete());
-    EXPECT_EQ(request_size_, upstream_request_->bodyLength());
-
-    ASSERT_TRUE(response_->complete());
-    EXPECT_STREQ(std::to_string(response_code).c_str(),
-                 response_->headers().Status()->value().c_str());
-    EXPECT_EQ(response_size_, response_->body().size());
+    hds_stream_->sendGrpcMessage(server_health_check_specifier);
+    // Wait until the request has been received by Envoy.
+    test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
   }
 
   void cleanupUpstreamConnection() {
@@ -127,21 +107,6 @@ public:
       fake_hds_connection_->close();
       fake_hds_connection_->waitForDisconnect();
     }
-  }
-
-  void requestHealthCheckSpecifier() {
-    envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
-    server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
-
-    hds_stream_->sendGrpcMessage(server_health_check_specifier);
-    // Wait until the request has been received by Envoy.
-    test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
-  }
-
-  void sendAndReceiveUpstream(uint32_t endpoint_index, uint32_t response_code = 200) {
-    initiateClientConnection();
-    waitForUpstreamResponse(endpoint_index, response_code);
-    cleanupUpstreamConnection();
   }
 
   static constexpr uint32_t upstream_endpoints_ = 5;

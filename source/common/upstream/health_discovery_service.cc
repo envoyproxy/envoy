@@ -38,7 +38,6 @@ void HDSReporter::sendHealthCheckRequest() {
   ENVOY_LOG(debug, "Sending HealthCheckRequest");
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
-  ENVOY_LOG(debug, "Counter responses: " + std::to_string(stats_.responses_.value()));
 }
 
 void HDSReporter::handleFailure() {
@@ -62,8 +61,6 @@ void HDSReporter::onReceiveMessage(
   stats_.requests_.inc();
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
-  ENVOY_LOG(debug, "Counter requests: " + std::to_string(stats_.requests_.value()));
-  ENVOY_LOG(debug, "Counter responses: " + std::to_string(stats_.responses_.value()));
 }
 
 void HDSReporter::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
