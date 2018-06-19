@@ -1573,18 +1573,18 @@ public:
   void expectSetsockoptFreebind() {
     if (!ENVOY_SOCKET_IP_FREEBIND.has_value()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                  Network::Address::InstanceConstSharedPtr,
-                                  Network::TransportSocketPtr&,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
-                               -> Network::ClientConnection* {
-            EXPECT_NE(nullptr, options.get());
-            EXPECT_EQ(1, options->size());
-            NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(
-                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
-            return connection_;
-          }));
+          .WillOnce(
+              Invoke([this](Network::Address::InstanceConstSharedPtr,
+                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options)
+                         -> Network::ClientConnection* {
+                EXPECT_NE(nullptr, options.get());
+                EXPECT_EQ(1, options->size());
+                NiceMock<Network::MockConnectionSocket> socket;
+                EXPECT_FALSE((Network::Socket::applyOptions(
+                    options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                return connection_;
+              }));
       cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
       return;
     }
@@ -1724,18 +1724,18 @@ public:
                                    absl::optional<int> keepalive_interval) {
     if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                  Network::Address::InstanceConstSharedPtr,
-                                  Network::TransportSocketPtr&,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
-                               -> Network::ClientConnection* {
-            EXPECT_NE(nullptr, options.get());
-            EXPECT_EQ(1, options->size());
-            NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(
-                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
-            return connection_;
-          }));
+          .WillOnce(
+              Invoke([this](Network::Address::InstanceConstSharedPtr,
+                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options)
+                         -> Network::ClientConnection* {
+                EXPECT_NE(nullptr, options.get());
+                EXPECT_EQ(1, options->size());
+                NiceMock<Network::MockConnectionSocket> socket;
+                EXPECT_FALSE((Network::Socket::applyOptions(
+                    options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                return connection_;
+              }));
       cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
       return;
     }
