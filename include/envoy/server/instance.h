@@ -197,21 +197,11 @@ public:
    * Admin requests are generally handled by posting to the 'main' thread, so
    * a callback must be supplied which will be called when the response is handled.
    *
-   * @param request The admin request URL path as a string.
+   * @param path The admin request URL path as a string.
    * @param params map of parameter names and values.
    */
-  virtual void adminGet(absl::string_view request, const Http::Utility::QueryParams& params,
-                        AdminResponseHandler& response_handler) PURE;
-
-  /**
-   * Admin requests are generally handled by posting to the 'main' thread, so
-   * a callback must be supplied which will be called when the response is handled.
-   *
-   * @param request The admin request URL path as a string.
-   * @param params map of parameter names and values.
-   */
-  virtual void adminPost(absl::string_view request, const Http::Utility::QueryParams& params,
-                         AdminResponseHandler& response_handler) PURE;
+  virtual void adminRequest(absl::string_view path, const Http::Utility::QueryParams& params,
+                            absl::string_view method, AdminResponseHandler& response_handler) PURE;
 };
 
 } // namespace Server

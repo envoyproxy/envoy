@@ -995,17 +995,17 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
   return false;
 }
 
-void AdminImpl::dispatch(absl::string_view request, const Http::Utility::QueryParams& params,
-                         absl::string_view method,
-                         const Instance::AdminResponseHandler& response_handler) {
+Http::Code AdminImpl::request(absl::string_view path, const Http::Utility::QueryParams& params,
+                              absl::string_view method, Http::HeaderMap& response_headers,
+                              std::string& body) {
   AdminFilter filter(*this);
-  Http::HeaderMapImpl request_headers, response_headers;
+  Http::HeaderMapImpl request_headers;
   request_headers.insertMethod().value(method.data(), method.size());
   filter.decodeHeaders(request_headers, false);
 
   // TODO(jmarantz): make QueryParams a real class and put this serializer there,
   // along with proper URL escaping of the name and value.
-  std::string path_and_query = std::string(request);
+  std::string path_and_query = std::string(path);
   std::string delim = "?";
   for (auto p : params) {
     absl::StrAppend(&path_and_query, delim, p.first, "=", p.second);
@@ -1015,7 +1015,8 @@ void AdminImpl::dispatch(absl::string_view request, const Http::Utility::QueryPa
   Buffer::OwnedImpl response;
   Http::Code code = runCallback(path_and_query, response_headers, response, filter);
   AdminFilter::populateFallbackResponseHeaders(code, response_headers);
-  response_handler(code, response_headers, response.toString());
+  body = response.toString();
+  return code;
 }
 
 } // namespace Server

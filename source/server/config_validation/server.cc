@@ -102,20 +102,13 @@ void ValidationInstance::shutdown() {
   thread_local_.shutdownThread();
 }
 
-void ValidationInstance::adminGet(absl::string_view request,
-                                  const Http::Utility::QueryParams& params,
-                                  AdminResponseHandler& response_handler) {
-  UNREFERENCED_PARAMETER(request);
+void ValidationInstance::adminRequest(absl::string_view path,
+                                      const Http::Utility::QueryParams& params,
+                                      absl::string_view method,
+                                      AdminResponseHandler& response_handler) {
+  UNREFERENCED_PARAMETER(path);
   UNREFERENCED_PARAMETER(params);
-  UNREFERENCED_PARAMETER(response_handler);
-  NOT_REACHED;
-}
-
-void ValidationInstance::adminPost(absl::string_view request,
-                                   const Http::Utility::QueryParams& params,
-                                   AdminResponseHandler& response_handler) {
-  UNREFERENCED_PARAMETER(request);
-  UNREFERENCED_PARAMETER(params);
+  UNREFERENCED_PARAMETER(method);
   UNREFERENCED_PARAMETER(response_handler);
   NOT_REACHED;
 }

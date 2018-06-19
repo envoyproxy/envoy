@@ -463,20 +463,19 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-void InstanceImpl::adminGet(absl::string_view request, const Http::Utility::QueryParams& params,
-                            AdminResponseHandler& response_handler) {
+void InstanceImpl::adminRequest(absl::string_view path, const Http::Utility::QueryParams& params,
+                                absl::string_view method, AdminResponseHandler& response_handler) {
+  /*
   std::string request_copy = std::string(request);
   Http::Utility::QueryParams params_copy = params;
   AdminResponseHandler response_handler_copy = response_handler;
-  dispatcher_->post([this, request_copy, params_copy, response_handler_copy]() {
-    admin_->dispatch(request_copy, params_copy, "GET", response_handler_copy);
-  });
-}
-
-void InstanceImpl::adminPost(absl::string_view request, const Http::Utility::QueryParams& params,
-                             AdminResponseHandler& response_handler) {
-  dispatcher_->post([this, request, &params, &response_handler]() {
-    admin_->dispatch(request, params, "POST", response_handler);
+  */
+  dispatcher_->post([this, path, params, method, response_handler]() {
+    // admin_->dispatch(request_copy, params_copy, "GET", response_handler_copy);
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+    Http::Code code = admin_->request(path, params, method, response_headers, body);
+    response_handler(code, response_headers, body);
   });
 }
 

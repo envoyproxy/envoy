@@ -248,15 +248,15 @@ TEST_P(ServerInstanceImplTest, AdminGet) {
   initialize("test/server/node_bootstrap.yaml");
   const Http::Utility::QueryParams query_params;
   bool done = false;
-  Instance::AdminResponseHandler callback = [&done](Http::Code code,
-                                                    Http::HeaderMap& response_headers,
-                                                    absl::string_view body) {
-    EXPECT_THAT(body, HasSubstr("live 0 0 0"));
-    EXPECT_THAT(response_headers.ContentType()->value().getStringView(), HasSubstr("text/plain"));
-    EXPECT_EQ(Http::Code::OK, code);
-    done = true;
-  };
-  server_->adminGet("/server_info", query_params, callback);
+  Instance::AdminResponseHandler callback =
+      [&done](Http::Code code, Http::HeaderMap& response_headers, absl::string_view body) {
+        EXPECT_THAT(std::string(body), HasSubstr("live 0 0 0"));
+        EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                    HasSubstr("text/plain"));
+        EXPECT_EQ(Http::Code::OK, code);
+        done = true;
+      };
+  server_->adminRequest("/server_info", query_params, "GET", callback);
   server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(done);
 }
@@ -265,15 +265,15 @@ TEST_P(ServerInstanceImplTest, AdminPost) {
   initialize("test/server/node_bootstrap.yaml");
   const Http::Utility::QueryParams query_params;
   bool done = false;
-  Instance::AdminResponseHandler callback = [&done](Http::Code code,
-                                                    Http::HeaderMap& response_headers,
-                                                    absl::string_view body) {
-    EXPECT_EQ(body, "OK\n");
-    EXPECT_THAT(response_headers.ContentType()->value().getStringView(), HasSubstr("text/plain"));
-    EXPECT_EQ(Http::Code::OK, code);
-    done = true;
-  };
-  server_->adminPost("/healthcheck/fail", query_params, callback);
+  Instance::AdminResponseHandler callback =
+      [&done](Http::Code code, Http::HeaderMap& response_headers, absl::string_view body) {
+        EXPECT_EQ(body, "OK\n");
+        EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                    HasSubstr("text/plain"));
+        EXPECT_EQ(Http::Code::OK, code);
+        done = true;
+      };
+  server_->adminRequest("/healthcheck/fail", query_params, "POST", callback);
   server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_TRUE(done);
 }

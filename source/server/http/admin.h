@@ -107,8 +107,12 @@ public:
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
-  void dispatch(absl::string_view request, const Http::Utility::QueryParams& params,
-                absl::string_view method, const Instance::AdminResponseHandler& response_handler);
+  /**
+   * Executes an admin request with the specified query params.
+   */
+  Http::Code request(absl::string_view request, const Http::Utility::QueryParams& params,
+                     absl::string_view method, Http::HeaderMap& response_headers,
+                     std::string& body);
 
 private:
   /**

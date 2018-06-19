@@ -302,10 +302,8 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_METHOD3(adminGet,
-               void(absl::string_view, const Http::Utility::QueryParams&, AdminResponseHandler&));
-  MOCK_METHOD3(adminPost,
-               void(absl::string_view, const Http::Utility::QueryParams&, AdminResponseHandler&));
+  MOCK_METHOD4(adminRequest, void(absl::string_view, const Http::Utility::QueryParams&,
+                                  absl::string_view, AdminResponseHandler&));
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
