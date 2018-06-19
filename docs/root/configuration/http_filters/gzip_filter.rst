@@ -78,10 +78,10 @@ Every configured Gzip filter has statistics rooted at <stat_prefix>.gzip.* with 
   compressed, Counter, Number of requests compressed.
   not_compressed, Counter, Number of requests not compressed.
   no_accept_header, Counter, Number of requests with no accept header sent.
-  header_identity, Counter, Number of requests sent with the "identity" set as the *accept-encoding*.
-  header_gzip, Counter, Number of requests sent with the "gzip" set as the *accept-encoding*.
-  header_wildcard, Counter, Number of requests sent with the "\*" set as the *accept-encoding*.
-  header_not_valid, Counter, Number of requests sent with the a not valid *accept-encoding* header (aka "q=0" or an unsupported encoding type).
+  header_identity, Counter, Number of requests sent with "identity" set as the *accept-encoding*.
+  header_gzip, Counter, Number of requests sent with "gzip" set as the *accept-encoding*.
+  header_wildcard, Counter, Number of requests sent with "\*" set as the *accept-encoding*.
+  header_not_valid, Counter, Number of requests sent with a not valid *accept-encoding* header (aka "q=0" or an unsupported encoding type).
   total_uncompressed_bytes, Counter, The total uncompressed bytes of all the requests that were marked for compression.
   total_compressed_bytes, Counter, The total compressed bytes of all the requests that were marked for compression.
   content_length_too_small, Counter, Number of requests that accepted gzip encoding but did not compress because the payload was too small.

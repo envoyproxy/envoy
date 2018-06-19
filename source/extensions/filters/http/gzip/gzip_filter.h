@@ -21,9 +21,13 @@ namespace Gzip {
 
 /**
  * All gzip filter stats. @see stats_macros.h
- * Note that the total_bytes is only if the response
- * is expected to be compressed. This does not get counted if
- * the bytes are not expected to be compressed.
+ * "total_uncompressed_bytes" only includes bytes
+ * from requests that were marked for compression.
+ * If the request was not marked for compression,
+ * the filter increments "not_compressed", but does
+ * not add to "total_uncompressed_bytes". This way,
+ * the user can measure the memory performance of the
+ * compression.
  */
 // clang-format off
 #define ALL_GZIP_STATS(COUNTER)    \
@@ -66,7 +70,6 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   GzipStats& stats() { return stats_; }
-  const std::string stats_prefix() { return stats_prefix_; }
   const StringUtil::CaseUnorderedSet& contentTypeValues() const { return content_type_values_; }
   bool disableOnEtagHeader() const { return disable_on_etag_header_; }
   bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }

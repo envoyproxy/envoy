@@ -163,14 +163,14 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* accept_encoding = headers.AcceptEncoding();
 
   if (accept_encoding) {
-    bool is_wildcard = false; // true if found and not followed by `q=0`.
+    const bool is_wildcard = false; // true if found and not followed by `q=0`.
     for (const auto token : StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",",
                                                    false /* keep_empty */)) {
       const auto value = StringUtil::trim(StringUtil::cropRight(token, ";"));
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        const bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
         if (is_gzip) {
           config_->stats().header_gzip_.inc();
           return true;
@@ -186,7 +186,7 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
         return false;
       }
       // Otherwise, check if the header contains the wildcard. If so,
-      // mark as true. Use this as the very last resort, as gzip or 
+      // mark as true. Use this as the very last resort, as gzip or
       // identity is weighted higher. Note that this filter disregards
       // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
@@ -217,7 +217,7 @@ bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
 }
 
 bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
-  bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
+  const bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
   if (!is_etag_allowed) {
     config_->stats().not_compressed_etag_.inc();
   }
@@ -228,8 +228,9 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    bool is_minimum_content_length = StringUtil::atoul(content_length->value().c_str(), length) &&
-                                     length >= config_->minimumLength();
+    const bool is_minimum_content_length =
+        StringUtil::atoul(content_length->value().c_str(), length) &&
+        length >= config_->minimumLength();
     if (!is_minimum_content_length) {
       config_->stats().content_length_too_small_.inc();
     }
