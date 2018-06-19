@@ -67,7 +67,7 @@ void HDSReporter::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response ", message->DebugString());
   stats_.requests_.inc();
-  stream_->sendMessage(health_check_request_, false);
+  stream_->sendMessage(health_check_request_, true);
   ENVOY_LOG(debug, "Counter: " + std::to_string( stats_.requests_.value()));
 }
 
